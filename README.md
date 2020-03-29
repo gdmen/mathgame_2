@@ -1,29 +1,22 @@
-# README #
+# installation
+- install node.js
+- install go
 
-This README would normally document whatever steps are necessary to get your application up and running.
+# config
+- conf.json_ and test_conf.json_ -> fill them out and remove the trailing underscore
 
-### What is this repository for? ###
+# install mysql
 
-* Quick summary
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
+# set a mysql user/pass
+> mysql -u root -h 127.0.0.1 -p # check path
 
-### How do I get set up? ###
+> USE mysql;
 
-* Summary of set up
-* Configuration
-* Dependencies
-* Database configuration
-* How to run tests
-* Deployment instructions
+> ALTER USER 'root'@'localhost' IDENTIFIED BY '<PASSWORD>';
 
-### Contribution guidelines ###
+> CREATE DATABASE mathgame;
 
-* Writing tests
-* Code review
-* Other guidelines
-
-### Who do I talk to? ###
-
-* Repo owner or admin
-* Other community or team contact
+# refresh after not devloping for a long time
+> make clean
+> make # should install go dependencies
+> 
