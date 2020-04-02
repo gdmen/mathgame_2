@@ -36,7 +36,7 @@ func (a *Api) createVideo(c *gin.Context) {
 	}
 
 	glog.Infof("%s Success: %+v", logPrefix, model)
-	c.JSON(status, gin.H{"video": model})
+	c.JSON(status, model)
 	return
 }
 
@@ -75,7 +75,7 @@ func (a *Api) updateVideo(c *gin.Context) {
 
 	glog.Infof("%s Success: %+v", logPrefix, model)
 	glog.Infof("STATUS: %d", status)
-	c.JSON(status, gin.H{"video": model})
+	c.JSON(status, model)
 	return
 }
 
@@ -129,7 +129,7 @@ func (a *Api) getVideo(c *gin.Context) {
 	}
 
 	glog.Infof("%s Success: %+v", logPrefix, model)
-	c.JSON(status, gin.H{"video": model})
+	c.JSON(status, model)
 	return
 }
 
@@ -147,6 +147,6 @@ func (a *Api) listVideo(c *gin.Context) {
 	}
 
 	glog.Infof("%s Success: %+v", logPrefix, models)
-	c.JSON(status, gin.H{"videos": models})
+	c.JSON(status, models)
 	return
 }
