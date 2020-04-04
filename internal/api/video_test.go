@@ -31,7 +31,7 @@ func TestVideoBasic(t *testing.T) {
 	resp := httptest.NewRecorder()
 
 	values := url.Values{}
-	values.Add("title", "under the sea")
+	values.Add("title", "son of man")
 	values.Add("local_file_name", "tarzan_son_of_man.mp4")
 	values.Add("enabled", "1")
 	paramString := values.Encode()
@@ -50,7 +50,24 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `{"id":1,"title":"under the sea","local_file_name":"tarzan_son_of_man.mp4","enabled":true}` {
+	if strings.TrimSpace(string(body)) != `{"id":1,"title":"son of man","local_file_name":"tarzan_son_of_man.mp4","enabled":true}` {
+		t.Fatal("ERROR: " + string(body))
+	}
+
+	// Re-Create
+	resp = httptest.NewRecorder()
+
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusCreated, resp.Code, resp)
+	}
+
+	body, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(body)) != `{"id":1,"title":"son of man","local_file_name":"tarzan_son_of_man.mp4","enabled":true}` {
 		t.Fatal("ERROR: " + string(body))
 	}
 
@@ -69,7 +86,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `[{"id":1,"title":"under the sea","local_file_name":"tarzan_son_of_man.mp4","enabled":true}]` {
+	if strings.TrimSpace(string(body)) != `[{"id":1,"title":"son of man","local_file_name":"tarzan_son_of_man.mp4","enabled":true}]` {
 		t.Fatal("ERROR: " + string(body))
 	}
 

@@ -18,18 +18,17 @@ const (
 		local_file_name VARCHAR(32) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL UNIQUE,
 		enabled TINYINT NOT NULL
 	);`
-	CreateVideoSQL = `
+	createSQL = `
 	INSERT INTO videos(title, local_file_name, enabled) VALUES(?, ?, ?);`
-	CreateMultipleVideosSQL_A = `
-	INSERT INTO videos(title, local_file_name, enabled) VALUES`
-	CreateMultipleVideosSQL_B = `(?, ?, ?)`
-	UpdateVideoSQL            = `
+	updateSQL = `
 	UPDATE videos SET title=?, local_file_name=?, enabled=? WHERE id=?;`
-	DeleteVideoSQL = `
+	deleteSQL = `
 	DELETE FROM videos WHERE id=?;`
-	GetVideoSQL = `
+	getSQL = `
 	SELECT * FROM videos WHERE id=?;`
-	ListVideoSQL = `
+	getIdSQLdSQL = `
+	SELECT id FROM videos WHERE local_file_name=?;`
+	listSQL = `
 	SELECT * FROM videos;`
 )
 
@@ -50,32 +49,24 @@ type VideoManager struct {
 }
 
 func (m *VideoManager) Create(model *Video) (int, string, error) {
-	result, err := m.DB.Exec(CreateVideoSQL, model.Title, model.LocalFileName, model.Enabled)
+	result, err := m.DB.Exec(createSQL, model.Title, model.LocalFileName, model.Enabled)
 	if err != nil {
-		msg := "Couldn't add video to database"
-		return http.StatusInternalServerError, msg, err
+		if !strings.Contains(err.Error(), "Duplicate entry") {
+			msg := "Couldn't add video to database"
+			return http.StatusInternalServerError, msg, err
+		}
+		// Get the id of the already existing model
+		er := m.DB.QueryRow(getIdSQLdSQL, model.LocalFileName).Scan(&model.Id)
+		if er != nil {
+			panic("This should be impossible.")
+		} else {
+			return http.StatusOK, "", nil
+		}
 	}
 	// Get the Id that was just auto-written to the database
 	// Ignore errors (if the database doesn't support LastInsertId)
 	id, _ := result.LastInsertId()
 	model.Id = id
-	return http.StatusCreated, "", nil
-}
-
-func (m *VideoManager) CreateMultiple(models []*Video) (int, string, error) {
-	sql := CreateMultipleVideosSQL_A
-	sql += strings.Repeat(CreateMultipleVideosSQL_B+",", len(models))
-	sql = sql[:len(sql)-1] + ";"
-	m_params := []interface{}{}
-	for _, model := range models {
-		m_params = append(m_params, model.Title, model.LocalFileName, model.Enabled)
-	}
-	// Try to add all the ms at once
-	_, err := m.DB.Exec(sql, m_params...)
-	if err != nil {
-		msg := "Couldn't add videos to database"
-		return http.StatusInternalServerError, msg, err
-	}
 	return http.StatusCreated, "", nil
 }
 
@@ -86,7 +77,7 @@ func (m *VideoManager) Update(model *Video) (int, string, error) {
 		return status, msg, err
 	}
 	// Update
-	_, err = m.DB.Exec(UpdateVideoSQL, model.Title, model.LocalFileName, model.Enabled, model.Id)
+	_, err = m.DB.Exec(updateSQL, model.Title, model.LocalFileName, model.Enabled, model.Id)
 	if err != nil {
 		msg := "Couldn't update video in database"
 		return http.StatusInternalServerError, msg, err
@@ -95,7 +86,7 @@ func (m *VideoManager) Update(model *Video) (int, string, error) {
 }
 
 func (m *VideoManager) Delete(id int64) (int, string, error) {
-	result, err := m.DB.Exec(DeleteVideoSQL, id)
+	result, err := m.DB.Exec(deleteSQL, id)
 	if err != nil {
 		msg := "Couldn't delete video in database"
 		return http.StatusInternalServerError, msg, err
@@ -111,7 +102,7 @@ func (m *VideoManager) Delete(id int64) (int, string, error) {
 
 func (m *VideoManager) Get(id int64) (*Video, int, string, error) {
 	model := &Video{}
-	err := m.DB.QueryRow(GetVideoSQL, id).Scan(&model.Id, &model.Title, &model.LocalFileName, &model.Enabled)
+	err := m.DB.QueryRow(getSQL, id).Scan(&model.Id, &model.Title, &model.LocalFileName, &model.Enabled)
 	if err == sql.ErrNoRows {
 		msg := "Couldn't find a video with that Id"
 		return nil, http.StatusNotFound, msg, err
@@ -124,7 +115,7 @@ func (m *VideoManager) Get(id int64) (*Video, int, string, error) {
 
 func (m *VideoManager) List() (*[]Video, int, string, error) {
 	models := []Video{}
-	rows, err := m.DB.Query(ListVideoSQL)
+	rows, err := m.DB.Query(listSQL)
 	defer rows.Close()
 	if err != nil {
 		msg := "Couldn't get videos from database"
