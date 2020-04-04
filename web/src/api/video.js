@@ -1,5 +1,10 @@
-import React from "react";
 import Axios from "axios";
+import React from "react";
+import ReactPlayer from "react-player"
+
+import {
+    GetBaseUrl
+} from "../common/util.js";
 
 const ModelEndpoint = "/videos";
 
@@ -10,13 +15,13 @@ class BaseVideo extends React.Component {
             model: {
                 id: this.props.id,
                 title: "",
-                youtube_id: "",
-                start: 0,
-                end: 9999,
+                local_file_name: "",
                 enabled: false
             },
             error: null,
             isLoaded: false,
+            currTime: 0,
+            player: undefined
         };
     }
 
@@ -24,39 +29,35 @@ class BaseVideo extends React.Component {
         Axios
             .get(this.props.url + ModelEndpoint + "/" + this.state.model.id)
             .then(resp => {
-                console.log(resp.data.enabled);
+                console.log(resp.data);
                 this.setState((state, props) => ({
                     isLoaded: true,
                     model: {
                         ...state.model,
                         title: resp.data.title,
-                        youtube_id: resp.data.youtube_id,
-                        start: resp.data.start,
-                        end: resp.data.end,
+                        local_file_name: resp.data.local_file_name,
                         enabled: resp.data.enabled
                     }
                 }));
             })
-            .catch(this.catchError.bind(this))
+            .catch(this.catchError.bind(this));
     }
 
-    postModel() {
+    postModel(id) {
         Axios
-            .post(this.props.url + ModelEndpoint + "/" + this.state.model.id, this.state.model)
+            .post(this.props.url + ModelEndpoint + "/" + id, this.state.model)
             .then(resp => {
                 this.setState((state, props) => ({
                     isLoaded: true,
                     model: {
                         ...state.model,
                         title: resp.data.title,
-                        youtube_id: resp.data.youtube_id,
-                        start: resp.data.start,
-                        end: resp.data.end,
+                        local_file_name: resp.data.local_file_name,
                         enabled: resp.data.enabled
                     }
                 }));
             })
-            .catch(this.catchError.bind(this))
+            .catch(this.catchError.bind(this));
     }
 
     catchError(err) {
@@ -94,11 +95,51 @@ class BaseVideo extends React.Component {
         let model = this.state.model;
         return (
             <div>
-                <p>id: {model.id}</p>
-                <p>youtube_id: {model.youtube_id}</p>
-                <p>start: {model.start}</p>
-                <p>end: {model.end}</p>
-                <p>enabled: {model.enabled ? "true" : "false"}</p>
+                <div>
+                    <p>id: {model.id}</p>
+                    <p>local_file_name: {model.local_file_name}</p>
+                    <p>enabled: {model.enabled ? "true" : "false"}</p>
+                </div>
+                <div>
+                    <ReactPlayer
+                        ref={p => {
+                            if(this.state.player) {
+                                return;
+                            }
+                            this.setState((state, props) => ({
+                                player: p
+                            }));
+                        }}
+                        url={GetBaseUrl() + "/" + this.props.video_dir + model.local_file_name}
+                        playing
+                        controls
+                        config={{
+                            file: {
+                                attributes: {
+                                    controlsList: "nodownload",
+                                    disablepictureinpicture: "true",
+                                    onContextMenu: e => e.preventDefault()
+                                }
+                            }
+                        }}
+                        onSeek={() => {
+                            let delta = this.state.player.getCurrentTime() - this.state.currTime;
+                            if (Math.abs(delta) > 0.01) {
+                                this.state.player.seekTo(this.state.currTime);
+                            }
+                        }}
+                        onProgress={({played, playedSeconds, loaded, loadedSeconds}) => {
+                            let seeking = this.state.player.player.player.player.seeking
+                            if (!seeking) {
+                                this.setState((state, props) => ({currTime: playedSeconds}));
+                            }
+                        }}
+                        onEnded={() => {
+                        }}
+                        onError={() => {
+                        }}
+                    />
+                </div>
             </div>
         );
     }
@@ -116,16 +157,7 @@ class EditVideo extends BaseVideo {
         e.persist();
         const t = e.target;
         const name = t.name;
-        let value = t.value;
-        if (name === "enabled") {
-            value = t.checked;
-        }
-        if (name === "start" || name === "end") {
-            if (!Number(value)) {
-                return;
-            }
-            value = Number(value);
-        }
+        const value = name === "enabled" ? t.checked : t.value;
         this.setState((state, props) => ({
             model: {
                 ...state.model,
@@ -136,7 +168,7 @@ class EditVideo extends BaseVideo {
 
     handleSubmit(e) {
         e.preventDefault();
-        this.postModel();
+        this.postModel(this.state.model.id);
     }
 
     renderSuccess() {
@@ -145,9 +177,7 @@ class EditVideo extends BaseVideo {
             <form onSubmit={this.handleSubmit}>
                 <p>{model.id}</p>
                 <input type="text" name="title" value={model.title} onChange={this.handleChange} />
-                <input type="text" name="youtube_id" value={model.youtube_id} onChange={this.handleChange} />
-                <input type="number" name="start" value={model.start} onChange={this.handleChange} />
-                <input type="number" name="end" value={model.end} onChange={this.handleChange} />
+                <input type="text" name="local_file_name" value={model.local_file_name} onChange={this.handleChange} />
                 <input type="checkbox" name="enabled" checked={model.enabled} value={model.enabled} onChange={this.handleChange} />
                 <input type="submit" value="Submit" onChange={this.handleChange} />
             </form>
@@ -155,7 +185,22 @@ class EditVideo extends BaseVideo {
     }
 }
 
+class CreateVideo extends EditVideo {
+
+    componentDidMount() {
+        this.setState((state, props) => ({
+            isLoaded: true
+        }));
+    }
+
+    handleSubmit(e) {
+        e.preventDefault();
+        this.postModel("");
+    }
+}
+
 export {
     BaseVideo,
-    EditVideo
+    EditVideo,
+    CreateVideo
 }

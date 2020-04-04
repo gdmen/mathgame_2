@@ -15,18 +15,16 @@ const (
 	CREATE TABLE videos (
 		id INT AUTO_INCREMENT PRIMARY KEY,
 		title VARCHAR(128) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL,
-		youtube_id VARCHAR(32) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL UNIQUE,
-		start BIGINT NOT NULL,
-		end BIGINT NOT NULL,
+		local_file_name VARCHAR(32) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL UNIQUE,
 		enabled TINYINT NOT NULL
 	);`
 	CreateVideoSQL = `
-	INSERT INTO videos(title, youtube_id, start, end, enabled) VALUES(?, ?, ?, ?, ?);`
+	INSERT INTO videos(title, local_file_name, enabled) VALUES(?, ?, ?);`
 	CreateMultipleVideosSQL_A = `
-	INSERT INTO videos(title, youtube_id, start, end, enabled) VALUES`
-	CreateMultipleVideosSQL_B = `(?, ?, ?, ?, ?)`
+	INSERT INTO videos(title, local_file_name, enabled) VALUES`
+	CreateMultipleVideosSQL_B = `(?, ?, ?)`
 	UpdateVideoSQL            = `
-	UPDATE videos SET title=?, youtube_id=?, start=?, end=?, enabled=? WHERE id=?;`
+	UPDATE videos SET title=?, local_file_name=?, enabled=? WHERE id=?;`
 	DeleteVideoSQL = `
 	DELETE FROM videos WHERE id=?;`
 	GetVideoSQL = `
@@ -37,16 +35,14 @@ const (
 
 // Video represents a reward video
 type Video struct {
-	Id        int64  `json:"id"`
-	Title     string `json:"title" form:"title"`
-	YouTubeId string `json:"youtube_id" form:"youtube_id"`
-	Start     int64  `json:"start" form:"start"`
-	End       int64  `json:"end" form:"end"`
-	Enabled   bool   `json:"enabled" form:"enabled"`
+	Id            int64  `json:"id"`
+	Title         string `json:"title" form:"title"`
+	LocalFileName string `json:"local_file_name" form:"local_file_name"`
+	Enabled       bool   `json:"enabled" form:"enabled"`
 }
 
 func (model Video) String() string {
-	return fmt.Sprintf("Id: %d, Title: %s, YouTubeId: %s, Start: %d, End: %d, Enabled: %t", model.Id, model.Title, model.YouTubeId, model.Start, model.End, model.Enabled)
+	return fmt.Sprintf("Id: %d, Title: %s, LocalFileName: %s, Enabled: %t", model.Id, model.Title, model.LocalFileName, model.Enabled)
 }
 
 type VideoManager struct {
@@ -54,7 +50,7 @@ type VideoManager struct {
 }
 
 func (m *VideoManager) Create(model *Video) (int, string, error) {
-	result, err := m.DB.Exec(CreateVideoSQL, model.Title, model.YouTubeId, model.Start, model.End, model.Enabled)
+	result, err := m.DB.Exec(CreateVideoSQL, model.Title, model.LocalFileName, model.Enabled)
 	if err != nil {
 		msg := "Couldn't add video to database"
 		return http.StatusInternalServerError, msg, err
@@ -72,7 +68,7 @@ func (m *VideoManager) CreateMultiple(models []*Video) (int, string, error) {
 	sql = sql[:len(sql)-1] + ";"
 	m_params := []interface{}{}
 	for _, model := range models {
-		m_params = append(m_params, model.Title, model.YouTubeId, model.Start, model.End, model.Enabled)
+		m_params = append(m_params, model.Title, model.LocalFileName, model.Enabled)
 	}
 	// Try to add all the ms at once
 	_, err := m.DB.Exec(sql, m_params...)
@@ -90,7 +86,7 @@ func (m *VideoManager) Update(model *Video) (int, string, error) {
 		return status, msg, err
 	}
 	// Update
-	_, err = m.DB.Exec(UpdateVideoSQL, model.Title, model.YouTubeId, model.Start, model.End, model.Enabled, model.Id)
+	_, err = m.DB.Exec(UpdateVideoSQL, model.Title, model.LocalFileName, model.Enabled, model.Id)
 	if err != nil {
 		msg := "Couldn't update video in database"
 		return http.StatusInternalServerError, msg, err
@@ -115,7 +111,7 @@ func (m *VideoManager) Delete(id int64) (int, string, error) {
 
 func (m *VideoManager) Get(id int64) (*Video, int, string, error) {
 	model := &Video{}
-	err := m.DB.QueryRow(GetVideoSQL, id).Scan(&model.Id, &model.Title, &model.YouTubeId, &model.Start, &model.End, &model.Enabled)
+	err := m.DB.QueryRow(GetVideoSQL, id).Scan(&model.Id, &model.Title, &model.LocalFileName, &model.Enabled)
 	if err == sql.ErrNoRows {
 		msg := "Couldn't find a video with that Id"
 		return nil, http.StatusNotFound, msg, err
@@ -136,7 +132,7 @@ func (m *VideoManager) List() (*[]Video, int, string, error) {
 	}
 	for rows.Next() {
 		model := Video{}
-		err = rows.Scan(&model.Id, &model.Title, &model.YouTubeId, &model.Start, &model.End, &model.Enabled)
+		err = rows.Scan(&model.Id, &model.Title, &model.LocalFileName, &model.Enabled)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -161,7 +157,7 @@ func (m *VideoManager) Custom(sql string) (*[]Video, int, string, error) {
 	}
 	for rows.Next() {
 		model := Video{}
-		err = rows.Scan(&model.Id, &model.Title, &model.YouTubeId, &model.Start, &model.End, &model.Enabled)
+		err = rows.Scan(&model.Id, &model.Title, &model.LocalFileName, &model.Enabled)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err

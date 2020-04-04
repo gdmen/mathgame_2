@@ -32,9 +32,7 @@ func TestVideoBasic(t *testing.T) {
 
 	values := url.Values{}
 	values.Add("title", "under the sea")
-	values.Add("youtube_id", "C8OBlq_svBY")
-	values.Add("start", "12")
-	values.Add("end", "186")
+	values.Add("local_file_name", "tarzan_son_of_man.mp4")
 	values.Add("enabled", "1")
 	paramString := values.Encode()
 
@@ -52,7 +50,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `{"id":1,"title":"under the sea","youtube_id":"C8OBlq_svBY","start":12,"end":186,"enabled":true}` {
+	if strings.TrimSpace(string(body)) != `{"id":1,"title":"under the sea","local_file_name":"tarzan_son_of_man.mp4","enabled":true}` {
 		t.Fatal("ERROR: " + string(body))
 	}
 
@@ -71,7 +69,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `[{"id":1,"title":"under the sea","youtube_id":"C8OBlq_svBY","start":12,"end":186,"enabled":true}]` {
+	if strings.TrimSpace(string(body)) != `[{"id":1,"title":"under the sea","local_file_name":"tarzan_son_of_man.mp4","enabled":true}]` {
 		t.Fatal("ERROR: " + string(body))
 	}
 
@@ -96,7 +94,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `{"id":1,"title":"unda da sea","youtube_id":"C8OBlq_svBY","start":12,"end":186,"enabled":false}` {
+	if strings.TrimSpace(string(body)) != `{"id":1,"title":"unda da sea","local_file_name":"tarzan_son_of_man.mp4","enabled":false}` {
 		t.Fatal("ERROR: " + string(body))
 	}
 
@@ -115,7 +113,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `{"id":1,"title":"unda da sea","youtube_id":"C8OBlq_svBY","start":12,"end":186,"enabled":false}` {
+	if strings.TrimSpace(string(body)) != `{"id":1,"title":"unda da sea","local_file_name":"tarzan_son_of_man.mp4","enabled":false}` {
 		t.Fatal("ERROR: " + string(body))
 	}
 

@@ -8,6 +8,9 @@ test_conf.json
 # Project binaries
 bin/
 
+# Local videos to server
+*.mp4
+
 # Editor cruft
 *.swo
 *.swp
