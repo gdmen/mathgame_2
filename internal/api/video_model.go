@@ -9,32 +9,29 @@ import (
 )
 
 const (
-	// The id lines should be 'bigint' instead of 'integer'
-	// but sqlite3 has a fucky primary key system.
 	CreateVideoTableSQL = `
 	CREATE TABLE videos (
-		id INT AUTO_INCREMENT PRIMARY KEY,
+		id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
 		title VARCHAR(128) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL,
 		local_file_name VARCHAR(32) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL UNIQUE,
 		enabled TINYINT NOT NULL
 	);`
-	createSQL = `
+	createVideoSQL = `
 	INSERT INTO videos(title, local_file_name, enabled) VALUES(?, ?, ?);`
-	updateSQL = `
+	updateVideoSQL = `
 	UPDATE videos SET title=?, local_file_name=?, enabled=? WHERE id=?;`
-	deleteSQL = `
+	deleteVideoSQL = `
 	DELETE FROM videos WHERE id=?;`
-	getSQL = `
+	getVideoSQL = `
 	SELECT * FROM videos WHERE id=?;`
-	getIdSQLdSQL = `
+	getVideoIdSQL = `
 	SELECT id FROM videos WHERE local_file_name=?;`
-	listSQL = `
+	listVideoSQL = `
 	SELECT * FROM videos;`
 )
 
-// Video represents a reward video
 type Video struct {
-	Id            int64  `json:"id"`
+	Id            uint64 `json:"id"`
 	Title         string `json:"title" form:"title"`
 	LocalFileName string `json:"local_file_name" form:"local_file_name"`
 	Enabled       bool   `json:"enabled" form:"enabled"`
@@ -49,24 +46,24 @@ type VideoManager struct {
 }
 
 func (m *VideoManager) Create(model *Video) (int, string, error) {
-	result, err := m.DB.Exec(createSQL, model.Title, model.LocalFileName, model.Enabled)
+	_, err := m.DB.Exec(createVideoSQL, model.Title, model.LocalFileName, model.Enabled)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Duplicate entry") {
 			msg := "Couldn't add video to database"
 			return http.StatusInternalServerError, msg, err
 		}
 		// Get the id of the already existing model
-		er := m.DB.QueryRow(getIdSQLdSQL, model.LocalFileName).Scan(&model.Id)
+		er := m.DB.QueryRow(getVideoIdSQL, model.LocalFileName).Scan(&model.Id)
 		if er != nil {
-			panic("This should be impossible.")
-		} else {
-			return http.StatusOK, "", nil
+			panic("This should be impossible 1.")
 		}
+		return http.StatusOK, "", nil
 	}
-	// Get the Id that was just auto-written to the database
-	// Ignore errors (if the database doesn't support LastInsertId)
-	id, _ := result.LastInsertId()
-	model.Id = id
+	// Get the id of the already existing model
+	er := m.DB.QueryRow(getVideoIdSQL, model.LocalFileName).Scan(&model.Id)
+	if er != nil {
+		panic("This should be impossible 2.")
+	}
 	return http.StatusCreated, "", nil
 }
 
@@ -77,7 +74,7 @@ func (m *VideoManager) Update(model *Video) (int, string, error) {
 		return status, msg, err
 	}
 	// Update
-	_, err = m.DB.Exec(updateSQL, model.Title, model.LocalFileName, model.Enabled, model.Id)
+	_, err = m.DB.Exec(updateVideoSQL, model.Title, model.LocalFileName, model.Enabled, model.Id)
 	if err != nil {
 		msg := "Couldn't update video in database"
 		return http.StatusInternalServerError, msg, err
@@ -85,8 +82,8 @@ func (m *VideoManager) Update(model *Video) (int, string, error) {
 	return http.StatusOK, "", nil
 }
 
-func (m *VideoManager) Delete(id int64) (int, string, error) {
-	result, err := m.DB.Exec(deleteSQL, id)
+func (m *VideoManager) Delete(id uint64) (int, string, error) {
+	result, err := m.DB.Exec(deleteVideoSQL, id)
 	if err != nil {
 		msg := "Couldn't delete video in database"
 		return http.StatusInternalServerError, msg, err
@@ -100,9 +97,9 @@ func (m *VideoManager) Delete(id int64) (int, string, error) {
 	return http.StatusNoContent, "", nil
 }
 
-func (m *VideoManager) Get(id int64) (*Video, int, string, error) {
+func (m *VideoManager) Get(id uint64) (*Video, int, string, error) {
 	model := &Video{}
-	err := m.DB.QueryRow(getSQL, id).Scan(&model.Id, &model.Title, &model.LocalFileName, &model.Enabled)
+	err := m.DB.QueryRow(getVideoSQL, id).Scan(&model.Id, &model.Title, &model.LocalFileName, &model.Enabled)
 	if err == sql.ErrNoRows {
 		msg := "Couldn't find a video with that Id"
 		return nil, http.StatusNotFound, msg, err
@@ -115,7 +112,7 @@ func (m *VideoManager) Get(id int64) (*Video, int, string, error) {
 
 func (m *VideoManager) List() (*[]Video, int, string, error) {
 	models := []Video{}
-	rows, err := m.DB.Query(listSQL)
+	rows, err := m.DB.Query(listVideoSQL)
 	defer rows.Close()
 	if err != nil {
 		msg := "Couldn't get videos from database"

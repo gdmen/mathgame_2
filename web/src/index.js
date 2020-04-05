@@ -38,9 +38,9 @@ class AdminVideosView extends React.Component {
             <div>
                 <CreateVideo url={ApiUrl} />
                 <hr />
-                <BaseVideo id={1} url={ApiUrl} video_dir={conf.video_dir}/>
+                <BaseVideo id={1} url={ApiUrl} public_video_dir={conf.public_video_dir}/>
                 <hr />
-                <BaseVideo id={2} url={ApiUrl} video_dir={conf.video_dir}/>
+                <BaseVideo id={2} url={ApiUrl} public_video_dir={conf.public_video_dir}/>
                 <hr />
                 <EditVideo id={1} url={ApiUrl} />
             </div>

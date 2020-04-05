@@ -60,14 +60,6 @@ func ResetTestApi(c *common.Config) {
 	}
 }
 
-func InsertTestMeasurementTypes(c *common.Config) {
-	insertTestData(c, "measurement_types")
-}
-
-func InsertTestMeasurements(c *common.Config) {
-	insertTestData(c, "measurements")
-}
-
 func insertTestData(c *common.Config, tableName string) {
 	cmd := exec.Command(
 		TestDataDir+TestDataInsertScript, c.MySQLUser, c.MySQLPass, c.MySQLDatabase,

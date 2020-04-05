@@ -3,6 +3,8 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"math/rand"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang/glog"
@@ -12,6 +14,7 @@ import (
 )
 
 func main() {
+	rand.Seed(time.Now().UnixNano())
 	c, err := common.ReadConfig("conf.json")
 	if err != nil {
 		glog.Fatal(err)

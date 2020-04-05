@@ -13,6 +13,7 @@ import (
 
 var CREATE_TABLES_SQL = []string{
 	CreateVideoTableSQL,
+	CreateProblemTableSQL,
 }
 
 type Api struct {
@@ -48,6 +49,15 @@ func (a *Api) GetRouter() *gin.Engine {
 			video.GET("/:id", common.RequestIdMiddleware(), a.getVideo)
 			video.GET("", common.RequestIdMiddleware(), a.listVideo)
 			video.GET("/", common.RequestIdMiddleware(), a.listVideo)
+		}
+		problem := v1.Group("/problems")
+		{
+			problem.POST("", common.RequestIdMiddleware(), a.createProblem)
+			problem.POST("/", common.RequestIdMiddleware(), a.createProblem)
+			problem.DELETE("/:id", common.RequestIdMiddleware(), a.deleteProblem)
+			problem.GET("/:id", common.RequestIdMiddleware(), a.getProblem)
+			problem.GET("", common.RequestIdMiddleware(), a.listProblem)
+			problem.GET("/", common.RequestIdMiddleware(), a.listProblem)
 		}
 	}
 	return router

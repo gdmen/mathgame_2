@@ -110,7 +110,7 @@ class BaseVideo extends React.Component {
                                 player: p
                             }));
                         }}
-                        url={GetBaseUrl() + "/" + this.props.video_dir + model.local_file_name}
+                        url={GetBaseUrl() + "/" + this.props.public_video_dir + model.local_file_name}
                         playing
                         controls
                         config={{

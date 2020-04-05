@@ -9,26 +9,27 @@ import (
 	"github.com/golang/glog"
 
 	"garydmenezes.com/mathgame/internal/common"
+	"garydmenezes.com/mathgame/internal/generator"
 )
 
-func (a *Api) createVideo(c *gin.Context) {
+func (a *Api) createProblem(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Parse input
-	model := &Video{}
-	err := c.Bind(model)
+	opts := &generator.Options{}
+	err := c.Bind(opts)
 	if err != nil {
 		msg := "Couldn't parse input form"
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
 		c.JSON(http.StatusBadRequest, gin.H{"message": msg})
 		return
 	}
-	glog.Infof("%s %s", logPrefix, model)
+	glog.Infof("%s %s", logPrefix, opts)
 
 	// Write to database
-	manager := &VideoManager{DB: a.DB}
-	status, msg, err := manager.Create(model)
+	manager := &ProblemManager{DB: a.DB}
+	model, status, msg, err := manager.Create(opts)
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
 		c.JSON(status, gin.H{"message": msg})
@@ -40,44 +41,7 @@ func (a *Api) createVideo(c *gin.Context) {
 	return
 }
 
-func (a *Api) updateVideo(c *gin.Context) {
-	logPrefix := common.GetLogPrefix(c)
-	glog.Infof("%s fcn start", logPrefix)
-
-	// Parse input
-	paramId, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		msg := "URL id should be an integer"
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusNotFound, gin.H{"message": msg})
-		return
-	}
-	model := &Video{}
-	err = c.Bind(model)
-	if err != nil {
-		msg := "Couldn't parse input form"
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusBadRequest, gin.H{"message": msg})
-		return
-	}
-	model.Id = paramId
-	glog.Infof("%s %s", logPrefix, model)
-
-	// Write to database
-	manager := &VideoManager{DB: a.DB}
-	status, msg, err := manager.Update(model)
-	if err != nil {
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, gin.H{"message": msg})
-		return
-	}
-
-	glog.Infof("%s Success: %+v", logPrefix, model)
-	c.JSON(status, model)
-	return
-}
-
-func (a *Api) deleteVideo(c *gin.Context) {
+func (a *Api) deleteProblem(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
@@ -91,7 +55,7 @@ func (a *Api) deleteVideo(c *gin.Context) {
 	}
 
 	// Write to database
-	manager := &VideoManager{DB: a.DB}
+	manager := &ProblemManager{DB: a.DB}
 	status, msg, err := manager.Delete(paramId)
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
@@ -104,7 +68,7 @@ func (a *Api) deleteVideo(c *gin.Context) {
 	return
 }
 
-func (a *Api) getVideo(c *gin.Context) {
+func (a *Api) getProblem(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
@@ -118,7 +82,7 @@ func (a *Api) getVideo(c *gin.Context) {
 	}
 
 	// Read from database
-	manager := &VideoManager{DB: a.DB}
+	manager := &ProblemManager{DB: a.DB}
 	model, status, msg, err := manager.Get(paramId)
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
@@ -131,12 +95,12 @@ func (a *Api) getVideo(c *gin.Context) {
 	return
 }
 
-func (a *Api) listVideo(c *gin.Context) {
+func (a *Api) listProblem(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Read from database
-	manager := &VideoManager{DB: a.DB}
+	manager := &ProblemManager{DB: a.DB}
 	models, status, msg, err := manager.List()
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
