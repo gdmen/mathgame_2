@@ -12,6 +12,10 @@ import {
     EditVideo
 } from "./api/video.js";
 
+import {
+    BaseProblem
+} from "./api/problem.js";
+
 import "./index.css";
 
 const NotFound = () => (
@@ -48,10 +52,21 @@ class AdminVideosView extends React.Component {
     }
 }
 
+class ProblemView extends React.Component {
+    render() {
+        return (
+            <div>
+                <BaseProblem url={ApiUrl} />
+            </div>
+        )
+    }
+}
+
 const Main = () => (
     <main>
 	<Switch>
         <Route path="/admin/videos" component={AdminVideosView} />
+        <Route path="/problem" component={ProblemView} />
 	<Route path="*" component={NotFound} />
 	</Switch>
     </main>
