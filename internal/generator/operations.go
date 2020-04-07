@@ -42,7 +42,11 @@ func sub(a *Problem, b *Problem, opts *Options) *Problem {
 	if !opts.Negatives {
 		a, b = SortProblems(a, b)
 	}
-	prob.Expr = fmt.Sprintf("%s-%s", a.Expr, b.Expr)
+	expr_fmt := "%s-(%s)"
+	if b.isNumber {
+		expr_fmt = "%s-%s"
+	}
+	prob.Expr = fmt.Sprintf(expr_fmt, a.Expr, b.Expr)
 	a_v, b_v := a.GetAns(), b.GetAns()
 	prob.SetAns(a_v.Sub(a_v, b_v))
 	prob.Diff = (a.Diff + b.Diff) * subDiffMultiplier

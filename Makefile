@@ -13,8 +13,12 @@ GOFMT=gofmt -w
 
 .PHONY: web
 
-all: api web
-	$(GOBIN)/apiserver > apiserver.log 2>&1 &
+all: run_api run_web
+
+run_api: api
+	$(GOBIN)/apiserver > apiserver.log 2>&1
+
+run_web: web
 	cd web && npm start
 
 api: cmd/apiserver/main.go

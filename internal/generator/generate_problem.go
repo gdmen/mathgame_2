@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"math/rand"
 	"regexp"
+
+	"github.com/golang/glog"
 )
 
 const (
@@ -30,7 +32,11 @@ type Problem struct {
 }
 
 func (p *Problem) String() string {
-	return fmt.Sprintf("Problem[%f]: %s = %s", p.Diff, p.ExprString(), p.AnsString())
+	desc := "Problem"
+	if p.isNumber {
+		desc = "Number"
+	}
+	return fmt.Sprintf("%s[%f] {%s = %s}", desc, p.Diff, p.ExprString(), p.AnsString())
 }
 
 func (p *Problem) ExprString() string {
@@ -120,12 +126,14 @@ func GenerateProblem(opts *Options) (string, string, float64, error) {
 }
 
 func doStep(a *Problem, iteration int, opts *Options) *Problem {
+	logPrefix := "[doStep]"
+	glog.Infof("%s fcn start", logPrefix)
 	remainDiff := opts.TargetDifficulty - a.Diff
-	//fmt.Printf("**DO STEP: %d\n", iteration)
-	//fmt.Printf("*****remainDiff: %f\n", remainDiff)
-	//fmt.Printf("*****min reasonable: %f\n", getNumberDiff(opts.TargetDifficulty/math.Log(float64(iteration))))
+	glog.Infof("%s iteration: %d\n", logPrefix, iteration)
+	glog.Infof("%s remainDiff: %f\n", logPrefix, remainDiff)
+	glog.Infof("%s min reasonable: %f\n", logPrefix, getNumberDiff(opts.TargetDifficulty/math.Log(float64(iteration))))
 	if iteration > 1 && remainDiff <= getNumberDiff(opts.TargetDifficulty/math.Log(float64(iteration))) {
-		//fmt.Printf("*****returning_a: %s\n", a)
+		glog.Infof("%s returning_a: %s\n", logPrefix, a)
 		return a
 	}
 	possOps := []Operation{}
@@ -135,11 +143,10 @@ func doStep(a *Problem, iteration int, opts *Options) *Problem {
 	for len(possOps) > 0 {
 		i := rand.Intn(len(possOps))
 		randOp := possOps[i]
-		//fmt.Printf("*****randOp: %s\n", randOp.String())
 		maxBDiff := randOp.getInputDiff(remainDiff)
 		b := generateNumberProblem(maxBDiff, opts)
 		n := randOp.do(a, b, opts)
-		//fmt.Printf("********: %s\n", n)
+		glog.Infof("%s randOp %s: %s\n", logPrefix, randOp.String(), n)
 		if n.Diff-opts.TargetDifficulty <= targetDelta {
 			return n
 		}
@@ -147,6 +154,6 @@ func doStep(a *Problem, iteration int, opts *Options) *Problem {
 		possOps[i] = possOps[len(possOps)-1]
 		possOps = possOps[:len(possOps)-1]
 	}
-	//fmt.Printf("*****returning_z: %s\n", a)
+	glog.Infof("%s returning_z: %s\n", logPrefix, a)
 	return a
 }
