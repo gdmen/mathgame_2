@@ -12,6 +12,7 @@ import (
 )
 
 var CREATE_TABLES_SQL = []string{
+	CreateUserTableSQL,
 	CreateVideoTableSQL,
 	CreateProblemTableSQL,
 }
