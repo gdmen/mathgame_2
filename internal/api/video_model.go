@@ -12,8 +12,8 @@ const (
 	CreateVideoTableSQL = `
 	CREATE TABLE videos (
 		id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-		title VARCHAR(128) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL,
-		local_file_name VARCHAR(32) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL UNIQUE,
+		title VARCHAR(128) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+		local_file_name VARCHAR(32) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL UNIQUE,
 		enabled TINYINT NOT NULL
 	);`
 	createVideoSQL = `

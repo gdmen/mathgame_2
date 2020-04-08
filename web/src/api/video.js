@@ -117,7 +117,7 @@ class BaseVideo extends React.Component {
                             file: {
                                 attributes: {
                                     controlsList: "nodownload",
-                                    disablepictureinpicture: "true",
+                                    disablePictureInPicture: true,
                                     onContextMenu: e => e.preventDefault()
                                 }
                             }

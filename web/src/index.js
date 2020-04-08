@@ -16,6 +16,8 @@ import {
     BaseProblem
 } from "./api/problem.js";
 
+
+import "semantic-ui-css/semantic.min.css"
 import "./index.css";
 
 const NotFound = () => (

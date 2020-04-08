@@ -15,8 +15,8 @@ const (
 	CreateProblemTableSQL = `
 	CREATE TABLE problems (
 		id BIGINT(64) UNSIGNED NOT NULL PRIMARY KEY,
-		expression TEXT CHARACTER SET utf8 COLLATE utf8_bin NOT NULL,
-		answer TEXT CHARACTER SET utf8 COLLATE utf8_bin NOT NULL,
+		expression TEXT CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+		answer TEXT CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
 		difficulty FLOAT NOT NULL
 	);`
 	createProblemSQL = `

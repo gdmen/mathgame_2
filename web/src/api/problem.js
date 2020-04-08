@@ -1,7 +1,14 @@
 import Axios from "axios";
+import katex from 'katex';
 import React from "react";
+import {
+    Link
+} from 'react-router-dom'
+import {
+    Button
+} from 'semantic-ui-react'
 
-let mathjs = require('mathjs');
+import "katex/dist/katex.min.css"
 
 const ModelEndpoint = "/problems";
 
@@ -21,6 +28,7 @@ class BaseProblem extends React.Component {
                 answer: "",
                 difficulty: 0
             },
+            latex: "",
             error: null,
             isLoaded: false
         };
@@ -37,7 +45,11 @@ class BaseProblem extends React.Component {
                         expression: resp.data.expression,
                         answer: resp.data.answer,
                         difficulty: resp.data.difficulty
-                    }
+                    },
+                    latex: katex.renderToString(resp.data.expression, {
+                        displayMode: true,
+                        throwOnError: false
+                    })
                 }));
             })
             .catch(this.catchError.bind(this));
@@ -79,10 +91,14 @@ class BaseProblem extends React.Component {
         return (
             <div>
                 <div>
+                    <Button as={Link} to="/admin/videos">
+                        To videos
+                    </Button>
                     <p>id: {model.id}</p>
                     <p>expression: {model.expression}</p>
-                    <p>answer: {model.answer} ({mathjs.evaluate(model.expression)})</p>
+                    <p>answer: {model.answer}</p>
                     <p>difficulty: {model.difficulty}</p>
+                    <div id="problem" dangerouslySetInnerHTML={{__html: this.state.latex}}></div>
                 </div>
             </div>
         );
