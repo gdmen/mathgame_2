@@ -1,14 +1,10 @@
 import Axios from "axios";
 import katex from 'katex';
 import React from "react";
-import {
-    Link
-} from 'react-router-dom'
-import {
-    Button
-} from 'semantic-ui-react'
 
 import "katex/dist/katex.min.css"
+
+var ReactFitText = require('react-fittext');
 
 const ModelEndpoint = "/problems";
 
@@ -47,7 +43,6 @@ class BaseProblem extends React.Component {
                         difficulty: resp.data.difficulty
                     },
                     latex: katex.renderToString(resp.data.expression, {
-                        displayMode: true,
                         throwOnError: false
                     })
                 }));
@@ -80,25 +75,23 @@ class BaseProblem extends React.Component {
         if (this.state.error) {
             return <div>Error: {this.state.error.message}</div>;
         } else if (!this.state.isLoaded) {
-            return <div>Loading...</div>;
+            return <div id="problem">Loading...</div>;
         } else {
             return this.renderSuccess();
         }
     }
 
     renderSuccess() {
-        let model = this.state.model;
         return (
-            <div>
-                <div>
-                    <Button as={Link} to="/admin/videos">
-                        To videos
-                    </Button>
-                    <p>id: {model.id}</p>
-                    <p>expression: {model.expression}</p>
-                    <p>answer: {model.answer}</p>
-                    <p>difficulty: {model.difficulty}</p>
-                    <div id="problem" dangerouslySetInnerHTML={{__html: this.state.latex}}></div>
+            <div id="problem">
+                <ReactFitText compressor={0.75}>
+                    <div id="problem-display" dangerouslySetInnerHTML={{__html: this.state.latex}}></div>
+                </ReactFitText>
+                <div id="problem-answer" className="input-group">
+                    <input id="problem-answer-input" className="input-group-field" type="text" />
+                    <div className="input-group-button">
+                        <input type="submit" className="button" value="answer" />
+                    </div>
                 </div>
             </div>
         );

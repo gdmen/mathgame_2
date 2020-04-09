@@ -17,7 +17,7 @@ import {
 } from "./api/problem.js";
 
 
-import "semantic-ui-css/semantic.min.css"
+import "foundation-sites/dist/css/foundation.css";
 import "./index.css";
 
 const NotFound = () => (
@@ -76,7 +76,29 @@ const Main = () => (
 
 const App = () => (
     <div>
-	<Main />
+        <div className="top-bar">
+            <div className="top-bar-left">
+                <ul className="menu">
+                    <li className="menu-text">The Math Game</li>
+                </ul>
+            </div>
+
+            <div className="top-bar-right">
+                <ul className="menu">
+                    <li><a href="#">log in</a></li>
+                    <li><a href="#">2</a></li>
+                    <li><a href="/problem">3</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <div className="grid-container full">
+            <div className="grid-x grid-margin-x align-center">
+                <div className="cell small-11 medium-8 large-7">
+	            <Main />
+                </div>
+            </div>
+        </div>
     </div>
 )
 
@@ -84,4 +106,4 @@ ReactDOM.render((
     <BrowserRouter>
 	<App />
     </BrowserRouter>
-), document.getElementById("root"))
+), document.getElementById("react"))
