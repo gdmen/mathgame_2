@@ -17,6 +17,6 @@
 > CREATE DATABASE mathgame;
 
 # refresh after not devloping for a long time
-> make clean
+> make clean  
 > make # should install go dependencies
 > 

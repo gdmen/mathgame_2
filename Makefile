@@ -13,7 +13,7 @@ GOFMT=gofmt -w
 
 .PHONY: web
 
-all: run_api run_web
+all: api web
 
 run_api: api
 	$(GOBIN)/apiserver > apiserver.log 2>&1
