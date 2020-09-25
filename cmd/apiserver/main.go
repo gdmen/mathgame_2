@@ -9,6 +9,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang/glog"
 
+	_ "garydmenezes.com/mathgame/internal/docs"
+
 	"garydmenezes.com/mathgame/internal/api"
 	"garydmenezes.com/mathgame/internal/common"
 )

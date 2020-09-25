@@ -12,6 +12,13 @@ import (
 	"garydmenezes.com/mathgame/internal/generator"
 )
 
+type CreateProblemReq struct {
+	Operations       []string `json:"operations" form:"operations"`
+	Fractions        bool     `json:"fractions" form:"fractions"`
+	Negatives        bool     `json:"negatives" form:"negatives"`
+	TargetDifficulty float64  `json:"target_difficulty" form:"target_difficulty"`
+}
+
 func (a *Api) createProblem(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)

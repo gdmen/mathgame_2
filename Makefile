@@ -18,11 +18,11 @@ all: api web
 run_api: api
 	$(GOBIN)/apiserver > apiserver.log 2>&1
 
-run_web: web
+run_web:
 	cd web && npm start
 
-api: cmd/apiserver/main.go
-	$(GOBUILD) -o ./bin/apiserver ./$^
+api: docs
+	$(GOBUILD) -o ./bin/apiserver ./cmd/apiserver/main.go
 
 web:
 	cd web && npm run build; cd -
@@ -32,26 +32,20 @@ test: test-api
 test-api: internal/api
 	$(GOTEST) ./$^
 
+check-swagger:
+	which swagger || (GO111MODULE=off go get -u github.com/go-swagger/go-swagger/cmd/swagger)
+
+docs: check-swagger
+	swagger generate spec -o ./swagger.yaml --scan-models
+
+serve-docs: check-swagger
+	swagger serve -F=swagger swagger.yaml
+
 clean:
+	$(RM) ./swagger.yaml
 	$(RM) ./bin/*
 	GOBIN=$(GOBIN) $(GOCLEAN)
 	$(GOMOD) tidy
 
 install:
 	ln -s ../../conf.json web/src/conf.json
-
-# dist:
-
-#apiserver_pi: src/apiserver.go
-#	env GOOS=linux GOARCH=arm GOARM=5 $(GOBUILD) -o ./bin/apiserver_pi ./$^
-
-#release: apiserver_pi ui
-#	mkdir -p ./bin/release
-#	rm -r ./bin/release/*
-#	cp ./bin/apiserver_pi ./bin/release
-#	cp -r release/* ./bin/release
-#	cp -r web/build ./bin/release/ui_server
-
-#deploy:
-#	ssh -t pi@10.0.0.174 "rm -rf ./delta/*"
-#	scp -r ./bin/release/* pi@10.0.0.174:./delta
