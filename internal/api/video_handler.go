@@ -21,7 +21,7 @@ func (a *Api) createVideo(c *gin.Context) {
 	if err != nil {
 		msg := "Couldn't parse input form"
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		c.JSON(http.StatusBadRequest, GetError(msg))
 		return
 	}
 	glog.Infof("%s %s", logPrefix, model)
@@ -31,7 +31,7 @@ func (a *Api) createVideo(c *gin.Context) {
 	status, msg, err := manager.Create(model)
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, gin.H{"message": msg})
+		c.JSON(status, GetError(msg))
 		return
 	}
 
@@ -49,7 +49,7 @@ func (a *Api) updateVideo(c *gin.Context) {
 	if err != nil {
 		msg := "URL id should be an integer"
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusNotFound, gin.H{"message": msg})
+		c.JSON(http.StatusNotFound, GetError(msg))
 		return
 	}
 	model := &Video{}
@@ -57,7 +57,7 @@ func (a *Api) updateVideo(c *gin.Context) {
 	if err != nil {
 		msg := "Couldn't parse input form"
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		c.JSON(http.StatusBadRequest, GetError(msg))
 		return
 	}
 	model.Id = paramId
@@ -68,7 +68,7 @@ func (a *Api) updateVideo(c *gin.Context) {
 	status, msg, err := manager.Update(model)
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, gin.H{"message": msg})
+		c.JSON(status, GetError(msg))
 		return
 	}
 
@@ -86,7 +86,7 @@ func (a *Api) deleteVideo(c *gin.Context) {
 	if err != nil {
 		msg := "URL id should be an integer"
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		c.JSON(http.StatusBadRequest, GetError(msg))
 		return
 	}
 
@@ -95,7 +95,7 @@ func (a *Api) deleteVideo(c *gin.Context) {
 	status, msg, err := manager.Delete(paramId)
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, gin.H{"message": msg})
+		c.JSON(status, GetError(msg))
 		return
 	}
 
@@ -113,7 +113,7 @@ func (a *Api) getVideo(c *gin.Context) {
 	if err != nil {
 		msg := "URL id should be an integer"
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusNotFound, gin.H{"message": msg})
+		c.JSON(http.StatusNotFound, GetError(msg))
 		return
 	}
 
@@ -122,7 +122,7 @@ func (a *Api) getVideo(c *gin.Context) {
 	model, status, msg, err := manager.Get(paramId)
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, gin.H{"message": msg})
+		c.JSON(status, GetError(msg))
 		return
 	}
 
@@ -140,7 +140,7 @@ func (a *Api) listVideo(c *gin.Context) {
 	models, status, msg, err := manager.List()
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, gin.H{"message": msg})
+		c.JSON(status, GetError(msg))
 		return
 	}
 

@@ -1,4 +1,4 @@
-package api
+package api // import "garydmenezes.com/mathgame/internal/api"
 
 import (
 	"database/sql"

@@ -15,7 +15,7 @@ GOFMT=gofmt -w
 
 all: api web
 
-run_api: api
+run_api:
 	$(GOBIN)/apiserver > apiserver.log 2>&1
 
 run_web:

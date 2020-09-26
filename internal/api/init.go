@@ -17,6 +17,14 @@ var CREATE_TABLES_SQL = []string{
 	CreateProblemTableSQL,
 }
 
+type Error struct {
+	Message string `json:"message" form:"message"`
+}
+
+func GetError(message string) map[string]interface{} {
+	return gin.H{"message": message}
+}
+
 type Api struct {
 	DB *sql.DB
 }

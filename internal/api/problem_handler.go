@@ -12,13 +12,6 @@ import (
 	"garydmenezes.com/mathgame/internal/generator"
 )
 
-type CreateProblemReq struct {
-	Operations       []string `json:"operations" form:"operations"`
-	Fractions        bool     `json:"fractions" form:"fractions"`
-	Negatives        bool     `json:"negatives" form:"negatives"`
-	TargetDifficulty float64  `json:"target_difficulty" form:"target_difficulty"`
-}
-
 func (a *Api) createProblem(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
@@ -29,7 +22,7 @@ func (a *Api) createProblem(c *gin.Context) {
 	if err != nil {
 		msg := "Couldn't parse input form"
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		c.JSON(http.StatusBadRequest, GetError(msg))
 		return
 	}
 	glog.Infof("%s %s", logPrefix, opts)
@@ -39,7 +32,7 @@ func (a *Api) createProblem(c *gin.Context) {
 	model, status, msg, err := manager.Create(opts)
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, gin.H{"message": msg})
+		c.JSON(status, GetError(msg))
 		return
 	}
 
@@ -57,7 +50,7 @@ func (a *Api) deleteProblem(c *gin.Context) {
 	if err != nil {
 		msg := "URL id should be an integer"
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		c.JSON(http.StatusBadRequest, GetError(msg))
 		return
 	}
 
@@ -66,7 +59,7 @@ func (a *Api) deleteProblem(c *gin.Context) {
 	status, msg, err := manager.Delete(paramId)
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, gin.H{"message": msg})
+		c.JSON(status, GetError(msg))
 		return
 	}
 
@@ -84,7 +77,7 @@ func (a *Api) getProblem(c *gin.Context) {
 	if err != nil {
 		msg := "URL id should be an integer"
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusNotFound, gin.H{"message": msg})
+		c.JSON(http.StatusNotFound, GetError(msg))
 		return
 	}
 
@@ -93,7 +86,7 @@ func (a *Api) getProblem(c *gin.Context) {
 	model, status, msg, err := manager.Get(paramId)
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, gin.H{"message": msg})
+		c.JSON(status, GetError(msg))
 		return
 	}
 
@@ -111,7 +104,7 @@ func (a *Api) listProblem(c *gin.Context) {
 	models, status, msg, err := manager.List()
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, gin.H{"message": msg})
+		c.JSON(status, GetError(msg))
 		return
 	}
 
