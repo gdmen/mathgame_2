@@ -2,7 +2,7 @@ package docs
 
 /*
 swagger:route DELETE /problems/{id} problems deleteProblem
-Delete a math problem.
+Delete a problem.
 responses:
   204:
   400: error

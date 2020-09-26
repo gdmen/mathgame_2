@@ -77,7 +77,7 @@ func (a *Api) getProblem(c *gin.Context) {
 	if err != nil {
 		msg := "URL id should be an integer"
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusNotFound, GetError(msg))
+		c.JSON(http.StatusBadRequest, GetError(msg))
 		return
 	}
 

@@ -5,7 +5,7 @@ import "garydmenezes.com/mathgame/internal/generator"
 
 /*
 swagger:route POST /problems problems createProblem
-Create a math problem.
+Generate a problem.
 responses:
   200: createProblemResp
   201: createProblemResp

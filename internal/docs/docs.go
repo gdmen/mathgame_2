@@ -4,8 +4,9 @@ Package classification Math Game API.
 Documentation of our Math Game API.
 
   Schemes: http
-  BasePath: /
+  BasePath: /api/v1/
   Version: 1.0.0
+  Host: localhost:8080
 
   Consumes:
   - application/json
