@@ -13,7 +13,7 @@ GOFMT=gofmt -w
 
 .PHONY: web
 
-all: api web
+all: api
 
 run_api:
 	$(GOBIN)/apiserver > apiserver.log 2>&1
@@ -33,7 +33,16 @@ test-api: internal/api
 	$(GOTEST) ./$^
 
 check-swagger:
-	which swagger || (GO111MODULE=off go get -u github.com/go-swagger/go-swagger/cmd/swagger)
+	if ! which swagger; then \
+		$(eval DIR := $(shell mktemp -d)) \
+		git clone https://github.com/go-swagger/go-swagger "$(DIR)"; \
+		cd "$(DIR)"; \
+		git checkout v0.26.0; \
+		pwd; \
+		go install -ldflags "-X github.com/go-swagger/go-swagger/cmd/swagger/commands.Version=$(git describe --tags) -X github.com/go-swagger/go-swagger/cmd/swagger/commands.Commit=$(git rev-parse HEAD)" ./cmd/swagger; \
+		cd -; \
+		rm -rf "$(DIR)"; \
+	fi
 
 docs: check-swagger
 	swagger generate spec -o ./swagger.yaml --scan-models
@@ -48,4 +57,5 @@ clean:
 	$(GOMOD) tidy
 
 install:
+	cd web && npm install; cd -
 	ln -s ../../conf.json web/src/conf.json

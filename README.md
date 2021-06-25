@@ -1,6 +1,7 @@
 # installation
 - install node.js
 - install go
+- install go-swagger
 
 # config
 - conf.json_ and test_conf.json_ -> fill them out and remove the trailing underscore
