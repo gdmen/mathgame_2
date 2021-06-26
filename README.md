@@ -4,7 +4,7 @@
 - install go-swagger
 
 # config
-- conf.json_ and test_conf.json_ -> fill them out and remove the trailing underscore
+- Fill out conf.json_ and remove the trailing underscore
 
 # install mysql
 

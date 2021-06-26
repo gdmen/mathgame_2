@@ -10,6 +10,8 @@ GOINSTALL=$(GOCMD) install
 GOMOD=$(GOCMD) mod
 GOTEST=$(GOCMD) test
 GOFMT=gofmt -w
+GOPATH=$(HOME)/go
+SWAGGER=$(GOPATH)/bin/swagger
 
 .PHONY: web
 
@@ -22,7 +24,7 @@ run_web:
 	cd web && npm start
 
 api: docs
-	gofmt -s -w .
+	$(GOFMT) -s .
 	$(GOBUILD) -o ./bin/apiserver ./cmd/apiserver/main.go
 
 web:
@@ -34,22 +36,17 @@ test-api: internal/api
 	$(GOTEST) ./$^
 
 check-swagger:
-	if ! which swagger; then \
-		$(eval DIR := $(shell mktemp -d)) \
-		git clone https://github.com/go-swagger/go-swagger "$(DIR)"; \
-		cd "$(DIR)"; \
-		git checkout v0.26.0; \
-		pwd; \
-		go install -ldflags "-X github.com/go-swagger/go-swagger/cmd/swagger/commands.Version=$(git describe --tags) -X github.com/go-swagger/go-swagger/cmd/swagger/commands.Commit=$(git rev-parse HEAD)" ./cmd/swagger; \
-		cd -; \
-		rm -rf "$(DIR)"; \
+	if ! which swagger >/dev/null; then \
+		go get github.com/go-swagger/go-swagger/cmd/swagger && \
+		go install github.com/go-swagger/go-swagger/cmd/swagger && \
+		echo "swagger installed"; \
 	fi
 
 docs: check-swagger
-	swagger generate spec -o ./swagger.yaml --scan-models
+	$(SWAGGER) generate spec -o ./swagger.yaml --scan-models
 
 serve-docs: check-swagger
-	swagger serve -F=swagger swagger.yaml
+	$(SWAGGER) serve -F=swagger swagger.yaml
 
 clean:
 	$(RM) ./swagger.yaml
