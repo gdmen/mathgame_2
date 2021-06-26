@@ -54,12 +54,12 @@ func sub(a *Problem, b *Problem, opts *Options) *Problem {
 }
 
 var operations = map[string]Operation{
-	"+": Operation{
+	"+": {
 		getInputDiff: addInputDiff,
 		do:           add,
 		String:       func() string { return "add" },
 	},
-	"-": Operation{
+	"-": {
 		getInputDiff: subInputDiff,
 		do:           sub,
 		String:       func() string { return "sub" },

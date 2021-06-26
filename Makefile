@@ -22,6 +22,7 @@ run_web:
 	cd web && npm start
 
 api: docs
+	gofmt -s -w .
 	$(GOBUILD) -o ./bin/apiserver ./cmd/apiserver/main.go
 
 web:
