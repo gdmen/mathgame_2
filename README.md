@@ -9,7 +9,7 @@
 # install mysql
 
 # set a mysql user/pass
-> mysql -u root -h 127.0.0.1 -p # check path
+> mysql -u root -p # check path
 
 > USE mysql;
 
