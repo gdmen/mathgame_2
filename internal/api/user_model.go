@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/volatiletech/authboss"
+	"github.com/volatiletech/authboss/v3"
 )
 
 var (
