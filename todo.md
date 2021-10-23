@@ -4,5 +4,5 @@
 
 - Add failure case unit tests
 
-- Move internal/common/middleware and log to api
-- Move internal/common/common to lib
+- Move server/common/middleware and log to api
+- Move server/common/common to lib

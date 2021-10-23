@@ -1,5 +1,5 @@
 // Package api contains api routes, handlers, and models
-package api // import "garydmenezes.com/mathgame/internal/api"
+package api // import "garydmenezes.com/mathgame/server/api"
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 
-	"garydmenezes.com/mathgame/internal/common"
+	"garydmenezes.com/mathgame/server/common"
 )
 
 func InsertTestProblems(c *common.Config) {

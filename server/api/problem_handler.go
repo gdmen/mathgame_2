@@ -1,5 +1,5 @@
 // Package api contains api routes, handlers, and models
-package api // import "garydmenezes.com/mathgame/internal/api"
+package api // import "garydmenezes.com/mathgame/server/api"
 
 import (
 	"net/http"
@@ -8,8 +8,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
 
-	"garydmenezes.com/mathgame/internal/common"
-	"garydmenezes.com/mathgame/internal/generator"
+	"garydmenezes.com/mathgame/server/common"
+	"garydmenezes.com/mathgame/server/generator"
 )
 
 func (a *Api) createProblem(c *gin.Context) {

@@ -1,5 +1,5 @@
 // Package api contains api routes, handlers, and models
-package api // import "garydmenezes.com/mathgame/internal/api"
+package api // import "garydmenezes.com/mathgame/server/api"
 
 import (
 	"database/sql"
@@ -8,7 +8,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
-	"garydmenezes.com/mathgame/internal/common"
+	"garydmenezes.com/mathgame/server/common"
 )
 
 var CREATE_TABLES_SQL = []string{

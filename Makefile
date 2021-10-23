@@ -32,7 +32,7 @@ web:
 
 test: test-api
 
-test-api: internal/api
+test-api: server/api
 	$(GOTEST) ./$^
 
 check-swagger:

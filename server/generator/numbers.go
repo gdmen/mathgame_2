@@ -1,5 +1,5 @@
 // Package generator contains a math problem generator
-package generator // import "garydmenezes.com/mathgame/internal/generator"
+package generator // import "garydmenezes.com/mathgame/server/generator"
 
 import (
 	"math"

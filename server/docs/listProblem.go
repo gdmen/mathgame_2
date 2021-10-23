@@ -1,6 +1,6 @@
 package docs
 
-import "garydmenezes.com/mathgame/internal/api"
+import "garydmenezes.com/mathgame/server/api"
 
 /*
 swagger:route GET /problems problems listProblem

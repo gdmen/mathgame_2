@@ -1,4 +1,4 @@
-package api // import "garydmenezes.com/mathgame/internal/api"
+package api // import "garydmenezes.com/mathgame/server/api"
 
 import (
 	"database/sql"
@@ -10,7 +10,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 
-	"garydmenezes.com/mathgame/internal/common"
+	"garydmenezes.com/mathgame/server/common"
 )
 
 const (

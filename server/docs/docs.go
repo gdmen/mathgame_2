@@ -25,7 +25,7 @@ swagger:meta
 */
 package docs
 
-import "garydmenezes.com/mathgame/internal/api"
+import "garydmenezes.com/mathgame/server/api"
 
 //swagger:response error
 type ErrorResp struct {

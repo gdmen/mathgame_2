@@ -1,7 +1,7 @@
 package docs
 
-import "garydmenezes.com/mathgame/internal/api"
-import "garydmenezes.com/mathgame/internal/generator"
+import "garydmenezes.com/mathgame/server/api"
+import "garydmenezes.com/mathgame/server/generator"
 
 /*
 swagger:route POST /problems problems createProblem

@@ -1,5 +1,5 @@
 // Package api contains api routes, handlers, and models
-package api // import "garydmenezes.com/mathgame/internal/api"
+package api // import "garydmenezes.com/mathgame/server/api"
 
 import (
 	"database/sql"
@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"garydmenezes.com/mathgame/internal/generator"
+	"garydmenezes.com/mathgame/server/generator"
 )
 
 const (
