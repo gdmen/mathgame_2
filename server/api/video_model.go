@@ -53,15 +53,15 @@ func (m *VideoManager) Create(model *Video) (int, string, error) {
 			return http.StatusInternalServerError, msg, err
 		}
 		// Get the id of the already existing model
-		er := m.DB.QueryRow(getVideoIdSQL, model.LocalFileName).Scan(&model.Id)
-		if er != nil {
+		err = m.DB.QueryRow(getVideoIdSQL, model.LocalFileName).Scan(&model.Id)
+		if err != nil {
 			panic("This should be impossible 1.")
 		}
 		return http.StatusOK, "", nil
 	}
 	// Get the id of the already existing model
-	er := m.DB.QueryRow(getVideoIdSQL, model.LocalFileName).Scan(&model.Id)
-	if er != nil {
+	err = m.DB.QueryRow(getVideoIdSQL, model.LocalFileName).Scan(&model.Id)
+	if err != nil {
 		panic("This should be impossible 2.")
 	}
 	return http.StatusCreated, "", nil

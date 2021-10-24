@@ -17,10 +17,10 @@ SWAGGER=$(GOPATH)/bin/swagger
 
 all: api
 
-run_api:
+run_api: api
 	$(GOBIN)/apiserver > apiserver.log 2>&1
 
-run_web:
+run_web: web
 	cd web && npm start
 
 api: docs
@@ -30,9 +30,9 @@ api: docs
 web:
 	cd web && npm run build; cd -
 
-test: test-api
+test: test_api
 
-test-api: server/api
+test_api: server/api
 	$(GOTEST) ./$^
 
 check-swagger:

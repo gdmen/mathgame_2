@@ -133,34 +133,4 @@ func TestVideoBasic(t *testing.T) {
 	if strings.TrimSpace(string(body)) != `{"id":1,"title":"unda da sea","local_file_name":"tarzan_son_of_man.mp4","enabled":false}` {
 		t.Fatal("ERROR: " + string(body))
 	}
-
-	// Delete
-	resp = httptest.NewRecorder()
-
-	req, _ = http.NewRequest("DELETE", "/api/v1/videos/1", nil)
-
-	r.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusNoContent, resp.Code, resp)
-	}
-
-	// List
-	resp = httptest.NewRecorder()
-
-	req, _ = http.NewRequest("GET", "/api/v1/videos/", nil)
-
-	r.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusOK, resp.Code, resp)
-	}
-
-	body, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.TrimSpace(string(body)) != "[]" {
-		t.Fatal("ERROR: " + string(body))
-	}
 }

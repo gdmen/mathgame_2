@@ -96,34 +96,4 @@ func TestProblemBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Delete
-	resp = httptest.NewRecorder()
-
-	req, _ = http.NewRequest("DELETE", fmt.Sprintf("/api/v1/problems/%s", id), nil)
-
-	r.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusNoContent, resp.Code, resp)
-	}
-
-	// List
-	resp = httptest.NewRecorder()
-
-	req, _ = http.NewRequest("GET", "/api/v1/problems/", nil)
-
-	r.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusOK, resp.Code, resp)
-	}
-
-	body, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.TrimSpace(string(body)) != "[]" {
-		t.Fatal("ERROR: " + string(body))
-	}
 }

@@ -1,7 +1,11 @@
-import React from 'react'
+import React, { useEffect, useState } from "react";
 import ReactDOM from 'react-dom'
 import { BrowserRouter, Route, Switch } from 'react-router-dom'
 
+import { Auth0Provider } from "@auth0/auth0-react"
+import { useAuth0 } from "@auth0/auth0-react";
+
+import { LoginButton } from './auth0.js'
 import { BaseVideo, CreateVideo, EditVideo } from './api/video.js'
 
 import { BaseProblem } from './api/problem.js'
@@ -51,14 +55,30 @@ class AdminVideosView extends React.Component {
   }
 }
 
-class ProblemView extends React.Component {
-  render() {
-    return (
-      <div>
-        <BaseProblem url={ApiUrl} />
-      </div>
-    )
+const ProblemView = () => {
+  const { isLoading, isAuthenticated, getAccessTokenSilently } = useAuth0();
+  const [accessToken, setAccessToken] = useState(null);
+  useEffect(() => {
+    const getAccessToken = async () => {
+      try {
+        setAccessToken(await getAccessTokenSilently());
+      } catch (e) {
+        console.log(e.message);
+      }
+    };
+
+    getAccessToken();
+  }, [getAccessTokenSilently]);
+
+  if (isLoading) {
+    return <div>loading... </div>;
   }
+
+  return (
+    <div>
+      <BaseProblem url={ApiUrl} accessToken={accessToken} />
+    </div>
+  )
 }
 
 const Main = () => (
@@ -83,7 +103,7 @@ const App = () => (
       <div className="top-bar-right">
         <ul className="menu">
           <li>
-            <a href="/">log in</a>
+            <LoginButton />
           </li>
           <li>
             <a href="/">2</a>
@@ -107,7 +127,17 @@ const App = () => (
 
 ReactDOM.render(
   <BrowserRouter>
+    <Auth0Provider
+      domain="compteam.auth0.com"
+      clientId="IJt7c4yK6NhRGpIvmBYxLtWCCQbtCekZ"
+      redirectUri={window.location.origin}
+      //audience="https://compteam.auth0.com/api/v2/"
+      audience="mathgame"
+      //scope="test:access"
+      //scope="read:current_user update:current_user_metadata test:access"
+    >
     <App />
+  </Auth0Provider>
   </BrowserRouter>,
   document.getElementById('react')
 )

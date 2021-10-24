@@ -12,6 +12,8 @@ import (
 	"garydmenezes.com/mathgame/server/generator"
 )
 
+// TODO: there's a lot in the handlers that can be pulled out to helper fcns
+
 func (a *Api) createProblem(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
@@ -73,6 +75,7 @@ func (a *Api) getProblem(c *gin.Context) {
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Parse input
+	// TODO: normalize this with other handlers / extract to a helper fcn
 	paramId, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		msg := "URL id should be an integer"

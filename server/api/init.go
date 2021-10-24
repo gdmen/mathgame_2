@@ -7,8 +7,10 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	ginadapter "github.com/gwatts/gin-adapter"
 
 	"garydmenezes.com/mathgame/server/common"
+	"garydmenezes.com/mathgame/server/common/auth0"
 )
 
 var CREATE_TABLES_SQL = []string{
@@ -44,29 +46,47 @@ func NewApi(db *sql.DB) (*Api, error) {
 
 func (a *Api) GetRouter() *gin.Engine {
 	router := gin.Default()
-	// Allow all origins, methods
-	router.Use(cors.Default())
+	// - No origin allowed by default
+	// - GET,POST, PUT, HEAD methods
+	// - Credentials share disabled
+	// - Preflight requests cached for 12 hours
+	config := cors.DefaultConfig()
+	// TODO: limit allowed origins
+	config.AllowAllOrigins = true
+	config.AllowHeaders = append(config.AllowHeaders, "Authorization")
+	config.AllowMethods = []string{"GET", "POST", "DELETE"}
+	router.Use(cors.New(config))
+
+	// Use our auth0 jwt middleware
+	router.Use(ginadapter.Wrap(auth0.EnsureValidToken()))
 
 	v1 := router.Group("/api/v1")
 	{
+		problem := v1.Group("/problems")
+		{
+			problem.POST("", common.RequestIdMiddleware(), a.createProblem)
+			problem.POST("/", common.RequestIdMiddleware(), a.createProblem)
+			//problem.DELETE("/:id", common.RequestIdMiddleware(), a.deleteProblem)
+			problem.GET("/:id", common.RequestIdMiddleware(), a.getProblem)
+			problem.GET("", common.RequestIdMiddleware(), a.listProblem)
+			problem.GET("/", common.RequestIdMiddleware(), a.listProblem)
+		}
+		user := v1.Group("/users")
+		{
+			user.POST("", common.RequestIdMiddleware(), a.createUser)
+			user.POST("/", common.RequestIdMiddleware(), a.createUser)
+			user.POST("/:auth0_id", common.RequestIdMiddleware(), a.updateUser)
+			user.GET("/:auth0_id", common.RequestIdMiddleware(), a.getUser)
+		}
 		video := v1.Group("/videos")
 		{
 			video.POST("", common.RequestIdMiddleware(), a.createVideo)
 			video.POST("/", common.RequestIdMiddleware(), a.createVideo)
 			video.POST("/:id", common.RequestIdMiddleware(), a.updateVideo)
-			video.DELETE("/:id", common.RequestIdMiddleware(), a.deleteVideo)
+			//video.DELETE("/:id", common.RequestIdMiddleware(), a.deleteVideo)
 			video.GET("/:id", common.RequestIdMiddleware(), a.getVideo)
 			video.GET("", common.RequestIdMiddleware(), a.listVideo)
 			video.GET("/", common.RequestIdMiddleware(), a.listVideo)
-		}
-		problem := v1.Group("/problems")
-		{
-			problem.POST("", common.RequestIdMiddleware(), a.createProblem)
-			problem.POST("/", common.RequestIdMiddleware(), a.createProblem)
-			problem.DELETE("/:id", common.RequestIdMiddleware(), a.deleteProblem)
-			problem.GET("/:id", common.RequestIdMiddleware(), a.getProblem)
-			problem.GET("", common.RequestIdMiddleware(), a.listProblem)
-			problem.GET("/", common.RequestIdMiddleware(), a.listProblem)
 		}
 	}
 	return router

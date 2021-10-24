@@ -14,7 +14,7 @@ import (
 const (
 	CreateProblemTableSQL = `
 	CREATE TABLE problems (
-		id BIGINT(64) UNSIGNED NOT NULL PRIMARY KEY,
+		id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
 		expression TEXT CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
 		answer TEXT CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
 		difficulty FLOAT NOT NULL
@@ -46,6 +46,7 @@ type ProblemManager struct {
 
 func (m *ProblemManager) Create(opts *generator.Options) (*Problem, int, string, error) {
 	model := &Problem{}
+	// TODO: change this to a loop that tries to add problems until a new problem is added
 	var err error
 	model.Expr, model.Ans, model.Diff, err = generator.GenerateProblem(opts)
 	if err != nil {
@@ -57,7 +58,7 @@ func (m *ProblemManager) Create(opts *generator.Options) (*Problem, int, string,
 		return nil, http.StatusBadRequest, msg, err
 	}
 
-	// Generate model.Hash
+	// Use expression hash as model.Id
 	h := fnv.New64a()
 	h.Write([]byte(model.Expr))
 	model.Id = h.Sum64()

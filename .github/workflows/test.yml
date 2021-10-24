@@ -27,4 +27,4 @@ jobs:
       run: make api
 
     - name: Test
-      run: make test-api
+      run: make test_api
