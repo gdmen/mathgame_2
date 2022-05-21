@@ -1,0 +1,24 @@
+{
+  "models": [
+    {
+      "name": "video",
+      "key": "Id",
+      "unique": ["LocalFileName"],
+      "fields": [
+        {
+          "name": "Id", "type": "uint64",
+          "sql": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY"
+        },
+        {"name": "Title", "type": "string",
+          "sql": "VARCHAR(128) NOT NULL"
+        },
+        {"name": "LocalFileName", "type": "string",
+          "sql": "VARCHAR(32) NOT NULL UNIQUE"
+        },
+        {"name": "Enabled", "type": "bool",
+          "sql": "TINYINT NOT NULL DEFAULT '1'"
+        }
+      ]
+    }
+  ]
+}
