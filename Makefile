@@ -51,7 +51,7 @@ serve-docs: check-swagger
 clean:
 	$(RM) ./swagger.yaml
 	$(RM) ./bin/*
-	GOBIN=$(GOBIN) $(GOCLEAN)
+	GOBIN=$(GOBIN) $(GOCLEAN) -testcache
 	$(GOMOD) tidy
 
 install:

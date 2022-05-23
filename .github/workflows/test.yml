@@ -24,6 +24,9 @@ jobs:
         sudo /etc/init.d/mysql start
         mysql -e 'CREATE DATABASE mathgame_test;' -u root -proot
 
+    - name: Clean
+      run: make clean
+
     - name: Build
       run: make api
 
