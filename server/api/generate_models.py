@@ -10,6 +10,7 @@ def camel_to_snake(s: str) -> str:
 
 def get_model_string(m: dict) -> str:
 
+    key_name = ""
     key_type = ""
     key_auto = False
     unique_struct_fields = []
@@ -19,11 +20,14 @@ def get_model_string(m: dict) -> str:
     non_key_sql_fields = []
     unique_sql_fields = []
     for f in m["fields"]:
+        if "PRIMARY KEY" in f["sql"]:
+            key_name = f["name"]
+    for f in m["fields"]:
         n = f["name"]
         snake_n = camel_to_snake(n)
         struct_fields.append(n)
         sql_fields.append(snake_n)
-        if n == m["key"]:
+        if n == key_name:
             key_type = f["type"]
             key_auto = "AUTO_INCREMENT" in f["sql"]
         else:
@@ -77,7 +81,7 @@ import (
 '''.format(
         m["name"].capitalize(),
         m["name"],
-        camel_to_snake(m["key"])
+        camel_to_snake(key_name)
     )
 
     # get key SQL
@@ -85,7 +89,7 @@ import (
     get{0}KeySQL = `SELECT {1} FROM {2}s WHERE {3};`
 '''.format(
         m["name"].capitalize(),
-        camel_to_snake(m["key"]),
+        camel_to_snake(key_name),
         m["name"],
         ", ".join([f+"=?" for f in unique_sql_fields]),
     )
@@ -105,7 +109,7 @@ import (
         m["name"].capitalize(),
         m["name"],
         ", ".join([f+"=?" for f in non_key_sql_fields]),
-        camel_to_snake(m["key"])
+        camel_to_snake(key_name)
     )
 
     # delete SQL
@@ -114,7 +118,7 @@ import (
 '''.format(
         m["name"].capitalize(),
         m["name"],
-        camel_to_snake(m["key"])
+        camel_to_snake(key_name)
     )
 
     # const end
@@ -124,7 +128,7 @@ import (
     s += "type {0} struct {{".format(m["name"].capitalize())
     for f in m["fields"]:
         fstr = '\n{0} {1} `json:"{2}"'
-        if f["name"] != m["key"]:
+        if f["name"] != key_name:
             fstr += ' form:"{2}"'
         fstr += "`"
         s += fstr.format(f["name"], f["type"], camel_to_snake(f["name"]))
@@ -172,7 +176,7 @@ import (
         ", ".join(["model." + n for n in create_struct_fields]),
         m["name"],
         ", ".join(["model." + n for n in unique_struct_fields]),
-        m["key"]
+        key_name
     )
 
     # manager.Get()
@@ -191,7 +195,7 @@ import (
     }}
 '''.format(
         m["name"].capitalize(),
-        camel_to_snake(m["key"]),
+        camel_to_snake(key_name),
         key_type,
         ", ".join(["&model." + n for n in struct_fields]),
         m["name"]
@@ -247,8 +251,8 @@ import (
     }}
 '''.format(
         m["name"].capitalize(),
-        m["key"],
-        ", ".join(["model." + n for n in non_key_struct_fields + [m["key"]]]),
+        key_name,
+        ", ".join(["model." + n for n in non_key_struct_fields + [key_name]]),
         m["name"]
     )
 
@@ -270,7 +274,7 @@ import (
     }}
 '''.format(
         m["name"].capitalize(),
-        camel_to_snake(m["key"]),
+        camel_to_snake(key_name),
         key_type,
         m["name"]
     )

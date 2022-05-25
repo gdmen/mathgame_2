@@ -2,111 +2,128 @@
 package api // import "garydmenezes.com/mathgame/server/api"
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
+	"net/http"
 	"strings"
-
-	"github.com/volatiletech/authboss/v3"
-)
-
-var (
-	assertUser   = &User{}
-	assertStorer = &UserManager{}
-
-	_ authboss.User         = assertUser
-	_ authboss.AuthableUser = assertUser
-
-	_ authboss.CreatingServerStorer = assertStorer
 )
 
 const (
 	CreateUserTableSQL = `
-	CREATE TABLE users (
-		id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-		email VARCHAR(320) CHARACTER SET utf8 COLLATE utf8_general_ci UNIQUE NOT NULL,
-		password VARCHAR(225) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-		name VARCHAR(128) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL
-	);`
-	createUserSQL = `
-	INSERT INTO users(email, password, name) VALUES(?, ?, ?);`
-	updateUserSQL = `
-	UPDATE users SET password=?, name=? WHERE email=?;`
-	getUserSQL = `
-	SELECT * FROM users WHERE email=?;`
+    CREATE TABLE users (
+        auth0_id VARCHAR(225) NOT NULL PRIMARY KEY,
+	id BIGINT UNSIGNED AUTO_INCREMENT UNIQUE,
+	email VARCHAR(320) NOT NULL,
+	username VARCHAR(128) NOT NULL
+    ) DEFAULT CHARSET=utf8 ;`
+
+	createUserSQL = `INSERT INTO users (auth0_id, id, email, username) VALUES (?, ?, ?, ?);`
+
+	getUserSQL = `SELECT * FROM users WHERE auth0_id=?;`
+
+	getUserKeySQL = `SELECT auth0_id FROM users WHERE id=?;`
+
+	listUserSQL = `SELECT * FROM users;`
+
+	updateUserSQL = `UPDATE users SET id=?, email=?, username=? WHERE auth0_id=?;`
+
+	deleteUserSQL = `DELETE FROM users WHERE auth0_id=?;`
 )
 
 type User struct {
-	Id       uint64 `json:"id"`
+	Auth0Id  string `json:"auth0_id"`
+	Id       uint64 `json:"id" form:"id"`
 	Email    string `json:"email" form:"email"`
-	Password string `json:"password" form:"password"`
-	Name     string `json:"name" form:"name"`
+	Username string `json:"username" form:"username"`
 }
 
 func (model User) String() string {
-	return fmt.Sprintf("Id: %d, Email: %s, Password: %s, Name: %s", model.Id, model.Email, model.Password, model.Name)
-}
-
-func (model *User) GetPID() (pid string) {
-	return model.Email
-}
-func (model *User) PutPID(pid string) {
-	model.Email = pid
-}
-func (model *User) GetPassword() (password string) {
-	return model.Password
-}
-func (model *User) PutPassword(password string) {
-	model.Password = password
+	return fmt.Sprintf("Auth0Id: %v, Id: %v, Email: %v, Username: %v", model.Auth0Id, model.Id, model.Email, model.Username)
 }
 
 type UserManager struct {
 	DB *sql.DB
 }
 
-// New creates a blank user, it is not yet persisted in the database
-// but is just for storing data
-func (m *UserManager) New(ctx context.Context) authboss.User {
-	return &User{}
-}
-
-// Create the user in storage, it should not overwrite a user
-// and should return ErrUserFound if it currently exists.
-func (m *UserManager) Create(ctx context.Context, user authboss.User) error {
-	model := user.(*User)
-	_, err := m.DB.Exec(createUserSQL, model.Email, model.Password, model.Name)
+func (m *UserManager) Create(model *User) (int, string, error) {
+	status := http.StatusCreated
+	_, err := m.DB.Exec(createUserSQL, model.Auth0Id, model.Id, model.Email, model.Username)
 	if err != nil {
-		if strings.Contains(err.Error(), "Duplicate entry") {
-			return authboss.ErrUserFound
+		if !strings.Contains(err.Error(), "Duplicate entry") {
+			msg := "Couldn't add user to database"
+			return http.StatusInternalServerError, msg, err
 		}
-		return err
+		status = http.StatusOK
 	}
-	return nil
+	// Update model with the key of the already existing model
+	_ = m.DB.QueryRow(getUserKeySQL, model.Id).Scan(&model.Auth0Id)
+	return status, "", nil
 }
 
-// Load will look up the user based on the passed in PrimaryID
-func (m *UserManager) Load(ctx context.Context, id string) (authboss.User, error) {
+func (m *UserManager) Get(auth0_id string) (*User, int, string, error) {
 	model := &User{}
-	err := m.DB.QueryRow(getUserSQL, id).Scan(&model.Id, &model.Email, &model.Password, &model.Name)
+	err := m.DB.QueryRow(getUserSQL, auth0_id).Scan(&model.Auth0Id, &model.Id, &model.Email, &model.Username)
 	if err == sql.ErrNoRows {
-		return nil, authboss.ErrUserNotFound
+		msg := "Couldn't find a user with that auth0_id"
+		return nil, http.StatusNotFound, msg, err
 	} else if err != nil {
-		return nil, err
+		msg := "Couldn't get user from database"
+		return nil, http.StatusInternalServerError, msg, err
 	}
-	return model, nil
+	return model, http.StatusOK, "", nil
 }
 
-// Save persists the user in the database, this should never
-// create a user and instead return ErrUserNotFound if the user
-// does not exist.
-func (m *UserManager) Save(ctx context.Context, user authboss.User) error {
-	model := user.(*User)
-	// Check for existence
-	user, err := m.Load(ctx, model.Email)
+func (m *UserManager) List() (*[]User, int, string, error) {
+	models := []User{}
+	rows, err := m.DB.Query(listUserSQL)
+	defer rows.Close()
 	if err != nil {
-		return err
+		msg := "Couldn't get users from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	for rows.Next() {
+		model := User{}
+		err = rows.Scan(&model.Auth0Id, &model.Id, &model.Email, &model.Username)
+		if err != nil {
+			msg := "Couldn't scan row from database"
+			return nil, http.StatusInternalServerError, msg, err
+		}
+		models = append(models, model)
+	}
+	err = rows.Err()
+	if err != nil {
+		msg := "Error scanning rows from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	return &models, http.StatusOK, "", nil
+}
+
+func (m *UserManager) Update(model *User) (int, string, error) {
+	// Check for 404s
+	_, status, msg, err := m.Get(model.Auth0Id)
+	if err != nil {
+		return status, msg, err
 	}
 	// Update
-	_, err = m.DB.Exec(updateUserSQL, model.Email, model.Password, model.Name, model.Id)
-	return err
+	_, err = m.DB.Exec(updateUserSQL, model.Id, model.Email, model.Username, model.Auth0Id)
+	if err != nil {
+		msg := "Couldn't update user in database"
+		return http.StatusInternalServerError, msg, err
+	}
+	return http.StatusOK, "", nil
+}
+
+func (m *UserManager) Delete(auth0_id string) (int, string, error) {
+	result, err := m.DB.Exec(deleteUserSQL, auth0_id)
+	if err != nil {
+		msg := "Couldn't delete user in database"
+		return http.StatusInternalServerError, msg, err
+	}
+	// Check for 404s
+	// Ignore errors (if the database doesn't support RowsAffected)
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		return http.StatusNotFound, "", nil
+	}
+	return http.StatusNoContent, "", nil
 }
