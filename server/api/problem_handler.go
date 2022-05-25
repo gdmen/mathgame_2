@@ -2,6 +2,7 @@
 package api // import "garydmenezes.com/mathgame/server/api"
 
 import (
+	"hash/fnv"
 	"net/http"
 	"strconv"
 
@@ -27,9 +28,30 @@ func (a *Api) createProblem(c *gin.Context) {
 	}
 	glog.Infof("%s %s", logPrefix, opts)
 
+	// Generate Problem
+	model := &Problem{}
+	model.Expr, model.Ans, model.Diff, err = generator.GenerateProblem(opts)
+	if err != nil {
+		if err, ok := err.(*generator.OptionsError); ok {
+			msg := "Failed options validation"
+			glog.Errorf("%s %s: %v", logPrefix, msg, err)
+			c.JSON(http.StatusBadRequest, GetError(msg))
+			return
+		}
+		msg := "Couldn't generate problem"
+		glog.Errorf("%s %s: %v", logPrefix, msg, err)
+		c.JSON(http.StatusBadRequest, GetError(msg))
+		return
+	}
+
+	// Generate model.Hash
+	h := fnv.New64a()
+	h.Write([]byte(model.Expr))
+	model.Id = h.Sum64()
+
 	// Write to database
 	manager := &ProblemManager{DB: a.DB}
-	model, status, msg, err := manager.Create(opts)
+	status, msg, err := manager.Create(model)
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
 		c.JSON(status, GetError(msg))

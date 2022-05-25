@@ -11,7 +11,8 @@ def camel_to_snake(s: str) -> str:
 def get_model_string(m: dict) -> str:
 
     key_type = ""
-    unique_struct_fields = m["unique"]
+    key_auto = False
+    unique_struct_fields = []
     struct_fields = []
     non_key_struct_fields = []
     sql_fields = []
@@ -24,10 +25,12 @@ def get_model_string(m: dict) -> str:
         sql_fields.append(snake_n)
         if n == m["key"]:
             key_type = f["type"]
+            key_auto = "AUTO_INCREMENT" in f["sql"]
         else:
             non_key_struct_fields.append(n)
             non_key_sql_fields.append(snake_n)
-        if n in unique_struct_fields:
+        if "UNIQUE" in f["sql"]:
+            unique_struct_fields.append(n)
             unique_sql_fields.append(snake_n)
 
     # file comment & imports
@@ -58,13 +61,14 @@ import (
     )
 
     # create SQL
+    create_sql_fields = non_key_sql_fields if key_auto else sql_fields
     s += '''
     create{0}SQL = `INSERT INTO {1}s ({2}) VALUES ({3});`
 '''.format(
         m["name"].capitalize(),
         m["name"],
-        ", ".join(non_key_sql_fields),
-        ", ".join(["?"]*len(non_key_sql_fields))
+        ", ".join(create_sql_fields),
+        ", ".join(["?"]*len(create_sql_fields))
     )
 
     # get SQL
@@ -147,6 +151,7 @@ import (
     )
 
     # manager.Create()
+    create_struct_fields = non_key_struct_fields if key_auto else struct_fields
     s += '''
     func (m *{0}Manager) Create(model *{0}) (int, string, error) {{
         status := http.StatusCreated
@@ -164,7 +169,7 @@ import (
     }}
 '''.format(
         m["name"].capitalize(),
-        ", ".join(["model." + n for n in non_key_struct_fields]),
+        ", ".join(["model." + n for n in create_struct_fields]),
         m["name"],
         ", ".join(["model." + n for n in unique_struct_fields]),
         m["key"]

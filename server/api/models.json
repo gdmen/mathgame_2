@@ -1,9 +1,27 @@
 {
   "models": [
     {
+      "name": "problem",
+      "key": "Id",
+      "fields": [
+        {
+          "name": "Id", "type": "uint64",
+          "sql": "BIGINT UNSIGNED PRIMARY KEY UNIQUE"
+        },
+        {"name": "Expr", "type": "string",
+          "sql": "TEXT NOT NULL"
+        },
+        {"name": "Ans", "type": "string",
+          "sql": "TEXT NOT NULL"
+        },
+        {"name": "Diff", "type": "float64",
+          "sql": "FLOAT NOT NULL"
+        }
+      ]
+    },
+    {
       "name": "video",
       "key": "Id",
-      "unique": ["LocalFileName"],
       "fields": [
         {
           "name": "Id", "type": "uint64",
