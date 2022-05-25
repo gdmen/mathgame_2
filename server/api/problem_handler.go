@@ -30,6 +30,7 @@ func (a *Api) createProblem(c *gin.Context) {
 
 	// Generate Problem
 	model := &Problem{}
+	// TODO: change this to a loop that tries to add problems until a new problem is added
 	model.Expr, model.Ans, model.Diff, err = generator.GenerateProblem(opts)
 	if err != nil {
 		if err, ok := err.(*generator.OptionsError); ok {
@@ -44,7 +45,7 @@ func (a *Api) createProblem(c *gin.Context) {
 		return
 	}
 
-	// Generate model.Hash
+	// Use expression hash as model.Id
 	h := fnv.New64a()
 	h.Write([]byte(model.Expr))
 	model.Id = h.Sum64()
