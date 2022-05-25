@@ -24,13 +24,14 @@ run_web:
 	cd web && npm start
 
 api: docs
+	cd server/api && python3 generate_models.py -c models.json && cd -
 	$(GOFMT) -s .
 	$(GOBUILD) -o ./bin/apiserver ./cmd/apiserver/main.go
 
 web:
 	cd web && npm run build; cd -
 
-test: test-api
+test: api test-api
 
 test-api: server/api
 	$(GOTEST) ./$^
