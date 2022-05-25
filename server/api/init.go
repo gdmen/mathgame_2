@@ -7,8 +7,10 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	gin_adapter "github.com/gwatts/gin-adapter"
 
 	"garydmenezes.com/mathgame/server/common"
+	"garydmenezes.com/mathgame/server/common/auth0"
 )
 
 var CREATE_TABLES_SQL = []string{
@@ -26,7 +28,8 @@ func GetError(message string) map[string]interface{} {
 }
 
 type Api struct {
-	DB *sql.DB
+	DB     *sql.DB
+	IsTest bool
 }
 
 func NewApi(db *sql.DB) (*Api, error) {
@@ -44,11 +47,31 @@ func NewApi(db *sql.DB) (*Api, error) {
 
 func (a *Api) GetRouter() *gin.Engine {
 	router := gin.Default()
-	// Allow all origins, methods
-	router.Use(cors.Default())
+	// - No origin allowed by default
+	// - GET,POST, PUT, HEAD methods
+	// - Credentials share disabled
+	// - Preflight requests cached for 12 hours
+	config := cors.DefaultConfig()
+	// TODO: limit allowed origins
+	config.AllowAllOrigins = true
+	config.AllowHeaders = append(config.AllowHeaders, "Authorization")
+	config.AllowMethods = []string{"GET", "POST", "DELETE"}
+	router.Use(cors.New(config))
+
+	// Use our auth0 jwt middleware
+	if !a.IsTest {
+		router.Use(gin_adapter.Wrap(auth0.EnsureValidToken()))
+	}
 
 	v1 := router.Group("/api/v1")
 	{
+		user := v1.Group("/users")
+		{
+			user.POST("", common.RequestIdMiddleware(), a.createUser)
+			user.POST("/", common.RequestIdMiddleware(), a.createUser)
+			user.POST("/:auth0_id", common.RequestIdMiddleware(), a.updateUser)
+			user.GET("/:auth0_id", common.RequestIdMiddleware(), a.getUser)
+		}
 		video := v1.Group("/videos")
 		{
 			video.POST("", common.RequestIdMiddleware(), a.createVideo)
