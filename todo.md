@@ -1,3 +1,5 @@
+- Move .env to conf.json
+
 - Handler test data should be in a separate file & should be auto-updated by the tests
 
 - Hardcoded API token for writes

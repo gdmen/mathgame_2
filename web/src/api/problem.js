@@ -31,8 +31,11 @@ class BaseProblem extends React.Component {
     }
 
     createModel() {
+        const config = {
+          headers: { Authorization: `Bearer ` + this.props.accessToken }
+        };
         Axios
-            .post(this.props.url + ModelEndpoint, this.state.options)
+            .post(this.props.url + ModelEndpoint, this.state.options, config)
             .then(resp => {
                 this.setState((state, props) => ({
                     isLoaded: true,
