@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/golang/glog"
 	gin_adapter "github.com/gwatts/gin-adapter"
 
 	"garydmenezes.com/mathgame/server/common"
@@ -37,6 +38,8 @@ func NewApi(db *sql.DB) (*Api, error) {
 		_, err := db.Exec(sql)
 		if err != nil {
 			if strings.Contains(err.Error(), "already exists") {
+				msg := "Not creating table"
+				glog.Infof("%s: %v", msg, err)
 				continue
 			}
 			return nil, err

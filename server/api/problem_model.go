@@ -12,12 +12,12 @@ const (
 	CreateProblemTableSQL = `
     CREATE TABLE problems (
         id BIGINT UNSIGNED PRIMARY KEY UNIQUE,
-	expr TEXT NOT NULL,
-	ans TEXT NOT NULL,
-	diff FLOAT NOT NULL
+	expression TEXT NOT NULL,
+	answer TEXT NOT NULL,
+	difficulty FLOAT NOT NULL
     ) DEFAULT CHARSET=utf8 ;`
 
-	createProblemSQL = `INSERT INTO problems (id, expr, ans, diff) VALUES (?, ?, ?, ?);`
+	createProblemSQL = `INSERT INTO problems (id, expression, answer, difficulty) VALUES (?, ?, ?, ?);`
 
 	getProblemSQL = `SELECT * FROM problems WHERE id=?;`
 
@@ -25,20 +25,20 @@ const (
 
 	listProblemSQL = `SELECT * FROM problems;`
 
-	updateProblemSQL = `UPDATE problems SET expr=?, ans=?, diff=? WHERE id=?;`
+	updateProblemSQL = `UPDATE problems SET expression=?, answer=?, difficulty=? WHERE id=?;`
 
 	deleteProblemSQL = `DELETE FROM problems WHERE id=?;`
 )
 
 type Problem struct {
-	Id   uint64  `json:"id"`
-	Expr string  `json:"expr" form:"expr"`
-	Ans  string  `json:"ans" form:"ans"`
-	Diff float64 `json:"diff" form:"diff"`
+	Id         uint64  `json:"id"`
+	Expression string  `json:"expression" form:"expression"`
+	Answer     string  `json:"answer" form:"answer"`
+	Difficulty float64 `json:"difficulty" form:"difficulty"`
 }
 
 func (model Problem) String() string {
-	return fmt.Sprintf("Id: %v, Expr: %v, Ans: %v, Diff: %v", model.Id, model.Expr, model.Ans, model.Diff)
+	return fmt.Sprintf("Id: %v, Expression: %v, Answer: %v, Difficulty: %v", model.Id, model.Expression, model.Answer, model.Difficulty)
 }
 
 type ProblemManager struct {
@@ -47,7 +47,7 @@ type ProblemManager struct {
 
 func (m *ProblemManager) Create(model *Problem) (int, string, error) {
 	status := http.StatusCreated
-	_, err := m.DB.Exec(createProblemSQL, model.Id, model.Expr, model.Ans, model.Diff)
+	_, err := m.DB.Exec(createProblemSQL, model.Id, model.Expression, model.Answer, model.Difficulty)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Duplicate entry") {
 			msg := "Couldn't add problem to database"
@@ -62,7 +62,7 @@ func (m *ProblemManager) Create(model *Problem) (int, string, error) {
 
 func (m *ProblemManager) Get(id uint64) (*Problem, int, string, error) {
 	model := &Problem{}
-	err := m.DB.QueryRow(getProblemSQL, id).Scan(&model.Id, &model.Expr, &model.Ans, &model.Diff)
+	err := m.DB.QueryRow(getProblemSQL, id).Scan(&model.Id, &model.Expression, &model.Answer, &model.Difficulty)
 	if err == sql.ErrNoRows {
 		msg := "Couldn't find a problem with that id"
 		return nil, http.StatusNotFound, msg, err
@@ -83,7 +83,7 @@ func (m *ProblemManager) List() (*[]Problem, int, string, error) {
 	}
 	for rows.Next() {
 		model := Problem{}
-		err = rows.Scan(&model.Id, &model.Expr, &model.Ans, &model.Diff)
+		err = rows.Scan(&model.Id, &model.Expression, &model.Answer, &model.Difficulty)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -105,7 +105,7 @@ func (m *ProblemManager) Update(model *Problem) (int, string, error) {
 		return status, msg, err
 	}
 	// Update
-	_, err = m.DB.Exec(updateProblemSQL, model.Expr, model.Ans, model.Diff, model.Id)
+	_, err = m.DB.Exec(updateProblemSQL, model.Expression, model.Answer, model.Difficulty, model.Id)
 	if err != nil {
 		msg := "Couldn't update problem in database"
 		return http.StatusInternalServerError, msg, err

@@ -31,7 +31,7 @@ func (a *Api) createProblem(c *gin.Context) {
 	// Generate Problem
 	model := &Problem{}
 	// TODO: change this to a loop that tries to add problems until a new problem is added
-	model.Expr, model.Ans, model.Diff, err = generator.GenerateProblem(opts)
+	model.Expression, model.Answer, model.Difficulty, err = generator.GenerateProblem(opts)
 	if err != nil {
 		if err, ok := err.(*generator.OptionsError); ok {
 			msg := "Failed options validation"
@@ -47,7 +47,7 @@ func (a *Api) createProblem(c *gin.Context) {
 
 	// Use expression hash as model.Id
 	h := fnv.New64a()
-	h.Write([]byte(model.Expr))
+	h.Write([]byte(model.Expression))
 	model.Id = h.Sum64()
 
 	// Write to database

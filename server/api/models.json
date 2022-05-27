@@ -29,15 +29,15 @@
           "sql": "BIGINT UNSIGNED PRIMARY KEY UNIQUE"
         },
         {
-          "name": "Expr", "type": "string",
+          "name": "Expression", "type": "string",
           "sql": "TEXT NOT NULL"
         },
         {
-          "name": "Ans", "type": "string",
+          "name": "Answer", "type": "string",
           "sql": "TEXT NOT NULL"
         },
         {
-          "name": "Diff", "type": "float64",
+          "name": "Difficulty", "type": "float64",
           "sql": "FLOAT NOT NULL"
         }
       ]
