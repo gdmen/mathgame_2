@@ -29,8 +29,11 @@ func GetError(message string) map[string]interface{} {
 }
 
 type Api struct {
-	DB     *sql.DB
-	IsTest bool
+	DB             *sql.DB
+	isTest         bool
+	userManager    *UserManager
+	videoManager   *VideoManager
+	problemManager *ProblemManager
 }
 
 func NewApi(db *sql.DB) (*Api, error) {
@@ -45,7 +48,11 @@ func NewApi(db *sql.DB) (*Api, error) {
 			return nil, err
 		}
 	}
-	return &Api{DB: db}, nil
+	a := &Api{DB: db}
+	a.userManager = &UserManager{DB: db}
+	a.videoManager = &VideoManager{DB: db}
+	a.problemManager = &ProblemManager{DB: db}
+	return a, nil
 }
 
 func (a *Api) GetRouter() *gin.Engine {
@@ -62,7 +69,7 @@ func (a *Api) GetRouter() *gin.Engine {
 	router.Use(cors.New(config))
 
 	// Use our auth0 jwt middleware
-	if !a.IsTest {
+	if !a.isTest {
 		router.Use(gin_adapter.Wrap(auth0.EnsureValidToken()))
 	}
 

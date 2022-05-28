@@ -19,17 +19,10 @@ func (a *Api) createVideo(c *gin.Context) {
 	}
 
 	// Write to database
-	manager := &VideoManager{DB: a.DB}
-	status, msg, err := manager.Create(model)
-	if err != nil {
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, GetError(msg))
+	status, msg, err := a.videoManager.Create(model)
+	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
-
-	glog.Infof("%s Success: %+v", logPrefix, model)
-	c.JSON(status, model)
-	return
 }
 
 func (a *Api) updateVideo(c *gin.Context) {
@@ -46,17 +39,10 @@ func (a *Api) updateVideo(c *gin.Context) {
 	}
 
 	// Write to database
-	manager := &VideoManager{DB: a.DB}
-	status, msg, err := manager.Update(model)
-	if err != nil {
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, GetError(msg))
+	status, msg, err := a.videoManager.Update(model)
+	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
-
-	glog.Infof("%s Success: %+v", logPrefix, model)
-	c.JSON(status, model)
-	return
 }
 
 func (a *Api) deleteVideo(c *gin.Context) {
@@ -70,17 +56,10 @@ func (a *Api) deleteVideo(c *gin.Context) {
 	}
 
 	// Write to database
-	manager := &VideoManager{DB: a.DB}
-	status, msg, err := manager.Delete(model.Id)
-	if err != nil {
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, GetError(msg))
+	status, msg, err := a.videoManager.Delete(model.Id)
+	if HandleManagerResp(logPrefix, c, status, msg, err, nil) != nil {
 		return
 	}
-
-	glog.Infof("%s Success", logPrefix)
-	c.JSON(status, nil)
-	return
 }
 
 func (a *Api) getVideo(c *gin.Context) {
@@ -94,17 +73,10 @@ func (a *Api) getVideo(c *gin.Context) {
 	}
 
 	// Read from database
-	manager := &VideoManager{DB: a.DB}
-	model, status, msg, err := manager.Get(model.Id)
-	if err != nil {
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, GetError(msg))
+	model, status, msg, err := a.videoManager.Get(model.Id)
+	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
-
-	glog.Infof("%s Success: %+v", logPrefix, model)
-	c.JSON(status, model)
-	return
 }
 
 func (a *Api) listVideo(c *gin.Context) {
@@ -112,15 +84,8 @@ func (a *Api) listVideo(c *gin.Context) {
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Read from database
-	manager := &VideoManager{DB: a.DB}
-	models, status, msg, err := manager.List()
-	if err != nil {
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, GetError(msg))
+	models, status, msg, err := a.videoManager.List()
+	if HandleManagerResp(logPrefix, c, status, msg, err, models) != nil {
 		return
 	}
-
-	glog.Infof("%s Success: %+v", logPrefix, models)
-	c.JSON(status, models)
-	return
 }

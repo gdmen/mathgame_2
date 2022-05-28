@@ -19,17 +19,10 @@ func (a *Api) createUser(c *gin.Context) {
 	}
 
 	// Write to database
-	manager := &UserManager{DB: a.DB}
-	status, msg, err := manager.Create(model)
-	if err != nil {
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, GetError(msg))
+	status, msg, err := a.userManager.Create(model)
+	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
-
-	glog.Infof("%s Success: %+v", logPrefix, model)
-	c.JSON(status, model)
-	return
 }
 
 func (a *Api) updateUser(c *gin.Context) {
@@ -46,17 +39,10 @@ func (a *Api) updateUser(c *gin.Context) {
 	}
 
 	// Write to database
-	manager := &UserManager{DB: a.DB}
-	status, msg, err := manager.Update(model)
-	if err != nil {
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, GetError(msg))
+	status, msg, err := a.userManager.Update(model)
+	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
-
-	glog.Infof("%s Success: %+v", logPrefix, model)
-	c.JSON(status, model)
-	return
 }
 
 func (a *Api) getUser(c *gin.Context) {
@@ -70,15 +56,8 @@ func (a *Api) getUser(c *gin.Context) {
 	}
 
 	// Read from database
-	manager := &UserManager{DB: a.DB}
-	model, status, msg, err := manager.Get(model.Auth0Id)
-	if err != nil {
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, GetError(msg))
+	model, status, msg, err := a.userManager.Get(model.Auth0Id)
+	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
-
-	glog.Infof("%s Success: %+v", logPrefix, model)
-	c.JSON(status, model)
-	return
 }

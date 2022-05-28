@@ -54,7 +54,7 @@ func ResetTestApi(c *common.Config) {
 		os.Exit(1)
 	}
 	TestApi, err = NewApi(db)
-	TestApi.IsTest = true
+	TestApi.isTest = true
 	if err != nil {
 		fmt.Printf("Couldn't init Api: %v", err)
 		os.Exit(1)

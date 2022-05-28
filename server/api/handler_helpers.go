@@ -31,3 +31,15 @@ func BindModelFromURI(logPrefix string, c *gin.Context, model interface{}) error
 	glog.Infof("%s %s", logPrefix, model)
 	return nil
 }
+
+func HandleManagerResp(logPrefix string, c *gin.Context, status int, msg string, err error, model interface{}) error {
+	if err != nil {
+		glog.Errorf("%s %s: %v", logPrefix, msg, err)
+		c.JSON(status, GetError(msg))
+		return err
+	}
+
+	glog.Infof("%s Success: %+v", logPrefix, model)
+	c.JSON(status, model)
+	return nil
+}

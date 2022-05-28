@@ -49,17 +49,10 @@ func (a *Api) createProblem(c *gin.Context) {
 	model.Id = h.Sum64()
 
 	// Write to database
-	manager := &ProblemManager{DB: a.DB}
-	status, msg, err := manager.Create(model)
-	if err != nil {
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, GetError(msg))
+	status, msg, err := a.problemManager.Create(model)
+	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
-
-	glog.Infof("%s Success: %+v", logPrefix, model)
-	c.JSON(status, model)
-	return
 }
 
 func (a *Api) deleteProblem(c *gin.Context) {
@@ -73,17 +66,10 @@ func (a *Api) deleteProblem(c *gin.Context) {
 	}
 
 	// Write to database
-	manager := &ProblemManager{DB: a.DB}
-	status, msg, err := manager.Delete(model.Id)
-	if err != nil {
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, GetError(msg))
+	status, msg, err := a.problemManager.Delete(model.Id)
+	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
-
-	glog.Infof("%s Success", logPrefix)
-	c.JSON(status, nil)
-	return
 }
 
 func (a *Api) getProblem(c *gin.Context) {
@@ -97,17 +83,10 @@ func (a *Api) getProblem(c *gin.Context) {
 	}
 
 	// Read from database
-	manager := &ProblemManager{DB: a.DB}
-	model, status, msg, err := manager.Get(model.Id)
-	if err != nil {
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, GetError(msg))
+	model, status, msg, err := a.problemManager.Get(model.Id)
+	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
-
-	glog.Infof("%s Success: %+v", logPrefix, model)
-	c.JSON(status, model)
-	return
 }
 
 func (a *Api) listProblem(c *gin.Context) {
@@ -115,15 +94,8 @@ func (a *Api) listProblem(c *gin.Context) {
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Read from database
-	manager := &ProblemManager{DB: a.DB}
-	models, status, msg, err := manager.List()
-	if err != nil {
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, GetError(msg))
+	models, status, msg, err := a.problemManager.List()
+	if HandleManagerResp(logPrefix, c, status, msg, err, models) != nil {
 		return
 	}
-
-	glog.Infof("%s Success: %+v", logPrefix, models)
-	c.JSON(status, models)
-	return
 }
