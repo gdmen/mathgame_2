@@ -4,7 +4,6 @@ package api // import "garydmenezes.com/mathgame/server/api"
 import (
 	"hash/fnv"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
@@ -19,18 +18,17 @@ func (a *Api) createProblem(c *gin.Context) {
 
 	// Parse input
 	opts := &generator.Options{}
-	err := c.Bind(opts)
-	if err != nil {
-		msg := "Couldn't parse input form"
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusBadRequest, GetError(msg))
+	if BindModelFromURI(logPrefix, c, opts) != nil {
 		return
 	}
-	glog.Infof("%s %s", logPrefix, opts)
+	if BindModelFromForm(logPrefix, c, opts) != nil {
+		return
+	}
 
 	// Generate Problem
 	model := &Problem{}
 	// TODO: change this to a loop that tries to add problems until a new problem is added
+	var err error
 	model.Expression, model.Answer, model.Difficulty, err = generator.GenerateProblem(opts)
 	if err != nil {
 		if err, ok := err.(*generator.OptionsError); ok {
@@ -69,17 +67,14 @@ func (a *Api) deleteProblem(c *gin.Context) {
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Parse input
-	paramId, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		msg := "URL id should be an integer"
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusBadRequest, GetError(msg))
+	model := &Problem{}
+	if BindModelFromURI(logPrefix, c, model) != nil {
 		return
 	}
 
 	// Write to database
 	manager := &ProblemManager{DB: a.DB}
-	status, msg, err := manager.Delete(paramId)
+	status, msg, err := manager.Delete(model.Id)
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
 		c.JSON(status, GetError(msg))
@@ -96,17 +91,14 @@ func (a *Api) getProblem(c *gin.Context) {
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Parse input
-	paramId, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		msg := "URL id should be an integer"
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusBadRequest, GetError(msg))
+	model := &Problem{}
+	if BindModelFromURI(logPrefix, c, model) != nil {
 		return
 	}
 
 	// Read from database
 	manager := &ProblemManager{DB: a.DB}
-	model, status, msg, err := manager.Get(paramId)
+	model, status, msg, err := manager.Get(model.Id)
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
 		c.JSON(status, GetError(msg))

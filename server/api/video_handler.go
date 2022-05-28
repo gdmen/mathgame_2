@@ -2,9 +2,6 @@
 package api // import "garydmenezes.com/mathgame/server/api"
 
 import (
-	"net/http"
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
 
@@ -17,14 +14,9 @@ func (a *Api) createVideo(c *gin.Context) {
 
 	// Parse input
 	model := &Video{}
-	err := c.Bind(model)
-	if err != nil {
-		msg := "Couldn't parse input form"
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusBadRequest, GetError(msg))
+	if BindModelFromForm(logPrefix, c, model) != nil {
 		return
 	}
-	glog.Infof("%s %s", logPrefix, model)
 
 	// Write to database
 	manager := &VideoManager{DB: a.DB}
@@ -45,23 +37,13 @@ func (a *Api) updateVideo(c *gin.Context) {
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Parse input
-	paramId, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		msg := "URL id should be an integer"
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusNotFound, GetError(msg))
-		return
-	}
 	model := &Video{}
-	err = c.Bind(model)
-	if err != nil {
-		msg := "Couldn't parse input form"
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusBadRequest, GetError(msg))
+	if BindModelFromURI(logPrefix, c, model) != nil {
 		return
 	}
-	model.Id = paramId
-	glog.Infof("%s %s", logPrefix, model)
+	if BindModelFromForm(logPrefix, c, model) != nil {
+		return
+	}
 
 	// Write to database
 	manager := &VideoManager{DB: a.DB}
@@ -82,17 +64,14 @@ func (a *Api) deleteVideo(c *gin.Context) {
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Parse input
-	paramId, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		msg := "URL id should be an integer"
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusBadRequest, GetError(msg))
+	model := &Video{}
+	if BindModelFromURI(logPrefix, c, model) != nil {
 		return
 	}
 
 	// Write to database
 	manager := &VideoManager{DB: a.DB}
-	status, msg, err := manager.Delete(paramId)
+	status, msg, err := manager.Delete(model.Id)
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
 		c.JSON(status, GetError(msg))
@@ -109,17 +88,14 @@ func (a *Api) getVideo(c *gin.Context) {
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Parse input
-	paramId, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		msg := "URL id should be an integer"
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusNotFound, GetError(msg))
+	model := &Video{}
+	if BindModelFromURI(logPrefix, c, model) != nil {
 		return
 	}
 
 	// Read from database
 	manager := &VideoManager{DB: a.DB}
-	model, status, msg, err := manager.Get(paramId)
+	model, status, msg, err := manager.Get(model.Id)
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
 		c.JSON(status, GetError(msg))

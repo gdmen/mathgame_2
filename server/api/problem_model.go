@@ -31,10 +31,10 @@ const (
 )
 
 type Problem struct {
-	Id         uint64  `json:"id"`
-	Expression string  `json:"expression" form:"expression"`
-	Answer     string  `json:"answer" form:"answer"`
-	Difficulty float64 `json:"difficulty" form:"difficulty"`
+	Id         uint64  `json:"id" uri:"id"`
+	Expression string  `json:"expression" uri:"expression" form:"expression"`
+	Answer     string  `json:"answer" uri:"answer" form:"answer"`
+	Difficulty float64 `json:"difficulty" uri:"difficulty" form:"difficulty"`
 }
 
 func (model Problem) String() string {

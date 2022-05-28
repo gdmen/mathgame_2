@@ -2,8 +2,6 @@
 package api // import "garydmenezes.com/mathgame/server/api"
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
 
@@ -16,14 +14,9 @@ func (a *Api) createUser(c *gin.Context) {
 
 	// Parse input
 	model := &User{}
-	err := c.Bind(model)
-	if err != nil {
-		msg := "Couldn't parse input form"
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusBadRequest, GetError(msg))
+	if BindModelFromForm(logPrefix, c, model) != nil {
 		return
 	}
-	glog.Infof("%s %s", logPrefix, model)
 
 	// Write to database
 	manager := &UserManager{DB: a.DB}
@@ -45,15 +38,12 @@ func (a *Api) updateUser(c *gin.Context) {
 
 	// Parse input
 	model := &User{}
-	err := c.Bind(model)
-	if err != nil {
-		msg := "Couldn't parse input form"
-		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusBadRequest, GetError(msg))
+	if BindModelFromURI(logPrefix, c, model) != nil {
 		return
 	}
-	model.Auth0Id = c.Param("auth0_id")
-	glog.Infof("%s %s", logPrefix, model)
+	if BindModelFromForm(logPrefix, c, model) != nil {
+		return
+	}
 
 	// Write to database
 	manager := &UserManager{DB: a.DB}
@@ -73,9 +63,15 @@ func (a *Api) getUser(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
+	// Parse input
+	model := &User{}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
 	// Read from database
 	manager := &UserManager{DB: a.DB}
-	model, status, msg, err := manager.Get(c.Param("auth0_id"))
+	model, status, msg, err := manager.Get(model.Auth0Id)
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
 		c.JSON(status, GetError(msg))

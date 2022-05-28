@@ -127,7 +127,7 @@ import (
     # model struct
     s += "type {0} struct {{".format(m["name"].capitalize())
     for f in m["fields"]:
-        fstr = '\n{0} {1} `json:"{2}"'
+        fstr = '\n{0} {1} `json:"{2}" uri:"{2}"'
         if f["name"] != key_name:
             fstr += ' form:"{2}"'
         fstr += "`"

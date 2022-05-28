@@ -31,10 +31,10 @@ const (
 )
 
 type Video struct {
-	Id            uint64 `json:"id"`
-	Title         string `json:"title" form:"title"`
-	LocalFileName string `json:"local_file_name" form:"local_file_name"`
-	Enabled       bool   `json:"enabled" form:"enabled"`
+	Id            uint64 `json:"id" uri:"id"`
+	Title         string `json:"title" uri:"title" form:"title"`
+	LocalFileName string `json:"local_file_name" uri:"local_file_name" form:"local_file_name"`
+	Enabled       bool   `json:"enabled" uri:"enabled" form:"enabled"`
 }
 
 func (model Video) String() string {
