@@ -1,4 +1,4 @@
-# generate_model.py
+# generate_models.py
 
 import argparse
 import re
@@ -9,7 +9,6 @@ def camel_to_snake(s: str) -> str:
     return CAMEL_TO_SNAKE_RE.sub('_', s).lower()
 
 def get_model_string(m: dict) -> str:
-
     key_name = ""
     key_type = ""
     key_auto = False
@@ -282,7 +281,7 @@ import (
     return s
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate a golang model for the math game.")
+    parser = argparse.ArgumentParser(description="Generate a go model for the math game.")
     parser.add_argument("-c", "--config", metavar="config", type=str, help="name of the config file (models.json)", required=True)
     args = parser.parse_args()
     c = {}

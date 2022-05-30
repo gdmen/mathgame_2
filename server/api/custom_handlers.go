@@ -12,7 +12,7 @@ import (
 	"garydmenezes.com/mathgame/server/generator"
 )
 
-func (a *Api) createProblem(c *gin.Context) {
+func (a *Api) customCreateProblem(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
@@ -51,51 +51,6 @@ func (a *Api) createProblem(c *gin.Context) {
 	// Write to database
 	status, msg, err := a.problemManager.Create(model)
 	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
-		return
-	}
-}
-
-func (a *Api) deleteProblem(c *gin.Context) {
-	logPrefix := common.GetLogPrefix(c)
-	glog.Infof("%s fcn start", logPrefix)
-
-	// Parse input
-	model := &Problem{}
-	if BindModelFromURI(logPrefix, c, model) != nil {
-		return
-	}
-
-	// Write to database
-	status, msg, err := a.problemManager.Delete(model.Id)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
-		return
-	}
-}
-
-func (a *Api) getProblem(c *gin.Context) {
-	logPrefix := common.GetLogPrefix(c)
-	glog.Infof("%s fcn start", logPrefix)
-
-	// Parse input
-	model := &Problem{}
-	if BindModelFromURI(logPrefix, c, model) != nil {
-		return
-	}
-
-	// Read from database
-	model, status, msg, err := a.problemManager.Get(model.Id)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
-		return
-	}
-}
-
-func (a *Api) listProblem(c *gin.Context) {
-	logPrefix := common.GetLogPrefix(c)
-	glog.Infof("%s fcn start", logPrefix)
-
-	// Read from database
-	models, status, msg, err := a.problemManager.List()
-	if HandleManagerResp(logPrefix, c, status, msg, err, models) != nil {
 		return
 	}
 }

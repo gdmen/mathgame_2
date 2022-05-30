@@ -94,8 +94,8 @@ func (a *Api) GetRouter() *gin.Engine {
 		}
 		problem := v1.Group("/problems")
 		{
-			problem.POST("", common.RequestIdMiddleware(), a.createProblem)
-			problem.POST("/", common.RequestIdMiddleware(), a.createProblem)
+			problem.POST("", common.RequestIdMiddleware(), a.customCreateProblem)
+			problem.POST("/", common.RequestIdMiddleware(), a.customCreateProblem)
 			problem.DELETE("/:id", common.RequestIdMiddleware(), a.deleteProblem)
 			problem.GET("/:id", common.RequestIdMiddleware(), a.getProblem)
 			problem.GET("", common.RequestIdMiddleware(), a.listProblem)

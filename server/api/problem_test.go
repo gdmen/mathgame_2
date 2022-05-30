@@ -2,7 +2,9 @@
 package api // import "garydmenezes.com/mathgame/server/api"
 
 import (
+	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -57,8 +59,11 @@ func TestProblemBasic(t *testing.T) {
 	}
 
 	// {"id":2806439303743259763,"expression":"5+112","answer":"117","difficulty":5.759936284165179}
-	id := strings.Split(strings.Split(string(body), ",")[0], ":")[1]
-	if len(id) == 0 {
+	model := Problem{}
+	json.Unmarshal(body, &model)
+	h := fnv.New64a()
+	h.Write([]byte(model.Expression))
+	if model.Id != h.Sum64() {
 		t.Fatal("ERROR: " + string(body))
 	}
 
@@ -84,7 +89,7 @@ func TestProblemBasic(t *testing.T) {
 	// Get
 	resp = httptest.NewRecorder()
 
-	req, _ = http.NewRequest("GET", fmt.Sprintf("/api/v1/problems/%s", id), nil)
+	req, _ = http.NewRequest("GET", fmt.Sprintf("/api/v1/problems/%d", model.Id), nil)
 
 	r.ServeHTTP(resp, req)
 
@@ -100,7 +105,7 @@ func TestProblemBasic(t *testing.T) {
 	// Delete
 	resp = httptest.NewRecorder()
 
-	req, _ = http.NewRequest("DELETE", fmt.Sprintf("/api/v1/problems/%s", id), nil)
+	req, _ = http.NewRequest("DELETE", fmt.Sprintf("/api/v1/problems/%d", model.Id), nil)
 
 	r.ServeHTTP(resp, req)
 

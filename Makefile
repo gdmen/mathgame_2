@@ -24,7 +24,7 @@ run_web: web
 	cd web && npm start
 
 api: docs
-	cd server/api && python3 generate_models.py -c models.json && cd -
+	cd server/api && python3 generate_models.py -c models.json && python3 generate_handlers.py -c models.json && cd -
 	$(GOFMT) -s .
 	$(GOBUILD) -o ./bin/apiserver ./cmd/apiserver/main.go
 
