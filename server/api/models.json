@@ -54,8 +54,16 @@
           "sql": "VARCHAR(128) NOT NULL"
         },
         {
-          "name": "LocalFileName", "type": "string",
-          "sql": "VARCHAR(32) NOT NULL UNIQUE"
+          "name": "URL", "type": "string",
+          "sql": "VARCHAR(256) NOT NULL"
+        },
+        {
+          "name": "Start", "type": "int",
+          "sql": "INT(5) NOT NULL DEFAULT '0'"
+        },
+        {
+          "name": "End", "type": "int",
+          "sql": "INT(5) NOT NULL DEFAULT '99999'"
         },
         {
           "name": "Enabled", "type": "bool",

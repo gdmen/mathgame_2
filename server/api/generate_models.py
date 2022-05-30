@@ -11,27 +11,34 @@ def camel_to_snake(s: str) -> str:
 def get_model_string(m: dict) -> str:
     key_name = ""
     key_type = ""
-    key_auto = False
     unique_struct_fields = []
     struct_fields = []
     non_key_struct_fields = []
+    auto_incr_struct_fields = []
+    create_struct_fields = []
     sql_fields = []
     non_key_sql_fields = []
+    auto_incr_sql_fields = []
+    create_sql_fields = []
     unique_sql_fields = []
     for f in m["fields"]:
         if "PRIMARY KEY" in f["sql"]:
             key_name = f["name"]
+            key_type = f["type"]
     for f in m["fields"]:
         n = f["name"]
         snake_n = camel_to_snake(n)
         struct_fields.append(n)
         sql_fields.append(snake_n)
-        if n == key_name:
-            key_type = f["type"]
-            key_auto = "AUTO_INCREMENT" in f["sql"]
-        else:
+        if n != key_name:
             non_key_struct_fields.append(n)
             non_key_sql_fields.append(snake_n)
+        if "AUTO_INCREMENT" in f["sql"]:
+            auto_incr_struct_fields.append(n)
+            auto_incr_sql_fields.append(snake_n)
+        else:
+            create_struct_fields.append(n)
+            create_sql_fields.append(snake_n)
         if "UNIQUE" in f["sql"]:
             unique_struct_fields.append(n)
             unique_sql_fields.append(snake_n)
@@ -64,7 +71,6 @@ import (
     )
 
     # create SQL
-    create_sql_fields = non_key_sql_fields if key_auto else sql_fields
     s += '''
     create{0}SQL = `INSERT INTO {1}s ({2}) VALUES ({3});`
 '''.format(
@@ -88,9 +94,9 @@ import (
     get{0}KeySQL = `SELECT {1} FROM {2}s WHERE {3};`
 '''.format(
         m["name"].capitalize(),
-        camel_to_snake(key_name),
+        ", ".join(auto_incr_sql_fields),
         m["name"],
-        ", ".join([f+"=?" for f in unique_sql_fields]),
+        ", ".join([f+"=?" for f in create_sql_fields]),
     )
 
     # list SQL
@@ -154,29 +160,54 @@ import (
     )
 
     # manager.Create()
-    create_struct_fields = non_key_struct_fields if key_auto else struct_fields
     s += '''
     func (m *{0}Manager) Create(model *{0}) (int, string, error) {{
         status := http.StatusCreated
-        _, err := m.DB.Exec(create{0}SQL, {1})
+        {1}, err := m.DB.Exec(create{0}SQL, {2})
         if err != nil {{
             if !strings.Contains(err.Error(), "Duplicate entry") {{
-                msg := "Couldn't add {2} to database"
+                msg := "Couldn't add {3} to database"
                 return http.StatusInternalServerError, msg, err
             }}
-            status = http.StatusOK
-        }}
-        // Update model with the key of the already existing model
-        _ = m.DB.QueryRow(get{0}KeySQL, {3}).Scan(&model.{4})
-        return status, "", nil
-    }}
+'''.format(
+        m["name"].capitalize(),
+        "result" if key_name in auto_incr_struct_fields else "_",
+        ", ".join(["model." + n for n in create_struct_fields]),
+        m["name"]
+    )
+
+    if auto_incr_struct_fields:
+        s += '''
+            // Update model with the configured return field.
+            _ = m.DB.QueryRow(get{0}KeySQL, {1}).Scan({2})
 '''.format(
         m["name"].capitalize(),
         ", ".join(["model." + n for n in create_struct_fields]),
+        ", ".join(["&model." + n for n in auto_incr_struct_fields])
+    )
+
+    s += '''
+            return http.StatusOK, "", nil
+        }
+    '''
+
+    if key_name in auto_incr_struct_fields:
+        s += '''
+        last_id, err := result.LastInsertId()
+        if err != nil {{
+            msg := "Couldn't add {0} to database"
+            return http.StatusInternalServerError, msg, err
+        }}
+        model.{1} = uint64(last_id)
+'''.format(
         m["name"],
-        ", ".join(["model." + n for n in unique_struct_fields]),
         key_name
     )
+
+    s += '''
+        return status, "", nil
+    }
+'''
 
     # manager.Get()
     s += '''

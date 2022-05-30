@@ -21,7 +21,7 @@ const (
 
 	getProblemSQL = `SELECT * FROM problems WHERE id=?;`
 
-	getProblemKeySQL = `SELECT id FROM problems WHERE id=?;`
+	getProblemKeySQL = `SELECT  FROM problems WHERE id=?, expression=?, answer=?, difficulty=?;`
 
 	listProblemSQL = `SELECT * FROM problems;`
 
@@ -53,10 +53,10 @@ func (m *ProblemManager) Create(model *Problem) (int, string, error) {
 			msg := "Couldn't add problem to database"
 			return http.StatusInternalServerError, msg, err
 		}
-		status = http.StatusOK
+
+		return http.StatusOK, "", nil
 	}
-	// Update model with the key of the already existing model
-	_ = m.DB.QueryRow(getProblemKeySQL, model.Id).Scan(&model.Id)
+
 	return status, "", nil
 }
 

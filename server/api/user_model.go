@@ -17,11 +17,11 @@ const (
 	username VARCHAR(128) NOT NULL
     ) DEFAULT CHARSET=utf8 ;`
 
-	createUserSQL = `INSERT INTO users (auth0_id, id, email, username) VALUES (?, ?, ?, ?);`
+	createUserSQL = `INSERT INTO users (auth0_id, email, username) VALUES (?, ?, ?);`
 
 	getUserSQL = `SELECT * FROM users WHERE auth0_id=?;`
 
-	getUserKeySQL = `SELECT auth0_id FROM users WHERE id=?;`
+	getUserKeySQL = `SELECT id FROM users WHERE auth0_id=?, email=?, username=?;`
 
 	listUserSQL = `SELECT * FROM users;`
 
@@ -47,16 +47,19 @@ type UserManager struct {
 
 func (m *UserManager) Create(model *User) (int, string, error) {
 	status := http.StatusCreated
-	_, err := m.DB.Exec(createUserSQL, model.Auth0Id, model.Id, model.Email, model.Username)
+	_, err := m.DB.Exec(createUserSQL, model.Auth0Id, model.Email, model.Username)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Duplicate entry") {
 			msg := "Couldn't add user to database"
 			return http.StatusInternalServerError, msg, err
 		}
-		status = http.StatusOK
+
+		// Update model with the configured return field.
+		_ = m.DB.QueryRow(getUserKeySQL, model.Auth0Id, model.Email, model.Username).Scan(&model.Id)
+
+		return http.StatusOK, "", nil
 	}
-	// Update model with the key of the already existing model
-	_ = m.DB.QueryRow(getUserKeySQL, model.Id).Scan(&model.Auth0Id)
+
 	return status, "", nil
 }
 
