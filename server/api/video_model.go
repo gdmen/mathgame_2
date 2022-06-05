@@ -33,11 +33,11 @@ const (
 )
 
 type Video struct {
-	Id      uint64 `json:"id" uri:"id"`
+	Id      uint32 `json:"id" uri:"id"`
 	Title   string `json:"title" uri:"title" form:"title"`
 	URL     string `json:"url" uri:"url" form:"url"`
-	Start   int    `json:"start" uri:"start" form:"start"`
-	End     int    `json:"end" uri:"end" form:"end"`
+	Start   uint32 `json:"start" uri:"start" form:"start"`
+	End     uint32 `json:"end" uri:"end" form:"end"`
 	Enabled bool   `json:"enabled" uri:"enabled" form:"enabled"`
 }
 
@@ -69,12 +69,12 @@ func (m *VideoManager) Create(model *Video) (int, string, error) {
 		msg := "Couldn't add video to database"
 		return http.StatusInternalServerError, msg, err
 	}
-	model.Id = uint64(last_id)
+	model.Id = uint32(last_id)
 
 	return status, "", nil
 }
 
-func (m *VideoManager) Get(id uint64) (*Video, int, string, error) {
+func (m *VideoManager) Get(id uint32) (*Video, int, string, error) {
 	model := &Video{}
 	err := m.DB.QueryRow(getVideoSQL, id).Scan(&model.Id, &model.Title, &model.URL, &model.Start, &model.End, &model.Enabled)
 	if err == sql.ErrNoRows {
@@ -127,7 +127,7 @@ func (m *VideoManager) Update(model *Video) (int, string, error) {
 	return http.StatusOK, "", nil
 }
 
-func (m *VideoManager) Delete(id uint64) (int, string, error) {
+func (m *VideoManager) Delete(id uint32) (int, string, error) {
 	result, err := m.DB.Exec(deleteVideoSQL, id)
 	if err != nil {
 		msg := "Couldn't delete video in database"

@@ -1,15 +1,13 @@
 package common
 
 import (
-	"net/http"
-
-	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/satori/go.uuid"
 )
 
 const (
 	RequestIdKey = "X-Request-Id"
+	Auth0IdKey   = "X-Auth0-Id"
 )
 
 func RequestIdMiddleware() gin.HandlerFunc {
@@ -20,12 +18,17 @@ func RequestIdMiddleware() gin.HandlerFunc {
 	}
 }
 
-// IsAuthenticated is a middleware that checks if
-// the user has already been authenticated previously.
-func IsAuthenticated(ctx *gin.Context) {
-	if sessions.Default(ctx).Get("profile") == nil {
-		ctx.Redirect(http.StatusSeeOther, "/")
-	} else {
-		ctx.Next()
+type TestAuth0 struct {
+	Auth0Id string `json:"test_auth0_id" uri:"test_auth0_id" form:"test_auth0_id"`
+}
+
+func TestAuth0Middleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		model := &TestAuth0{}
+		err := c.Bind(model)
+		if err != nil {
+			panic(err)
+		}
+		c.Set(Auth0IdKey, model.Auth0Id)
 	}
 }

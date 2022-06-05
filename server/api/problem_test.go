@@ -31,7 +31,7 @@ func TestProblemBasic(t *testing.T) {
 	r := TestApi.GetRouter()
 
 	test_model := &Problem{
-		Id:         2806439303743259763,
+		Id:         1305619059,
 		Expression: "5+112",
 		Answer:     "117",
 		Difficulty: 5.759936284165179,
@@ -58,9 +58,9 @@ func TestProblemBasic(t *testing.T) {
 
 	model := Problem{}
 	json.Unmarshal(body, &model)
-	h := fnv.New64a()
+	h := fnv.New32a()
 	h.Write([]byte(model.Expression))
-	if model.Id != h.Sum64() {
-		t.Fatal("ERROR: " + string(body))
+	if model.Id != h.Sum32() {
+		t.Fatalf("Expected Id: %d, got: %d", h.Sum32(), model.Id)
 	}
 }

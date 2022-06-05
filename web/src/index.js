@@ -1,3 +1,5 @@
+import Axios from "axios";
+
 import React, { useEffect, useState } from "react";
 import ReactDOM from 'react-dom'
 import { BrowserRouter, Route, Switch } from 'react-router-dom'
@@ -31,6 +33,36 @@ const NotFound = () => (
 var conf = require('./conf')
 const ApiUrl = conf.api_host + ':' + conf.api_port + '/api/v1'
 
+const IndexView = () => {
+  const { user, isLoading, isAuthenticated, getAccessTokenSilently} = useAuth0();
+  const [accessToken, setAccessToken] = useState(null);
+  useEffect(() => {
+    const getAccessToken = async () => {
+      try {
+        setAccessToken(await getAccessTokenSilently());
+      } catch (e) {
+        console.log(e.message);
+      }
+    };
+
+    getAccessToken();
+  }, [getAccessTokenSilently]);
+
+  if (isLoading) {
+    return <div>loading... </div>;
+  }
+
+  var config = { headers: { Authorization: `Bearer ` + accessToken } };
+  Axios
+      .post(ApiUrl + "/users", {auth0_id: user.sub, email: user.email, username: user.name}, config)
+
+  return (
+    <div>
+      hello home page
+    </div>
+  )
+}
+
 class AdminVideosView extends React.Component {
   render() {
     return (
@@ -56,7 +88,7 @@ class AdminVideosView extends React.Component {
 }
 
 const ProblemView = () => {
-  const { isLoading, isAuthenticated, getAccessTokenSilently } = useAuth0();
+  const { user, isLoading, isAuthenticated, getAccessTokenSilently} = useAuth0();
   const [accessToken, setAccessToken] = useState(null);
   useEffect(() => {
     const getAccessToken = async () => {
@@ -76,7 +108,7 @@ const ProblemView = () => {
 
   return (
     <div>
-      <BaseProblem url={ApiUrl} accessToken={accessToken} />
+      <BaseProblem url={ApiUrl} accessToken={accessToken} auth0Id={user.sub} />
     </div>
   )
 }
@@ -86,6 +118,7 @@ const Main = () => (
     <Switch>
       <Route path="/admin/videos" component={AdminVideosView} />
       <Route path="/problem" component={ProblemView} />
+      <Route path="" component={IndexView} />
       <Route path="*" component={NotFound} />
     </Switch>
   </main>
@@ -106,10 +139,10 @@ const App = () => (
             <LoginButton />
           </li>
           <li>
-            <a href="/">2</a>
+            <a href="/">/</a>
           </li>
           <li>
-            <a href="/problem">3</a>
+            <a href="/problem">problem</a>
           </li>
         </ul>
       </div>

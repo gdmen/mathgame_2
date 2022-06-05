@@ -6,18 +6,15 @@ import "katex/dist/katex.min.css"
 
 var ReactFitText = require('react-fittext');
 
-const ModelEndpoint = "/problems";
+const ModelEndpoint = "/problems/";
 
 class BaseProblem extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
-            options: {
-                operations: ["+", "-"],
-                fractions: false,
-                negatives: false,
-                target_difficulty: 6
-            },
+            config: { headers: { Authorization: `Bearer ` + this.props.accessToken } },
+            problem_id: 0,
+            user_id: 0,
             model: {
                 id: 0,
                 expression: "",
@@ -30,25 +27,30 @@ class BaseProblem extends React.Component {
         };
     }
 
-    createModel() {
-        const config = {
-          headers: { Authorization: `Bearer ` + this.props.accessToken }
-        };
+    getModel() {
         Axios
-            .post(this.props.url + ModelEndpoint, this.state.options, config)
+            .get(this.props.url + "/gamestates/" + this.state.user_id, this.state.config)
             .then(resp => {
                 this.setState((state, props) => ({
-                    isLoaded: true,
-                    model: {
-                        id: resp.data.id,
-                        expression: resp.data.expression,
-                        answer: resp.data.answer,
-                        difficulty: resp.data.difficulty
-                    },
-                    latex: katex.renderToString(resp.data.expression, {
-                        throwOnError: false
-                    })
+                    problem_id: resp.data.problem_id
                 }));
+                Axios
+                    .get(this.props.url + ModelEndpoint + this.state.problem_id, this.state.config)
+                    .then(resp => {
+                        this.setState((state, props) => ({
+                            isLoaded: true,
+                            model: {
+                                id: resp.data.id,
+                                expression: resp.data.expression,
+                                answer: resp.data.answer,
+                                difficulty: resp.data.difficulty
+                            },
+                            latex: katex.renderToString(resp.data.expression, {
+                                throwOnError: false
+                            })
+                        }));
+                    })
+                    .catch(this.catchError.bind(this));
             })
             .catch(this.catchError.bind(this));
     }
@@ -71,7 +73,15 @@ class BaseProblem extends React.Component {
     }
 
     componentDidMount() {
-        this.createModel();
+        Axios
+            .get(this.props.url + "/users/" + this.props.auth0Id, this.state.config)
+            .then(resp => {
+                this.setState((state, props) => ({
+                    user_id: resp.data.id
+                }));
+                this.getModel();
+            })
+            .catch(this.catchError.bind(this));
     }
 
     render() {

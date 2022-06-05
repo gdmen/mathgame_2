@@ -31,10 +31,10 @@ const (
 )
 
 type Gamestate struct {
-	UserId    uint64 `json:"user_id" uri:"user_id"`
-	ProblemId uint64 `json:"problem_id" uri:"problem_id" form:"problem_id"`
-	NumSolved int    `json:"num_solved" uri:"num_solved" form:"num_solved"`
-	NumTarget int    `json:"num_target" uri:"num_target" form:"num_target"`
+	UserId    uint32 `json:"user_id" uri:"user_id"`
+	ProblemId uint32 `json:"problem_id" uri:"problem_id" form:"problem_id"`
+	NumSolved uint32 `json:"num_solved" uri:"num_solved" form:"num_solved"`
+	NumTarget uint32 `json:"num_target" uri:"num_target" form:"num_target"`
 }
 
 func (model Gamestate) String() string {
@@ -60,7 +60,7 @@ func (m *GamestateManager) Create(model *Gamestate) (int, string, error) {
 	return status, "", nil
 }
 
-func (m *GamestateManager) Get(user_id uint64) (*Gamestate, int, string, error) {
+func (m *GamestateManager) Get(user_id uint32) (*Gamestate, int, string, error) {
 	model := &Gamestate{}
 	err := m.DB.QueryRow(getGamestateSQL, user_id).Scan(&model.UserId, &model.ProblemId, &model.NumSolved, &model.NumTarget)
 	if err == sql.ErrNoRows {
@@ -113,7 +113,7 @@ func (m *GamestateManager) Update(model *Gamestate) (int, string, error) {
 	return http.StatusOK, "", nil
 }
 
-func (m *GamestateManager) Delete(user_id uint64) (int, string, error) {
+func (m *GamestateManager) Delete(user_id uint32) (int, string, error) {
 	result, err := m.DB.Exec(deleteGamestateSQL, user_id)
 	if err != nil {
 		msg := "Couldn't delete gamestate in database"

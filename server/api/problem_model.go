@@ -31,7 +31,7 @@ const (
 )
 
 type Problem struct {
-	Id         uint64  `json:"id" uri:"id"`
+	Id         uint32  `json:"id" uri:"id"`
 	Expression string  `json:"expression" uri:"expression" form:"expression"`
 	Answer     string  `json:"answer" uri:"answer" form:"answer"`
 	Difficulty float64 `json:"difficulty" uri:"difficulty" form:"difficulty"`
@@ -60,7 +60,7 @@ func (m *ProblemManager) Create(model *Problem) (int, string, error) {
 	return status, "", nil
 }
 
-func (m *ProblemManager) Get(id uint64) (*Problem, int, string, error) {
+func (m *ProblemManager) Get(id uint32) (*Problem, int, string, error) {
 	model := &Problem{}
 	err := m.DB.QueryRow(getProblemSQL, id).Scan(&model.Id, &model.Expression, &model.Answer, &model.Difficulty)
 	if err == sql.ErrNoRows {
@@ -113,7 +113,7 @@ func (m *ProblemManager) Update(model *Problem) (int, string, error) {
 	return http.StatusOK, "", nil
 }
 
-func (m *ProblemManager) Delete(id uint64) (int, string, error) {
+func (m *ProblemManager) Delete(id uint32) (int, string, error) {
 	result, err := m.DB.Exec(deleteProblemSQL, id)
 	if err != nil {
 		msg := "Couldn't delete problem in database"

@@ -2,11 +2,11 @@
 package api // import "garydmenezes.com/mathgame/server/api"
 
 import (
+	"bytes"
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -30,17 +30,15 @@ func TestVideoBasic(t *testing.T) {
 	// Create
 	resp := httptest.NewRecorder()
 
-	values := url.Values{}
-	values.Add("title", "son of man")
-	values.Add("url", "https://www.youtube.com/watch?v=-WcHPFUwd6U")
-	values.Add("start", "24")
-	values.Add("end", "116")
-	values.Add("enabled", "1")
-	paramString := values.Encode()
-
-	req, _ := http.NewRequest("POST", "/api/v1/videos/", strings.NewReader(paramString))
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Add("Content-Length", strconv.Itoa(len(paramString)))
+	video := Video{
+		Title:   "son of man",
+		URL:     "https://www.youtube.com/watch?v=-WcHPFUwd6U",
+		Start:   24,
+		End:     116,
+		Enabled: true,
+	}
+	body, _ := json.Marshal(video)
+	req, _ := http.NewRequest("POST", "/api/v1/videos/", bytes.NewBuffer(body))
 
 	r.ServeHTTP(resp, req)
 
@@ -48,7 +46,7 @@ func TestVideoBasic(t *testing.T) {
 		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusCreated, resp.Code, resp)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,13 +76,10 @@ func TestVideoBasic(t *testing.T) {
 	// Update
 	resp = httptest.NewRecorder()
 
-	values.Set("title", "unda da sea")
-	values.Set("enabled", "0")
-	paramString = values.Encode()
-
-	req, _ = http.NewRequest("POST", "/api/v1/videos/1", strings.NewReader(paramString))
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Add("Content-Length", strconv.Itoa(len(paramString)))
+	video.Title = "unda da sea"
+	video.Enabled = false
+	body, _ = json.Marshal(video)
+	req, _ = http.NewRequest("POST", "/api/v1/videos/1", bytes.NewBuffer(body))
 
 	r.ServeHTTP(resp, req)
 

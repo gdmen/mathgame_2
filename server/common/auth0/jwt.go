@@ -71,7 +71,7 @@ func EnsureValidToken() func(next http.Handler) http.Handler {
 
 	errorHandler := func(w http.ResponseWriter, r *http.Request, err error) {
 		log.Printf("Encountered error while validating JWT: %v", err)
-                // TODO: remove this before deployment
+		// TODO: remove this before deployment
 		log.Printf("SENSITIVE full request: %v", r)
 
 		w.Header().Set("Content-Type", "application/json")
