@@ -93,19 +93,6 @@
       ]
     },
     {
-      "name": "eventtype",
-      "fields": [
-        {
-          "name": "Id", "type": "uint64",
-          "sql": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY"
-        },
-        {
-          "name": "Name", "type": "string",
-          "sql": "VARCHAR(32) NOT NULL"
-        }
-      ]
-    },
-    {
       "name": "event",
       "fields": [
         {
@@ -121,8 +108,8 @@
           "sql": "BIGINT UNSIGNED NOT NULL"
         },
         {
-          "name": "EventTypeId", "type": "uint64",
-          "sql": "BIGINT UNSIGNED NOT NULL"
+          "name": "EventType", "type": "string",
+          "sql": "VARCHAR(32) NOT NULL"
         },
         {
           "name": "Value", "type": "string",

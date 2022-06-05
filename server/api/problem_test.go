@@ -9,9 +9,6 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -33,24 +30,25 @@ func TestProblemBasic(t *testing.T) {
 	ResetTestApi(c)
 	r := TestApi.GetRouter()
 
-	// Create
+	test_model := &Problem{
+		Id:         2806439303743259763,
+		Expression: "5+112",
+		Answer:     "117",
+		Difficulty: 5.759936284165179,
+	}
+
+	// Backend Create
+	TestApi.problemManager.Create(test_model)
+
+	// Get
 	resp := httptest.NewRecorder()
 
-	values := url.Values{}
-	values.Add("operations", "+")
-	values.Add("operations", "-")
-	values.Add("negatives", "false")
-	values.Add("target_difficulty", "6")
-	paramString := values.Encode()
-
-	req, _ := http.NewRequest("POST", "/api/v1/problems/", strings.NewReader(paramString))
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Add("Content-Length", strconv.Itoa(len(paramString)))
+	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/problems/%d", test_model.Id), nil)
 
 	r.ServeHTTP(resp, req)
 
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusCreated, resp.Code, resp)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusOK, resp.Code, resp)
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
@@ -58,77 +56,11 @@ func TestProblemBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// {"id":2806439303743259763,"expression":"5+112","answer":"117","difficulty":5.759936284165179}
 	model := Problem{}
 	json.Unmarshal(body, &model)
 	h := fnv.New64a()
 	h.Write([]byte(model.Expression))
 	if model.Id != h.Sum64() {
-		t.Fatal("ERROR: " + string(body))
-	}
-
-	// List
-	resp = httptest.NewRecorder()
-
-	req, _ = http.NewRequest("GET", "/api/v1/problems/", nil)
-
-	r.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusOK, resp.Code, resp)
-	}
-
-	body, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(string(body)) < 2 {
-		t.Fatal("ERROR: " + string(body))
-	}
-
-	// Get
-	resp = httptest.NewRecorder()
-
-	req, _ = http.NewRequest("GET", fmt.Sprintf("/api/v1/problems/%d", model.Id), nil)
-
-	r.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusOK, resp.Code, resp)
-	}
-
-	body, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Delete
-	resp = httptest.NewRecorder()
-
-	req, _ = http.NewRequest("DELETE", fmt.Sprintf("/api/v1/problems/%d", model.Id), nil)
-
-	r.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusNoContent, resp.Code, resp)
-	}
-
-	// List
-	resp = httptest.NewRecorder()
-
-	req, _ = http.NewRequest("GET", "/api/v1/problems/", nil)
-
-	r.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusOK, resp.Code, resp)
-	}
-
-	body, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.TrimSpace(string(body)) != "[]" {
 		t.Fatal("ERROR: " + string(body))
 	}
 }

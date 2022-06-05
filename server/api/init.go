@@ -19,7 +19,6 @@ var CREATE_TABLES_SQL = []string{
 	CreateVideoTableSQL,
 	CreateProblemTableSQL,
 	CreateGamestateTableSQL,
-	CreateEventtypeTableSQL,
 	CreateEventTableSQL,
 }
 
@@ -38,7 +37,6 @@ type Api struct {
 	videoManager     *VideoManager
 	problemManager   *ProblemManager
 	gamestateManager *GamestateManager
-	eventtypeManager *EventtypeManager
 	eventManager     *EventManager
 }
 
@@ -59,7 +57,6 @@ func NewApi(db *sql.DB) (*Api, error) {
 	a.videoManager = &VideoManager{DB: db}
 	a.problemManager = &ProblemManager{DB: db}
 	a.gamestateManager = &GamestateManager{DB: db}
-	a.eventtypeManager = &EventtypeManager{DB: db}
 	a.eventManager = &EventManager{DB: db}
 	return a, nil
 }
@@ -103,12 +100,12 @@ func (a *Api) GetRouter() *gin.Engine {
 		}
 		problem := v1.Group("/problems")
 		{
-			problem.POST("", common.RequestIdMiddleware(), a.customCreateProblem)
-			problem.POST("/", common.RequestIdMiddleware(), a.customCreateProblem)
-			problem.DELETE("/:id", common.RequestIdMiddleware(), a.deleteProblem)
 			problem.GET("/:id", common.RequestIdMiddleware(), a.getProblem)
-			problem.GET("", common.RequestIdMiddleware(), a.listProblem)
-			problem.GET("/", common.RequestIdMiddleware(), a.listProblem)
+		}
+		event := v1.Group("/events")
+		{
+			event.POST("", common.RequestIdMiddleware(), a.createEvent)
+			event.POST("/", common.RequestIdMiddleware(), a.createEvent)
 		}
 	}
 	return router
