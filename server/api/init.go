@@ -104,8 +104,8 @@ func (a *Api) GetRouter() *gin.Engine {
 		}
 		event := v1.Group("/events")
 		{
-			event.POST("", common.RequestIdMiddleware(), a.createEvent)
-			event.POST("/", common.RequestIdMiddleware(), a.createEvent)
+			event.POST("", common.RequestIdMiddleware(), a.customCreateEvent)
+			event.POST("/", common.RequestIdMiddleware(), a.customCreateEvent)
 		}
 	}
 	return router

@@ -19,11 +19,11 @@ const (
 	value TEXT NOT NULL
     ) DEFAULT CHARSET=utf8 ;`
 
-	createEventSQL = `INSERT INTO events (timestamp, user_id, event_type, value) VALUES (?, ?, ?, ?);`
+	createEventSQL = `INSERT INTO events (user_id, event_type, value) VALUES (?, ?, ?);`
 
 	getEventSQL = `SELECT * FROM events WHERE id=?;`
 
-	getEventKeySQL = `SELECT id FROM events WHERE timestamp=?, user_id=?, event_type=?, value=?;`
+	getEventKeySQL = `SELECT id FROM events WHERE user_id=?, event_type=?, value=?;`
 
 	listEventSQL = `SELECT * FROM events;`
 
@@ -50,7 +50,7 @@ type EventManager struct {
 
 func (m *EventManager) Create(model *Event) (int, string, error) {
 	status := http.StatusCreated
-	result, err := m.DB.Exec(createEventSQL, model.Timestamp, model.UserId, model.EventType, model.Value)
+	result, err := m.DB.Exec(createEventSQL, model.UserId, model.EventType, model.Value)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Duplicate entry") {
 			msg := "Couldn't add event to database"
@@ -58,7 +58,7 @@ func (m *EventManager) Create(model *Event) (int, string, error) {
 		}
 
 		// Update model with the configured return field.
-		_ = m.DB.QueryRow(getEventKeySQL, model.Timestamp, model.UserId, model.EventType, model.Value).Scan(&model.Id)
+		_ = m.DB.QueryRow(getEventKeySQL, model.UserId, model.EventType, model.Value).Scan(&model.Id)
 
 		return http.StatusOK, "", nil
 	}

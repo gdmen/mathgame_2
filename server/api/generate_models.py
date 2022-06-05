@@ -39,7 +39,7 @@ def get_model_string(m: dict) -> str:
         if "AUTO_INCREMENT" in f["sql"]:
             auto_incr_struct_fields.append(n)
             auto_incr_sql_fields.append(snake_n)
-        else:
+        elif not "DEFAULT" in f["sql"]:
             create_struct_fields.append(n)
             create_sql_fields.append(snake_n)
         if "UNIQUE" in f["sql"]:
