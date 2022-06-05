@@ -15,33 +15,33 @@ const (
         id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
 	timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	user_id BIGINT UNSIGNED NOT NULL,
-	event_type_id BIGINT UNSIGNED NOT NULL,
+	event_type VARCHAR(32) NOT NULL,
 	value TEXT NOT NULL
     ) DEFAULT CHARSET=utf8 ;`
 
-	createEventSQL = `INSERT INTO events (timestamp, user_id, event_type_id, value) VALUES (?, ?, ?, ?);`
+	createEventSQL = `INSERT INTO events (timestamp, user_id, event_type, value) VALUES (?, ?, ?, ?);`
 
 	getEventSQL = `SELECT * FROM events WHERE id=?;`
 
-	getEventKeySQL = `SELECT id FROM events WHERE timestamp=?, user_id=?, event_type_id=?, value=?;`
+	getEventKeySQL = `SELECT id FROM events WHERE timestamp=?, user_id=?, event_type=?, value=?;`
 
 	listEventSQL = `SELECT * FROM events;`
 
-	updateEventSQL = `UPDATE events SET timestamp=?, user_id=?, event_type_id=?, value=? WHERE id=?;`
+	updateEventSQL = `UPDATE events SET timestamp=?, user_id=?, event_type=?, value=? WHERE id=?;`
 
 	deleteEventSQL = `DELETE FROM events WHERE id=?;`
 )
 
 type Event struct {
-	Id          uint64    `json:"id" uri:"id"`
-	Timestamp   time.Time `json:"timestamp" uri:"timestamp" form:"timestamp"`
-	UserId      uint64    `json:"user_id" uri:"user_id" form:"user_id"`
-	EventTypeId uint64    `json:"event_type_id" uri:"event_type_id" form:"event_type_id"`
-	Value       string    `json:"value" uri:"value" form:"value"`
+	Id        uint64    `json:"id" uri:"id"`
+	Timestamp time.Time `json:"timestamp" uri:"timestamp" form:"timestamp"`
+	UserId    uint64    `json:"user_id" uri:"user_id" form:"user_id"`
+	EventType string    `json:"event_type" uri:"event_type" form:"event_type"`
+	Value     string    `json:"value" uri:"value" form:"value"`
 }
 
 func (model Event) String() string {
-	return fmt.Sprintf("Id: %v, Timestamp: %v, UserId: %v, EventTypeId: %v, Value: %v", model.Id, model.Timestamp, model.UserId, model.EventTypeId, model.Value)
+	return fmt.Sprintf("Id: %v, Timestamp: %v, UserId: %v, EventType: %v, Value: %v", model.Id, model.Timestamp, model.UserId, model.EventType, model.Value)
 }
 
 type EventManager struct {
@@ -50,7 +50,7 @@ type EventManager struct {
 
 func (m *EventManager) Create(model *Event) (int, string, error) {
 	status := http.StatusCreated
-	result, err := m.DB.Exec(createEventSQL, model.Timestamp, model.UserId, model.EventTypeId, model.Value)
+	result, err := m.DB.Exec(createEventSQL, model.Timestamp, model.UserId, model.EventType, model.Value)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Duplicate entry") {
 			msg := "Couldn't add event to database"
@@ -58,7 +58,7 @@ func (m *EventManager) Create(model *Event) (int, string, error) {
 		}
 
 		// Update model with the configured return field.
-		_ = m.DB.QueryRow(getEventKeySQL, model.Timestamp, model.UserId, model.EventTypeId, model.Value).Scan(&model.Id)
+		_ = m.DB.QueryRow(getEventKeySQL, model.Timestamp, model.UserId, model.EventType, model.Value).Scan(&model.Id)
 
 		return http.StatusOK, "", nil
 	}
@@ -75,7 +75,7 @@ func (m *EventManager) Create(model *Event) (int, string, error) {
 
 func (m *EventManager) Get(id uint64) (*Event, int, string, error) {
 	model := &Event{}
-	err := m.DB.QueryRow(getEventSQL, id).Scan(&model.Id, &model.Timestamp, &model.UserId, &model.EventTypeId, &model.Value)
+	err := m.DB.QueryRow(getEventSQL, id).Scan(&model.Id, &model.Timestamp, &model.UserId, &model.EventType, &model.Value)
 	if err == sql.ErrNoRows {
 		msg := "Couldn't find a event with that id"
 		return nil, http.StatusNotFound, msg, err
@@ -96,7 +96,7 @@ func (m *EventManager) List() (*[]Event, int, string, error) {
 	}
 	for rows.Next() {
 		model := Event{}
-		err = rows.Scan(&model.Id, &model.Timestamp, &model.UserId, &model.EventTypeId, &model.Value)
+		err = rows.Scan(&model.Id, &model.Timestamp, &model.UserId, &model.EventType, &model.Value)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -118,7 +118,7 @@ func (m *EventManager) Update(model *Event) (int, string, error) {
 		return status, msg, err
 	}
 	// Update
-	_, err = m.DB.Exec(updateEventSQL, model.Timestamp, model.UserId, model.EventTypeId, model.Value, model.Id)
+	_, err = m.DB.Exec(updateEventSQL, model.Timestamp, model.UserId, model.EventType, model.Value, model.Id)
 	if err != nil {
 		msg := "Couldn't update event in database"
 		return http.StatusInternalServerError, msg, err
