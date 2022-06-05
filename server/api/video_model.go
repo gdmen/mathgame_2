@@ -14,9 +14,9 @@ const (
         id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
 	title VARCHAR(128) NOT NULL,
 	url VARCHAR(256) NOT NULL,
-	start INT(5) NOT NULL DEFAULT '0',
-	end INT(5) NOT NULL DEFAULT '99999',
-	enabled TINYINT NOT NULL DEFAULT '1'
+	start INT(5) NOT NULL,
+	end INT(5) NOT NULL,
+	enabled TINYINT NOT NULL
     ) DEFAULT CHARSET=utf8 ;`
 
 	createVideoSQL = `INSERT INTO videos (title, url, start, end, enabled) VALUES (?, ?, ?, ?, ?);`

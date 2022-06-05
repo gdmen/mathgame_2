@@ -59,15 +59,74 @@
         },
         {
           "name": "Start", "type": "int",
-          "sql": "INT(5) NOT NULL DEFAULT '0'"
+          "sql": "INT(5) NOT NULL"
         },
         {
           "name": "End", "type": "int",
-          "sql": "INT(5) NOT NULL DEFAULT '99999'"
+          "sql": "INT(5) NOT NULL"
         },
         {
           "name": "Enabled", "type": "bool",
-          "sql": "TINYINT NOT NULL DEFAULT '1'"
+          "sql": "TINYINT NOT NULL"
+        }
+      ]
+    },
+    {
+      "name": "gamestate",
+      "fields": [
+        {
+          "name": "UserId", "type": "uint64",
+          "sql": "BIGINT UNSIGNED PRIMARY KEY"
+        },
+        {
+          "name": "ProblemId", "type": "uint64",
+          "sql": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "NumSolved", "type": "int",
+          "sql": "INT(5) NOT NULL"
+        },
+        {
+          "name": "NumTarget", "type": "int",
+          "sql": "INT(5) NOT NULL"
+        }
+      ]
+    },
+    {
+      "name": "eventtype",
+      "fields": [
+        {
+          "name": "Id", "type": "uint64",
+          "sql": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY"
+        },
+        {
+          "name": "Name", "type": "string",
+          "sql": "VARCHAR(32) NOT NULL"
+        }
+      ]
+    },
+    {
+      "name": "event",
+      "fields": [
+        {
+          "name": "Id", "type": "uint64",
+          "sql": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY"
+        },
+        {
+          "name": "Timestamp", "type": "time.Time",
+          "sql": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+        },
+        {
+          "name": "UserId", "type": "uint64",
+          "sql": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "EventTypeId", "type": "uint64",
+          "sql": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "Value", "type": "string",
+          "sql": "TEXT NOT NULL"
         }
       ]
     }

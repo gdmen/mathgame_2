@@ -18,6 +18,9 @@ var CREATE_TABLES_SQL = []string{
 	CreateUserTableSQL,
 	CreateVideoTableSQL,
 	CreateProblemTableSQL,
+	CreateGamestateTableSQL,
+	CreateEventtypeTableSQL,
+	CreateEventTableSQL,
 }
 
 type Error struct {
@@ -29,11 +32,14 @@ func GetError(message string) map[string]interface{} {
 }
 
 type Api struct {
-	DB             *sql.DB
-	isTest         bool
-	userManager    *UserManager
-	videoManager   *VideoManager
-	problemManager *ProblemManager
+	DB               *sql.DB
+	isTest           bool
+	userManager      *UserManager
+	videoManager     *VideoManager
+	problemManager   *ProblemManager
+	gamestateManager *GamestateManager
+	eventtypeManager *EventtypeManager
+	eventManager     *EventManager
 }
 
 func NewApi(db *sql.DB) (*Api, error) {
@@ -52,6 +58,9 @@ func NewApi(db *sql.DB) (*Api, error) {
 	a.userManager = &UserManager{DB: db}
 	a.videoManager = &VideoManager{DB: db}
 	a.problemManager = &ProblemManager{DB: db}
+	a.gamestateManager = &GamestateManager{DB: db}
+	a.eventtypeManager = &EventtypeManager{DB: db}
+	a.eventManager = &EventManager{DB: db}
 	return a, nil
 }
 

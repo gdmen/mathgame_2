@@ -9,6 +9,7 @@ def camel_to_snake(s: str) -> str:
     return CAMEL_TO_SNAKE_RE.sub('_', s).lower()
 
 def get_model_string(m: dict) -> str:
+    import_time = False
     key_name = ""
     key_type = ""
     unique_struct_fields = []
@@ -26,6 +27,8 @@ def get_model_string(m: dict) -> str:
             key_name = f["name"]
             key_type = f["type"]
     for f in m["fields"]:
+        if any(x in f["sql"] for x in ["TIMESTAMP", "DATE", "DATETIME"]):
+            import_time = True
         n = f["name"]
         snake_n = camel_to_snake(n)
         struct_fields.append(n)
@@ -52,7 +55,11 @@ import (
     "fmt"
     "net/http"
     "strings"
-)
+'''
+    if import_time:
+        s += '''    "time"
+'''
+    s += ''')
 '''
 
     # const start
