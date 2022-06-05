@@ -32,7 +32,7 @@ const (
 
 type User struct {
 	Auth0Id  string `json:"auth0_id" uri:"auth0_id"`
-	Id       uint64 `json:"id" uri:"id" form:"id"`
+	Id       uint32 `json:"id" uri:"id" form:"id"`
 	Email    string `json:"email" uri:"email" form:"email"`
 	Username string `json:"username" uri:"username" form:"username"`
 }

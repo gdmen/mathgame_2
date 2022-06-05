@@ -205,10 +205,11 @@ import (
             msg := "Couldn't add {0} to database"
             return http.StatusInternalServerError, msg, err
         }}
-        model.{1} = uint64(last_id)
+        model.{1} = {2}(last_id)
 '''.format(
         m["name"],
-        key_name
+        key_name,
+        key_type
     )
 
     s += '''

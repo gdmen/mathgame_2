@@ -20,7 +20,7 @@ func (a *Api) createUser(c *gin.Context) {
 
 	// Write to database
 	status, msg, err := a.userManager.Create(model)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
 }
@@ -37,7 +37,7 @@ func (a *Api) getUser(c *gin.Context) {
 
 	// Read from database
 	model, status, msg, err := a.userManager.Get(model.Auth0Id)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
 }
@@ -48,7 +48,7 @@ func (a *Api) listUser(c *gin.Context) {
 
 	// Read from database
 	models, status, msg, err := a.userManager.List()
-	if HandleManagerResp(logPrefix, c, status, msg, err, models) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {
 		return
 	}
 }
@@ -59,16 +59,16 @@ func (a *Api) updateUser(c *gin.Context) {
 
 	// Parse input
 	model := &User{}
-	if BindModelFromURI(logPrefix, c, model) != nil {
+	if BindModelFromForm(logPrefix, c, model) != nil {
 		return
 	}
-	if BindModelFromForm(logPrefix, c, model) != nil {
+	if BindModelFromURI(logPrefix, c, model) != nil {
 		return
 	}
 
 	// Write to database
 	status, msg, err := a.userManager.Update(model)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
 }
@@ -85,7 +85,7 @@ func (a *Api) deleteUser(c *gin.Context) {
 
 	// Write to database
 	status, msg, err := a.userManager.Delete(model.Auth0Id)
-	if HandleManagerResp(logPrefix, c, status, msg, err, nil) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {
 		return
 	}
 }
@@ -102,7 +102,7 @@ func (a *Api) createProblem(c *gin.Context) {
 
 	// Write to database
 	status, msg, err := a.problemManager.Create(model)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
 }
@@ -119,7 +119,7 @@ func (a *Api) getProblem(c *gin.Context) {
 
 	// Read from database
 	model, status, msg, err := a.problemManager.Get(model.Id)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
 }
@@ -130,7 +130,7 @@ func (a *Api) listProblem(c *gin.Context) {
 
 	// Read from database
 	models, status, msg, err := a.problemManager.List()
-	if HandleManagerResp(logPrefix, c, status, msg, err, models) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {
 		return
 	}
 }
@@ -141,16 +141,16 @@ func (a *Api) updateProblem(c *gin.Context) {
 
 	// Parse input
 	model := &Problem{}
-	if BindModelFromURI(logPrefix, c, model) != nil {
+	if BindModelFromForm(logPrefix, c, model) != nil {
 		return
 	}
-	if BindModelFromForm(logPrefix, c, model) != nil {
+	if BindModelFromURI(logPrefix, c, model) != nil {
 		return
 	}
 
 	// Write to database
 	status, msg, err := a.problemManager.Update(model)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
 }
@@ -167,7 +167,7 @@ func (a *Api) deleteProblem(c *gin.Context) {
 
 	// Write to database
 	status, msg, err := a.problemManager.Delete(model.Id)
-	if HandleManagerResp(logPrefix, c, status, msg, err, nil) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {
 		return
 	}
 }
@@ -184,7 +184,7 @@ func (a *Api) createVideo(c *gin.Context) {
 
 	// Write to database
 	status, msg, err := a.videoManager.Create(model)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
 }
@@ -201,7 +201,7 @@ func (a *Api) getVideo(c *gin.Context) {
 
 	// Read from database
 	model, status, msg, err := a.videoManager.Get(model.Id)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
 }
@@ -212,7 +212,7 @@ func (a *Api) listVideo(c *gin.Context) {
 
 	// Read from database
 	models, status, msg, err := a.videoManager.List()
-	if HandleManagerResp(logPrefix, c, status, msg, err, models) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {
 		return
 	}
 }
@@ -223,16 +223,16 @@ func (a *Api) updateVideo(c *gin.Context) {
 
 	// Parse input
 	model := &Video{}
-	if BindModelFromURI(logPrefix, c, model) != nil {
+	if BindModelFromForm(logPrefix, c, model) != nil {
 		return
 	}
-	if BindModelFromForm(logPrefix, c, model) != nil {
+	if BindModelFromURI(logPrefix, c, model) != nil {
 		return
 	}
 
 	// Write to database
 	status, msg, err := a.videoManager.Update(model)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
 }
@@ -249,7 +249,89 @@ func (a *Api) deleteVideo(c *gin.Context) {
 
 	// Write to database
 	status, msg, err := a.videoManager.Delete(model.Id)
-	if HandleManagerResp(logPrefix, c, status, msg, err, nil) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {
+		return
+	}
+}
+
+func (a *Api) createOption(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Option{}
+	if BindModelFromForm(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Write to database
+	status, msg, err := a.optionManager.Create(model)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
+}
+
+func (a *Api) getOption(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Option{}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Read from database
+	model, status, msg, err := a.optionManager.Get(model.UserId)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
+}
+
+func (a *Api) listOption(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Read from database
+	models, status, msg, err := a.optionManager.List()
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {
+		return
+	}
+}
+
+func (a *Api) updateOption(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Option{}
+	if BindModelFromForm(logPrefix, c, model) != nil {
+		return
+	}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Write to database
+	status, msg, err := a.optionManager.Update(model)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
+}
+
+func (a *Api) deleteOption(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Option{}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Write to database
+	status, msg, err := a.optionManager.Delete(model.UserId)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {
 		return
 	}
 }
@@ -266,7 +348,7 @@ func (a *Api) createGamestate(c *gin.Context) {
 
 	// Write to database
 	status, msg, err := a.gamestateManager.Create(model)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
 }
@@ -283,7 +365,7 @@ func (a *Api) getGamestate(c *gin.Context) {
 
 	// Read from database
 	model, status, msg, err := a.gamestateManager.Get(model.UserId)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
 }
@@ -294,7 +376,7 @@ func (a *Api) listGamestate(c *gin.Context) {
 
 	// Read from database
 	models, status, msg, err := a.gamestateManager.List()
-	if HandleManagerResp(logPrefix, c, status, msg, err, models) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {
 		return
 	}
 }
@@ -305,16 +387,16 @@ func (a *Api) updateGamestate(c *gin.Context) {
 
 	// Parse input
 	model := &Gamestate{}
-	if BindModelFromURI(logPrefix, c, model) != nil {
+	if BindModelFromForm(logPrefix, c, model) != nil {
 		return
 	}
-	if BindModelFromForm(logPrefix, c, model) != nil {
+	if BindModelFromURI(logPrefix, c, model) != nil {
 		return
 	}
 
 	// Write to database
 	status, msg, err := a.gamestateManager.Update(model)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
 }
@@ -331,7 +413,7 @@ func (a *Api) deleteGamestate(c *gin.Context) {
 
 	// Write to database
 	status, msg, err := a.gamestateManager.Delete(model.UserId)
-	if HandleManagerResp(logPrefix, c, status, msg, err, nil) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {
 		return
 	}
 }
@@ -348,7 +430,7 @@ func (a *Api) createEvent(c *gin.Context) {
 
 	// Write to database
 	status, msg, err := a.eventManager.Create(model)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
 }
@@ -365,7 +447,7 @@ func (a *Api) getEvent(c *gin.Context) {
 
 	// Read from database
 	model, status, msg, err := a.eventManager.Get(model.Id)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
 }
@@ -376,7 +458,7 @@ func (a *Api) listEvent(c *gin.Context) {
 
 	// Read from database
 	models, status, msg, err := a.eventManager.List()
-	if HandleManagerResp(logPrefix, c, status, msg, err, models) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {
 		return
 	}
 }
@@ -387,16 +469,16 @@ func (a *Api) updateEvent(c *gin.Context) {
 
 	// Parse input
 	model := &Event{}
-	if BindModelFromURI(logPrefix, c, model) != nil {
+	if BindModelFromForm(logPrefix, c, model) != nil {
 		return
 	}
-	if BindModelFromForm(logPrefix, c, model) != nil {
+	if BindModelFromURI(logPrefix, c, model) != nil {
 		return
 	}
 
 	// Write to database
 	status, msg, err := a.eventManager.Update(model)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
 }
@@ -413,7 +495,7 @@ func (a *Api) deleteEvent(c *gin.Context) {
 
 	// Write to database
 	status, msg, err := a.eventManager.Delete(model.Id)
-	if HandleManagerResp(logPrefix, c, status, msg, err, nil) != nil {
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {
 		return
 	}
 }

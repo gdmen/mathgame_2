@@ -34,7 +34,7 @@ func (a *Api) create{0}(c *gin.Context) {{
 
 	// Write to database
 	status, msg, err := a.{1}Manager.Create(model)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {{
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {{
 		return
 	}}
 }}
@@ -51,7 +51,7 @@ func (a *Api) get{0}(c *gin.Context) {{
 
 	// Read from database
 	model, status, msg, err := a.{1}Manager.Get(model.{2})
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {{
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {{
 		return
 	}}
 }}
@@ -62,7 +62,7 @@ func (a *Api) list{0}(c *gin.Context) {{
 
 	// Read from database
 	models, status, msg, err := a.{1}Manager.List()
-	if HandleManagerResp(logPrefix, c, status, msg, err, models) != nil {{
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {{
 		return
 	}}
 }}
@@ -73,16 +73,16 @@ func (a *Api) update{0}(c *gin.Context) {{
 
 	// Parse input
 	model := &{0}{{}}
-	if BindModelFromURI(logPrefix, c, model) != nil {{
+	if BindModelFromForm(logPrefix, c, model) != nil {{
 		return
 	}}
-	if BindModelFromForm(logPrefix, c, model) != nil {{
+	if BindModelFromURI(logPrefix, c, model) != nil {{
 		return
 	}}
 
 	// Write to database
 	status, msg, err := a.{1}Manager.Update(model)
-	if HandleManagerResp(logPrefix, c, status, msg, err, model) != nil {{
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {{
 		return
 	}}
 }}
@@ -99,7 +99,7 @@ func (a *Api) delete{0}(c *gin.Context) {{
 
 	// Write to database
 	status, msg, err := a.{1}Manager.Delete(model.{2})
-	if HandleManagerResp(logPrefix, c, status, msg, err, nil) != nil {{
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {{
 		return
 	}}
 }}

@@ -8,7 +8,7 @@
           "sql": "VARCHAR(225) NOT NULL PRIMARY KEY"
         },
         {
-          "name": "Id", "type": "uint64",
+          "name": "Id", "type": "uint32",
           "sql": "BIGINT UNSIGNED AUTO_INCREMENT UNIQUE"
         },
         {
@@ -25,7 +25,7 @@
       "name": "problem",
       "fields": [
         {
-          "name": "Id", "type": "uint64",
+          "name": "Id", "type": "uint32",
           "sql": "BIGINT UNSIGNED PRIMARY KEY UNIQUE"
         },
         {
@@ -46,7 +46,7 @@
       "name": "video",
       "fields": [
         {
-          "name": "Id", "type": "uint64",
+          "name": "Id", "type": "uint32",
           "sql": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY"
         },
         {
@@ -58,11 +58,11 @@
           "sql": "VARCHAR(256) NOT NULL"
         },
         {
-          "name": "Start", "type": "int",
+          "name": "Start", "type": "uint32",
           "sql": "INT(5) NOT NULL"
         },
         {
-          "name": "End", "type": "int",
+          "name": "End", "type": "uint32",
           "sql": "INT(5) NOT NULL"
         },
         {
@@ -72,22 +72,47 @@
       ]
     },
     {
-      "name": "gamestate",
+      "name": "option",
       "fields": [
         {
-          "name": "UserId", "type": "uint64",
+          "name": "UserId", "type": "uint32",
           "sql": "BIGINT UNSIGNED PRIMARY KEY"
         },
         {
-          "name": "ProblemId", "type": "uint64",
+          "name": "Operations", "type": "string",
+          "sql": "VARCHAR(256) NOT NULL"
+        },
+        {
+          "name": "Fractions", "type": "bool",
+          "sql": "TINYINT NOT NULL"
+        },
+        {
+          "name": "Negatives", "type": "bool",
+          "sql": "TINYINT NOT NULL"
+        },
+        {
+          "name": "TargetDifficulty", "type": "float64",
+          "sql": "DOUBLE NOT NULL"
+        }
+      ]
+    },
+    {
+      "name": "gamestate",
+      "fields": [
+        {
+          "name": "UserId", "type": "uint32",
+          "sql": "BIGINT UNSIGNED PRIMARY KEY"
+        },
+        {
+          "name": "ProblemId", "type": "uint32",
           "sql": "BIGINT UNSIGNED NOT NULL"
         },
         {
-          "name": "NumSolved", "type": "int",
+          "name": "NumSolved", "type": "uint32",
           "sql": "INT(5) NOT NULL"
         },
         {
-          "name": "NumTarget", "type": "int",
+          "name": "NumTarget", "type": "uint32",
           "sql": "INT(5) NOT NULL"
         }
       ]
@@ -96,7 +121,7 @@
       "name": "event",
       "fields": [
         {
-          "name": "Id", "type": "uint64",
+          "name": "Id", "type": "uint32",
           "sql": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY"
         },
         {
@@ -104,7 +129,7 @@
           "sql": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
         },
         {
-          "name": "UserId", "type": "uint64",
+          "name": "UserId", "type": "uint32",
           "sql": "BIGINT UNSIGNED NOT NULL"
         },
         {

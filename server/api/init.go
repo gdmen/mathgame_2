@@ -18,6 +18,7 @@ var CREATE_TABLES_SQL = []string{
 	CreateUserTableSQL,
 	CreateVideoTableSQL,
 	CreateProblemTableSQL,
+	CreateOptionTableSQL,
 	CreateGamestateTableSQL,
 	CreateEventTableSQL,
 }
@@ -36,6 +37,7 @@ type Api struct {
 	userManager      *UserManager
 	videoManager     *VideoManager
 	problemManager   *ProblemManager
+	optionManager    *OptionManager
 	gamestateManager *GamestateManager
 	eventManager     *EventManager
 }
@@ -56,6 +58,7 @@ func NewApi(db *sql.DB) (*Api, error) {
 	a.userManager = &UserManager{DB: db}
 	a.videoManager = &VideoManager{DB: db}
 	a.problemManager = &ProblemManager{DB: db}
+	a.optionManager = &OptionManager{DB: db}
 	a.gamestateManager = &GamestateManager{DB: db}
 	a.eventManager = &EventManager{DB: db}
 	return a, nil
@@ -74,38 +77,52 @@ func (a *Api) GetRouter() *gin.Engine {
 	config.AllowMethods = []string{"GET", "POST", "DELETE"}
 	router.Use(cors.New(config))
 
+	// Use our request id middleware
+	router.Use(common.RequestIdMiddleware())
+
 	// Use our auth0 jwt middleware
 	if !a.isTest {
 		router.Use(gin_adapter.Wrap(auth0.EnsureValidToken()))
+	} else {
+		router.Use(common.TestAuth0Middleware())
 	}
 
 	v1 := router.Group("/api/v1")
 	{
 		user := v1.Group("/users")
 		{
-			user.POST("", common.RequestIdMiddleware(), a.createUser)
-			user.POST("/", common.RequestIdMiddleware(), a.createUser)
-			user.POST("/:auth0_id", common.RequestIdMiddleware(), a.updateUser)
-			user.GET("/:auth0_id", common.RequestIdMiddleware(), a.getUser)
+			user.POST("", a.customCreateOrUpdateUser)
+			user.POST("/", a.customCreateOrUpdateUser)
+			user.POST("/:auth0_id", a.updateUser)
+			user.GET("/:auth0_id", a.getUser)
+		}
+		option := v1.Group("/options")
+		{
+			option.POST("/:user_id", a.updateOption)
+			option.GET("/:user_id", a.getOption)
+		}
+		gamestate := v1.Group("/gamestates")
+		{
+			gamestate.GET("/:user_id", a.getGamestate)
 		}
 		video := v1.Group("/videos")
 		{
-			video.POST("", common.RequestIdMiddleware(), a.createVideo)
-			video.POST("/", common.RequestIdMiddleware(), a.createVideo)
-			video.POST("/:id", common.RequestIdMiddleware(), a.updateVideo)
-			video.DELETE("/:id", common.RequestIdMiddleware(), a.deleteVideo)
-			video.GET("/:id", common.RequestIdMiddleware(), a.getVideo)
-			video.GET("", common.RequestIdMiddleware(), a.listVideo)
-			video.GET("/", common.RequestIdMiddleware(), a.listVideo)
+			video.POST("", a.createVideo)
+			video.POST("/", a.createVideo)
+			video.POST("/:id", a.updateVideo)
+			video.DELETE("/:id", a.deleteVideo)
+			video.GET("/:id", a.getVideo)
+			video.GET("", a.listVideo)
+			video.GET("/", a.listVideo)
 		}
 		problem := v1.Group("/problems")
 		{
-			problem.GET("/:id", common.RequestIdMiddleware(), a.getProblem)
+			problem.GET("/:id", a.getProblem)
 		}
 		event := v1.Group("/events")
 		{
-			event.POST("", common.RequestIdMiddleware(), a.customCreateEvent)
-			event.POST("/", common.RequestIdMiddleware(), a.customCreateEvent)
+			event.POST("", a.customCreateEvent)
+			event.POST("/", a.customCreateEvent)
 		}
 	}
 	return router

@@ -33,9 +33,9 @@ const (
 )
 
 type Event struct {
-	Id        uint64    `json:"id" uri:"id"`
+	Id        uint32    `json:"id" uri:"id"`
 	Timestamp time.Time `json:"timestamp" uri:"timestamp" form:"timestamp"`
-	UserId    uint64    `json:"user_id" uri:"user_id" form:"user_id"`
+	UserId    uint32    `json:"user_id" uri:"user_id" form:"user_id"`
 	EventType string    `json:"event_type" uri:"event_type" form:"event_type"`
 	Value     string    `json:"value" uri:"value" form:"value"`
 }
@@ -68,12 +68,12 @@ func (m *EventManager) Create(model *Event) (int, string, error) {
 		msg := "Couldn't add event to database"
 		return http.StatusInternalServerError, msg, err
 	}
-	model.Id = uint64(last_id)
+	model.Id = uint32(last_id)
 
 	return status, "", nil
 }
 
-func (m *EventManager) Get(id uint64) (*Event, int, string, error) {
+func (m *EventManager) Get(id uint32) (*Event, int, string, error) {
 	model := &Event{}
 	err := m.DB.QueryRow(getEventSQL, id).Scan(&model.Id, &model.Timestamp, &model.UserId, &model.EventType, &model.Value)
 	if err == sql.ErrNoRows {
@@ -126,7 +126,7 @@ func (m *EventManager) Update(model *Event) (int, string, error) {
 	return http.StatusOK, "", nil
 }
 
-func (m *EventManager) Delete(id uint64) (int, string, error) {
+func (m *EventManager) Delete(id uint32) (int, string, error) {
 	result, err := m.DB.Exec(deleteEventSQL, id)
 	if err != nil {
 		msg := "Couldn't delete event in database"
