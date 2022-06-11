@@ -23,7 +23,7 @@ const (
 
 	getVideoSQL = `SELECT * FROM videos WHERE id=?;`
 
-	getVideoKeySQL = `SELECT id FROM videos WHERE title=?, url=?, start=?, end=?, enabled=?;`
+	getVideoKeySQL = `SELECT id FROM videos WHERE title=? AND url=? AND start=? AND end=? AND enabled=?;`
 
 	listVideoSQL = `SELECT * FROM videos;`
 
@@ -59,7 +59,11 @@ func (m *VideoManager) Create(model *Video) (int, string, error) {
 		}
 
 		// Update model with the configured return field.
-		_ = m.DB.QueryRow(getVideoKeySQL, model.Title, model.URL, model.Start, model.End, model.Enabled).Scan(&model.Id)
+		err = m.DB.QueryRow(getVideoKeySQL, model.Title, model.URL, model.Start, model.End, model.Enabled).Scan(&model.Id)
+		if err != nil {
+			msg := "Couldn't add video to database"
+			return http.StatusInternalServerError, msg, err
+		}
 
 		return http.StatusOK, "", nil
 	}

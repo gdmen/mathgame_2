@@ -21,7 +21,7 @@ const (
 
 	getGamestateSQL = `SELECT * FROM gamestates WHERE user_id=?;`
 
-	getGamestateKeySQL = `SELECT  FROM gamestates WHERE user_id=?, problem_id=?, num_solved=?, num_target=?;`
+	getGamestateKeySQL = `SELECT  FROM gamestates WHERE user_id=? AND problem_id=? AND num_solved=? AND num_target=?;`
 
 	listGamestateSQL = `SELECT * FROM gamestates;`
 

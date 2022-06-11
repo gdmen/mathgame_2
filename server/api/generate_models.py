@@ -103,7 +103,7 @@ import (
         m["name"].capitalize(),
         ", ".join(auto_incr_sql_fields),
         m["name"],
-        ", ".join([f+"=?" for f in create_sql_fields]),
+        " AND ".join([f+"=?" for f in create_sql_fields]),
     )
 
     # list SQL
@@ -186,11 +186,16 @@ import (
     if auto_incr_struct_fields:
         s += '''
             // Update model with the configured return field.
-            _ = m.DB.QueryRow(get{0}KeySQL, {1}).Scan({2})
+            err = m.DB.QueryRow(get{0}KeySQL, {1}).Scan({2})
+            if err != nil {{
+                msg := "Couldn't add {3} to database"
+                return http.StatusInternalServerError, msg, err
+            }}
 '''.format(
         m["name"].capitalize(),
         ", ".join(["model." + n for n in create_struct_fields]),
-        ", ".join(["&model." + n for n in auto_incr_struct_fields])
+        ", ".join(["&model." + n for n in auto_incr_struct_fields]),
+        m["name"]
     )
 
     s += '''

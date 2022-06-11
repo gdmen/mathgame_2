@@ -62,6 +62,7 @@ func OptionalWriteHandleMngrResp(logPrefix string, c *gin.Context, status int, m
 
 	glog.Infof("%s (HTTP %d) %T: %+v", logPrefix, status, model, model)
 	if writeCtx {
+		glog.Infof("%s writing to reponse body: %v", logPrefix, model)
 		c.JSON(status, model)
 	}
 	return nil

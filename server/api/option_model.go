@@ -22,7 +22,7 @@ const (
 
 	getOptionSQL = `SELECT * FROM options WHERE user_id=?;`
 
-	getOptionKeySQL = `SELECT  FROM options WHERE user_id=?, operations=?, fractions=?, negatives=?, target_difficulty=?;`
+	getOptionKeySQL = `SELECT  FROM options WHERE user_id=? AND operations=? AND fractions=? AND negatives=? AND target_difficulty=?;`
 
 	listOptionSQL = `SELECT * FROM options;`
 

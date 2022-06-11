@@ -21,7 +21,7 @@ const (
 
 	getUserSQL = `SELECT * FROM users WHERE auth0_id=?;`
 
-	getUserKeySQL = `SELECT id FROM users WHERE auth0_id=?, email=?, username=?;`
+	getUserKeySQL = `SELECT id FROM users WHERE auth0_id=? AND email=? AND username=?;`
 
 	listUserSQL = `SELECT * FROM users;`
 
@@ -55,7 +55,11 @@ func (m *UserManager) Create(model *User) (int, string, error) {
 		}
 
 		// Update model with the configured return field.
-		_ = m.DB.QueryRow(getUserKeySQL, model.Auth0Id, model.Email, model.Username).Scan(&model.Id)
+		err = m.DB.QueryRow(getUserKeySQL, model.Auth0Id, model.Email, model.Username).Scan(&model.Id)
+		if err != nil {
+			msg := "Couldn't add user to database"
+			return http.StatusInternalServerError, msg, err
+		}
 
 		return http.StatusOK, "", nil
 	}

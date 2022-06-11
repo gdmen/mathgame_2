@@ -1,5 +1,3 @@
-import Axios from "axios";
-
 import React, { useEffect, useState } from "react";
 import ReactDOM from 'react-dom'
 import { BrowserRouter, Route, Switch } from 'react-router-dom'
@@ -8,12 +6,14 @@ import { Auth0Provider } from "@auth0/auth0-react"
 import { useAuth0 } from "@auth0/auth0-react";
 
 import { LoginButton } from './auth0.js'
-import { BaseVideo, CreateVideo, EditVideo } from './api/video.js'
 
-import { BaseProblem } from './api/problem.js'
+import { HomeView } from './home.js'
+import { PlayView } from './play.js'
 
 import 'foundation-sites/dist/css/foundation.css'
-import './index.css'
+
+const conf = require('./conf')
+const ApiUrl = conf.api_host + ':' + conf.api_port + '/api/v1'
 
 const NotFound = () => (
   <div>
@@ -21,142 +21,105 @@ const NotFound = () => (
   </div>
 )
 
-/*
- * TODO:
- * - react import files
- * - video.js file
- *   - video display (id as input)
- *   - video create form
- *   - video edit form
- */
+const Main = ({ token, url, isLoading, isAuthenticated, user }) => {
+  return (
+    <main>
+      <Switch>
+        <Route exact path="/">
+          <HomeView isLoading={isLoading} isAuthenticated={isAuthenticated} user={user}/>
+        </Route>
+        <Route path="/play">
+          {!isLoading && isAuthenticated &&
+            <PlayView token={token} url={url} user={user}/>
+          }
+        </Route>
+        <Route path="*" component={NotFound} />
+      </Switch>
+    </main>
+  )
+}
 
-var conf = require('./conf')
-const ApiUrl = conf.api_host + ':' + conf.api_port + '/api/v1'
+const App = () => {
+  const {user, isLoading, isAuthenticated, getAccessTokenSilently} = useAuth0();
+  const [token, setToken] = useState(null);
+  const [appUser, setAppUser] = useState(null);
 
-const IndexView = () => {
-  const { user, isLoading, isAuthenticated, getAccessTokenSilently} = useAuth0();
-  const [accessToken, setAccessToken] = useState(null);
   useEffect(() => {
-    const getAccessToken = async () => {
+    const getToken = async () => {
       try {
-        setAccessToken(await getAccessTokenSilently());
+        setToken(await getAccessTokenSilently());
       } catch (e) {
         console.log(e.message);
       }
     };
 
-    getAccessToken();
+    getToken();
   }, [getAccessTokenSilently]);
 
-  if (isLoading) {
-    return <div>loading... </div>;
-  }
-
-  var config = { headers: { Authorization: `Bearer ` + accessToken } };
-  Axios
-      .post(ApiUrl + "/users", {auth0_id: user.sub, email: user.email, username: user.name}, config)
-
-  return (
-    <div>
-      hello home page
-    </div>
-  )
-}
-
-class AdminVideosView extends React.Component {
-  render() {
-    return (
-      <div>
-        <CreateVideo url={ApiUrl} />
-        <hr />
-        <BaseVideo
-          id={1}
-          url={ApiUrl}
-          public_video_dir={conf.public_video_dir}
-        />
-        <hr />
-        <BaseVideo
-          id={2}
-          url={ApiUrl}
-          public_video_dir={conf.public_video_dir}
-        />
-        <hr />
-        <EditVideo id={1} url={ApiUrl} />
-      </div>
-    )
-  }
-}
-
-const ProblemView = () => {
-  const { user, isLoading, isAuthenticated, getAccessTokenSilently} = useAuth0();
-  const [accessToken, setAccessToken] = useState(null);
   useEffect(() => {
-    const getAccessToken = async () => {
+    const getAppUser = async () => {
       try {
-        setAccessToken(await getAccessTokenSilently());
+        if (token == null) {
+          return;
+        }
+        const settings = {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token,
+            },
+            body: JSON.stringify({
+              auth0_id: user.sub,
+              email: user.email,
+              username: user.name,
+            })
+        };
+        const req = await fetch(ApiUrl + "/users", settings);
+        const json = await req.json();
+        setAppUser(json);
       } catch (e) {
         console.log(e.message);
       }
     };
 
-    getAccessToken();
-  }, [getAccessTokenSilently]);
-
-  if (isLoading) {
-    return <div>loading... </div>;
-  }
+    getAppUser();
+  }, [token, user]);
 
   return (
     <div>
-      <BaseProblem url={ApiUrl} accessToken={accessToken} auth0Id={user.sub} />
-    </div>
-  )
-}
+      <div className="top-bar">
+        <div className="top-bar-left">
+          <ul className="menu">
+            <li className="menu-text">The Math Game</li>
+          </ul>
+        </div>
 
-const Main = () => (
-  <main>
-    <Switch>
-      <Route path="/admin/videos" component={AdminVideosView} />
-      <Route path="/problem" component={ProblemView} />
-      <Route path="" component={IndexView} />
-      <Route path="*" component={NotFound} />
-    </Switch>
-  </main>
-)
-
-const App = () => (
-  <div>
-    <div className="top-bar">
-      <div className="top-bar-left">
-        <ul className="menu">
-          <li className="menu-text">The Math Game</li>
-        </ul>
+        <div className="top-bar-right">
+          <ul className="menu">
+            <li>
+              <LoginButton />
+            </li>
+            <li>
+              <a href="/">/</a>
+            </li>
+            <li>
+              <a href="/play">play</a>
+            </li>
+          </ul>
+        </div>
       </div>
 
-      <div className="top-bar-right">
-        <ul className="menu">
-          <li>
-            <LoginButton />
-          </li>
-          <li>
-            <a href="/">/</a>
-          </li>
-          <li>
-            <a href="/problem">problem</a>
-          </li>
-        </ul>
-      </div>
-    </div>
-
-    <div className="grid-container full">
-      <div className="grid-x grid-margin-x align-center">
-        <div className="cell small-11 medium-8 large-7">
-          <Main />
+      <div className="grid-container full">
+        <div className="grid-x grid-margin-x align-center">
+          <div className="cell small-11 medium-8 large-7">
+            <Main token={token} url={ApiUrl} isLoading={isLoading} isAuthenticated={isAuthenticated} user={appUser}/>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-)
+  )
+}
 
 ReactDOM.render(
   <BrowserRouter>
@@ -164,10 +127,7 @@ ReactDOM.render(
       domain="compteam.auth0.com"
       clientId="IJt7c4yK6NhRGpIvmBYxLtWCCQbtCekZ"
       redirectUri={window.location.origin}
-      //audience="https://compteam.auth0.com/api/v2/"
       audience="mathgame"
-      //scope="test:access"
-      //scope="read:current_user update:current_user_metadata test:access"
     >
     <App />
   </Auth0Provider>

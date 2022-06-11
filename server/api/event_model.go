@@ -23,7 +23,7 @@ const (
 
 	getEventSQL = `SELECT * FROM events WHERE id=?;`
 
-	getEventKeySQL = `SELECT id FROM events WHERE user_id=?, event_type=?, value=?;`
+	getEventKeySQL = `SELECT id FROM events WHERE user_id=? AND event_type=? AND value=?;`
 
 	listEventSQL = `SELECT * FROM events;`
 
@@ -58,7 +58,11 @@ func (m *EventManager) Create(model *Event) (int, string, error) {
 		}
 
 		// Update model with the configured return field.
-		_ = m.DB.QueryRow(getEventKeySQL, model.UserId, model.EventType, model.Value).Scan(&model.Id)
+		err = m.DB.QueryRow(getEventKeySQL, model.UserId, model.EventType, model.Value).Scan(&model.Id)
+		if err != nil {
+			msg := "Couldn't add event to database"
+			return http.StatusInternalServerError, msg, err
+		}
 
 		return http.StatusOK, "", nil
 	}

@@ -21,7 +21,7 @@ const (
 
 	getProblemSQL = `SELECT * FROM problems WHERE id=?;`
 
-	getProblemKeySQL = `SELECT  FROM problems WHERE id=?, expression=?, answer=?, difficulty=?;`
+	getProblemKeySQL = `SELECT  FROM problems WHERE id=? AND expression=? AND answer=? AND difficulty=?;`
 
 	listProblemSQL = `SELECT * FROM problems;`
 
