@@ -6,5 +6,7 @@
 	"mysql_pass": "",
 	"api_host": "http://localhost",
         "api_port": "8080",
-        "public_video_dir": "videos/"
+        "auth0_domain": "",
+        "auth0_clientId": "",
+        "auth0_audience": ""
 }

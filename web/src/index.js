@@ -124,10 +124,10 @@ const App = () => {
 ReactDOM.render(
   <BrowserRouter>
     <Auth0Provider
-      domain="compteam.auth0.com"
-      clientId="IJt7c4yK6NhRGpIvmBYxLtWCCQbtCekZ"
+      audience={conf.auth0_audience}
+      clientId={conf.auth0_clientId}
+      domain={conf.auth0_domain}
       redirectUri={window.location.origin}
-      audience="mathgame"
     >
     <App />
   </Auth0Provider>
