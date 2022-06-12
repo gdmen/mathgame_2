@@ -5,7 +5,7 @@ import { BrowserRouter, Route, Switch } from 'react-router-dom'
 import { Auth0Provider } from "@auth0/auth0-react"
 import { useAuth0 } from "@auth0/auth0-react";
 
-import { LoginButton } from './auth0.js'
+import { LoginButton, LogoutButton } from './auth0.js'
 
 import { HomeView } from './home.js'
 import { PlayView } from './play.js'
@@ -98,7 +98,7 @@ const App = () => {
         <div className="top-bar-right">
           <ul className="menu">
             <li>
-              <LoginButton />
+              {isAuthenticated ? <LogoutButton /> : <LoginButton />}
             </li>
             <li>
               <a href="/">/</a>
