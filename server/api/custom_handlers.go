@@ -98,7 +98,6 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	} else if event.EventType == WORKING_ON_PROBLEM {
 		// TODO: valudate duration
 	} else if event.EventType == ANSWERED_PROBLEM {
-		glog.Infof("%s %s", logPrefix, "answered problem DEBUG!")
 		// Get Problem
 		problem, status, msg, err := a.problemManager.Get(gamestate.ProblemId)
 		if HandleMngrResp(logPrefix, c, status, msg, err, problem) != nil {
@@ -108,7 +107,6 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			msg := fmt.Sprintf("Incorrect answer: {%s}, expected: {%s}", event.Value, problem.Answer)
 			glog.Infof("%s %s", logPrefix, msg)
 		} else { // Answer was correct
-			glog.Infof("%s %s", logPrefix, "correct answered problem DEBUG!")
 			// Update counts
 			gamestate.NumSolved += 1
 			// Get Options

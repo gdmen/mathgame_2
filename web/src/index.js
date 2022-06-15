@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import ReactDOM from 'react-dom'
 import { BrowserRouter, Route, Switch } from 'react-router-dom'
 
@@ -21,7 +21,7 @@ const NotFound = () => (
   </div>
 )
 
-const Main = ({ token, url, isLoading, isAuthenticated, user }) => {
+const Main = ({ token, url, isLoading, isAuthenticated, user, postEvent }) => {
   return (
     <main>
       <Switch>
@@ -30,7 +30,7 @@ const Main = ({ token, url, isLoading, isAuthenticated, user }) => {
         </Route>
         <Route path="/play">
           {!isLoading && isAuthenticated &&
-            <PlayView token={token} url={url} user={user}/>
+            <PlayView token={token} url={url} user={user} postEvent={postEvent}/>
           }
         </Route>
         <Route path="*" component={NotFound} />
@@ -43,6 +43,30 @@ const App = () => {
   const {user, isLoading, isAuthenticated, getAccessTokenSilently} = useAuth0();
   const [token, setToken] = useState(null);
   const [appUser, setAppUser] = useState(null);
+
+  const genPostEventFcn = useCallback(() => {
+    return async function(event_type, value) {
+      try {
+        const settings = {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + token,
+            },
+            body: JSON.stringify({
+              'event_type': event_type,
+              'value': value,
+            }),
+        };
+        const req = await fetch(ApiUrl+ "/events", settings);
+        const json = await req.json();
+        return json;
+      } catch (e) {
+        console.log(e.message);
+      }
+    };
+  }, [token]);
 
   useEffect(() => {
     const getToken = async () => {
@@ -78,13 +102,14 @@ const App = () => {
         const req = await fetch(ApiUrl + "/users", settings);
         const json = await req.json();
         setAppUser(json);
+        genPostEventFcn("logged_in", "");
       } catch (e) {
         console.log(e.message);
       }
     };
 
     getAppUser();
-  }, [token, user]);
+  }, [token, user, genPostEventFcn]);
 
   return (
     <div>
@@ -113,7 +138,7 @@ const App = () => {
       <div className="grid-container full">
         <div className="grid-x grid-margin-x align-center">
           <div className="cell small-11 medium-8 large-7">
-            <Main token={token} url={ApiUrl} isLoading={isLoading} isAuthenticated={isAuthenticated} user={appUser}/>
+            <Main token={token} url={ApiUrl} isLoading={isLoading} isAuthenticated={isAuthenticated} user={appUser} postEvent={genPostEventFcn()}/>
           </div>
         </div>
       </div>
