@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import "katex/dist/katex.min.css"
 
 import { ProblemView } from './problem.js'
+import { VideoView } from './video.js'
 
 const PlayView = ({ token, url, user, postEvent}) => {
   const [gamestate, setGamestate] = useState(null);
@@ -86,7 +87,6 @@ const PlayView = ({ token, url, user, postEvent}) => {
 
   useEffect(() => {
     getVideos();
-    console.log(videos);
   }, [getVideos]);
 
   useEffect(() => {
@@ -106,7 +106,7 @@ const PlayView = ({ token, url, user, postEvent}) => {
     setAnswer("");
   }
   if (gamestate.num_solved >= gamestate.num_target) {
-    return <div>VIDEO</div>
+    return <VideoView video={videos[0]} postEvent={postEvent}/>
   }
   return <ProblemView latex={latex} answer={answer} setAnswer={setAnswer} postAnswer={postAnswer}/>
 }

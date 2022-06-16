@@ -36,8 +36,8 @@ type Video struct {
 	Id      uint32 `json:"id" uri:"id"`
 	Title   string `json:"title" uri:"title" form:"title"`
 	URL     string `json:"url" uri:"url" form:"url"`
-	Start   uint32 `json:"start" uri:"start" form:"start"`
-	End     uint32 `json:"end" uri:"end" form:"end"`
+	Start   int32  `json:"start" uri:"start" form:"start"`
+	End     int32  `json:"end" uri:"end" form:"end"`
 	Enabled bool   `json:"enabled" uri:"enabled" form:"enabled"`
 }
 

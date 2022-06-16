@@ -58,11 +58,11 @@
           "sql": "VARCHAR(256) NOT NULL"
         },
         {
-          "name": "Start", "type": "uint32",
+          "name": "Start", "type": "int32",
           "sql": "INT(5) NOT NULL"
         },
         {
-          "name": "End", "type": "uint32",
+          "name": "End", "type": "int32",
           "sql": "INT(5) NOT NULL"
         },
         {
