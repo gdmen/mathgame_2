@@ -10,6 +10,7 @@ const PlayView = ({ token, url, user, postEvent}) => {
   const [problem, setProblem] = useState(null);
   const [latex, setLatex] = useState(null);
   const [answer, setAnswer] = useState(null);
+  const [videos, setVideos] = useState(null);
 
   const getGamestate = useCallback(async () => {
     try {
@@ -54,6 +55,27 @@ const PlayView = ({ token, url, user, postEvent}) => {
     }
   }, [token, url, gamestate]);
 
+  const getVideos = useCallback(async () => {
+    try {
+      if (token == null || url == null || user == null) {
+        return;
+      }
+      const settings = {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+          },
+      };
+      const req = await fetch(url+ "/videos/", settings);
+      const json = await req.json();
+      setVideos(json);
+    } catch (e) {
+      console.log(e.message);
+    }
+  }, [token, url, user]);
+
   useEffect(() => {
     getGamestate();
   }, [getGamestate]);
@@ -61,6 +83,11 @@ const PlayView = ({ token, url, user, postEvent}) => {
   useEffect(() => {
     getProblem();
   }, [getProblem]);
+
+  useEffect(() => {
+    getVideos();
+    console.log(videos);
+  }, [getVideos]);
 
   useEffect(() => {
     postEvent("displayed_problem", "");
