@@ -2,9 +2,8 @@ import katex from 'katex';
 import React, { useCallback, useEffect, useState } from "react";
 
 import "katex/dist/katex.min.css"
-import './play.css'
 
-var ReactFitText = require('react-fittext');
+import { ProblemView } from './problem.js'
 
 const PlayView = ({ token, url, user, postEvent}) => {
   const [gamestate, setGamestate] = useState(null);
@@ -79,24 +78,10 @@ const PlayView = ({ token, url, user, postEvent}) => {
   if (answer == null) {
     setAnswer("");
   }
-  return (
-    <div id="problem">
-        <ReactFitText compressor={0.75}>
-            <div id="problem-display" dangerouslySetInnerHTML={{__html: latex}}></div>
-        </ReactFitText>
-        <div id="problem-answer" className="input-group">
-            <input id="problem-answer-input" className="input-group-field" type="text"
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-            />
-            <div className="input-group-button">
-                <input type="submit" className="button" value="answer"
-                  onClick={postAnswer}
-                />
-            </div>
-        </div>
-    </div>
-  )
+  if (gamestate.num_solved >= gamestate.num_target) {
+    return <div>VIDEO</div>
+  }
+  return <ProblemView latex={latex} answer={answer} setAnswer={setAnswer} postAnswer={postAnswer}/>
 }
 
 export {
