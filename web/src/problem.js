@@ -4,8 +4,16 @@ import './problem.css'
 
 var ReactFitText = require('react-fittext');
 
-const ProblemView = ({ latex, answer, setAnswer, postAnswer }) => {
-  return (
+const ProblemView = ({ gamestate, latex, answer, setAnswer, postAnswer }) => {
+  if (gamestate == null || latex == null || answer == null || setAnswer == null || postAnswer == null) {
+    return <div></div>
+  }
+
+  var progress = String(100.0 * gamestate.solved / gamestate.target) + "%";
+  return (<>
+    <div className="success progress">
+      <div className="progress-meter" style={{width: progress}}></div>
+    </div>
     <div id="problem">
         <ReactFitText compressor={0.75}>
             <div id="problem-display" dangerouslySetInnerHTML={{__html: latex}}></div>
@@ -22,7 +30,7 @@ const ProblemView = ({ latex, answer, setAnswer, postAnswer }) => {
             </div>
         </div>
     </div>
-  )
+  </>)
 }
 
 export {

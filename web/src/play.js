@@ -108,7 +108,7 @@ const PlayView = ({ token, url, user, postEvent}) => {
   if (gamestate.solved >= gamestate.target) {
     return <VideoView video={video} postEvent={postEvent}/>
   }
-  return <ProblemView latex={latex} answer={answer} setAnswer={setAnswer} postAnswer={postAnswer}/>
+  return <ProblemView gamestate={gamestate} latex={latex} answer={answer} setAnswer={setAnswer} postAnswer={postAnswer}/>
 }
 
 export {

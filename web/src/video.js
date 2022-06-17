@@ -6,6 +6,10 @@ import './video.css'
 const VideoView = ({ video, postEvent }) => {
   const [playing, setPlaying] = useState(null);
 
+  if (video == null || postEvent == null) {
+    return <div></div>
+  }
+
   const play = async () => {
     setPlaying(true);
   };
