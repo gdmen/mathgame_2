@@ -76,26 +76,23 @@ func (a *Api) generateProblem(logPrefix string, c *gin.Context, opts *Option) (*
 }
 
 func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint32, error) {
-	// Get video ids belonging to this user
-	userHasVideos, status, msg, err := a.userHasVideoManager.CustomList(fmt.Sprintf("select * from userHasVideos where user_id=%d", userId))
-	if HandleMngrResp(logPrefix, c, status, msg, err, userHasVideos) != nil {
+	// Get videos belonging to this user
+	videos, status, msg, err := a.videoManager.CustomList(fmt.Sprintf("SELECT * FROM videos INNER JOIN userHasVideos ON videos.id = userHasVideos.video_id WHERE userHasVideos.user_id=%d AND videos.enabled=1;", userId))
+	if HandleMngrResp(logPrefix, c, status, msg, err, videos) != nil {
 		return 0, err
 	}
 
-	var videoIds []uint32
-	for _, e := range *userHasVideos {
-		videoIds = append(videoIds, e.VideoId)
-	}
-
-	// If there are no selected videos, select from all videos
-	if len(videoIds) < 1 {
-		videos, status, msg, err := a.videoManager.List()
+	// If there are no videos for this user, select from all videos
+	if len(*videos) < 1 {
+		videos, status, msg, err = a.videoManager.CustomList("SELECT * FROM videos WHERE enabled=1;")
 		if HandleMngrResp(logPrefix, c, status, msg, err, videos) != nil {
 			return 0, err
 		}
-		for _, e := range *videos {
-			videoIds = append(videoIds, e.Id)
-		}
+	}
+
+	var videoIds []uint32
+	for _, v := range *videos {
+		videoIds = append(videoIds, v.Id)
 	}
 
 	// If there are no videos at all in the database, add a default and use that
@@ -104,7 +101,7 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint
 		glog.Errorf("%s %s", logPrefix, msg)
 		video := &Video{
 			Title:   "You've Got a Friend in Me",
-			URL:     "https://www.youtube.com/watch?v=nMN4JZ8crVY",
+			URL:     "https://www.youtube.com/watch?v=rUWxSEwctFU", //"https://www.youtube.com/watch?v=nMN4JZ8crVY",
 			Start:   0,
 			End:     9999,
 			Enabled: true,
@@ -274,7 +271,7 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 			ProblemId: problem.Id,
 			VideoId:   videoId,
 			Solved:    0,
-			Target:    10,
+			Target:    2,
 		}
 		status, msg, err = a.gamestateManager.Create(default_gamestate)
 		if HandleMngrResp(logPrefix, c, status, msg, err, default_gamestate) != nil {

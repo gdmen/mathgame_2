@@ -24,3 +24,6 @@
 
 # insert some test videos
 mysql -u root -proot mathgame < videos.sql
+
+# drop and recreate db
+mysql -u root -proot mathgame < drop.sql

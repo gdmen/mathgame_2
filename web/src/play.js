@@ -98,15 +98,13 @@ const PlayView = ({ token, url, user, postEvent}) => {
   };
 
   if (!gamestate || !problem) {
-    return (
-      <div>loading</div>
-    )
+    return <div id="loading"></div>
   }
   if (answer == null) {
     setAnswer("");
   }
   if (gamestate.solved >= gamestate.target) {
-    return <VideoView video={video} postEvent={postEvent}/>
+    return <VideoView video={video} postEvent={postEvent} />
   }
   return <ProblemView gamestate={gamestate} latex={latex} answer={answer} setAnswer={setAnswer} postAnswer={postAnswer}/>
 }

@@ -7,7 +7,7 @@ const VideoView = ({ video, postEvent }) => {
   const [playing, setPlaying] = useState(null);
 
   if (video == null || postEvent == null) {
-    return <div></div>
+    return <div id="loading"></div>
   }
 
   const play = async () => {
@@ -19,7 +19,10 @@ const VideoView = ({ video, postEvent }) => {
       <ReactPlayer
         url={video.url}
         playing={playing}
-        onEnded={() => { postEvent("done_watching_video", video.id); }}
+        onEnded={() => {
+          postEvent("done_watching_video", video.id);
+          window.location.href="play";
+        }}
       />
       <div id="click-blocker" onClick={play}></div>
     </div>

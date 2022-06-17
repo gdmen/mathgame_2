@@ -6,7 +6,7 @@ var ReactFitText = require('react-fittext');
 
 const ProblemView = ({ gamestate, latex, answer, setAnswer, postAnswer }) => {
   if (gamestate == null || latex == null || answer == null || setAnswer == null || postAnswer == null) {
-    return <div></div>
+    return <div id="loading"></div>
   }
 
   var progress = String(100.0 * gamestate.solved / gamestate.target) + "%";
