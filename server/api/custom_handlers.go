@@ -75,6 +75,53 @@ func (a *Api) generateProblem(logPrefix string, c *gin.Context, opts *Option) (*
 	return model, nil
 }
 
+func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint32, error) {
+	// Get video ids belonging to this user
+	userHasVideos, status, msg, err := a.userHasVideoManager.CustomList(fmt.Sprintf("select * from userHasVideos where user_id=%d", userId))
+	if HandleMngrResp(logPrefix, c, status, msg, err, userHasVideos) != nil {
+		return 0, err
+	}
+
+	var videoIds []uint32
+	for _, e := range *userHasVideos {
+		videoIds = append(videoIds, e.VideoId)
+	}
+
+	// If there are no selected videos, select from all videos
+	if len(videoIds) < 1 {
+		videos, status, msg, err := a.videoManager.List()
+		if HandleMngrResp(logPrefix, c, status, msg, err, videos) != nil {
+			return 0, err
+		}
+		for _, e := range *videos {
+			videoIds = append(videoIds, e.Id)
+		}
+	}
+
+	// If there are no videos at all in the database, add a default and use that
+	if len(videoIds) < 1 {
+		msg := "Couldn't find any videos in the database, adding a default."
+		glog.Errorf("%s %s", logPrefix, msg)
+		video := &Video{
+			Title:   "You've Got a Friend in Me",
+			URL:     "https://www.youtube.com/watch?v=nMN4JZ8crVY",
+			Start:   0,
+			End:     9999,
+			Enabled: true,
+		}
+		status, msg, err := a.videoManager.Create(video)
+		if HandleMngrResp(logPrefix, c, status, msg, err, video) != nil {
+			return 0, err
+		}
+		videoIds = append(videoIds, video.Id)
+	}
+
+	// Select video
+	videoId := videoIds[0]
+
+	return videoId, nil
+}
+
 // Do stuff based on the event and return an updated Gamestate{}
 func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, writeCtx bool) error {
 	auth0Id := GetAuth0IdFromContext(logPrefix, c, a.isTest)
@@ -108,7 +155,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			glog.Infof("%s %s", logPrefix, msg)
 		} else { // Answer was correct
 			// Update counts
-			gamestate.NumSolved += 1
+			gamestate.Solved += 1
 			// Get Options
 			option, status, msg, err := a.optionManager.Get(user.Id)
 			if HandleMngrResp(logPrefix, c, status, msg, err, option) != nil {
@@ -120,15 +167,21 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 				return err
 			}
 			gamestate.ProblemId = problem.Id
+			// Set a new reward video
+			videoId, err := a.selectVideo(logPrefix, c, user.Id)
+			if err != nil {
+				return err
+			}
+			gamestate.VideoId = videoId
 		}
 	} else if event.EventType == WATCHING_VIDEO {
 		// TODO: validate duration
 	} else if event.EventType == DONE_WATCHING_VIDEO {
 		// TODO: validate videoID
-		if gamestate.NumSolved == gamestate.NumTarget {
-			gamestate.NumSolved = 0
+		if gamestate.Solved == gamestate.Target {
+			gamestate.Solved = 0
 			// TODO: This is where we would calculate work % and re-evaluate
-			// difficulty and NumTarget
+			// difficulty and Target
 		}
 	} else {
 		msg := fmt.Sprintf("Invalid EventType: %s", event.EventType)
@@ -208,13 +261,19 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 		if err != nil {
 			return
 		}
+		// Set a new reward video
+		videoId, err := a.selectVideo(logPrefix, c, user.Id)
+		if err != nil {
+			return
+		}
 
 		// Write default new gamestate to database
 		default_gamestate := &Gamestate{
 			UserId:    user.Id,
 			ProblemId: problem.Id,
-			NumSolved: 0,
-			NumTarget: 10,
+			VideoId:   videoId,
+			Solved:    0,
+			Target:    10,
 		}
 		status, msg, err = a.gamestateManager.Create(default_gamestate)
 		if HandleMngrResp(logPrefix, c, status, msg, err, default_gamestate) != nil {

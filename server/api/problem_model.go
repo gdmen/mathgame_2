@@ -76,6 +76,33 @@ func (m *ProblemManager) Get(id uint32) (*Problem, int, string, error) {
 func (m *ProblemManager) List() (*[]Problem, int, string, error) {
 	models := []Problem{}
 	rows, err := m.DB.Query(listProblemSQL)
+
+	defer rows.Close()
+	if err != nil {
+		msg := "Couldn't get problems from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	for rows.Next() {
+		model := Problem{}
+		err = rows.Scan(&model.Id, &model.Expression, &model.Answer, &model.Difficulty)
+		if err != nil {
+			msg := "Couldn't scan row from database"
+			return nil, http.StatusInternalServerError, msg, err
+		}
+		models = append(models, model)
+	}
+	err = rows.Err()
+	if err != nil {
+		msg := "Error scanning rows from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	return &models, http.StatusOK, "", nil
+}
+
+func (m *ProblemManager) CustomList(sql string) (*[]Problem, int, string, error) {
+	models := []Problem{}
+	rows, err := m.DB.Query(sql)
+
 	defer rows.Close()
 	if err != nil {
 		msg := "Couldn't get problems from database"

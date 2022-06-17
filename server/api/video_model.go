@@ -94,6 +94,33 @@ func (m *VideoManager) Get(id uint32) (*Video, int, string, error) {
 func (m *VideoManager) List() (*[]Video, int, string, error) {
 	models := []Video{}
 	rows, err := m.DB.Query(listVideoSQL)
+
+	defer rows.Close()
+	if err != nil {
+		msg := "Couldn't get videos from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	for rows.Next() {
+		model := Video{}
+		err = rows.Scan(&model.Id, &model.Title, &model.URL, &model.Start, &model.End, &model.Enabled)
+		if err != nil {
+			msg := "Couldn't scan row from database"
+			return nil, http.StatusInternalServerError, msg, err
+		}
+		models = append(models, model)
+	}
+	err = rows.Err()
+	if err != nil {
+		msg := "Error scanning rows from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	return &models, http.StatusOK, "", nil
+}
+
+func (m *VideoManager) CustomList(sql string) (*[]Video, int, string, error) {
+	models := []Video{}
+	rows, err := m.DB.Query(sql)
+
 	defer rows.Close()
 	if err != nil {
 		msg := "Couldn't get videos from database"

@@ -108,11 +108,15 @@
           "sql": "BIGINT UNSIGNED NOT NULL"
         },
         {
-          "name": "NumSolved", "type": "uint32",
+          "name": "VideoId", "type": "uint32",
+          "sql": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "Solved", "type": "uint32",
           "sql": "INT(5) NOT NULL"
         },
         {
-          "name": "NumTarget", "type": "uint32",
+          "name": "Target", "type": "uint32",
           "sql": "INT(5) NOT NULL"
         }
       ]
@@ -139,6 +143,23 @@
         {
           "name": "Value", "type": "string",
           "sql": "TEXT NOT NULL"
+        }
+      ]
+    },
+    {
+      "name": "userHasVideo",
+      "fields": [
+        {
+          "name": "Id", "type": "uint32",
+          "sql": "BIGINT UNSIGNED PRIMARY KEY UNIQUE"
+        },
+        {
+          "name": "UserId", "type": "uint32",
+          "sql": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "VideoId", "type": "uint32",
+          "sql": "BIGINT UNSIGNED NOT NULL"
         }
       ]
     }
