@@ -499,3 +499,85 @@ func (a *Api) deleteEvent(c *gin.Context) {
 		return
 	}
 }
+
+func (a *Api) createUserhasvideo(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Userhasvideo{}
+	if BindModelFromForm(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Write to database
+	status, msg, err := a.userHasVideoManager.Create(model)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
+}
+
+func (a *Api) getUserhasvideo(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Userhasvideo{}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Read from database
+	model, status, msg, err := a.userHasVideoManager.Get(model.Id)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
+}
+
+func (a *Api) listUserhasvideo(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Read from database
+	models, status, msg, err := a.userHasVideoManager.List()
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {
+		return
+	}
+}
+
+func (a *Api) updateUserhasvideo(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Userhasvideo{}
+	if BindModelFromForm(logPrefix, c, model) != nil {
+		return
+	}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Write to database
+	status, msg, err := a.userHasVideoManager.Update(model)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
+}
+
+func (a *Api) deleteUserhasvideo(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Userhasvideo{}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Write to database
+	status, msg, err := a.userHasVideoManager.Delete(model.Id)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {
+		return
+	}
+}

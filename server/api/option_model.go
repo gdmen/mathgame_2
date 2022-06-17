@@ -78,6 +78,33 @@ func (m *OptionManager) Get(user_id uint32) (*Option, int, string, error) {
 func (m *OptionManager) List() (*[]Option, int, string, error) {
 	models := []Option{}
 	rows, err := m.DB.Query(listOptionSQL)
+
+	defer rows.Close()
+	if err != nil {
+		msg := "Couldn't get options from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	for rows.Next() {
+		model := Option{}
+		err = rows.Scan(&model.UserId, &model.Operations, &model.Fractions, &model.Negatives, &model.TargetDifficulty)
+		if err != nil {
+			msg := "Couldn't scan row from database"
+			return nil, http.StatusInternalServerError, msg, err
+		}
+		models = append(models, model)
+	}
+	err = rows.Err()
+	if err != nil {
+		msg := "Error scanning rows from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	return &models, http.StatusOK, "", nil
+}
+
+func (m *OptionManager) CustomList(sql string) (*[]Option, int, string, error) {
+	models := []Option{}
+	rows, err := m.DB.Query(sql)
+
 	defer rows.Close()
 	if err != nil {
 		msg := "Couldn't get options from database"

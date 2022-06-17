@@ -11,7 +11,7 @@ const PlayView = ({ token, url, user, postEvent}) => {
   const [problem, setProblem] = useState(null);
   const [latex, setLatex] = useState(null);
   const [answer, setAnswer] = useState(null);
-  const [videos, setVideos] = useState(null);
+  const [video, setVideo] = useState(null);
 
   const getGamestate = useCallback(async () => {
     try {
@@ -56,9 +56,9 @@ const PlayView = ({ token, url, user, postEvent}) => {
     }
   }, [token, url, gamestate]);
 
-  const getVideos = useCallback(async () => {
+  const getVideo = useCallback(async () => {
     try {
-      if (token == null || url == null || user == null) {
+      if (token == null || url == null || gamestate == null) {
         return;
       }
       const settings = {
@@ -69,13 +69,13 @@ const PlayView = ({ token, url, user, postEvent}) => {
             'Authorization': 'Bearer ' + token,
           },
       };
-      const req = await fetch(url+ "/videos/", settings);
+      const req = await fetch(url+ "/videos/" + gamestate.video_id, settings);
       const json = await req.json();
-      setVideos(json);
+      setVideo(json);
     } catch (e) {
       console.log(e.message);
     }
-  }, [token, url, user]);
+  }, [token, url, gamestate]);
 
   useEffect(() => {
     getGamestate();
@@ -86,8 +86,8 @@ const PlayView = ({ token, url, user, postEvent}) => {
   }, [getProblem]);
 
   useEffect(() => {
-    getVideos();
-  }, [getVideos]);
+    getVideo();
+  }, [getVideo]);
 
   useEffect(() => {
     postEvent("displayed_problem", "");
@@ -105,8 +105,8 @@ const PlayView = ({ token, url, user, postEvent}) => {
   if (answer == null) {
     setAnswer("");
   }
-  if (gamestate.num_solved >= gamestate.num_target) {
-    return <VideoView video={videos[0]} postEvent={postEvent}/>
+  if (gamestate.solved >= gamestate.target) {
+    return <VideoView video={video} postEvent={postEvent}/>
   }
   return <ProblemView latex={latex} answer={answer} setAnswer={setAnswer} postAnswer={postAnswer}/>
 }

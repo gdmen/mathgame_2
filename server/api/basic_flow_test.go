@@ -122,7 +122,7 @@ func TestFlowBasic(t *testing.T) {
 	fetchGamestate(t, r, u, gs)
 
 	// Do problem solving loop
-	for gs.NumSolved != gs.NumTarget {
+	for gs.Solved != gs.Target {
 		t.Logf("gs: %v", gs)
 		p := Problem{}
 		fetchProblem(t, r, u, gs.ProblemId, &p)
@@ -131,18 +131,18 @@ func TestFlowBasic(t *testing.T) {
 		gs = reportEvent(t, r, u, "working_on_problem", "15")
 
 		// Have some incorrect answered for the first half of this round of problem solving
-		ns := gs.NumSolved
-		if gs.NumSolved < gs.NumTarget/2 {
+		ns := gs.Solved
+		if gs.Solved < gs.Target/2 {
 			gs = reportEvent(t, r, u, "answered_problem", "definitely the wrong answer")
 			gs = reportEvent(t, r, u, "answered_problem", "-12323")
-			if gs.NumSolved != ns {
+			if gs.Solved != ns {
 				t.Fatal("Incorrect answers were treated as solved.")
 			}
 		}
 
 		// Answer correctly
 		gs = reportEvent(t, r, u, "answered_problem", p.Answer)
-		if gs.NumSolved != ns+1 {
+		if gs.Solved != ns+1 {
 			t.Fatal("Correct answer was not incremented.")
 		}
 	}
@@ -156,11 +156,11 @@ func TestFlowBasic(t *testing.T) {
 	gs = reportEvent(t, r, u, "watching_video", "10")
 	gs = reportEvent(t, r, u, "watching_video", "10")
 	gs = reportEvent(t, r, u, "watching_video", "10")
-	if gs.NumSolved != gs.NumTarget {
+	if gs.Solved != gs.Target {
 		t.Fatal("We should still be in a problems-done-watching-video state.")
 	}
-	gs = reportEvent(t, r, u, "done_watching_video", "1")
-	if gs.NumSolved != 0 {
-		t.Fatal("NumSolved should have been reset.")
+	gs = reportEvent(t, r, u, "done_watching_video", fmt.Sprint(gs.VideoId))
+	if gs.Solved != 0 {
+		t.Fatal("Solved should have been reset.")
 	}
 }

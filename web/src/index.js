@@ -56,7 +56,7 @@ const App = () => {
             },
             body: JSON.stringify({
               'event_type': event_type,
-              'value': value,
+              'value': String(value),
             }),
         };
         const req = await fetch(ApiUrl+ "/events", settings);

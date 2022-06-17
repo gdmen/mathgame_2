@@ -13,19 +13,20 @@ const (
     CREATE TABLE gamestates (
         user_id BIGINT UNSIGNED PRIMARY KEY,
 	problem_id BIGINT UNSIGNED NOT NULL,
-	num_solved INT(5) NOT NULL,
-	num_target INT(5) NOT NULL
+	video_id BIGINT UNSIGNED NOT NULL,
+	solved INT(5) NOT NULL,
+	target INT(5) NOT NULL
     ) DEFAULT CHARSET=utf8 ;`
 
-	createGamestateSQL = `INSERT INTO gamestates (user_id, problem_id, num_solved, num_target) VALUES (?, ?, ?, ?);`
+	createGamestateSQL = `INSERT INTO gamestates (user_id, problem_id, video_id, solved, target) VALUES (?, ?, ?, ?, ?);`
 
 	getGamestateSQL = `SELECT * FROM gamestates WHERE user_id=?;`
 
-	getGamestateKeySQL = `SELECT  FROM gamestates WHERE user_id=? AND problem_id=? AND num_solved=? AND num_target=?;`
+	getGamestateKeySQL = `SELECT  FROM gamestates WHERE user_id=? AND problem_id=? AND video_id=? AND solved=? AND target=?;`
 
 	listGamestateSQL = `SELECT * FROM gamestates;`
 
-	updateGamestateSQL = `UPDATE gamestates SET problem_id=?, num_solved=?, num_target=? WHERE user_id=?;`
+	updateGamestateSQL = `UPDATE gamestates SET problem_id=?, video_id=?, solved=?, target=? WHERE user_id=?;`
 
 	deleteGamestateSQL = `DELETE FROM gamestates WHERE user_id=?;`
 )
@@ -33,12 +34,13 @@ const (
 type Gamestate struct {
 	UserId    uint32 `json:"user_id" uri:"user_id"`
 	ProblemId uint32 `json:"problem_id" uri:"problem_id" form:"problem_id"`
-	NumSolved uint32 `json:"num_solved" uri:"num_solved" form:"num_solved"`
-	NumTarget uint32 `json:"num_target" uri:"num_target" form:"num_target"`
+	VideoId   uint32 `json:"video_id" uri:"video_id" form:"video_id"`
+	Solved    uint32 `json:"solved" uri:"solved" form:"solved"`
+	Target    uint32 `json:"target" uri:"target" form:"target"`
 }
 
 func (model Gamestate) String() string {
-	return fmt.Sprintf("UserId: %v, ProblemId: %v, NumSolved: %v, NumTarget: %v", model.UserId, model.ProblemId, model.NumSolved, model.NumTarget)
+	return fmt.Sprintf("UserId: %v, ProblemId: %v, VideoId: %v, Solved: %v, Target: %v", model.UserId, model.ProblemId, model.VideoId, model.Solved, model.Target)
 }
 
 type GamestateManager struct {
@@ -47,7 +49,7 @@ type GamestateManager struct {
 
 func (m *GamestateManager) Create(model *Gamestate) (int, string, error) {
 	status := http.StatusCreated
-	_, err := m.DB.Exec(createGamestateSQL, model.UserId, model.ProblemId, model.NumSolved, model.NumTarget)
+	_, err := m.DB.Exec(createGamestateSQL, model.UserId, model.ProblemId, model.VideoId, model.Solved, model.Target)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Duplicate entry") {
 			msg := "Couldn't add gamestate to database"
@@ -62,7 +64,7 @@ func (m *GamestateManager) Create(model *Gamestate) (int, string, error) {
 
 func (m *GamestateManager) Get(user_id uint32) (*Gamestate, int, string, error) {
 	model := &Gamestate{}
-	err := m.DB.QueryRow(getGamestateSQL, user_id).Scan(&model.UserId, &model.ProblemId, &model.NumSolved, &model.NumTarget)
+	err := m.DB.QueryRow(getGamestateSQL, user_id).Scan(&model.UserId, &model.ProblemId, &model.VideoId, &model.Solved, &model.Target)
 	if err == sql.ErrNoRows {
 		msg := "Couldn't find a gamestate with that user_id"
 		return nil, http.StatusNotFound, msg, err
@@ -76,6 +78,7 @@ func (m *GamestateManager) Get(user_id uint32) (*Gamestate, int, string, error) 
 func (m *GamestateManager) List() (*[]Gamestate, int, string, error) {
 	models := []Gamestate{}
 	rows, err := m.DB.Query(listGamestateSQL)
+
 	defer rows.Close()
 	if err != nil {
 		msg := "Couldn't get gamestates from database"
@@ -83,7 +86,33 @@ func (m *GamestateManager) List() (*[]Gamestate, int, string, error) {
 	}
 	for rows.Next() {
 		model := Gamestate{}
-		err = rows.Scan(&model.UserId, &model.ProblemId, &model.NumSolved, &model.NumTarget)
+		err = rows.Scan(&model.UserId, &model.ProblemId, &model.VideoId, &model.Solved, &model.Target)
+		if err != nil {
+			msg := "Couldn't scan row from database"
+			return nil, http.StatusInternalServerError, msg, err
+		}
+		models = append(models, model)
+	}
+	err = rows.Err()
+	if err != nil {
+		msg := "Error scanning rows from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	return &models, http.StatusOK, "", nil
+}
+
+func (m *GamestateManager) CustomList(sql string) (*[]Gamestate, int, string, error) {
+	models := []Gamestate{}
+	rows, err := m.DB.Query(sql)
+
+	defer rows.Close()
+	if err != nil {
+		msg := "Couldn't get gamestates from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	for rows.Next() {
+		model := Gamestate{}
+		err = rows.Scan(&model.UserId, &model.ProblemId, &model.VideoId, &model.Solved, &model.Target)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -105,7 +134,7 @@ func (m *GamestateManager) Update(model *Gamestate) (int, string, error) {
 		return status, msg, err
 	}
 	// Update
-	_, err = m.DB.Exec(updateGamestateSQL, model.ProblemId, model.NumSolved, model.NumTarget, model.UserId)
+	_, err = m.DB.Exec(updateGamestateSQL, model.ProblemId, model.VideoId, model.Solved, model.Target, model.UserId)
 	if err != nil {
 		msg := "Couldn't update gamestate in database"
 		return http.StatusInternalServerError, msg, err

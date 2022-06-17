@@ -83,6 +83,33 @@ func (m *UserManager) Get(auth0_id string) (*User, int, string, error) {
 func (m *UserManager) List() (*[]User, int, string, error) {
 	models := []User{}
 	rows, err := m.DB.Query(listUserSQL)
+
+	defer rows.Close()
+	if err != nil {
+		msg := "Couldn't get users from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	for rows.Next() {
+		model := User{}
+		err = rows.Scan(&model.Auth0Id, &model.Id, &model.Email, &model.Username)
+		if err != nil {
+			msg := "Couldn't scan row from database"
+			return nil, http.StatusInternalServerError, msg, err
+		}
+		models = append(models, model)
+	}
+	err = rows.Err()
+	if err != nil {
+		msg := "Error scanning rows from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	return &models, http.StatusOK, "", nil
+}
+
+func (m *UserManager) CustomList(sql string) (*[]User, int, string, error) {
+	models := []User{}
+	rows, err := m.DB.Query(sql)
+
 	defer rows.Close()
 	if err != nil {
 		msg := "Couldn't get users from database"

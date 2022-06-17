@@ -93,6 +93,33 @@ func (m *EventManager) Get(id uint32) (*Event, int, string, error) {
 func (m *EventManager) List() (*[]Event, int, string, error) {
 	models := []Event{}
 	rows, err := m.DB.Query(listEventSQL)
+
+	defer rows.Close()
+	if err != nil {
+		msg := "Couldn't get events from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	for rows.Next() {
+		model := Event{}
+		err = rows.Scan(&model.Id, &model.Timestamp, &model.UserId, &model.EventType, &model.Value)
+		if err != nil {
+			msg := "Couldn't scan row from database"
+			return nil, http.StatusInternalServerError, msg, err
+		}
+		models = append(models, model)
+	}
+	err = rows.Err()
+	if err != nil {
+		msg := "Error scanning rows from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	return &models, http.StatusOK, "", nil
+}
+
+func (m *EventManager) CustomList(sql string) (*[]Event, int, string, error) {
+	models := []Event{}
+	rows, err := m.DB.Query(sql)
+
 	defer rows.Close()
 	if err != nil {
 		msg := "Couldn't get events from database"

@@ -244,11 +244,8 @@ import (
         m["name"]
     )
 
-    # manager.List()
-    s += '''
-    func (m *{0}Manager) List() (*[]{0}, int, string, error) {{
-        models := []{0}{{}}
-        rows, err := m.DB.Query(list{0}SQL)
+    # manager.List() and manager.CustomList(sql)
+    list_code = '''
         defer rows.Close()
         if err != nil {{
             msg := "Couldn't get {1}s from database"
@@ -275,6 +272,24 @@ import (
         m["name"],
         ", ".join(["&model." + n for n in struct_fields])
     )
+
+    # manager.List()
+    s += '''
+    func (m *{0}Manager) List() (*[]{0}, int, string, error) {{
+        models := []{0}{{}}
+        rows, err := m.DB.Query(list{0}SQL)
+'''.format(
+        m["name"].capitalize())
+    s += list_code
+
+    # manager.CustomList()
+    s += '''
+    func (m *{0}Manager) CustomList(sql string) (*[]{0}, int, string, error) {{
+        models := []{0}{{}}
+        rows, err := m.DB.Query(sql)
+'''.format(
+        m["name"].capitalize())
+    s += list_code
 
     # manager.Update()
     s += '''

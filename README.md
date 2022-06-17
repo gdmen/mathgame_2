@@ -20,3 +20,7 @@
 # refresh after not developing for a long time
 > make clean  
 > make # should install go dependencies
+
+
+# insert some test videos
+mysql -u root -proot mathgame < videos.sql
