@@ -8,5 +8,6 @@
         "api_port": "8080",
         "auth0_domain": "",
         "auth0_clientId": "",
-        "auth0_audience": ""
+        "auth0_audience": "",
+        "event_reporting_interval": 5000
 }

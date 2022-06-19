@@ -6,7 +6,7 @@ import "katex/dist/katex.min.css"
 import { ProblemView } from './problem.js'
 import { VideoView } from './video.js'
 
-const PlayView = ({ token, url, user, postEvent}) => {
+const PlayView = ({ token, url, user, postEvent, interval }) => {
   const [gamestate, setGamestate] = useState(null);
   const [problem, setProblem] = useState(null);
   const [latex, setLatex] = useState(null);
@@ -97,9 +97,9 @@ const PlayView = ({ token, url, user, postEvent}) => {
   }
 
   if (gamestate.solved >= gamestate.target) {
-    return <VideoView video={video} postEvent={postEvent} />
+    return <VideoView video={video} postEvent={postEvent} interval={interval} />
   }
-  return <ProblemView gamestate={gamestate} latex={latex} postAnswer={postAnswer} postEvent={postEvent} />
+  return <ProblemView gamestate={gamestate} latex={latex} postAnswer={postAnswer} postEvent={postEvent} interval={interval} />
 }
 
 export {

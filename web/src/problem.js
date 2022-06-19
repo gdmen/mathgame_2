@@ -4,10 +4,8 @@ import './problem.css'
 
 var ReactFitText = require('react-fittext');
 
-const workReportingInterval = 5; // seconds
-
 class WorkReporterSingleton {
-  constructor(postEvent) {
+  constructor(postEvent, interval) {
     var singleton = WorkReporterSingleton._instance;
     if (singleton) {
       singleton.setUpListeners();
@@ -16,10 +14,11 @@ class WorkReporterSingleton {
     WorkReporterSingleton._instance = this;
 
     this.postEvent = postEvent;
+    this.interval = interval;
 
     this.setUpListeners();
 
-    setInterval(this.reportWorking.bind(this), 1000 * workReportingInterval);
+    setInterval(this.reportWorking.bind(this), this.interval);
   }
 
   destruct() {
@@ -42,7 +41,7 @@ class WorkReporterSingleton {
 
   reportWorking() {
       if (this.focus) {
-        this.postEvent("working_on_problem", workReportingInterval);
+        this.postEvent("working_on_problem", this.interval);
       }
   }
 
@@ -55,19 +54,19 @@ class WorkReporterSingleton {
   }
 }
 
-const ProblemView = ({ gamestate, latex, postAnswer, postEvent }) => {
+const ProblemView = ({ gamestate, latex, postAnswer, postEvent, interval }) => {
   const [answer, setAnswer] = useState("");
 
   useEffect(() => {
     setAnswer("");
   }, [latex]);
 
-  if (gamestate == null || latex == null || postAnswer == null) {
+  if (gamestate == null || latex == null || postAnswer == null || postEvent == null || interval == null) {
     return <div id="loading"></div>
   }
 
   postEvent("displayed_problem", gamestate.problem_id);
-  var reporter = new WorkReporterSingleton(postEvent);
+  var reporter = new WorkReporterSingleton(postEvent, interval);
   var progress = String(100.0 * gamestate.solved / gamestate.target) + "%";
   return (<>
     <div className="success progress">

@@ -3,7 +3,7 @@ import ReactPlayer from 'react-player'
 
 import './video.css'
 
-const VideoView = ({ video, postEvent }) => {
+const VideoView = ({ video, postEvent, interval }) => {
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
@@ -12,7 +12,7 @@ const VideoView = ({ video, postEvent }) => {
     elapsedRef.current = elapsed;
   }, [elapsed]);
 
-  if (video == null || postEvent == null) {
+  if (video == null || postEvent == null || interval == null) {
     return <div id="loading"></div>
   }
 
@@ -25,9 +25,11 @@ const VideoView = ({ video, postEvent }) => {
       <ReactPlayer
         url={video.url}
         playing={playing}
-        onProgress={(p) => {
-          postEvent("watching_video", p.playedSeconds - elapsedRef.current);
-          setElapsed(p.playedSeconds);
+        progressInterval={interval}
+        onProgress={(e) => {
+          var playedMillis = 1000 * e.playedSeconds;
+          postEvent("watching_video", playedMillis - elapsedRef.current);
+          setElapsed(playedMillis);
         }}
         onEnded={() => {
           postEvent("done_watching_video", video.id);
