@@ -30,7 +30,7 @@ const Main = ({ token, url, isLoading, isAuthenticated, user, postEvent }) => {
         </Route>
         <Route path="/play">
           {!isLoading && isAuthenticated &&
-            <PlayView token={token} url={url} user={user} postEvent={postEvent}/>
+            <PlayView token={token} url={url} user={user} postEvent={postEvent} interval={conf.event_reporting_interval} />
           }
         </Route>
         <Route path="*" component={NotFound} />
