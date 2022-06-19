@@ -10,7 +10,6 @@ const PlayView = ({ token, url, user, postEvent}) => {
   const [gamestate, setGamestate] = useState(null);
   const [problem, setProblem] = useState(null);
   const [latex, setLatex] = useState(null);
-  const [answer, setAnswer] = useState(null);
   const [video, setVideo] = useState(null);
 
   const getGamestate = useCallback(async () => {
@@ -89,24 +88,18 @@ const PlayView = ({ token, url, user, postEvent}) => {
     getVideo();
   }, [getVideo]);
 
-  useEffect(() => {
-    postEvent("displayed_problem", "");
-  }, [postEvent, problem]);
-
-  const postAnswer = async () => {
+  const postAnswer = async (answer) => {
     setGamestate(await postEvent("answered_problem", answer));
   };
 
   if (!gamestate || !problem) {
     return <div id="loading"></div>
   }
-  if (answer == null) {
-    setAnswer("");
-  }
+
   if (gamestate.solved >= gamestate.target) {
     return <VideoView video={video} postEvent={postEvent} />
   }
-  return <ProblemView gamestate={gamestate} latex={latex} answer={answer} setAnswer={setAnswer} postAnswer={postAnswer}/>
+  return <ProblemView gamestate={gamestate} latex={latex} postAnswer={postAnswer} postEvent={postEvent} />
 }
 
 export {

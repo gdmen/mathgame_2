@@ -59,6 +59,7 @@ const App = () => {
               'value': String(value),
             }),
         };
+        console.log("reporting " + event_type + ":" + String(value));
         const req = await fetch(ApiUrl+ "/events", settings);
         const json = await req.json();
         return json;
