@@ -19,8 +19,14 @@
 
 # refresh after not developing for a long time
 > make clean  
-> make # should install go dependencies
+> make
 
+# development
+> make dev_api
+> make dev_web
+
+# production
+> see ./deploy/README.md
 
 # insert some test videos
 mysql -u root -proot mathgame < videos.sql
