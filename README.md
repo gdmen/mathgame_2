@@ -29,7 +29,7 @@
 > see ./deploy/README.md
 
 # insert some test videos
-mysql -u root -proot mathgame < videos.sql
+mysql -u root -proot mathgame < deploy/videos.sql
 
 # drop and recreate db
-mysql -u root -proot mathgame < drop.sql
+mysql -u root -proot mathgame < deploy/drop.sql
