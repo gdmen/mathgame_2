@@ -1,5 +1,4 @@
 // TODO for Trevor:
-* video should be centered
 * full set of videos
 * incorrect answers should have a UI indication
 

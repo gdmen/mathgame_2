@@ -1,9 +1,19 @@
 #video {
+  width: auto;
+  height: auto;
   position: relative;
+  padding-top: 56.25%; /* Player ratio: 100 / (1280 / 720) */
 }
+
 #video #click-blocker {
   height: 100%;
   position: absolute;
   top: 0;
   width: 100%;
+}
+
+.react-player {
+  position: absolute;
+  top: 0;
+  left: 0;
 }

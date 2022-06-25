@@ -1,7 +1,5 @@
 import React from "react";
 
-import './home.css'
-
 const HomeView = ({ isLoading, isAuthenticated, user }) => {
   if (isLoading) {
     return (

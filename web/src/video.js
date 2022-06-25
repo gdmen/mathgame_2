@@ -23,6 +23,9 @@ const VideoView = ({ video, postEvent, interval }) => {
   return (
     <div id="video">
       <ReactPlayer
+        className='react-player'
+        width="100%"
+        height="100%"
         url={video.url}
         playing={playing}
         progressInterval={interval}

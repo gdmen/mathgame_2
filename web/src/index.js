@@ -11,6 +11,7 @@ import { HomeView } from './home.js'
 import { PlayView } from './play.js'
 
 import 'foundation-sites/dist/css/foundation.css'
+import './index.css'
 
 const conf = require('./conf')
 const ApiUrl = conf.api_host + ':' + conf.api_port + '/api/v1'
@@ -138,7 +139,7 @@ const App = () => {
 
       <div className="grid-container full">
         <div className="grid-x grid-margin-x align-center">
-          <div className="cell small-11 medium-8 large-7">
+          <div className="cell small-12 medium-10 large-8">
             <Main token={token} url={ApiUrl} isLoading={isLoading} isAuthenticated={isAuthenticated} user={appUser} postEvent={genPostEventFcn()}/>
           </div>
         </div>
