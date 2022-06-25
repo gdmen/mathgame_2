@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+        "math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -114,7 +115,8 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint
 	}
 
 	// Select video
-	videoId := videoIds[0]
+        ind := rand.Intn(len(videoIds))
+	videoId := videoIds[ind]
 
 	return videoId, nil
 }
