@@ -1,6 +1,5 @@
 // TODO for Trevor:
 * enter should submit answer
-* working_on_problem event should stop out of focus
 * video should be centered
 * full set of videos
 

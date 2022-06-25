@@ -31,11 +31,11 @@ class WorkReporterSingleton {
 
   setUpListeners() {
     if (!this.listenersAlive) {
-      window.addEventListener("focus", this.onFocus);
-      window.addEventListener("blur", this.onBlur);
+      window.addEventListener("focus", this.onFocus.bind(this));
+      window.addEventListener("blur", this.onBlur.bind(this));
       this.listenersAlive = true;
-      // Calls this.onFocus when the window first loads
     }
+    // Call this.onFocus when the window loads
     this.onFocus();
   }
 
