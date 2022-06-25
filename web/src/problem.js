@@ -94,7 +94,7 @@ const ProblemView = ({ gamestate, latex, postAnswer, postEvent, interval }) => {
                 onKeyDown={(e) => { if (e.key === "Enter") { reporter.reportAnswer(answer); }}}
             />
             <div className="input-group-button">
-                <input type="submit" className="button" value="answer"
+                <input type="submit" className="button" value="submit"
                   onClick={() => { reporter.reportAnswer(answer); }}
                 />
             </div>

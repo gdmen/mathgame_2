@@ -118,20 +118,15 @@ const App = () => {
       <div className="top-bar">
         <div className="top-bar-left">
           <ul className="menu">
-            <li className="menu-text">The Math Game</li>
+            <li className="menu-text"><a href="/">The Math Game</a></li>
           </ul>
         </div>
 
         <div className="top-bar-right">
           <ul className="menu">
+            <li>{user ? user.username : ""}</li>
             <li>
               {isAuthenticated ? <LogoutButton /> : <LoginButton />}
-            </li>
-            <li>
-              <a href="/">/</a>
-            </li>
-            <li>
-              <a href="/play">play</a>
             </li>
           </ul>
         </div>

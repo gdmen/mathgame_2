@@ -1,3 +1,8 @@
 .top-bar {
   margin-bottom: 2em;
 }
+
+.menu-text a {
+  color: inherit;
+  padding: none;
+}
