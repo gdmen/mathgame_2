@@ -27,5 +27,8 @@ cd mathgame_2
 git fetch --all
 git reset --hard origin/master
 make
+sudo cp deploy/mathgame-api.service /etc/systemd/system
+sudo cp deploy/mathgame-web.service /etc/systemd/system
+sudo systemctl daemon-reload
 sudo service mathgame-api restart
 sudo service mathgame-web restart
