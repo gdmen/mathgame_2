@@ -22,8 +22,8 @@
 > make
 
 # development
-> make dev_api
-> make dev_web
+> make dev-api
+> make dev-web
 
 # production
 > see ./deploy/README.md

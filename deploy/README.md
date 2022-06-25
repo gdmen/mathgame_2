@@ -21,3 +21,11 @@ sudo systemctl enable mathgame-api
 sudo systemctl enable mathgame-web
 sudo service mathgame-api start
 sudo service mathgame-web start
+
+# Updates
+cd mathgame_2
+git fetch --all
+git reset --hard origin/master
+make
+sudo service mathgame-api restart
+sudo service mathgame-web restart

@@ -14,20 +14,20 @@ GOPATH=$(HOME)/go
 SWAGGER=$(GOPATH)/bin/swagger
 RM=rm -rf
 
-all: build_api build_web
+all: build-api build-web
 
-dev_api:
+dev-api:
 	$(GOBIN)/apiserver > apiserver.log 2>&1
 
-dev_web:
+dev-web:
 	cd web && npm start
 
-build_api:
+build-api:
 	cd server/api && python3 generate_models.py -c models.json && python3 generate_handlers.py -c models.json && cd -
 	$(GOFMT) -s .
 	$(GOBUILD) -o ./bin/apiserver ./cmd/apiserver/main.go
 
-test: build_api test-api
+test: build-api test-api
 
 test-api: server/api
 	$(GOTEST) ./$^
@@ -39,10 +39,10 @@ check-swagger:
 		echo "swagger installed"; \
 	fi
 
-build_docs: check-swagger
+build-docs: check-swagger
 	$(SWAGGER) generate spec -o ./swagger.yaml --scan-models
 
-dev_docs: check-swagger
+dev-docs: check-swagger
 	$(SWAGGER) serve -F=swagger swagger.yaml
 
 clean:
@@ -52,12 +52,12 @@ clean:
 	$(GOMOD) tidy
 	$(RM) ./web/build/*
 
-build_web:
+build-web:
 	cd web && npm run build && npm install; cd -
 	ln -s ../../conf.json web/src/conf.json
 
-prod_web:
+prod-web:
 	cd web && serve -s build -l 443 --ssl-cert "/etc/letsencrypt/live/cowabunga.online/fullchain.pem" --ssl-key "/etc/letsencrypt/live/cowabunga.online/privkey.pem"
 
-prod_api:
+prod-api:
 	GIN_MODE=release $(GOBIN)/apiserver

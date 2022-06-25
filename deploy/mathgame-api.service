@@ -11,7 +11,7 @@ Restart=always
 RestartSec=1s
 
 WorkingDirectory=/home/ubuntu/mathgame_2
-ExecStart=make prod_api
+ExecStart=make prod-api
 
 [Install]
 WantedBy=multi-user.target

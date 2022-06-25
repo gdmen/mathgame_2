@@ -28,7 +28,7 @@ jobs:
       run: make clean
 
     - name: Build
-      run: make api
+      run: make build-api
 
     - name: Test
       run: make test-api
