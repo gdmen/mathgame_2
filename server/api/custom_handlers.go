@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
-        "math/rand"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -68,7 +68,7 @@ func (a *Api) generateProblem(logPrefix string, c *gin.Context, opts *Option) (*
 	model.Id = h.Sum32()
 
 	// Write to database
-        // TODO: collisions here will return the wrong Expre/Ans for the given problem id after returning a 200 for a duplicate?
+	// TODO: collisions here will return the wrong Expre/Ans for the given problem id after returning a 200 for a duplicate?
 	status, msg, err := a.problemManager.Create(model)
 	if HandleMngrResp(logPrefix, c, status, msg, err, model) != nil {
 		return nil, err
@@ -116,7 +116,7 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint
 	}
 
 	// Select video
-        ind := rand.Intn(len(videoIds))
+	ind := rand.Intn(len(videoIds))
 	videoId := videoIds[ind]
 
 	return videoId, nil

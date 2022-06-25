@@ -17,19 +17,31 @@ class EventReporterSingleton {
     this.interval = interval;
     this.postAnswer = postAnswer;
     this.lastAnswer = "";
+    this.lastProblemId = null;
+    this.answerChanged = false;
 
     this.setUpListeners();
 
     setInterval(this.reportWorking.bind(this), this.interval);
   }
 
-  reportAnswer(answer) {
+  reportAnswer(answer, problem_id) {
     if (answer === "" || answer === this.lastAnswer) {
       return;
     }
-    this.lastAnswer = answer;
     this.tearDownListeners();
+    this.lastAnswer = answer;
+    this.lastProblemId = problem_id;
+    this.answerChanged = false;
     this.postAnswer(answer);
+  }
+
+  wasIncorrectAnswer(problem_id) {
+    return this.lastAnswer !== "" && !this.answerChanged && this.lastProblemId === problem_id;
+  }
+
+  answerWasSet() {
+    this.answerChanged = true;
   }
 
   tearDownListeners() {
@@ -90,15 +102,20 @@ const ProblemView = ({ gamestate, latex, postAnswer, postEvent, interval }) => {
         <div id="problem-answer" className="input-group">
             <input id="problem-answer-input" className="input-group-field" type="text"
                 value={answer}
-                onChange={(e) => { setAnswer(e.target.value); }}
-                onKeyDown={(e) => { if (e.key === "Enter") { reporter.reportAnswer(answer); }}}
+                onChange={(e) => { setAnswer(e.target.value); reporter.answerWasSet(); }}
+                onKeyDown={(e) => { if (e.key === "Enter") { reporter.reportAnswer(answer, gamestate.problem_id); }}}
             />
             <div className="input-group-button">
                 <input type="submit" className="button" value="submit"
-                  onClick={() => { reporter.reportAnswer(answer); }}
+                  onClick={() => { reporter.reportAnswer(answer, gamestate.problem_id); }}
                 />
             </div>
         </div>
+        { reporter.wasIncorrectAnswer(gamestate.problem_id) &&
+            <div className="label alert">
+              <div>Try Again!</div>
+            </div>
+        }
     </div>
   </>)
 }

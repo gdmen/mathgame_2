@@ -10,7 +10,7 @@ import { LoginButton, LogoutButton } from './auth0.js'
 import { HomeView } from './home.js'
 import { PlayView } from './play.js'
 
-import 'foundation-sites/dist/css/foundation.css'
+import 'foundation-sites/dist/css/foundation.min.css'
 import './index.css'
 
 const conf = require('./conf')

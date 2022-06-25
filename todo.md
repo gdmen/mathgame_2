@@ -1,6 +1,5 @@
 // TODO for Trevor:
 * full set of videos
-* incorrect answers should have a UI indication
 
 /*INSERT INTO userHasVideos (user_id, video_id) VALUES (1, 2);*/
 
