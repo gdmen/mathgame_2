@@ -4,24 +4,35 @@ import './problem.css'
 
 var ReactFitText = require('react-fittext');
 
-class WorkReporterSingleton {
-  constructor(postEvent, interval) {
-    var singleton = WorkReporterSingleton._instance;
+class EventReporterSingleton {
+  constructor(postEvent, interval, postAnswer) {
+    var singleton = EventReporterSingleton._instance;
     if (singleton) {
       singleton.setUpListeners();
       return singleton;
     }
-    WorkReporterSingleton._instance = this;
+    EventReporterSingleton._instance = this;
 
     this.postEvent = postEvent;
     this.interval = interval;
+    this.postAnswer = postAnswer;
+    this.lastAnswer = "";
 
     this.setUpListeners();
 
     setInterval(this.reportWorking.bind(this), this.interval);
   }
 
-  destruct() {
+  reportAnswer(answer) {
+    if (answer === "" || answer === this.lastAnswer) {
+      return;
+    }
+    this.lastAnswer = answer;
+    this.tearDownListeners();
+    this.postAnswer(answer);
+  }
+
+  tearDownListeners() {
     window.removeEventListener("focus", this.onFocus);
     window.removeEventListener("blur", this.onBlur);
     this.listenersAlive = false;
@@ -66,7 +77,7 @@ const ProblemView = ({ gamestate, latex, postAnswer, postEvent, interval }) => {
   }
 
   postEvent("displayed_problem", gamestate.problem_id);
-  var reporter = new WorkReporterSingleton(postEvent, interval);
+  var reporter = new EventReporterSingleton(postEvent, interval, postAnswer);
   var progress = String(100.0 * gamestate.solved / gamestate.target) + "%";
   return (<>
     <div className="success progress">
@@ -79,11 +90,12 @@ const ProblemView = ({ gamestate, latex, postAnswer, postEvent, interval }) => {
         <div id="problem-answer" className="input-group">
             <input id="problem-answer-input" className="input-group-field" type="text"
                 value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
+                onChange={(e) => { setAnswer(e.target.value); }}
+                onKeyDown={(e) => { if (e.key === "Enter") { reporter.reportAnswer(answer); }}}
             />
             <div className="input-group-button">
                 <input type="submit" className="button" value="answer"
-                  onClick={() => { reporter.destruct(); postAnswer(answer); }}
+                  onClick={() => { reporter.reportAnswer(answer); }}
                 />
             </div>
         </div>
