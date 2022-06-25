@@ -169,7 +169,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		// TODO: validate duration
 	} else if event.EventType == DONE_WATCHING_VIDEO {
 		// TODO: validate videoID
-		if gamestate.Solved == gamestate.Target {
+		if gamestate.Solved >= gamestate.Target {
 			// TODO: This is where we would calculate work % and re-evaluate
 			// difficulty and Target
 			gamestate.Solved = 0
