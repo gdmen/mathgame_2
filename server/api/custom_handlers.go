@@ -251,7 +251,7 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 			Operations:       "+,-",
 			Fractions:        false,
 			Negatives:        false,
-			TargetDifficulty: 6,
+			TargetDifficulty: 10,
 		}
 		status, msg, err := a.optionManager.Create(default_option)
 		if HandleMngrResp(logPrefix, c, status, msg, err, default_option) != nil {
@@ -274,7 +274,7 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 			ProblemId: problem.Id,
 			VideoId:   videoId,
 			Solved:    0,
-			Target:    2,
+			Target:    20,
 		}
 		status, msg, err = a.gamestateManager.Create(default_gamestate)
 		if HandleMngrResp(logPrefix, c, status, msg, err, default_gamestate) != nil {
