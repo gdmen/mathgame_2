@@ -1,7 +1,3 @@
-// TODO for Trevor:
-* full set of videos
-
-/*INSERT INTO userHasVideos (user_id, video_id) VALUES (1, 2);*/
 
 Features to add:
 * Difficulty scaling based on % work time
@@ -11,6 +7,7 @@ Features to add:
   * generate better problems
   * should be able to take an expression as input and output a difficulty (each time we update the problem generation algorithm, we need to recalc the difficulty of existing problems)
 * choose videos for this user
+  * INSERT INTO userHasVideos (user_id, video_id) VALUES (1, 2);
 
 //
 

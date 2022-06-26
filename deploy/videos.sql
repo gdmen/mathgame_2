@@ -16,3 +16,15 @@ INSERT INTO videos (title, url, start, end, enabled) VALUES ("Free Fallin'", "ht
 INSERT INTO videos (title, url, start, end, enabled) VALUES ("Keep Your Head Up", "https://www.youtube.com/watch?v=E-QUzwbRPyQ", 0, 9999, 1);
 INSERT INTO videos (title, url, start, end, enabled) VALUES ("You Belong With Me", "https://www.youtube.com/watch?v=VuNIsY6JdUw", 0, 9999, 1);
 INSERT INTO videos (title, url, start, end, enabled) VALUES ("Play That Song", "https://www.youtube.com/watch?v=J5qWnG5RQTk", 0, 9999, 1);
+INSERT INTO videos (title, url, start, end, enabled) VALUES ("Shake It Off", "https://www.youtube.com/watch?v=nfWlot6h_JM", 0, 9999, 1);
+INSERT INTO videos (title, url, start, end, enabled) VALUES ("Shut Up and Dance", "https://www.youtube.com/watch?v=6JCLY0Rlx6Q", 0, 9999, 1);
+INSERT INTO videos (title, url, start, end, enabled) VALUES ("Rainbow Connection", "https://www.youtube.com/watch?v=WS3Lkc6Gzlk", 0, 9999, 1);
+INSERT INTO videos (title, url, start, end, enabled) VALUES ("Livin' On A Prayer", "https://www.youtube.com/watch?v=lDK9QqIzhwk", 0, 9999, 1);
+INSERT INTO videos (title, url, start, end, enabled) VALUES ("Somewhere Over The Rainbow", "https://www.youtube.com/watch?v=V1bFr2SWP1I", 0, 9999, 1);
+INSERT INTO videos (title, url, start, end, enabled) VALUES ("What A Wonderful World", "https://www.youtube.com/watch?v=rBrd_3VMC3c", 0, 9999, 1);
+INSERT INTO videos (title, url, start, end, enabled) VALUES ("Piano Man", "https://www.youtube.com/watch?v=gxEPV4kolz0", 0, 9999, 1);
+INSERT INTO videos (title, url, start, end, enabled) VALUES ("California Girls", "https://www.youtube.com/watch?v=S-fe9T28VLM", 0, 9999, 1);
+INSERT INTO videos (title, url, start, end, enabled) VALUES ("What Makes You Beautiful", "https://www.youtube.com/watch?v=QJO3ROT-A4E", 0, 9999, 1);
+INSERT INTO videos (title, url, start, end, enabled) VALUES ("I'm Yours", "https://www.youtube.com/watch?v=EkHTsc9PU2A", 0, 9999, 1);
+INSERT INTO videos (title, url, start, end, enabled) VALUES ("Party In The U.S.A", "https://www.youtube.com/watch?v=M11SvDtPBhA", 0, 9999, 1);
+INSERT INTO videos (title, url, start, end, enabled) VALUES ("Puff The Magic Dragon", "https://www.youtube.com/watch?v=z15pxWUXvLY", 0, 9999, 1);
