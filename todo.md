@@ -3,6 +3,15 @@
 
 /*INSERT INTO userHasVideos (user_id, video_id) VALUES (1, 2);*/
 
+Features to add:
+* Difficulty scaling based on % work time
+* configuration of target work % time
+* problem generation algorithm work
+  * word problems
+  * generate better problems
+  * should be able to take an expression as input and output a difficulty (each time we update the problem generation algorithm, we need to recalc the difficulty of existing problems)
+* choose videos for this user
+
 //
 
 - Add a cron that will simplify event logs (e.g. merge adjacent watching_video events)
