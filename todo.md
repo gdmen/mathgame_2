@@ -21,3 +21,7 @@ Features to add:
 
 - Move server/common/middleware and log to api
 - Move server/common/common to lib
+
+
+// the number(+1) of problems Trevor's done so far
+- SELECT COUNT(DISTINCT(`value`)) FROM `events` WHERE `user_id` = 7 AND `event_type` = "displayed_problem"

@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"math"
 	"math/rand"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,9 +39,19 @@ var EventTypes = [...]string{
 	DONE_WATCHING_VIDEO,
 }
 
+func (a *Api) CustomValueQuery(sql string) (string, int, string, error) {
+	var value string
+	err := a.DB.QueryRow(sql).Scan(&value)
+	if err != nil {
+		msg := "Couldn't get value from database"
+		return "", http.StatusInternalServerError, msg, err
+	}
+	return value, http.StatusOK, "", nil
+}
+
 func (a *Api) generateProblem(logPrefix string, c *gin.Context, opts *Option) (*Problem, error) {
 	model := &Problem{}
-	// TODO: should this just be the API model, not the generator model?
+	// TODO: should this just be the API model, and we don't even need a generator model?
 	generator_opts := &generator.Options{
 		Operations:       strings.Split(opts.Operations, ","),
 		Fractions:        opts.Fractions,
@@ -78,6 +90,10 @@ func (a *Api) generateProblem(logPrefix string, c *gin.Context, opts *Option) (*
 }
 
 func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint32, error) {
+	if a.isTest {
+		return 1, nil
+	}
+
 	// Get videos belonging to this user
 	videos, status, msg, err := a.videoManager.CustomList(fmt.Sprintf("SELECT * FROM videos INNER JOIN userHasVideos ON videos.id = userHasVideos.video_id WHERE userHasVideos.user_id=%d AND videos.enabled=1;", userId))
 	if HandleMngrResp(logPrefix, c, status, msg, err, videos) != nil {
@@ -137,6 +153,14 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	if HandleMngrResp(logPrefix, c, status, msg, err, gamestate) != nil {
 		return err
 	}
+	glog.Infof("%s Gamestate: %v", logPrefix, gamestate)
+
+	// Get Option
+	option, status, msg, err := a.optionManager.Get(user.Id)
+	if HandleMngrResp(logPrefix, c, status, msg, err, option) != nil {
+		return err
+	}
+	glog.Infof("%s Option: %v", logPrefix, option)
 
 	if event.EventType == LOGGED_IN {
 		// no-op
@@ -156,11 +180,6 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		} else { // Answer was correct
 			// Update counts
 			gamestate.Solved += 1
-			// Get Options
-			option, status, msg, err := a.optionManager.Get(user.Id)
-			if HandleMngrResp(logPrefix, c, status, msg, err, option) != nil {
-				return err
-			}
 			// Generate a new problem
 			problem, err := a.generateProblem(logPrefix, c, option)
 			if err != nil {
@@ -172,9 +191,60 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		// TODO: validate duration
 	} else if event.EventType == DONE_WATCHING_VIDEO {
 		// TODO: validate videoID
+
+		// Difficulty adjustment limits
+		workTarget := 0.40
+		epsilon := 0.05
+		var maxProbs uint32 = 20
+		var minProbs uint32 = 5
+		// End difficulty adjustment limits
+
 		if gamestate.Solved >= gamestate.Target {
-			// TODO: This is where we would calculate work % and re-evaluate
-			// difficulty and Target
+			// Calculate work % for the entire lifetime of the user.
+			query := `SELECT (total-play)/total FROM
+                                  (SELECT
+                                  SUM(CASE WHEN event_type='watching_video' THEN value ELSE 0 END) AS play,
+                                  SUM(value) AS total
+                                  FROM events
+                                  WHERE user_id=%d AND event_type IN ('working_on_problem', 'watching_video')
+                                  ORDER BY timestamp DESC LIMIT %d)
+                                  AS X;`
+			// *** NOTE ***
+			// The 3600 on this line is aiming to select the past ~1 hour of work+play.
+			// This assumes a 1 second event reporting interval.
+			value, status, msg, err := a.CustomValueQuery(fmt.Sprintf(query, user.Id, 3600))
+			if HandleMngrResp(logPrefix, c, status, msg, err, value) != nil {
+				return err
+			}
+			workPercentage, err := strconv.ParseFloat(value, 32)
+			glog.Infof("%s workPercentage: %v", logPrefix, workPercentage)
+			if err != nil {
+				return err
+			}
+			// Adjust work load. Levers are difficulty and target number of problems.
+			glog.Infof("%s workTarget: %v", logPrefix, workTarget)
+
+			// Make it more difficult
+			if workTarget-workPercentage > epsilon {
+				if gamestate.Target < maxProbs {
+					gamestate.Target += 1
+				} else {
+					gamestate.Target -= 1
+					option.TargetDifficulty += math.Max(0.1*option.TargetDifficulty, 1)
+				}
+			}
+
+			// Make it easier
+			if workTarget-workPercentage < epsilon {
+				if gamestate.Target > minProbs {
+					gamestate.Target -= 1
+				} else {
+					gamestate.Target += 1
+					option.TargetDifficulty -= math.Max(0.1*option.TargetDifficulty, 1)
+				}
+			}
+
+			// Reset solved progress
 			gamestate.Solved = 0
 
 			// Set a new reward video
@@ -199,11 +269,20 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		return err
 	}
 
+	// Write the updated Option
+	glog.Infof("%s Option: %v", logPrefix, option)
+	status, msg, err = a.optionManager.Update(option)
+	if HandleMngrResp(logPrefix, c, status, msg, err, option) != nil {
+		return err
+	}
+
 	// Write the updated gamestate
+	glog.Infof("%s Gamestate: %v", logPrefix, gamestate)
 	status, msg, err = a.gamestateManager.Update(gamestate)
 	if (writeCtx && HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, gamestate) != nil) || HandleMngrResp(logPrefix, c, status, msg, err, gamestate) != nil {
 		return err
 	}
+
 	return nil
 }
 

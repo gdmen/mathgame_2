@@ -17,7 +17,7 @@ RM=rm -rf
 all: build-api build-web
 
 dev-api:
-	$(GOBIN)/apiserver > apiserver.log 2>&1
+	$(GOBIN)/apiserver -v 3 --logtostderr 1
 
 dev-web:
 	cd web && npm start
