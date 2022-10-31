@@ -33,3 +33,7 @@ sudo cp deploy/mathgame-web.service /etc/systemd/system
 sudo systemctl daemon-reload
 sudo service mathgame-api restart
 sudo service mathgame-web restart
+
+# Production logs
+journalctl -u mathgame-api -b
+journalctl -u mathgame-web -b
