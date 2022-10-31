@@ -1,4 +1,4 @@
-# Ubuntu
+# Ubuntu 22.04
 sudo apt-get update
 sudo apt install golang-go
 sudo apt install make
@@ -6,6 +6,7 @@ sudo apt install make
 sudo apt-get install nodejs npm
 sudo npm install -g serve
 
+# Using let's encrypt
 sudo apt-get remove certbot
 sudo ln -s /snap/bin/certbot /usr/bin/certbot
 sudo certbot certonly --standalone
