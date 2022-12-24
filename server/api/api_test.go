@@ -37,7 +37,7 @@ func TestMain(m *testing.M) {
 }
 
 func ResetTestApi(c *common.Config) {
-	connectStr := fmt.Sprintf("%s:%s@tcp(%s:%s)/?charset=utf8&parseTime=true", c.MySQLUser, c.MySQLPass, c.MySQLHost, c.MySQLPort)
+	connectStr := fmt.Sprintf("%s:%s@tcp(%s:%s)/?charset=utf8&parseTime=true&time_zone=UTC", c.MySQLUser, c.MySQLPass, c.MySQLHost, c.MySQLPort)
 	db, err := sql.Open("mysql", connectStr)
 	if err != nil {
 		fmt.Printf("Couldn't connect to db: %v", err)
