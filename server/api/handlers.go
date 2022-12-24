@@ -581,3 +581,85 @@ func (a *Api) deleteUserhasvideo(c *gin.Context) {
 		return
 	}
 }
+
+func (a *Api) createUserhasteacher(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Userhasteacher{}
+	if BindModelFromForm(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Write to database
+	status, msg, err := a.userHasTeacherManager.Create(model)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
+}
+
+func (a *Api) getUserhasteacher(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Userhasteacher{}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Read from database
+	model, status, msg, err := a.userHasTeacherManager.Get(model.Id)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
+}
+
+func (a *Api) listUserhasteacher(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Read from database
+	models, status, msg, err := a.userHasTeacherManager.List()
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {
+		return
+	}
+}
+
+func (a *Api) updateUserhasteacher(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Userhasteacher{}
+	if BindModelFromForm(logPrefix, c, model) != nil {
+		return
+	}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Write to database
+	status, msg, err := a.userHasTeacherManager.Update(model)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
+}
+
+func (a *Api) deleteUserhasteacher(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Userhasteacher{}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Write to database
+	status, msg, err := a.userHasTeacherManager.Delete(model.Id)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {
+		return
+	}
+}

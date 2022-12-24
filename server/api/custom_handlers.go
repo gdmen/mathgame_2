@@ -200,8 +200,8 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		// End difficulty adjustment limits
 
 		if gamestate.Solved >= gamestate.Target {
-                        // Calculate work % for the "recent past" of the user.
-                        query := `SELECT work/total FROM
+			// Calculate work % for the "recent past" of the user.
+			query := `SELECT work/total FROM
                                   (SELECT
                                   SUM(CASE WHEN event_type='working_on_problem' THEN value ELSE 0 END) AS work,
                                   SUM(value) AS total
@@ -211,7 +211,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
                                   AS X;`
 			// *** NOTE ***
 			// The 3600 on this line is aiming to select the past ~1 hour of work+play.
-			// This assumes a 1 second event reporting interval.
+			// This assumes a 1000ms (1s) event reporting interval.
 			value, status, msg, err := a.CustomValueQuery(fmt.Sprintf(query, user.Id, 3600))
 			if HandleMngrResp(logPrefix, c, status, msg, err, value) != nil {
 				return err

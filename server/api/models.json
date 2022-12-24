@@ -162,6 +162,23 @@
           "sql": "BIGINT UNSIGNED NOT NULL"
         }
       ]
+    },
+    {
+      "name": "userHasTeacher",
+      "fields": [
+        {
+          "name": "Id", "type": "uint32",
+          "sql": "BIGINT UNSIGNED PRIMARY KEY UNIQUE"
+        },
+        {
+          "name": "UserId", "type": "uint32",
+          "sql": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "TeacherId", "type": "uint32",
+          "sql": "BIGINT UNSIGNED NOT NULL"
+        }
+      ]
     }
   ]
 }
