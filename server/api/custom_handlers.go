@@ -195,6 +195,8 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		// Difficulty adjustment limits
 		workTarget := 0.40
 		epsilon := 0.05
+		var recentPast int = 900 // seconds aka 15 minutes. This assumes a 1 second event reporting interval.
+		var minDiff float64 = 3
 		var maxProbs uint32 = 20
 		var minProbs uint32 = 5
 		// End difficulty adjustment limits
@@ -209,10 +211,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
                                   WHERE user_id=%d AND event_type IN ('working_on_problem', 'watching_video')
                                   ORDER BY timestamp DESC LIMIT %d)
                                   AS X;`
-			// *** NOTE ***
-			// The 3600 on this line is aiming to select the past ~1 hour of work+play.
-			// This assumes a 1 second event reporting interval.
-			value, status, msg, err := a.CustomValueQuery(fmt.Sprintf(query, user.Id, 3600))
+			value, status, msg, err := a.CustomValueQuery(fmt.Sprintf(query, user.Id, recentPast))
 			if HandleMngrResp(logPrefix, c, status, msg, err, value) != nil {
 				return err
 			}
@@ -224,6 +223,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			// Adjust work load. Levers are difficulty and target number of problems.
 			glog.Infof("%s workTarget: %v", logPrefix, workTarget)
 
+			glog.Infof("%s starting difficulty & num problems: %v, %v", logPrefix, option.TargetDifficulty, gamestate.Target)
 			// Make it more difficult
 			if workTarget-workPercentage > epsilon {
 				if gamestate.Target < maxProbs {
@@ -240,9 +240,15 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 					gamestate.Target -= 1
 				} else {
 					gamestate.Target += 1
-					option.TargetDifficulty -= math.Max(0.1*option.TargetDifficulty, 1)
+					if option.TargetDifficulty <= minDiff {
+						glog.Infof("%s difficulty of %v should not be below %v and we're already at minProbs. Will not make this easier.", logPrefix, option.TargetDifficulty, minDiff)
+						option.TargetDifficulty = minDiff
+					} else {
+						option.TargetDifficulty = math.Max(minDiff, option.TargetDifficulty-math.Max(0.1*option.TargetDifficulty, 1))
+					}
 				}
 			}
+			glog.Infof("%s modified difficulty & num problems: %v, %v", logPrefix, option.TargetDifficulty, gamestate.Target)
 
 			// Reset solved progress
 			gamestate.Solved = 0
