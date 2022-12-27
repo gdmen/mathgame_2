@@ -193,7 +193,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		// TODO: validate videoID
 
 		// Difficulty adjustment limits
-		workTarget := 0.40
+		workTarget := 0.70
 		epsilon := 0.05
 		var recentPast int = 900 // seconds aka 15 minutes. This assumes a 1 second event reporting interval.
 		var minDiff float64 = 3
