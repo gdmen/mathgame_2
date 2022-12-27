@@ -207,10 +207,12 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
                                   (SELECT
                                   SUM(CASE WHEN event_type='working_on_problem' THEN value ELSE 0 END) AS work,
                                   SUM(value) AS total
-                                  FROM events
-                                  WHERE user_id=%d AND event_type IN ('working_on_problem', 'watching_video')
-                                  ORDER BY timestamp DESC LIMIT %d)
-                                  AS X;`
+                                  FROM
+                                    (SELECT *
+                                    FROM events
+                                    WHERE user_id=%d AND event_type IN ('working_on_problem', 'watching_video')
+                                    ORDER BY timestamp DESC LIMIT %d) AS X
+                                  ) AS Y;`
 			value, status, msg, err := a.CustomValueQuery(fmt.Sprintf(query, user.Id, recentPast))
 			if HandleMngrResp(logPrefix, c, status, msg, err, value) != nil {
 				return err
@@ -224,18 +226,19 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			glog.Infof("%s workTarget: %v", logPrefix, workTarget)
 
 			glog.Infof("%s starting difficulty & num problems: %v, %v", logPrefix, option.TargetDifficulty, gamestate.Target)
-			// Make it more difficult
-			if workTarget-workPercentage > epsilon {
+			// Only do something if we are not already on target
+			if math.Abs(workTarget-workPercentage) < epsilon {
+				glog.Infof("%s difficulty is on target", logPrefix)
+			} else if workTarget > workPercentage {
+				// Make it more difficult
 				if gamestate.Target < maxProbs {
 					gamestate.Target += 1
 				} else {
 					gamestate.Target -= 1
 					option.TargetDifficulty += math.Max(0.1*option.TargetDifficulty, 1)
 				}
-			}
-
-			// Make it easier
-			if workTarget-workPercentage < epsilon {
+			} else if workTarget < workPercentage {
+				// Make it easier
 				if gamestate.Target > minProbs {
 					gamestate.Target -= 1
 				} else {
