@@ -238,14 +238,12 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			if workTarget-workPercentage < epsilon {
 				if gamestate.Target > minProbs {
 					gamestate.Target -= 1
-				} else {
+				} else if option.TargetDifficulty > minDiff {
 					gamestate.Target += 1
-					if option.TargetDifficulty <= minDiff {
-						glog.Infof("%s difficulty of %v should not be below %v and we're already at minProbs. Will not make this easier.", logPrefix, option.TargetDifficulty, minDiff)
-						option.TargetDifficulty = minDiff
-					} else {
-						option.TargetDifficulty = math.Max(minDiff, option.TargetDifficulty-math.Max(0.1*option.TargetDifficulty, 1))
-					}
+					option.TargetDifficulty = math.Max(minDiff, option.TargetDifficulty-math.Max(0.1*option.TargetDifficulty, 1))
+				} else {
+					glog.Infof("%s we're already at minDiff and minProbs. Will not make this easier.", logPrefix)
+					option.TargetDifficulty = minDiff
 				}
 			}
 			glog.Infof("%s modified difficulty & num problems: %v, %v", logPrefix, option.TargetDifficulty, gamestate.Target)
@@ -323,8 +321,6 @@ func (a *Api) customListEvent(c *gin.Context) {
 	}
 
 	// Get recent events belonging to the specified user
-	glog.Infof("%s HERE!", logPrefix)
-	glog.Infof(fmt.Sprintf("SELECT * FROM events WHERE user_id=%d AND timestamp > now() - interval %d second AND event_type IN (%s);", params.UserId, params.Seconds, strings.Join([]string{LOGGED_IN, DISPLAYED_PROBLEM, ANSWERED_PROBLEM, DONE_WATCHING_VIDEO}, ",")))
 	events, status, msg, err := a.eventManager.CustomList(fmt.Sprintf("SELECT * FROM events WHERE user_id=%d AND timestamp > now() - interval %d second AND event_type IN (\"%s\");", params.UserId, params.Seconds, strings.Join([]string{LOGGED_IN, DISPLAYED_PROBLEM, ANSWERED_PROBLEM, DONE_WATCHING_VIDEO}, "\",\"")))
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, events) != nil {
 		return

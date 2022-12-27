@@ -87,6 +87,10 @@ func (opts Options) String() string {
 }
 
 func validateOptions(opts *Options) error {
+	minDiff := 0.0
+	if opts.TargetDifficulty < minDiff {
+		return &OptionsError{s: fmt.Sprintf("%v is the minimum difficulty. %v is not allowed.", minDiff, opts.TargetDifficulty)}
+	}
 	for _, o := range opts.Operations {
 		if !isSupportedOperation(o) {
 			return &OptionsError{s: fmt.Sprintf("'%s' is not a supported operation", o)}
