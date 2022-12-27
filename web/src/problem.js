@@ -59,7 +59,9 @@ class EventReporterSingleton {
       this.listenersAlive = true;
     }
     // Call this.onFocus when the window loads
-    this.onFocus();
+    if (document.hasFocus()) {
+      this.onFocus();
+    }
   }
 
   reportWorking() {
