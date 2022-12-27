@@ -5,6 +5,7 @@ import { useParams } from 'react-router-dom'
 import "katex/dist/katex.min.css"
 
 import { ProblemCompanionView } from './problem_companion.js'
+import { VideoCompanionView } from './video_companion.js'
 
 class RefresherSingleton {
   constructor(getGamestate, getEvents, interval) {
@@ -61,13 +62,13 @@ class RefresherSingleton {
 const CompanionView = ({ token, url, user }) => {
   const [gamestate, setGamestate] = useState(null);
   const [problem, setProblem] = useState(null);
+  const [video, setVideo] = useState(null);
+  const [latex, setLatex] = useState(null);
+
   const [answer, setAnswer] = useState(null);
   const [attempts, setAttempts] = useState(null);
-  const [latex, setLatex] = useState(null);
   const { student_id } = useParams();
   const interval = 1000;
-
-  //TODO: add a loop to re-fetch gamestate and events.
 
   const getGamestate = useCallback(async () => {
     try {
@@ -108,6 +109,27 @@ const CompanionView = ({ token, url, user }) => {
       setProblem(json);
       setAnswer(json["answer"]);
       setLatex(katex.renderToString(json.expression));
+    } catch (e) {
+      console.log(e.message);
+    }
+  }, [token, url, gamestate]);
+
+  const getVideo = useCallback(async () => {
+    try {
+      if (token == null || url == null || gamestate == null) {
+        return;
+      }
+      const settings = {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+          },
+      };
+      const req = await fetch(url+ "/videos/" + gamestate.video_id, settings);
+      const json = await req.json();
+      setVideo(json);
     } catch (e) {
       console.log(e.message);
     }
@@ -163,6 +185,10 @@ const CompanionView = ({ token, url, user }) => {
   }, [getProblem]);
 
   useEffect(() => {
+    getVideo();
+  }, [getVideo]);
+
+  useEffect(() => {
     getEvents();
   }, [getEvents]);
 
@@ -173,7 +199,7 @@ const CompanionView = ({ token, url, user }) => {
   new RefresherSingleton(getGamestate, getEvents, interval);
 
   if (gamestate.solved >= gamestate.target) {
-    return <div>watching video</div>
+    return <VideoCompanionView video={video} />
   }
   return <ProblemCompanionView gamestate={gamestate} latex={latex} answer={answer} attempts={attempts}/>
 }
