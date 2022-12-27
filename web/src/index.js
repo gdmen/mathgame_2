@@ -9,6 +9,7 @@ import { LoginButton, LogoutButton } from './auth0.js'
 
 import { HomeView } from './home.js'
 import { PlayView } from './play.js'
+import { CompanionView } from './companion.js'
 
 import 'foundation-sites/dist/css/foundation.min.css'
 import './index.css'
@@ -32,6 +33,11 @@ const Main = ({ token, url, isLoading, isAuthenticated, user, postEvent }) => {
         <Route path="/play">
           {!isLoading && isAuthenticated &&
             <PlayView token={token} url={url} user={user} postEvent={postEvent} interval={conf.event_reporting_interval} />
+          }
+        </Route>
+        <Route path="/companion/:student_id">
+          {!isLoading && isAuthenticated &&
+            <CompanionView token={token} url={url} user={user} />
           }
         </Route>
         <Route path="*" component={NotFound} />

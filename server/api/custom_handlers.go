@@ -202,8 +202,8 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		// End difficulty adjustment limits
 
 		if gamestate.Solved >= gamestate.Target {
-                        // Calculate work % for the "recent past" of the user.
-                        query := `SELECT work/total FROM
+			// Calculate work % for the "recent past" of the user.
+			query := `SELECT work/total FROM
                                   (SELECT
                                   SUM(CASE WHEN event_type='working_on_problem' THEN value ELSE 0 END) AS work,
                                   SUM(value) AS total
@@ -304,6 +304,29 @@ func (a *Api) customCreateEvent(c *gin.Context) {
 	glog.Infof("%s bound model: %v", logPrefix, event)
 
 	if a.processEvent(logPrefix, c, event, true) != nil {
+		return
+	}
+}
+
+func (a *Api) customListEvent(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	type Params struct {
+		UserId  uint32 `json:"user_id" uri:"user_id" form:"user_id"`
+		Seconds uint32 `json:"seconds" uri:"seconds" form:"seconds"`
+	}
+	params := &Params{}
+	if BindModelFromURI(logPrefix, c, params) != nil {
+		return
+	}
+
+	// Get recent events belonging to the specified user
+	glog.Infof("%s HERE!", logPrefix)
+	glog.Infof(fmt.Sprintf("SELECT * FROM events WHERE user_id=%d AND timestamp > now() - interval %d second AND event_type IN (%s);", params.UserId, params.Seconds, strings.Join([]string{LOGGED_IN, DISPLAYED_PROBLEM, ANSWERED_PROBLEM, DONE_WATCHING_VIDEO}, ",")))
+	events, status, msg, err := a.eventManager.CustomList(fmt.Sprintf("SELECT * FROM events WHERE user_id=%d AND timestamp > now() - interval %d second AND event_type IN (\"%s\");", params.UserId, params.Seconds, strings.Join([]string{LOGGED_IN, DISPLAYED_PROBLEM, ANSWERED_PROBLEM, DONE_WATCHING_VIDEO}, "\",\"")))
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, events) != nil {
 		return
 	}
 }

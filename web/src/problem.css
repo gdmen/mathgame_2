@@ -7,3 +7,34 @@
     border-bottom: 2px solid #333;
     font-size: 3em;
 }
+
+#problem-companion {
+  float: left;
+  text-align: center;
+  width: 70%;
+}
+
+#problem-answer-companion {
+    font-size: 2em;
+}
+
+#problem-attempts {
+  border-left: 1px solid lightgray;
+  float: right;
+  padding-left: 2em;
+  width: 30%;
+}
+
+.problem-attempt {
+}
+
+.attempt-time {
+  float: right;
+  font-size: 0.5em;
+}
+
+#problem-attempts-header {
+  font-size: 1.25em;
+  font-variant: small-caps;
+  text-align: center;
+}

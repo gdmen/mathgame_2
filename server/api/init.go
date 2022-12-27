@@ -124,6 +124,7 @@ func (a *Api) GetRouter() *gin.Engine {
 		}
 		event := v1.Group("/events")
 		{
+			event.GET("/:user_id/:seconds", a.customListEvent)
 			event.POST("", a.customCreateEvent)
 			event.POST("/", a.customCreateEvent)
 		}
