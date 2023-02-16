@@ -1,6 +1,6 @@
 import React, { } from "react";
 
-import './problem.css'
+import './problem.scss'
 
 var ReactFitText = require('react-fittext');
 

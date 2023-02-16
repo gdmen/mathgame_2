@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import ReactPlayer from 'react-player'
 
-import './video.css'
+import './video.scss'
 
 const VideoView = ({ video, postEvent, interval }) => {
   const [playing, setPlaying] = useState(false);

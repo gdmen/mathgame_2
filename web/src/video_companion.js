@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import ReactPlayer from 'react-player'
 
-import './video.css'
+import './video.scss'
 
 const VideoCompanionView = ({ video }) => {
   const [playing, setPlaying] = useState(false);
