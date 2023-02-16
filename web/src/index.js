@@ -120,29 +120,19 @@ const App = () => {
 
   return (
     <div>
-      <div className="top-bar">
-        <div className="top-bar-left">
-          <ul className="menu">
-            <li className="menu-text"><a href="/">The Math Game</a></li>
-          </ul>
-        </div>
+      <div id="main-menu" className="clearfix">
+        <a href="/"><h3>The Math Game</h3></a>
 
-        <div className="top-bar-right">
-          <ul className="menu">
-            <li>{user ? user.username : ""}</li>
-            <li>
-              {isAuthenticated ? <LogoutButton /> : <LoginButton />}
-            </li>
-          </ul>
-        </div>
+        <ul className="menu">
+          <li>{user ? user.username : ""}</li>
+          <li>
+            {isAuthenticated ? <LogoutButton /> : <LoginButton />}
+          </li>
+        </ul>
       </div>
 
-      <div className="grid-container full">
-        <div className="grid-x grid-margin-x align-center">
-          <div className="cell small-12 medium-10 large-8">
+      <div id="content">
             <Main token={token} url={ApiUrl} isLoading={isLoading} isAuthenticated={isAuthenticated} user={appUser} postEvent={genPostEventFcn()}/>
-          </div>
-        </div>
       </div>
     </div>
   )

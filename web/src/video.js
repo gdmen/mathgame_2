@@ -13,7 +13,7 @@ const VideoView = ({ video, postEvent, interval }) => {
   }, [elapsed]);
 
   if (video == null || postEvent == null || interval == null) {
-    return <div id="loading">loading</div>
+    return <div className="content-loading">loading</div>
   }
 
   const play = () => {

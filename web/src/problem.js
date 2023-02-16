@@ -87,7 +87,7 @@ const ProblemView = ({ gamestate, latex, postAnswer, postEvent, interval }) => {
   }, [latex]);
 
   if (gamestate == null || latex == null || postAnswer == null || postEvent == null || interval == null) {
-    return <div id="loading"></div>
+    return <div className="content-loading"></div>
   }
 
   postEvent("displayed_problem", gamestate.problem_id);

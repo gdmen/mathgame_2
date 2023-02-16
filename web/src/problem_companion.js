@@ -21,7 +21,7 @@ const AttemptTime = ({ timestamp }) => {
 
 const ProblemCompanionView = ({ gamestate, latex, answer, attempts }) => {
   if (gamestate == null || latex == null || answer == null || attempts == null) {
-    return <div id="loading">loading</div>
+    return <div className="content-loading">loading</div>
   }
 
   var progress = String(100.0 * gamestate.solved / gamestate.target) + "%";
