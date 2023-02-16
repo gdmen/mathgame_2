@@ -11,8 +11,7 @@ import { HomeView } from './home.js'
 import { PlayView } from './play.js'
 import { CompanionView } from './companion.js'
 
-import 'foundation-sites/dist/css/foundation.min.css'
-import './index.css'
+import './index.scss'
 
 const conf = require('./conf')
 const ApiUrl = conf.api_host + ':' + conf.api_port + '/api/v1'

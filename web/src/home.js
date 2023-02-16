@@ -1,7 +1,7 @@
 import React from "react";
 import { LoginButton } from './auth0.js'
 
-import "./home.css"
+import "./home.scss"
 
 const HomeView = ({ isLoading, isAuthenticated, user }) => {
   if (isLoading) {
