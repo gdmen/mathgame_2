@@ -1,8 +1,22 @@
-.top-bar {
-  margin-bottom: 2em;
+@import "reset.scss";
+@import "styles.scss";
+@import "components.scss";
+
+#main-menu {
+  align-items: center;
+  background-color: $background-color;
+  display: flex;
+  justify-content: space-between;
+  margin: 0 auto;
+  max-width: $max-width;
+  padding: $base-space;
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 }
 
-.menu-text a {
-  color: inherit;
-  padding: none;
+#content {
+  background-color: $background-color;
 }
+

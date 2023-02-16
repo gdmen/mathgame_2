@@ -1,3 +1,32 @@
-#home {
-  text-align: center;
+@import "styles.scss";
+
+#landing-hero {
+  background-color: $color-one;
+  .hero-content {
+    display: flex;
+    justify-content: space-between;
+    margin: 0 auto;
+    max-width: 0.95*$max-width;
+    padding: $base-space;
+    padding-top: 7*$base-space;
+    padding-bottom: 7*$base-space;
+    .hero-copy {
+      width: 50%;
+      p {
+        font-size: 1.125em;
+        line-height: 1.5;
+        margin-top: $base-space;
+      }
+      .button-container {
+        button {
+          background-color: $color-one-contrast;
+          color: white;
+          font-weight: 400;
+          margin-top: 1.5*$base-space;
+        }
+      }
+    }
+    .hero-image {
+    }
+  }
 }

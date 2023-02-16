@@ -7,7 +7,7 @@ const VideoCompanionView = ({ video }) => {
   const [playing, setPlaying] = useState(false);
   
   if (video == null) {
-    return <div id="loading">loading</div>
+    return <div className="content-loading">loading</div>
   }
 
   const play = () => {

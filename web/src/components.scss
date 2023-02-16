@@ -1,0 +1,13 @@
+button {
+  border: none;
+  background-color: white;
+  border-radius: $base-radius;
+  cursor: pointer;
+  padding: $base-space;
+  text-align: center;
+  text-decoration: none;
+}
+
+.content-loading {
+  text-align: center;
+}
