@@ -27,6 +27,27 @@
       }
     }
     .hero-image {
+      background-size: contain;
+      border-radius: 20%;
+      box-shadow: 0 0 2em 2em $color-one inset;
+      margin-top: -5em;
+      margin-bottom: -5em;
+      width: 50%;
+      img {
+        width: 100%;
+      }
+    }
+  }
+}
+
+@media only screen and (max-width: 768px) {
+  #landing-hero .hero-content {
+    padding: 4*$base-space 2*$base-space;
+    .hero-copy {
+      width: 100%;
+    }
+    .hero-image {
+      display: none;
     }
   }
 }

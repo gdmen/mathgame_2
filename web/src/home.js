@@ -1,5 +1,6 @@
 import React from "react";
 import { SignupButton } from './auth0.js';
+import heroImage from './img/hero.png';
 
 import "./home.scss";
 
@@ -21,8 +22,7 @@ const HomeView = ({ isLoading, isAuthenticated, user }) => {
               <SignupButton />
             </div>
           </div>
-          <div className="hero-image">
-          </div>
+          <div className="hero-image" style={{backgroundImage: `url(${heroImage})`}}></div>
         </div>
       </div>
     )
