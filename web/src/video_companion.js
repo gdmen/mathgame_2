@@ -15,15 +15,17 @@ const VideoCompanionView = ({ video }) => {
   };
 
   return (
-    <div id="video">
-      <ReactPlayer
-        className='react-player'
-        width="100%"
-        height="100%"
-        url={video.url}
-        playing={playing}
-      />
-      <div id="click-blocker" onClick={play}></div>
+    <div id="video-container">
+      <div id="video">
+        <ReactPlayer
+          className='react-player'
+          width="100%"
+          height="100%"
+          url={video.url}
+          playing={playing}
+        />
+        <div id="click-blocker" onClick={play}></div>
+      </div>
     </div>
   )
 }

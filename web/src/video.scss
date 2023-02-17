@@ -1,8 +1,15 @@
+@import "styles.scss";
+
+#video-container {
+  margin: 0 auto;
+  max-width: $max-width;
+}
+
 #video {
-  width: auto;
   height: auto;
-  position: relative;
   padding-top: 56.25%; /* Player ratio: 100 / (1280 / 720) */
+  position: relative;
+  width: auto;
 }
 
 #video #click-blocker {

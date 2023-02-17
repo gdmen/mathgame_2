@@ -21,25 +21,27 @@ const VideoView = ({ video, postEvent, interval }) => {
   };
 
   return (
-    <div id="video">
-      <ReactPlayer
-        className='react-player'
-        width="100%"
-        height="100%"
-        url={video.url}
-        playing={playing}
-        progressInterval={interval}
-        onProgress={(e) => {
-          var playedMillis = 1000 * e.playedSeconds;
-          postEvent("watching_video", playedMillis - elapsedRef.current);
-          setElapsed(playedMillis);
-        }}
-        onEnded={() => {
-          postEvent("done_watching_video", video.id);
-          window.location.href="play";
-        }}
-      />
-      <div id="click-blocker" onClick={play}></div>
+    <div id="video-container">
+      <div id="video">
+        <ReactPlayer
+          className='react-player'
+          width="100%"
+          height="100%"
+          url={video.url}
+          playing={playing}
+          progressInterval={interval}
+          onProgress={(e) => {
+            var playedMillis = 1000 * e.playedSeconds;
+            postEvent("watching_video", playedMillis - elapsedRef.current);
+            setElapsed(playedMillis);
+          }}
+          onEnded={() => {
+            postEvent("done_watching_video", video.id);
+            window.location.href="play";
+          }}
+        />
+        <div id="click-blocker" onClick={play}></div>
+      </div>
     </div>
   )
 }
