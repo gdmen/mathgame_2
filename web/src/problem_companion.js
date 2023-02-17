@@ -25,19 +25,21 @@ const ProblemCompanionView = ({ gamestate, latex, answer, attempts }) => {
   }
 
   var progress = String(100.0 * gamestate.solved / gamestate.target) + "%";
-  return (<>
-    <div className="success progress">
-      <div className="progress-meter" style={{width: progress}}></div>
-    </div>
+  return (
     <div id="problem-companion">
+      <div id="problem-mirror">
+        <div className="progress">
+          <div className="progress-meter" style={{width: progress}}>
+          </div>
+        </div>
         <ReactFitText compressor={0.75}>
             <div id="problem-display" dangerouslySetInnerHTML={{__html: latex}}></div>
         </ReactFitText>
         <div id="problem-answer-companion">
             Answer: {answer}
         </div>
-    </div>
-    <div id="problem-attempts">
+      </div>
+      <div id="problem-attempts">
         <div id="problem-attempts-header">
           attempts
         </div>
@@ -46,8 +48,8 @@ const ProblemCompanionView = ({ gamestate, latex, answer, attempts }) => {
             {attempt.value} <AttemptTime timestamp={attempt.timestamp} />
           </div>
         ))}
-    </div>
-  </>)
+      </div>
+    </div>)
 }
 
 export {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react"
 
 import './problem.scss'
 
@@ -94,10 +94,11 @@ const ProblemView = ({ gamestate, latex, postAnswer, postEvent, interval }) => {
   var reporter = new EventReporterSingleton(postEvent, interval, postAnswer);
   var progress = String(100.0 * gamestate.solved / gamestate.target) + "%";
   return (<>
-    <div className="success progress">
-      <div className="progress-meter" style={{width: progress}}></div>
-    </div>
     <div id="problem">
+        <div className="progress">
+          <div className="progress-meter" style={{width: progress}}>
+          </div>
+        </div>
         <ReactFitText compressor={0.75}>
             <div id="problem-display" dangerouslySetInnerHTML={{__html: latex}}></div>
         </ReactFitText>
@@ -107,10 +108,10 @@ const ProblemView = ({ gamestate, latex, postAnswer, postEvent, interval }) => {
                 onChange={(e) => { setAnswer(e.target.value); reporter.answerWasSet(); }}
                 onKeyDown={(e) => { if (e.key === "Enter") { reporter.reportAnswer(answer, gamestate.problem_id); }}}
             />
-            <div className="input-group-button">
-                <input type="submit" className="button" value="submit"
-                  onClick={() => { reporter.reportAnswer(answer, gamestate.problem_id); }}
-                />
+            <div>
+                <button onClick={() => { reporter.reportAnswer(answer, gamestate.problem_id); }}>
+                  <h3>submit</h3>
+                </button>
             </div>
         </div>
         { reporter.wasIncorrectAnswer(gamestate.problem_id) &&
