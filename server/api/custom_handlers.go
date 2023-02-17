@@ -357,13 +357,7 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 			return
 		}
 		// Write default new option to database
-		default_option := &Option{
-			UserId:           user.Id,
-			Operations:       "+,-",
-			Fractions:        false,
-			Negatives:        false,
-			TargetDifficulty: 10,
-		}
+		default_option := &Option{UserId: user.Id}
 		status, msg, err := a.optionManager.Create(default_option)
 		if HandleMngrResp(logPrefix, c, status, msg, err, default_option) != nil {
 			return
