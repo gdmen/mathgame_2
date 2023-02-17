@@ -80,19 +80,23 @@
         },
         {
           "name": "Operations", "type": "string",
-          "sql": "VARCHAR(256) NOT NULL"
+          "sql": "VARCHAR(256) NOT NULL DEFAULT '+'"
         },
         {
           "name": "Fractions", "type": "bool",
-          "sql": "TINYINT NOT NULL"
+          "sql": "TINYINT NOT NULL DEFAULT 0"
         },
         {
           "name": "Negatives", "type": "bool",
-          "sql": "TINYINT NOT NULL"
+          "sql": "TINYINT NOT NULL DEFAULT 0"
         },
         {
           "name": "TargetDifficulty", "type": "float64",
-          "sql": "DOUBLE NOT NULL"
+          "sql": "DOUBLE NOT NULL DEFAULT 3"
+        },
+        {
+          "name": "Pin", "type": "int32",
+          "sql": "INT(4) NOT NULL DEFAULT -1"
         }
       ]
     },
