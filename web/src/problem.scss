@@ -1,40 +1,67 @@
-#problem {
-    text-align: center;
+@import "styles.scss";
+
+.progress {
+  border-radius: $base-radius;
+  border: 1px solid gray;
+  font-size: 1.5em;
+  height: 1em;
+  .progress-meter {
+    background-color: $color-one;
+    border-radius: $base-radius 0 0 $base-radius;
+    height: 100%;
+  }
 }
-#problem-answer-input {
+
+#problem {
+  border-top: 1px gray;
+  margin: 0 auto;
+  max-width: $max-width;
+  padding: 0 $base-space;
+  text-align: center;
+  #problem-answer-input {
     border: none;
     box-shadow: none;
     border-bottom: 2px solid #333;
     font-size: 3em;
+  }
+  button {
+    background-color: $color-one-contrast;
+    color: white;
+    font-weight: 400;
+    margin-top: 1.5*$base-space;
+  }
 }
-
 #problem-companion {
-  float: left;
-  text-align: center;
-  width: 70%;
-}
 
-#problem-answer-companion {
-    font-size: 2em;
-}
+  display: flex;
+  justify-content: space-between;
+  margin: 0 auto;
+  max-width: $max-width;
+  padding: 0 $base-space;
 
-#problem-attempts {
-  border-left: 1px solid lightgray;
-  float: right;
-  padding-left: 2em;
-  width: 30%;
-}
+  #problem-mirror {
+    max-width: 0.7*$max-width;
+    text-align: center;
+    width: 70%;
+    #problem-answer-companion {
+        font-size: 2em;
+    }
+  }
 
-.problem-attempt {
-}
-
-.attempt-time {
-  float: right;
-  font-size: 0.5em;
-}
-
-#problem-attempts-header {
-  font-size: 1.25em;
-  font-variant: small-caps;
-  text-align: center;
+  #problem-attempts {
+    margin-left: 2em;
+    max-width: 0.3*$max-width;
+    width: 30%;
+    .problem-attempt {
+    }
+    .attempt-time {
+      float: right;
+      font-size: 0.5em;
+    }
+    #problem-attempts-header {
+      font-size: 1.25em;
+      font-variant: small-caps;
+      text-align: center;
+    }
+  }
 }
