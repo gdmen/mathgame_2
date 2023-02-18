@@ -193,7 +193,7 @@ const CompanionView = ({ token, url, user }) => {
   }, [getEvents]);
 
   if (!gamestate || !problem) {
-    return <div className="content-loading">loading</div>
+    return <div className="content-loading"></div>
   }
 
   new RefresherSingleton(getGamestate, getEvents, interval);

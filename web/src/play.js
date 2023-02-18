@@ -93,7 +93,7 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
   };
 
   if (!gamestate || !problem) {
-    return <div className="content-loading">loading</div>
+    return <div className="content-loading"></div>
   }
 
   if (gamestate.solved >= gamestate.target) {

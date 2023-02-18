@@ -10,4 +10,7 @@ button {
 
 .content-loading {
   text-align: center;
+  &:before {
+    content: "loading. . .";
+  }
 }
