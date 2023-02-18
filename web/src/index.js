@@ -8,6 +8,7 @@ import { useAuth0 } from "@auth0/auth0-react";
 import { LoginButton, LogoutButton } from './auth0.js'
 
 import { HomeView } from './home.js'
+import { SetupView } from './setup.js'
 import { PlayView } from './play.js'
 import { CompanionView } from './companion.js'
 
@@ -23,34 +24,39 @@ const NotFound = () => (
 )
 
 const MainView = ({ token, url, isLoading, isAuthenticated, user, options, postEvent }) => {
-  if (options == null) {
-    return null;
+  if (isLoading || (isAuthenticated && options == null)) {
+    return (
+      <div className="content-loading"></div>
+    )
   }
-  if (options.pin === -1) {
+  else if (options != null && options.pin === -1) {
     // TODO: kick off setup flow
     console.log(options);
+    return <SetupView token={token} url={url} user={user} postEvent={postEvent} options={options}/>
   }
-  // TODO: in the following switch, if not auth'd, redirect to landing page
-  return (
-    <main>
-      <Switch>
-        <Route exact path="/">
-          <HomeView isLoading={isLoading} isAuthenticated={isAuthenticated} user={user}/>
-        </Route>
-        <Route path="/play">
-          {!isLoading && isAuthenticated &&
-            <PlayView token={token} url={url} user={user} postEvent={postEvent} interval={conf.event_reporting_interval} />
-          }
-        </Route>
-        <Route path="/companion/:student_id">
-          {!isLoading && isAuthenticated &&
-            <CompanionView token={token} url={url} user={user} />
-          }
-        </Route>
-        <Route path="*" component={NotFound} />
-      </Switch>
-    </main>
-  )
+  else {
+    // TODO: in the following switch, if not auth'd, redirect to landing page
+    return (
+      <main>
+        <Switch>
+          <Route exact path="/">
+            <HomeView isLoading={isLoading} isAuthenticated={isAuthenticated} user={user} options={options}/>
+          </Route>
+          <Route path="/play">
+            {!isLoading && isAuthenticated &&
+              <PlayView token={token} url={url} user={user} postEvent={postEvent} interval={conf.event_reporting_interval} />
+            }
+          </Route>
+          <Route path="/companion/:student_id">
+            {!isLoading && isAuthenticated &&
+              <CompanionView token={token} url={url} user={user} />
+            }
+          </Route>
+          <Route path="*" component={NotFound} />
+        </Switch>
+      </main>
+    )
+  }
 }
 
 const AppView = () => {
