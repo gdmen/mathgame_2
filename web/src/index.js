@@ -22,7 +22,15 @@ const NotFound = () => (
   </div>
 )
 
-const Main = ({ token, url, isLoading, isAuthenticated, user, postEvent }) => {
+const MainView = ({ token, url, isLoading, isAuthenticated, user, options, postEvent }) => {
+  if (options == null) {
+    return null;
+  }
+  if (options.pin === -1) {
+    // TODO: kick off setup flow
+    console.log(options);
+  }
+  // TODO: in the following switch, if not auth'd, redirect to landing page
   return (
     <main>
       <Switch>
@@ -45,10 +53,11 @@ const Main = ({ token, url, isLoading, isAuthenticated, user, postEvent }) => {
   )
 }
 
-const App = () => {
+const AppView = () => {
   const {user, isLoading, isAuthenticated, getAccessTokenSilently} = useAuth0();
   const [token, setToken] = useState(null);
   const [appUser, setAppUser] = useState(null);
+  const [options, setOptions] = useState(null);
 
   const genPostEventFcn = useCallback(() => {
     return async function(event_type, value) {
@@ -88,9 +97,34 @@ const App = () => {
   }, [getAccessTokenSilently]);
 
   useEffect(() => {
+    const getOptions = async () => {
+      try {
+        if (token == null || appUser == null) {
+          return;
+        }
+        const settings = {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token,
+            }
+        };
+        const req = await fetch(ApiUrl + "/options/" + appUser.id, settings);
+        const json = await req.json();
+        setOptions(json);
+      } catch (e) {
+        console.log(e.message);
+      }
+    };
+
+    getOptions();
+  }, [token, appUser]);
+
+  useEffect(() => {
     const getAppUser = async () => {
       try {
-        if (token == null) {
+        if (token == null || user == null || genPostEventFcn == null) {
           return;
         }
         const settings = {
@@ -132,7 +166,7 @@ const App = () => {
       </div>
 
       <div id="content">
-            <Main token={token} url={ApiUrl} isLoading={isLoading} isAuthenticated={isAuthenticated} user={appUser} postEvent={genPostEventFcn()}/>
+            <MainView token={token} url={ApiUrl} isLoading={isLoading} isAuthenticated={isAuthenticated} user={appUser} options={options} postEvent={genPostEventFcn()}/>
       </div>
     </div>
   )
@@ -146,7 +180,7 @@ ReactDOM.render(
       domain={conf.auth0_domain}
       redirectUri={window.location.origin}
     >
-    <App />
+    <AppView />
   </Auth0Provider>
   </BrowserRouter>,
   document.getElementById('react')
