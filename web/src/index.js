@@ -29,10 +29,9 @@ const MainView = ({ token, url, isLoading, isAuthenticated, user, options, postE
       <div className="content-loading"></div>
     )
   }
+  // TODO: setup if: (pin not set OR no operations set OR no videos set)
   else if (options != null && options.pin === -1) {
-    // TODO: kick off setup flow
-    console.log(options);
-    return <SetupView token={token} url={url} user={user} postEvent={postEvent} options={options}/>
+    return <SetupView token={token} url={url} user={user} options={options}/>
   }
   else {
     // TODO: in the following switch, if not auth'd, redirect to landing page

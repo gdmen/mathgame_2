@@ -23,6 +23,10 @@
           color: white;
           font-weight: 400;
           margin-top: 1.5*$base-space;
+          transition-duration: 0.1s;
+          &:active {
+            transform: scale(0.95);
+          }
         }
       }
     }
