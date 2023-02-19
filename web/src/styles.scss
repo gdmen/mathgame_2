@@ -2,6 +2,8 @@
 $color-one: #BEE8B7;
 $color-two: #D6F7D2;
 $color-one-contrast: #007200;
+$color-inactive: #A9A9A9;
+$color-error: #DC143C;
 $background-color: white;
 $font-color: black;
 
@@ -10,6 +12,7 @@ $font-color: black;
 $base-font-family: 'Josefin Sans', sans-serif;
 html,button {
   font-family: $base-font-family;
+  font-size: 1em;
 }
 h1,h2,h3,h4,h5 {
 }
