@@ -16,33 +16,35 @@ const (
 	url VARCHAR(256) NOT NULL,
 	start INT(5) NOT NULL,
 	end INT(5) NOT NULL,
-	enabled TINYINT NOT NULL
+	enabled TINYINT NOT NULL,
+	thumbnailurl VARCHAR(256) NOT NULL
     ) DEFAULT CHARSET=utf8 ;`
 
-	createVideoSQL = `INSERT INTO videos (title, url, start, end, enabled) VALUES (?, ?, ?, ?, ?);`
+	createVideoSQL = `INSERT INTO videos (title, url, start, end, enabled, thumbnailurl) VALUES (?, ?, ?, ?, ?, ?);`
 
 	getVideoSQL = `SELECT * FROM videos WHERE id=?;`
 
-	getVideoKeySQL = `SELECT id FROM videos WHERE title=? AND url=? AND start=? AND end=? AND enabled=?;`
+	getVideoKeySQL = `SELECT id FROM videos WHERE title=? AND url=? AND start=? AND end=? AND enabled=? AND thumbnailurl=?;`
 
 	listVideoSQL = `SELECT * FROM videos;`
 
-	updateVideoSQL = `UPDATE videos SET title=?, url=?, start=?, end=?, enabled=? WHERE id=?;`
+	updateVideoSQL = `UPDATE videos SET title=?, url=?, start=?, end=?, enabled=?, thumbnailurl=? WHERE id=?;`
 
 	deleteVideoSQL = `DELETE FROM videos WHERE id=?;`
 )
 
 type Video struct {
-	Id      uint32 `json:"id" uri:"id"`
-	Title   string `json:"title" uri:"title" form:"title"`
-	URL     string `json:"url" uri:"url" form:"url"`
-	Start   int32  `json:"start" uri:"start" form:"start"`
-	End     int32  `json:"end" uri:"end" form:"end"`
-	Enabled bool   `json:"enabled" uri:"enabled" form:"enabled"`
+	Id           uint32 `json:"id" uri:"id"`
+	Title        string `json:"title" uri:"title" form:"title"`
+	URL          string `json:"url" uri:"url" form:"url"`
+	Start        int32  `json:"start" uri:"start" form:"start"`
+	End          int32  `json:"end" uri:"end" form:"end"`
+	Enabled      bool   `json:"enabled" uri:"enabled" form:"enabled"`
+	ThumbnailURL string `json:"thumbnailurl" uri:"thumbnailurl" form:"thumbnailurl"`
 }
 
 func (model Video) String() string {
-	return fmt.Sprintf("Id: %v, Title: %v, URL: %v, Start: %v, End: %v, Enabled: %v", model.Id, model.Title, model.URL, model.Start, model.End, model.Enabled)
+	return fmt.Sprintf("Id: %v, Title: %v, URL: %v, Start: %v, End: %v, Enabled: %v, ThumbnailURL: %v", model.Id, model.Title, model.URL, model.Start, model.End, model.Enabled, model.ThumbnailURL)
 }
 
 type VideoManager struct {
@@ -51,7 +53,7 @@ type VideoManager struct {
 
 func (m *VideoManager) Create(model *Video) (int, string, error) {
 	status := http.StatusCreated
-	result, err := m.DB.Exec(createVideoSQL, model.Title, model.URL, model.Start, model.End, model.Enabled)
+	result, err := m.DB.Exec(createVideoSQL, model.Title, model.URL, model.Start, model.End, model.Enabled, model.ThumbnailURL)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Duplicate entry") {
 			msg := "Couldn't add video to database"
@@ -59,7 +61,7 @@ func (m *VideoManager) Create(model *Video) (int, string, error) {
 		}
 
 		// Update model with the configured return field.
-		err = m.DB.QueryRow(getVideoKeySQL, model.Title, model.URL, model.Start, model.End, model.Enabled).Scan(&model.Id)
+		err = m.DB.QueryRow(getVideoKeySQL, model.Title, model.URL, model.Start, model.End, model.Enabled, model.ThumbnailURL).Scan(&model.Id)
 		if err != nil {
 			msg := "Couldn't add video to database"
 			return http.StatusInternalServerError, msg, err
@@ -80,7 +82,7 @@ func (m *VideoManager) Create(model *Video) (int, string, error) {
 
 func (m *VideoManager) Get(id uint32) (*Video, int, string, error) {
 	model := &Video{}
-	err := m.DB.QueryRow(getVideoSQL, id).Scan(&model.Id, &model.Title, &model.URL, &model.Start, &model.End, &model.Enabled)
+	err := m.DB.QueryRow(getVideoSQL, id).Scan(&model.Id, &model.Title, &model.URL, &model.Start, &model.End, &model.Enabled, &model.ThumbnailURL)
 	if err == sql.ErrNoRows {
 		msg := "Couldn't find a video with that id"
 		return nil, http.StatusNotFound, msg, err
@@ -102,7 +104,7 @@ func (m *VideoManager) List() (*[]Video, int, string, error) {
 	}
 	for rows.Next() {
 		model := Video{}
-		err = rows.Scan(&model.Id, &model.Title, &model.URL, &model.Start, &model.End, &model.Enabled)
+		err = rows.Scan(&model.Id, &model.Title, &model.URL, &model.Start, &model.End, &model.Enabled, &model.ThumbnailURL)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -128,7 +130,7 @@ func (m *VideoManager) CustomList(sql string) (*[]Video, int, string, error) {
 	}
 	for rows.Next() {
 		model := Video{}
-		err = rows.Scan(&model.Id, &model.Title, &model.URL, &model.Start, &model.End, &model.Enabled)
+		err = rows.Scan(&model.Id, &model.Title, &model.URL, &model.Start, &model.End, &model.Enabled, &model.ThumbnailURL)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -150,7 +152,7 @@ func (m *VideoManager) Update(model *Video) (int, string, error) {
 		return status, msg, err
 	}
 	// Update
-	_, err = m.DB.Exec(updateVideoSQL, model.Title, model.URL, model.Start, model.End, model.Enabled, model.Id)
+	_, err = m.DB.Exec(updateVideoSQL, model.Title, model.URL, model.Start, model.End, model.Enabled, model.ThumbnailURL, model.Id)
 	if err != nil {
 		msg := "Couldn't update video in database"
 		return http.StatusInternalServerError, msg, err
