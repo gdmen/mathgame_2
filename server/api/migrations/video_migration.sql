@@ -1,0 +1,1 @@
+ALTER TABLE videos ADD thumbnailurl VARCHAR(256) NOT NULL;

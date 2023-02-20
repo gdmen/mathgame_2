@@ -68,6 +68,10 @@
         {
           "name": "Enabled", "type": "bool",
           "sql": "TINYINT NOT NULL"
+        },
+        {
+          "name": "ThumbnailURL", "type": "string",
+          "sql": "VARCHAR(256) NOT NULL"
         }
       ]
     },

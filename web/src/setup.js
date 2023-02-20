@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import './setup.scss'
 
@@ -27,12 +27,12 @@ const OperationsTabView = ({ token, url, user, options, postOptions, advanceSetu
 
   const handleCheckboxChange = (e) => {
     let id = e.target.id;
-    let newArray = [...operations, id];
+    let newOptions = [...operations, id];
     if (operations.includes(id)) {
-      newArray = operations.filter(x => x !== id);
+      newOptions = operations.filter(x => x !== id);
     }
-    setOperations(newArray);
-    setError(newArray.length < 1);
+    setOperations(newOptions);
+    setError(newOptions.length < 1);
   };
 
   const handleSubmitClick = (e) => {
@@ -49,7 +49,7 @@ const OperationsTabView = ({ token, url, user, options, postOptions, advanceSetu
     <h2>Hi there! Let's do a little setup for your kid!</h2>
     <div className="setup-form">
       <h4>Which types of problems should we show? <span className={error ? "error" : ""}>Select one or more.</span></h4>
-      <ul>
+      <ul id="operation-buttons">
         {[...allOperationsMap.keys()].map(function(op, i) {
             var id = op;
             return (<li key={id}>
@@ -62,7 +62,140 @@ const OperationsTabView = ({ token, url, user, options, postOptions, advanceSetu
             </li>)
         })}
       </ul>
-      <button className={error ? "error" : ""} onClick={handleSubmitClick}>continue</button>
+      <button className={error ? "submit error" : "submit"} onClick={handleSubmitClick}>continue</button>
+    </div>
+  </>)
+}
+
+const VideosTabView = ({ token, url, user, advanceSetup }) => {
+  const [error, setError] = useState(true);
+  const [addError, setAddError] = useState(true);
+  const [videos, setVideos] = useState(new Map());
+  const [videoUrl, setVideoUrl] = useState(null);
+  const [videoTitle, setVideoTitle] = useState(null);
+  const [videoThumbnail, setVideoThumbnail] = useState(null);
+
+  useEffect(() => {
+    const getVideos = async () => {
+      try {
+        if (token == null || url == null || user == null) {
+          return;
+        }
+        const settings = {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token,
+            }
+        };
+        const req = await fetch(url+ "/videos", settings);
+        const json = await req.json();
+        let newVideos = new Map();
+        for (var i in json) {
+          let url = json[i].url;
+          newVideos.set(url, json[i]);
+        }
+        setVideos(newVideos);
+        setError(newVideos.size < 3);
+      } catch (e) {
+        console.log(e.message);
+      }
+    };
+
+    getVideos();
+  }, [token, url, user]);
+
+  const handleSubmitClick = (e) => {
+    // TODO: post updated videos
+    // redirect to next setup step
+    advanceSetup();
+  };
+
+  const fetchYouTubeMetadata = async function(url, okFcn, errFcn) {
+      try {
+        const settings = {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+        };
+        const req = await fetch("https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(url), settings);
+        const json = await req.json();
+        okFcn(json);
+      } catch (e) {
+        console.log(e.message);
+        errFcn(e);
+      }
+  };
+
+  const handleAddVideoChange = (e) => {
+    let url = e.target.value;
+    setVideoUrl(url);
+    setVideoTitle(null);
+    setVideoThumbnail(null);
+    let okFcn = function (json) {
+      setVideoTitle(json.title);
+      setVideoThumbnail(json.thumbnail_url);
+      setAddError(videos.has(url));
+    }
+    let errFcn = function (e) {
+      setAddError(true);
+    }
+    fetchYouTubeMetadata(url, okFcn, errFcn);
+  }
+
+  const postVideo = async function(video) {
+      try {
+        const settings = {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + token,
+            },
+            body: JSON.stringify(video),
+        };
+        const req = await fetch(url + "/videos/", settings);
+        if (req.ok) {
+          setVideos(videos => new Map(videos.set(video.url, video)));
+          setAddError(true);
+          setError(videos.size < 3);
+        }
+      } catch (e) {
+        console.log(e.message);
+      }
+  };
+
+  const handleAddVideoClick = (e) => {
+    postVideo({"title": videoTitle, "url": videoUrl, "thumbnailurl": videoThumbnail, "enabled": true});
+  };
+
+  return (<>
+    <div className="setup-form">
+      <h4>Add <span className={error ? "error" : ""}>at least three</span> <a href="http://www.youtube.com" target="_blank">YouTube</a> videos that your kid will love!</h4>
+      <ul id="video-list">
+        {[...videos.keys()].map(function(key, i) {
+            var id = i;
+            var video = videos.get(key);
+            return (<li key={id} style={{
+              backgroundImage: `url(${video.thumbnailurl})` 
+            }}>
+              <span className="video-title">{video.title}</span>
+            </li>)
+        })}
+      </ul>
+      <div id="add-video-interface" style={{
+          backgroundImage: `url(${videoThumbnail})` 
+      }}>
+        <div className={addError ? "video-title error": "video-title"}><h3>{videoTitle}</h3></div>
+        <div id="video-inputs">
+          <input type="text" placeholder="paste a YouTube link here" className={addError && videoUrl ? "error" : ""} onChange={handleAddVideoChange}/>
+          <button className={addError ? "error" : ""} onClick={handleAddVideoClick}>add</button>
+        </div>
+      </div>
+      <button className={error ? "submit error" : "submit"} onClick={handleSubmitClick}>continue</button>
     </div>
   </>)
 }
@@ -70,7 +203,6 @@ const OperationsTabView = ({ token, url, user, options, postOptions, advanceSetu
 const SetupView = ({ token, url, user, options }) => {
   const [activeTab, setActiveTab] = useState(null);
 
-  //const allTabs = ["set operations", "add videos", "set parent pin", "start playing!"];
   const allTabs = ["Choose Operations", "Add Videos", "Set Parent Pin", "Start Playing!"];
 
   if (activeTab == null) {
@@ -115,14 +247,15 @@ const SetupView = ({ token, url, user, options }) => {
         var className = tab === activeTab ? "tab active" : "tab";
         return (
           <div key={id} className={className}>
-            <div id={id} className="click-catcher" onClick={handleTabClick}></div>
+            <div id={id} className="tab-click-catcher" onClick={handleTabClick}></div>
             <span className="number">{i+1}</span>
             <span className="label">{tab}</span>
           </div>
         )
       })}
     </div>
-    { (activeTab === "Choose Operations") && <div className="tabContent"><OperationsTabView token={token} url={url} user={user} options={options} postOptions={postOptions} advanceSetup={advanceSetup}/></div> }
+    { (activeTab === "Choose Operations") && <div className="tab-content"><OperationsTabView token={token} url={url} user={user} options={options} postOptions={postOptions} advanceSetup={advanceSetup}/></div> }
+    { (activeTab === "Add Videos") && <div className="tab-content"><VideosTabView token={token} url={url} user={user} advanceSetup={advanceSetup}/></div> }
   </div>)
 }
 

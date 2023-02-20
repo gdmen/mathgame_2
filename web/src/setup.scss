@@ -20,7 +20,7 @@
           background-color: $color-one-contrast;
         }
       }
-      .click-catcher {
+      .tab-click-catcher {
         height: 100%;
         left: 0;
         position: absolute;
@@ -44,7 +44,7 @@
       }
     }
   }
-  .tabContent {
+  .tab-content {
     padding: 2*$base-space;
     h2 {
       line-height: 1.25em;
@@ -53,6 +53,7 @@
     .setup-form {
       display: inline-block;
       text-align: left;
+      width: 80%;
       h4 {
         line-height: 1.25em;
         margin-bottom: $base-space;
@@ -60,7 +61,7 @@
           color: $color-error;
         }
       }
-      ul {
+      ul#operation-buttons {
         display: flex;
         justify-content: flex-start;
         list-style-type: none;
@@ -91,12 +92,14 @@
       button {
         background-color: $color-one-contrast;
         color: white;
-        display: block;
         font-weight: 400;
-        margin: 0 auto;
-        margin-top: 1.5*$base-space;
-        padding: 0.5em 0.75em;
         transition-duration: 0.1s;
+        &.submit {
+          display: block;
+          margin: 0 auto;
+          margin-top: 1.5*$base-space;
+          padding: 0.5em 0.75em;
+        }
         &:active {
           transform: scale(0.95);
         }
@@ -106,17 +109,101 @@
         }
       }
     }
+    .video-title {
+      background-color: whitesmoke;
+      left: 0;
+      opacity: 0.75;
+      padding: $base-space;
+      position: absolute;
+      text-align: center;
+      top: 0;
+      width: 100%;
+    }
+    ul#video-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1%;
+      li {
+        aspect-ratio: 16 / 9;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: 100% auto;
+        border: 1px solid gray;
+        border-radius: 0.25em;
+        flex: 0 0 32%;
+        height: auto;
+        margin-bottom: 1%;
+        overflow: hidden;
+        position: relative;
+        .video-title {
+          height: 2em;
+          line-height: 1em;
+          overflow: hidden;
+          padding: 0;
+          text-overflow: ellipsis;
+        }
+      }
+    }
+    #add-video-interface {
+      aspect-ratio: 16 / 9;
+      background-color: whitesmoke;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: 100% auto;
+      overflow: hidden;
+      position: relative;
+      width: 100%;
+      #video-inputs {
+        background: rgba(245, 245, 245, .75);
+        display: flex;
+        justify-content: center;
+        padding: $base-space;
+        position: absolute;
+        top: 50%;
+        width: 100%;
+        input {
+          border: 0.25em solid $color-one;
+          min-width: 20em;
+          padding: 0.25em 0.5em;
+          &.error {
+            border-color: $color-error;
+          }
+        }
+        button {
+          border-radius: 0.25em;
+          margin-left: 1em;
+          padding: 0.25em 0.5em;
+        }
+      }
+    }
   }
 }
 
-@media only screen and (max-width: 850px) {
-  #setup #setup-tabs .tab {
-    padding: none;
-    .number {
-      margin-right: 0;
+@media only screen and (max-width: 870px) {
+  #setup {
+    #setup-tabs .tab {
+      padding: none;
+      .number {
+        margin-right: 0;
+      }
+      .label {
+        display: none;
+      }
     }
-    .label {
-      display: none;
+    .tab-content {
+      padding: $base-space $base-space/2;
+      .setup-form {
+        width: 100%;
+        #add-video-interface {
+          #video-title {
+            h3 {
+              font-size: 1em;
+            }
+          }
+          #video-inputs {
+          }
+        }
+      }
     }
   }
 }
