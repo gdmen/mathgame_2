@@ -16,7 +16,7 @@ const (
 	fractions TINYINT NOT NULL DEFAULT 0,
 	negatives TINYINT NOT NULL DEFAULT 0,
 	target_difficulty DOUBLE NOT NULL DEFAULT 3,
-	pin INT(4) NOT NULL DEFAULT -1
+	pin VARCHAR(4) NOT NULL DEFAULT ''
     ) DEFAULT CHARSET=utf8 ;`
 
 	createOptionSQL = `INSERT INTO options (user_id) VALUES (?);`
@@ -38,7 +38,7 @@ type Option struct {
 	Fractions        bool    `json:"fractions" uri:"fractions" form:"fractions"`
 	Negatives        bool    `json:"negatives" uri:"negatives" form:"negatives"`
 	TargetDifficulty float64 `json:"target_difficulty" uri:"target_difficulty" form:"target_difficulty"`
-	Pin              int32   `json:"pin" uri:"pin" form:"pin"`
+	Pin              string  `json:"pin" uri:"pin" form:"pin"`
 }
 
 func (model Option) String() string {

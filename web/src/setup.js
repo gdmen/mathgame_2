@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from "react";
+import PinInput from 'react-pin-input';
 
 import './setup.scss'
 
 /*
 
 1. Sign up with Auth0
-2. options.pin is -1 by default
+2. options.pin is "" by default
 3. set operations for your kid
 3. add at least 3 videos your kid will like - validate youtube videos / make sure they load and play
-4. set options.pin to chosen pin (repeat to confirm)
+4. set options.pin to chosen pin (repeat to confirm?)
 5. PIN IN MEMORY - if goto setup or parent page, keep pin. If goto any other page, purge pin
 6. START PLAYING NOW (goto play) vs CONFIGURE THIS FOR YOUR KID! (goto parent/options page)
 */
@@ -174,7 +175,7 @@ const VideosTabView = ({ token, url, user, advanceSetup }) => {
 
   return (<>
     <div className="setup-form">
-      <h4>Add <span className={error ? "error" : ""}>at least three</span> <a href="http://www.youtube.com" target="_blank">YouTube</a> videos that your kid will love!</h4>
+      <h4>Add <span className={error ? "error" : ""}>at least three</span> <a href="http://www.youtube.com" target="_blank" rel="noopener noreferrer">YouTube</a> videos that your kid will love!</h4>
       <ul id="video-list">
         {[...videos.keys()].map(function(key, i) {
             var id = i;
@@ -196,6 +197,52 @@ const VideosTabView = ({ token, url, user, advanceSetup }) => {
         </div>
       </div>
       <button className={error ? "submit error" : "submit"} onClick={handleSubmitClick}>continue</button>
+    </div>
+  </>)
+}
+
+const PinTabView = ({ token, url, user, options, postOptions, advanceSetup }) => {
+  const [error, setError] = useState(options.pin.length < 4);
+  const [pin, setPin] = useState(options.pin);
+
+  const handlePinChange = (pin) => {
+    setError(pin.length < 4);
+    if (pin.length === 4) {
+      setPin(pin);
+    }
+  };
+
+  const handleSubmitClick = (e) => {
+    // post updated options
+    options.pin = pin;
+    postOptions(options);
+    // redirect to next setup step
+    advanceSetup();
+  };
+
+  return (<>
+    <div className="setup-form">
+      <h4>Set a <span className={error ? "error" : ""}>four digit</span> PIN code! You'll need this PIN to edit these settings later!</h4>
+      <PinInput 
+        autoSelect={true}
+        initialValue={pin}
+        inputMode="number"
+        inputStyle={{borderRadius: '0.25em'}}
+        length={4} 
+        onChange={(value, index) => {handlePinChange(value);}}
+        type="numeric"
+      />
+      <button className={error ? "submit error" : "submit"} onClick={handleSubmitClick}>continue</button>
+    </div>
+  </>)
+}
+
+const StartPlayingTabView = () => {
+  return (<>
+    <h2>We're all set!</h2>
+    <div className="setup-form">
+      <h3>The Math Game will start easy and get harder to match your kid's math level!</h3>
+      <button id="start-playing-button" onClick={function(e){window.location.href="play"}}>Start Playing!</button>
     </div>
   </>)
 }
@@ -256,6 +303,8 @@ const SetupView = ({ token, url, user, options }) => {
     </div>
     { (activeTab === "Choose Operations") && <div className="tab-content"><OperationsTabView token={token} url={url} user={user} options={options} postOptions={postOptions} advanceSetup={advanceSetup}/></div> }
     { (activeTab === "Add Videos") && <div className="tab-content"><VideosTabView token={token} url={url} user={user} advanceSetup={advanceSetup}/></div> }
+    { (activeTab === "Set Parent Pin") && <div className="tab-content"><PinTabView token={token} url={url} user={user} options={options} postOptions={postOptions} advanceSetup={advanceSetup}/></div> }
+    { (activeTab === "Start Playing!") && <div className="tab-content"><StartPlayingTabView /></div> }
   </div>)
 }
 
