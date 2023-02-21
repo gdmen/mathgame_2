@@ -30,7 +30,7 @@ const MainView = ({ token, url, isLoading, isAuthenticated, user, options, postE
     )
   }
   // TODO: setup if: (pin not set OR no operations set OR no videos set)
-  else if (options != null && options.pin === -1) {
+  else if (options != null && options.pin === "") {
     return <SetupView token={token} url={url} user={user} options={options}/>
   }
   else {

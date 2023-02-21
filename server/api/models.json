@@ -99,8 +99,8 @@
           "sql": "DOUBLE NOT NULL DEFAULT 3"
         },
         {
-          "name": "Pin", "type": "int32",
-          "sql": "INT(4) NOT NULL DEFAULT -1"
+          "name": "Pin", "type": "string",
+          "sql": "VARCHAR(4) NOT NULL DEFAULT ''"
         }
       ]
     },
