@@ -18,6 +18,10 @@
         {
           "name": "Username", "type": "string",
           "sql": "VARCHAR(128) NOT NULL"
+        },
+        {
+          "name": "Pin", "type": "string",
+          "sql": "VARCHAR(4) NOT NULL DEFAULT ''"
         }
       ]
     },
@@ -97,10 +101,6 @@
         {
           "name": "TargetDifficulty", "type": "float64",
           "sql": "DOUBLE NOT NULL DEFAULT 3"
-        },
-        {
-          "name": "Pin", "type": "string",
-          "sql": "VARCHAR(4) NOT NULL DEFAULT ''"
         }
       ]
     },
