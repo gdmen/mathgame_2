@@ -362,8 +362,14 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 		if HandleMngrResp(logPrefix, c, status, msg, err, default_option) != nil {
 			return
 		}
+		// Get Option
+		option, status, msg, err := a.optionManager.Get(user.Id)
+		if HandleMngrResp(logPrefix, c, status, msg, err, option) != nil {
+			return
+		}
+		glog.Infof("%s Option: %v", logPrefix, option)
 		// Generate a new problem
-		problem, err := a.generateProblem(logPrefix, c, default_option)
+		problem, err := a.generateProblem(logPrefix, c, option)
 		if err != nil {
 			return
 		}
