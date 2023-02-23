@@ -15,8 +15,7 @@ const (
 	operations VARCHAR(256) NOT NULL DEFAULT '+',
 	fractions TINYINT NOT NULL DEFAULT 0,
 	negatives TINYINT NOT NULL DEFAULT 0,
-	target_difficulty DOUBLE NOT NULL DEFAULT 3,
-	pin VARCHAR(4) NOT NULL DEFAULT ''
+	target_difficulty DOUBLE NOT NULL DEFAULT 3
     ) DEFAULT CHARSET=utf8 ;`
 
 	createOptionSQL = `INSERT INTO options (user_id) VALUES (?);`
@@ -27,7 +26,7 @@ const (
 
 	listOptionSQL = `SELECT * FROM options;`
 
-	updateOptionSQL = `UPDATE options SET operations=?, fractions=?, negatives=?, target_difficulty=?, pin=? WHERE user_id=?;`
+	updateOptionSQL = `UPDATE options SET operations=?, fractions=?, negatives=?, target_difficulty=? WHERE user_id=?;`
 
 	deleteOptionSQL = `DELETE FROM options WHERE user_id=?;`
 )
@@ -38,11 +37,10 @@ type Option struct {
 	Fractions        bool    `json:"fractions" uri:"fractions" form:"fractions"`
 	Negatives        bool    `json:"negatives" uri:"negatives" form:"negatives"`
 	TargetDifficulty float64 `json:"target_difficulty" uri:"target_difficulty" form:"target_difficulty"`
-	Pin              string  `json:"pin" uri:"pin" form:"pin"`
 }
 
 func (model Option) String() string {
-	return fmt.Sprintf("UserId: %v, Operations: %v, Fractions: %v, Negatives: %v, TargetDifficulty: %v, Pin: %v", model.UserId, model.Operations, model.Fractions, model.Negatives, model.TargetDifficulty, model.Pin)
+	return fmt.Sprintf("UserId: %v, Operations: %v, Fractions: %v, Negatives: %v, TargetDifficulty: %v", model.UserId, model.Operations, model.Fractions, model.Negatives, model.TargetDifficulty)
 }
 
 type OptionManager struct {
@@ -66,7 +64,7 @@ func (m *OptionManager) Create(model *Option) (int, string, error) {
 
 func (m *OptionManager) Get(user_id uint32) (*Option, int, string, error) {
 	model := &Option{}
-	err := m.DB.QueryRow(getOptionSQL, user_id).Scan(&model.UserId, &model.Operations, &model.Fractions, &model.Negatives, &model.TargetDifficulty, &model.Pin)
+	err := m.DB.QueryRow(getOptionSQL, user_id).Scan(&model.UserId, &model.Operations, &model.Fractions, &model.Negatives, &model.TargetDifficulty)
 	if err == sql.ErrNoRows {
 		msg := "Couldn't find a option with that user_id"
 		return nil, http.StatusNotFound, msg, err
@@ -88,7 +86,7 @@ func (m *OptionManager) List() (*[]Option, int, string, error) {
 	}
 	for rows.Next() {
 		model := Option{}
-		err = rows.Scan(&model.UserId, &model.Operations, &model.Fractions, &model.Negatives, &model.TargetDifficulty, &model.Pin)
+		err = rows.Scan(&model.UserId, &model.Operations, &model.Fractions, &model.Negatives, &model.TargetDifficulty)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -114,7 +112,7 @@ func (m *OptionManager) CustomList(sql string) (*[]Option, int, string, error) {
 	}
 	for rows.Next() {
 		model := Option{}
-		err = rows.Scan(&model.UserId, &model.Operations, &model.Fractions, &model.Negatives, &model.TargetDifficulty, &model.Pin)
+		err = rows.Scan(&model.UserId, &model.Operations, &model.Fractions, &model.Negatives, &model.TargetDifficulty)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -136,7 +134,7 @@ func (m *OptionManager) Update(model *Option) (int, string, error) {
 		return status, msg, err
 	}
 	// Update
-	_, err = m.DB.Exec(updateOptionSQL, model.Operations, model.Fractions, model.Negatives, model.TargetDifficulty, model.Pin, model.UserId)
+	_, err = m.DB.Exec(updateOptionSQL, model.Operations, model.Fractions, model.Negatives, model.TargetDifficulty, model.UserId)
 	if err != nil {
 		msg := "Couldn't update option in database"
 		return http.StatusInternalServerError, msg, err

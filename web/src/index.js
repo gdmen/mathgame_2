@@ -30,7 +30,8 @@ const MainView = ({ token, url, isLoading, isAuthenticated, user, options, postE
     )
   }
   // TODO: setup if: (pin not set OR no operations set OR no videos set)
-  else if (options != null && options.pin === "") {
+  else if (options != null && user.pin === "") {
+    console.log(user);
     return <SetupView token={token} url={url} user={user} options={options}/>
   }
   else {
@@ -133,19 +134,14 @@ const AppView = () => {
           return;
         }
         const settings = {
-            method: 'POST',
+            method: 'GET',
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + token,
             },
-            body: JSON.stringify({
-              auth0_id: user.sub,
-              email: user.email,
-              username: user.name,
-            })
         };
-        const req = await fetch(ApiUrl + "/users", settings);
+        const req = await fetch(ApiUrl + "/users/" + encodeURIComponent(user.sub), settings);
         const json = await req.json();
         setAppUser(json);
         genPostEventFcn("logged_in", "");

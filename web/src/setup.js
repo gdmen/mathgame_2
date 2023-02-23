@@ -5,7 +5,7 @@ import './setup.scss'
 
 // TODO: clean this file up when I come back to pull views out for the settings page
 
-const OperationsTabView = ({ token, url, user, options, postOptions, advanceSetup }) => {
+const OperationsTabView = ({ token, url, user, options, advanceSetup }) => {
   const allOperationsMap = new Map([
     ["Addition", "+"],
     ["Subtraction", "-"],
@@ -16,6 +16,25 @@ const OperationsTabView = ({ token, url, user, options, postOptions, advanceSetu
   ]);
   const [error, setError] = useState(false);
   const [operations, setOperations] = useState(options.operations.split(",").map(function(op, i) { return revAllOperationsMap.get(op); }));
+
+  const postOptions = async function(options) {
+      try {
+        const settings = {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + token,
+            },
+            body: JSON.stringify(options),
+        };
+        const req = await fetch(url + "/options/" + options.user_id, settings);
+        const json = await req.json();
+        return json;
+      } catch (e) {
+        console.log(e.message);
+      }
+  };
 
   const handleCheckboxChange = (e) => {
     let id = e.target.id;
@@ -191,9 +210,9 @@ const VideosTabView = ({ token, url, user, advanceSetup }) => {
   </>)
 }
 
-const PinTabView = ({ token, url, user, options, postOptions, advanceSetup }) => {
-  const [error, setError] = useState(options.pin.length < 4);
-  const [pin, setPin] = useState(options.pin);
+const PinTabView = ({ token, url, user, advanceSetup }) => {
+  const [error, setError] = useState(user.pin.length < 4);
+  const [pin, setPin] = useState(user.pin);
 
   const handlePinChange = (pin) => {
     setError(pin.length < 4);
@@ -202,10 +221,29 @@ const PinTabView = ({ token, url, user, options, postOptions, advanceSetup }) =>
     }
   };
 
+  const postUser = async function(user) {
+      try {
+        const settings = {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + token,
+            },
+            body: JSON.stringify(user),
+        };
+        const req = await fetch(url + "/users/" + encodeURIComponent(user.auth0_id), settings);
+        const json = await req.json();
+        return json;
+      } catch (e) {
+        console.log(e.message);
+      }
+  };
+
   const handleSubmitClick = (e) => {
     // post updated options
-    options.pin = pin;
-    postOptions(options);
+    user.pin = pin;
+    postUser(user);
     // redirect to next setup step
     advanceSetup();
   };
@@ -258,25 +296,6 @@ const SetupView = ({ token, url, user, options }) => {
     setActiveTab(allTabs[clickedId]);
   }
 
-  const postOptions = async function(options) {
-      try {
-        const settings = {
-            method: 'POST',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ' + token,
-            },
-            body: JSON.stringify(options),
-        };
-        const req = await fetch(url + "/options/" + options.user_id, settings);
-        const json = await req.json();
-        return json;
-      } catch (e) {
-        console.log(e.message);
-      }
-  };
-
   return (<div id="setup">
     <div id="setup-tabs">
       {allTabs.map(function(tab, i){
@@ -291,9 +310,9 @@ const SetupView = ({ token, url, user, options }) => {
         )
       })}
     </div>
-    { (activeTab === "Choose Operations") && <div className="tab-content"><OperationsTabView token={token} url={url} user={user} options={options} postOptions={postOptions} advanceSetup={advanceSetup}/></div> }
+    { (activeTab === "Choose Operations") && <div className="tab-content"><OperationsTabView token={token} url={url} user={user} options={options} advanceSetup={advanceSetup}/></div> }
     { (activeTab === "Add Videos") && <div className="tab-content"><VideosTabView token={token} url={url} user={user} advanceSetup={advanceSetup}/></div> }
-    { (activeTab === "Set Parent Pin") && <div className="tab-content"><PinTabView token={token} url={url} user={user} options={options} postOptions={postOptions} advanceSetup={advanceSetup}/></div> }
+    { (activeTab === "Set Parent Pin") && <div className="tab-content"><PinTabView token={token} url={url} user={user} advanceSetup={advanceSetup}/></div> }
     { (activeTab === "Start Playing!") && <div className="tab-content"><StartPlayingTabView /></div> }
   </div>)
 }
