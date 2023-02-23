@@ -50,7 +50,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `{"id":1,"title":"son of man","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","start":24,"end":116,"enabled":true}` {
+	if strings.TrimSpace(string(body)) != `{"id":1,"title":"son of man","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","start":24,"end":116,"enabled":true,"thumbnailurl":""}` {
 		t.Fatal("ERROR: " + string(body))
 	}
 
@@ -69,7 +69,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `[{"id":1,"title":"son of man","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","start":24,"end":116,"enabled":true}]` {
+	if strings.TrimSpace(string(body)) != `[{"id":1,"title":"son of man","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","start":24,"end":116,"enabled":true,"thumbnailurl":""}]` {
 		t.Fatal("ERROR: " + string(body))
 	}
 
@@ -91,7 +91,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `{"id":1,"title":"unda da sea","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","start":24,"end":116,"enabled":false}` {
+	if strings.TrimSpace(string(body)) != `{"id":1,"title":"unda da sea","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","start":24,"end":116,"enabled":false,"thumbnailurl":""}` {
 		t.Fatal("ERROR: " + string(body))
 	}
 
@@ -110,7 +110,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `{"id":1,"title":"unda da sea","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","start":24,"end":116,"enabled":false}` {
+	if strings.TrimSpace(string(body)) != `{"id":1,"title":"unda da sea","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","start":24,"end":116,"enabled":false,"thumbnailurl":""}` {
 		t.Fatal("ERROR: " + string(body))
 	}
 
