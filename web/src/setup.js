@@ -3,16 +3,7 @@ import PinInput from 'react-pin-input';
 
 import './setup.scss'
 
-/*
-
-1. Sign up with Auth0
-2. options.pin is "" by default
-3. set operations for your kid
-3. add at least 3 videos your kid will like - validate youtube videos / make sure they load and play
-4. set options.pin to chosen pin (repeat to confirm?)
-5. PIN IN MEMORY - if goto setup or parent page, keep pin. If goto any other page, purge pin
-6. START PLAYING NOW (goto play) vs CONFIGURE THIS FOR YOUR KID! (goto parent/options page)
-*/
+// TODO: clean this file up when I come back to pull views out for the settings page
 
 const OperationsTabView = ({ token, url, user, options, postOptions, advanceSetup }) => {
   const allOperationsMap = new Map([
@@ -108,7 +99,6 @@ const VideosTabView = ({ token, url, user, advanceSetup }) => {
   }, [token, url, user]);
 
   const handleSubmitClick = (e) => {
-    // TODO: post updated videos
     // redirect to next setup step
     advanceSetup();
   };
