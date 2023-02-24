@@ -23,16 +23,15 @@ const NotFound = () => (
   </div>
 )
 
-const MainView = ({ token, url, isLoading, isAuthenticated, user, options, postEvent }) => {
-  if (isLoading || (isAuthenticated && options == null)) {
+const MainView = ({ token, url, isLoading, isAuthenticated, user, settings, postEvent }) => {
+  if (isLoading || (isAuthenticated && settings == null)) {
     return (
       <div className="content-loading"></div>
     )
   }
   // TODO: setup if: (pin not set OR no operations set OR no videos set)
-  else if (options != null && user.pin === "") {
-    console.log(user);
-    return <SetupView token={token} url={url} user={user} options={options}/>
+  else if (settings != null && user.pin === "") {
+    return <SetupView token={token} url={url} user={user} settings={settings}/>
   }
   else {
     // TODO: in the following switch, if not auth'd, redirect to landing page
@@ -40,7 +39,7 @@ const MainView = ({ token, url, isLoading, isAuthenticated, user, options, postE
       <main>
         <Switch>
           <Route exact path="/">
-            <HomeView isLoading={isLoading} isAuthenticated={isAuthenticated} user={user} options={options}/>
+            <HomeView isLoading={isLoading} isAuthenticated={isAuthenticated} user={user} settings={settings}/>
           </Route>
           <Route path="/play">
             {!isLoading && isAuthenticated &&
@@ -63,7 +62,7 @@ const AppView = () => {
   const {user, isLoading, isAuthenticated, getAccessTokenSilently} = useAuth0();
   const [token, setToken] = useState(null);
   const [appUser, setAppUser] = useState(null);
-  const [options, setOptions] = useState(null);
+  const [settings, setSettings] = useState(null);
 
   const genPostEventFcn = useCallback(() => {
     return async function(event_type, value) {
@@ -103,7 +102,7 @@ const AppView = () => {
   }, [getAccessTokenSilently]);
 
   useEffect(() => {
-    const getOptions = async () => {
+    const getSettings = async () => {
       try {
         if (token == null || appUser == null) {
           return;
@@ -116,15 +115,15 @@ const AppView = () => {
                 'Authorization': 'Bearer ' + token,
             }
         };
-        const req = await fetch(ApiUrl + "/options/" + appUser.id, settings);
+        const req = await fetch(ApiUrl + "/settings/" + appUser.id, settings);
         const json = await req.json();
-        setOptions(json);
+        setSettings(json);
       } catch (e) {
         console.log(e.message);
       }
     };
 
-    getOptions();
+    getSettings();
   }, [token, appUser]);
 
   useEffect(() => {
@@ -167,7 +166,7 @@ const AppView = () => {
       </div>
 
       <div id="content">
-            <MainView token={token} url={ApiUrl} isLoading={isLoading} isAuthenticated={isAuthenticated} user={appUser} options={options} postEvent={genPostEventFcn()}/>
+            <MainView token={token} url={ApiUrl} isLoading={isLoading} isAuthenticated={isAuthenticated} user={appUser} settings={settings} postEvent={genPostEventFcn()}/>
       </div>
     </div>
   )

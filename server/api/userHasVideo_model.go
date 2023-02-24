@@ -10,23 +10,23 @@ import (
 
 const (
 	CreateUserhasvideoTableSQL = `
-    CREATE TABLE userHasVideos (
+    CREATE TABLE userHasVideo (
         id BIGINT UNSIGNED PRIMARY KEY UNIQUE,
 	user_id BIGINT UNSIGNED NOT NULL,
 	video_id BIGINT UNSIGNED NOT NULL
     ) DEFAULT CHARSET=utf8 ;`
 
-	createUserhasvideoSQL = `INSERT INTO userHasVideos (id, user_id, video_id) VALUES (?, ?, ?);`
+	createUserhasvideoSQL = `INSERT INTO userHasVideo (id, user_id, video_id) VALUES (?, ?, ?);`
 
-	getUserhasvideoSQL = `SELECT * FROM userHasVideos WHERE id=?;`
+	getUserhasvideoSQL = `SELECT * FROM userHasVideo WHERE id=?;`
 
 	getUserhasvideoKeySQL = `SELECT  FROM userHasVideos WHERE id=? AND user_id=? AND video_id=?;`
 
-	listUserhasvideoSQL = `SELECT * FROM userHasVideos;`
+	listUserhasvideoSQL = `SELECT * FROM userHasVideo;`
 
-	updateUserhasvideoSQL = `UPDATE userHasVideos SET user_id=?, video_id=? WHERE id=?;`
+	updateUserhasvideoSQL = `UPDATE userHasVideo SET user_id=?, video_id=? WHERE id=?;`
 
-	deleteUserhasvideoSQL = `DELETE FROM userHasVideos WHERE id=?;`
+	deleteUserhasvideoSQL = `DELETE FROM userHasVideo WHERE id=?;`
 )
 
 type Userhasvideo struct {
@@ -77,7 +77,7 @@ func (m *UserhasvideoManager) List() (*[]Userhasvideo, int, string, error) {
 
 	defer rows.Close()
 	if err != nil {
-		msg := "Couldn't get userHasVideos from database"
+		msg := "Couldn't get userHasVideo from database"
 		return nil, http.StatusInternalServerError, msg, err
 	}
 	for rows.Next() {
@@ -103,7 +103,7 @@ func (m *UserhasvideoManager) CustomList(sql string) (*[]Userhasvideo, int, stri
 
 	defer rows.Close()
 	if err != nil {
-		msg := "Couldn't get userHasVideos from database"
+		msg := "Couldn't get userHasVideo from database"
 		return nil, http.StatusInternalServerError, msg, err
 	}
 	for rows.Next() {

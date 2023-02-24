@@ -68,31 +68,31 @@ import (
     # create table SQL
     s += '''
     Create{0}TableSQL = `
-    CREATE TABLE {1}s (
+    CREATE TABLE {1} (
         {2}
     ) DEFAULT CHARSET=utf8 ;`
 '''.format(
         m["name"].capitalize(),
-        m["name"],
+        m["table"],
         ",\n\t".join(["%s %s" % (camel_to_snake(f["name"]), f["sql"]) for f in m["fields"]])
     )
 
     # create SQL
     s += '''
-    create{0}SQL = `INSERT INTO {1}s ({2}) VALUES ({3});`
+    create{0}SQL = `INSERT INTO {1} ({2}) VALUES ({3});`
 '''.format(
         m["name"].capitalize(),
-        m["name"],
+        m["table"],
         ", ".join(create_sql_fields),
         ", ".join(["?"]*len(create_sql_fields))
     )
 
     # get SQL
     s += '''
-    get{0}SQL = `SELECT * FROM {1}s WHERE {2}=?;`
+    get{0}SQL = `SELECT * FROM {1} WHERE {2}=?;`
 '''.format(
         m["name"].capitalize(),
-        m["name"],
+        m["table"],
         camel_to_snake(key_name)
     )
 
@@ -108,28 +108,28 @@ import (
 
     # list SQL
     s += '''
-    list{0}SQL = `SELECT * FROM {1}s;`
+    list{0}SQL = `SELECT * FROM {1};`
 '''.format(
         m["name"].capitalize(),
-        m["name"]
+        m["table"]
     )
 
     # update SQL
     s += '''
-    update{0}SQL = `UPDATE {1}s SET {2} WHERE {3}=?;`
+    update{0}SQL = `UPDATE {1} SET {2} WHERE {3}=?;`
 '''.format(
         m["name"].capitalize(),
-        m["name"],
+        m["table"],
         ", ".join([f+"=?" for f in non_key_sql_fields]),
         camel_to_snake(key_name)
     )
 
     # delete SQL
     s += '''
-    delete{0}SQL = `DELETE FROM {1}s WHERE {2}=?;`
+    delete{0}SQL = `DELETE FROM {1} WHERE {2}=?;`
 '''.format(
         m["name"].capitalize(),
-        m["name"],
+        m["table"],
         camel_to_snake(key_name)
     )
 
@@ -248,7 +248,7 @@ import (
     list_code = '''
         defer rows.Close()
         if err != nil {{
-            msg := "Couldn't get {1}s from database"
+            msg := "Couldn't get {1} from database"
             return nil, http.StatusInternalServerError, msg, err
         }}
         for rows.Next() {{
@@ -269,7 +269,7 @@ import (
     }}
 '''.format(
         m["name"].capitalize(),
-        m["name"],
+        m["table"],
         ", ".join(["&model." + n for n in struct_fields])
     )
 

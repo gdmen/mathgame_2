@@ -2,6 +2,7 @@
   "models": [
     {
       "name": "user",
+      "table": "users",
       "fields": [
         {
           "name": "Auth0Id", "type": "string",
@@ -27,6 +28,7 @@
     },
     {
       "name": "problem",
+      "table": "problems",
       "fields": [
         {
           "name": "Id", "type": "uint32",
@@ -48,6 +50,7 @@
     },
     {
       "name": "video",
+      "table": "videos",
       "fields": [
         {
           "name": "Id", "type": "uint32",
@@ -80,7 +83,8 @@
       ]
     },
     {
-      "name": "option",
+      "name": "settings",
+      "table": "settings",
       "fields": [
         {
           "name": "UserId", "type": "uint32",
@@ -106,6 +110,7 @@
     },
     {
       "name": "gamestate",
+      "table": "gamestates",
       "fields": [
         {
           "name": "UserId", "type": "uint32",
@@ -131,6 +136,7 @@
     },
     {
       "name": "event",
+      "table": "events",
       "fields": [
         {
           "name": "Id", "type": "uint32",
@@ -156,6 +162,7 @@
     },
     {
       "name": "userHasVideo",
+      "table": "userHasVideo",
       "fields": [
         {
           "name": "Id", "type": "uint32",
