@@ -4,8 +4,8 @@ import heroImage from './img/hero.png';
 
 import "./home.scss";
 
-const HomeView = ({ isLoading, isAuthenticated, user, options }) => {
-  if (isAuthenticated && user && options) {
+const HomeView = ({ isLoading, isAuthenticated, user, settings }) => {
+  if (isAuthenticated && user && settings) {
     // User is logged in; redirect to /play
     window.location.href="play";
   }

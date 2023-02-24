@@ -18,7 +18,7 @@ var CREATE_TABLES_SQL = []string{
 	CreateUserTableSQL,
 	CreateVideoTableSQL,
 	CreateProblemTableSQL,
-	CreateOptionTableSQL,
+	CreateSettingsTableSQL,
 	CreateGamestateTableSQL,
 	CreateEventTableSQL,
 	CreateUserhasvideoTableSQL,
@@ -38,7 +38,7 @@ type Api struct {
 	userManager         *UserManager
 	videoManager        *VideoManager
 	problemManager      *ProblemManager
-	optionManager       *OptionManager
+	settingsManager     *SettingsManager
 	gamestateManager    *GamestateManager
 	eventManager        *EventManager
 	userHasVideoManager *UserhasvideoManager
@@ -60,7 +60,7 @@ func NewApi(db *sql.DB) (*Api, error) {
 	a.userManager = &UserManager{DB: db}
 	a.videoManager = &VideoManager{DB: db}
 	a.problemManager = &ProblemManager{DB: db}
-	a.optionManager = &OptionManager{DB: db}
+	a.settingsManager = &SettingsManager{DB: db}
 	a.gamestateManager = &GamestateManager{DB: db}
 	a.eventManager = &EventManager{DB: db}
 	a.userHasVideoManager = &UserhasvideoManager{DB: db}
@@ -99,10 +99,10 @@ func (a *Api) GetRouter() *gin.Engine {
 			user.POST("/:auth0_id", a.updateUser)
 			user.GET("/:auth0_id", a.getUser)
 		}
-		option := v1.Group("/options")
+		settings := v1.Group("/settings")
 		{
-			option.POST("/:user_id", a.updateOption)
-			option.GET("/:user_id", a.getOption)
+			settings.POST("/:user_id", a.updateSettings)
+			settings.GET("/:user_id", a.getSettings)
 		}
 		gamestate := v1.Group("/gamestates")
 		{

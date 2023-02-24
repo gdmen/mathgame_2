@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	CreateOptionTableSQL = `
-    CREATE TABLE options (
+	CreateSettingsTableSQL = `
+    CREATE TABLE settings (
         user_id BIGINT UNSIGNED PRIMARY KEY,
 	operations VARCHAR(256) NOT NULL DEFAULT '+',
 	fractions TINYINT NOT NULL DEFAULT 0,
@@ -18,20 +18,20 @@ const (
 	target_difficulty DOUBLE NOT NULL DEFAULT 3
     ) DEFAULT CHARSET=utf8 ;`
 
-	createOptionSQL = `INSERT INTO options (user_id) VALUES (?);`
+	createSettingsSQL = `INSERT INTO settings (user_id) VALUES (?);`
 
-	getOptionSQL = `SELECT * FROM options WHERE user_id=?;`
+	getSettingsSQL = `SELECT * FROM settings WHERE user_id=?;`
 
-	getOptionKeySQL = `SELECT  FROM options WHERE user_id=?;`
+	getSettingsKeySQL = `SELECT  FROM settingss WHERE user_id=?;`
 
-	listOptionSQL = `SELECT * FROM options;`
+	listSettingsSQL = `SELECT * FROM settings;`
 
-	updateOptionSQL = `UPDATE options SET operations=?, fractions=?, negatives=?, target_difficulty=? WHERE user_id=?;`
+	updateSettingsSQL = `UPDATE settings SET operations=?, fractions=?, negatives=?, target_difficulty=? WHERE user_id=?;`
 
-	deleteOptionSQL = `DELETE FROM options WHERE user_id=?;`
+	deleteSettingsSQL = `DELETE FROM settings WHERE user_id=?;`
 )
 
-type Option struct {
+type Settings struct {
 	UserId           uint32  `json:"user_id" uri:"user_id"`
 	Operations       string  `json:"operations" uri:"operations" form:"operations"`
 	Fractions        bool    `json:"fractions" uri:"fractions" form:"fractions"`
@@ -39,20 +39,20 @@ type Option struct {
 	TargetDifficulty float64 `json:"target_difficulty" uri:"target_difficulty" form:"target_difficulty"`
 }
 
-func (model Option) String() string {
+func (model Settings) String() string {
 	return fmt.Sprintf("UserId: %v, Operations: %v, Fractions: %v, Negatives: %v, TargetDifficulty: %v", model.UserId, model.Operations, model.Fractions, model.Negatives, model.TargetDifficulty)
 }
 
-type OptionManager struct {
+type SettingsManager struct {
 	DB *sql.DB
 }
 
-func (m *OptionManager) Create(model *Option) (int, string, error) {
+func (m *SettingsManager) Create(model *Settings) (int, string, error) {
 	status := http.StatusCreated
-	_, err := m.DB.Exec(createOptionSQL, model.UserId)
+	_, err := m.DB.Exec(createSettingsSQL, model.UserId)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Duplicate entry") {
-			msg := "Couldn't add option to database"
+			msg := "Couldn't add settings to database"
 			return http.StatusInternalServerError, msg, err
 		}
 
@@ -62,30 +62,30 @@ func (m *OptionManager) Create(model *Option) (int, string, error) {
 	return status, "", nil
 }
 
-func (m *OptionManager) Get(user_id uint32) (*Option, int, string, error) {
-	model := &Option{}
-	err := m.DB.QueryRow(getOptionSQL, user_id).Scan(&model.UserId, &model.Operations, &model.Fractions, &model.Negatives, &model.TargetDifficulty)
+func (m *SettingsManager) Get(user_id uint32) (*Settings, int, string, error) {
+	model := &Settings{}
+	err := m.DB.QueryRow(getSettingsSQL, user_id).Scan(&model.UserId, &model.Operations, &model.Fractions, &model.Negatives, &model.TargetDifficulty)
 	if err == sql.ErrNoRows {
-		msg := "Couldn't find a option with that user_id"
+		msg := "Couldn't find a settings with that user_id"
 		return nil, http.StatusNotFound, msg, err
 	} else if err != nil {
-		msg := "Couldn't get option from database"
+		msg := "Couldn't get settings from database"
 		return nil, http.StatusInternalServerError, msg, err
 	}
 	return model, http.StatusOK, "", nil
 }
 
-func (m *OptionManager) List() (*[]Option, int, string, error) {
-	models := []Option{}
-	rows, err := m.DB.Query(listOptionSQL)
+func (m *SettingsManager) List() (*[]Settings, int, string, error) {
+	models := []Settings{}
+	rows, err := m.DB.Query(listSettingsSQL)
 
 	defer rows.Close()
 	if err != nil {
-		msg := "Couldn't get options from database"
+		msg := "Couldn't get settings from database"
 		return nil, http.StatusInternalServerError, msg, err
 	}
 	for rows.Next() {
-		model := Option{}
+		model := Settings{}
 		err = rows.Scan(&model.UserId, &model.Operations, &model.Fractions, &model.Negatives, &model.TargetDifficulty)
 		if err != nil {
 			msg := "Couldn't scan row from database"
@@ -101,17 +101,17 @@ func (m *OptionManager) List() (*[]Option, int, string, error) {
 	return &models, http.StatusOK, "", nil
 }
 
-func (m *OptionManager) CustomList(sql string) (*[]Option, int, string, error) {
-	models := []Option{}
+func (m *SettingsManager) CustomList(sql string) (*[]Settings, int, string, error) {
+	models := []Settings{}
 	rows, err := m.DB.Query(sql)
 
 	defer rows.Close()
 	if err != nil {
-		msg := "Couldn't get options from database"
+		msg := "Couldn't get settings from database"
 		return nil, http.StatusInternalServerError, msg, err
 	}
 	for rows.Next() {
-		model := Option{}
+		model := Settings{}
 		err = rows.Scan(&model.UserId, &model.Operations, &model.Fractions, &model.Negatives, &model.TargetDifficulty)
 		if err != nil {
 			msg := "Couldn't scan row from database"
@@ -127,25 +127,25 @@ func (m *OptionManager) CustomList(sql string) (*[]Option, int, string, error) {
 	return &models, http.StatusOK, "", nil
 }
 
-func (m *OptionManager) Update(model *Option) (int, string, error) {
+func (m *SettingsManager) Update(model *Settings) (int, string, error) {
 	// Check for 404s
 	_, status, msg, err := m.Get(model.UserId)
 	if err != nil {
 		return status, msg, err
 	}
 	// Update
-	_, err = m.DB.Exec(updateOptionSQL, model.Operations, model.Fractions, model.Negatives, model.TargetDifficulty, model.UserId)
+	_, err = m.DB.Exec(updateSettingsSQL, model.Operations, model.Fractions, model.Negatives, model.TargetDifficulty, model.UserId)
 	if err != nil {
-		msg := "Couldn't update option in database"
+		msg := "Couldn't update settings in database"
 		return http.StatusInternalServerError, msg, err
 	}
 	return http.StatusOK, "", nil
 }
 
-func (m *OptionManager) Delete(user_id uint32) (int, string, error) {
-	result, err := m.DB.Exec(deleteOptionSQL, user_id)
+func (m *SettingsManager) Delete(user_id uint32) (int, string, error) {
+	result, err := m.DB.Exec(deleteSettingsSQL, user_id)
 	if err != nil {
-		msg := "Couldn't delete option in database"
+		msg := "Couldn't delete settings in database"
 		return http.StatusInternalServerError, msg, err
 	}
 	// Check for 404s

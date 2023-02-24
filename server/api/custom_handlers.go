@@ -49,14 +49,13 @@ func (a *Api) CustomValueQuery(sql string) (string, int, string, error) {
 	return value, http.StatusOK, "", nil
 }
 
-func (a *Api) generateProblem(logPrefix string, c *gin.Context, opts *Option) (*Problem, error) {
+func (a *Api) generateProblem(logPrefix string, c *gin.Context, settings *Settings) (*Problem, error) {
 	model := &Problem{}
-	// TODO: should this just be the API model, and we don't even need a generator model?
 	generator_opts := &generator.Options{
-		Operations:       strings.Split(opts.Operations, ","),
-		Fractions:        opts.Fractions,
-		Negatives:        opts.Negatives,
-		TargetDifficulty: opts.TargetDifficulty,
+		Operations:       strings.Split(settings.Operations, ","),
+		Fractions:        settings.Fractions,
+		Negatives:        settings.Negatives,
+		TargetDifficulty: settings.TargetDifficulty,
 	}
 
 	var err error
@@ -155,12 +154,12 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	}
 	glog.Infof("%s Gamestate: %v", logPrefix, gamestate)
 
-	// Get Option
-	option, status, msg, err := a.optionManager.Get(user.Id)
-	if HandleMngrResp(logPrefix, c, status, msg, err, option) != nil {
+	// Get Settings
+	settings, status, msg, err := a.settingsManager.Get(user.Id)
+	if HandleMngrResp(logPrefix, c, status, msg, err, settings) != nil {
 		return err
 	}
-	glog.Infof("%s Option: %v", logPrefix, option)
+	glog.Infof("%s Settings: %v", logPrefix, settings)
 
 	if event.EventType == LOGGED_IN {
 		// no-op
@@ -181,7 +180,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			// Update counts
 			gamestate.Solved += 1
 			// Generate a new problem
-			problem, err := a.generateProblem(logPrefix, c, option)
+			problem, err := a.generateProblem(logPrefix, c, settings)
 			if err != nil {
 				return err
 			}
@@ -225,7 +224,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			// Adjust work load. Levers are difficulty and target number of problems.
 			glog.Infof("%s workTarget: %v", logPrefix, workTarget)
 
-			glog.Infof("%s starting difficulty & num problems: %v, %v", logPrefix, option.TargetDifficulty, gamestate.Target)
+			glog.Infof("%s starting difficulty & num problems: %v, %v", logPrefix, settings.TargetDifficulty, gamestate.Target)
 			// Only do something if we are not already on target
 			if math.Abs(workTarget-workPercentage) < epsilon {
 				glog.Infof("%s difficulty is on target", logPrefix)
@@ -235,7 +234,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 					gamestate.Target += 1
 				} else {
 					gamestate.Target -= 1
-					option.TargetDifficulty += math.Max(0.1*option.TargetDifficulty, 1)
+					settings.TargetDifficulty += math.Max(0.1*settings.TargetDifficulty, 1)
 				}
 			} else if workTarget < workPercentage {
 				// Make it easier
@@ -243,15 +242,15 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 					gamestate.Target -= 1
 				} else {
 					gamestate.Target += 1
-					if option.TargetDifficulty <= minDiff {
-						glog.Infof("%s difficulty of %v should not be below %v and we're already at minProbs. Will not make this easier.", logPrefix, option.TargetDifficulty, minDiff)
-						option.TargetDifficulty = minDiff
+					if settings.TargetDifficulty <= minDiff {
+						glog.Infof("%s difficulty of %v should not be below %v and we're already at minProbs. Will not make this easier.", logPrefix, settings.TargetDifficulty, minDiff)
+						settings.TargetDifficulty = minDiff
 					} else {
-						option.TargetDifficulty = math.Max(minDiff, option.TargetDifficulty-math.Max(0.1*option.TargetDifficulty, 1))
+						settings.TargetDifficulty = math.Max(minDiff, settings.TargetDifficulty-math.Max(0.1*settings.TargetDifficulty, 1))
 					}
 				}
 			}
-			glog.Infof("%s modified difficulty & num problems: %v, %v", logPrefix, option.TargetDifficulty, gamestate.Target)
+			glog.Infof("%s modified difficulty & num problems: %v, %v", logPrefix, settings.TargetDifficulty, gamestate.Target)
 
 			// Reset solved progress
 			gamestate.Solved = 0
@@ -278,10 +277,10 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		return err
 	}
 
-	// Write the updated Option
-	glog.Infof("%s Option: %v", logPrefix, option)
-	status, msg, err = a.optionManager.Update(option)
-	if HandleMngrResp(logPrefix, c, status, msg, err, option) != nil {
+	// Write the updated settings
+	glog.Infof("%s Option: %v", logPrefix, settings)
+	status, msg, err = a.settingsManager.Update(settings)
+	if HandleMngrResp(logPrefix, c, status, msg, err, settings) != nil {
 		return err
 	}
 
@@ -356,20 +355,20 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 		if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, user) != nil {
 			return
 		}
-		// Write default new option to database
-		default_option := &Option{UserId: user.Id}
-		status, msg, err := a.optionManager.Create(default_option)
-		if HandleMngrResp(logPrefix, c, status, msg, err, default_option) != nil {
+		// Write default new settings to database
+		default_settings := &Settings{UserId: user.Id}
+		status, msg, err := a.settingsManager.Create(default_settings)
+		if HandleMngrResp(logPrefix, c, status, msg, err, default_settings) != nil {
 			return
 		}
-		// Get Option
-		option, status, msg, err := a.optionManager.Get(user.Id)
-		if HandleMngrResp(logPrefix, c, status, msg, err, option) != nil {
+		// Get settings
+		settings, status, msg, err := a.settingsManager.Get(user.Id)
+		if HandleMngrResp(logPrefix, c, status, msg, err, settings) != nil {
 			return
 		}
-		glog.Infof("%s Option: %v", logPrefix, option)
+		glog.Infof("%s Option: %v", logPrefix, settings)
 		// Generate a new problem
-		problem, err := a.generateProblem(logPrefix, c, option)
+		problem, err := a.generateProblem(logPrefix, c, settings)
 		if err != nil {
 			return
 		}

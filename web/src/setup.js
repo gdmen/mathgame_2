@@ -5,7 +5,7 @@ import './setup.scss'
 
 // TODO: clean this file up when I come back to pull views out for the settings page
 
-const OperationsTabView = ({ token, url, user, options, advanceSetup }) => {
+const OperationsTabView = ({ token, url, user, settings, advanceSetup }) => {
   const allOperationsMap = new Map([
     ["Addition", "+"],
     ["Subtraction", "-"],
@@ -15,9 +15,9 @@ const OperationsTabView = ({ token, url, user, options, advanceSetup }) => {
     ["-", "Subtraction"],
   ]);
   const [error, setError] = useState(false);
-  const [operations, setOperations] = useState(options.operations.split(",").map(function(op, i) { return revAllOperationsMap.get(op); }));
+  const [operations, setOperations] = useState(settings.operations.split(",").map(function(op, i) { return revAllOperationsMap.get(op); }));
 
-  const postOptions = async function(options) {
+  const postSettings = async function(model) {
       try {
         const settings = {
             method: 'POST',
@@ -26,9 +26,9 @@ const OperationsTabView = ({ token, url, user, options, advanceSetup }) => {
               'Content-Type': 'application/json',
               'Authorization': 'Bearer ' + token,
             },
-            body: JSON.stringify(options),
+            body: JSON.stringify(model),
         };
-        const req = await fetch(url + "/options/" + options.user_id, settings);
+        const req = await fetch(url + "/settings/" + model.user_id, settings);
         const json = await req.json();
         return json;
       } catch (e) {
@@ -38,20 +38,20 @@ const OperationsTabView = ({ token, url, user, options, advanceSetup }) => {
 
   const handleCheckboxChange = (e) => {
     let id = e.target.id;
-    let newOptions = [...operations, id];
+    let newSettings = [...operations, id];
     if (operations.includes(id)) {
-      newOptions = operations.filter(x => x !== id);
+      newSettings = operations.filter(x => x !== id);
     }
-    setOperations(newOptions);
-    setError(newOptions.length < 1);
+    setOperations(newSettings);
+    setError(newSettings.length < 1);
   };
 
   const handleSubmitClick = (e) => {
-    // post updated options
-    options.operations = operations.map(function(op, i) {
+    // post updated settings
+    settings.operations = operations.map(function(op, i) {
       return allOperationsMap.get(op);
     }).join(",");
-    postOptions(options);
+    postSettings(settings);
     // redirect to next setup step
     advanceSetup();
   };
@@ -241,7 +241,7 @@ const PinTabView = ({ token, url, user, advanceSetup }) => {
   };
 
   const handleSubmitClick = (e) => {
-    // post updated options
+    // post updated settings
     user.pin = pin;
     postUser(user);
     // redirect to next setup step
@@ -275,7 +275,7 @@ const StartPlayingTabView = () => {
   </>)
 }
 
-const SetupView = ({ token, url, user, options }) => {
+const SetupView = ({ token, url, user, settings }) => {
   const [activeTab, setActiveTab] = useState(null);
 
   const allTabs = ["Choose Operations", "Add Videos", "Set Parent Pin", "Start Playing!"];
@@ -310,7 +310,7 @@ const SetupView = ({ token, url, user, options }) => {
         )
       })}
     </div>
-    { (activeTab === "Choose Operations") && <div className="tab-content"><OperationsTabView token={token} url={url} user={user} options={options} advanceSetup={advanceSetup}/></div> }
+    { (activeTab === "Choose Operations") && <div className="tab-content"><OperationsTabView token={token} url={url} user={user} settings={settings} advanceSetup={advanceSetup}/></div> }
     { (activeTab === "Add Videos") && <div className="tab-content"><VideosTabView token={token} url={url} user={user} advanceSetup={advanceSetup}/></div> }
     { (activeTab === "Set Parent Pin") && <div className="tab-content"><PinTabView token={token} url={url} user={user} advanceSetup={advanceSetup}/></div> }
     { (activeTab === "Start Playing!") && <div className="tab-content"><StartPlayingTabView /></div> }

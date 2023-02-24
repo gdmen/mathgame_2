@@ -254,57 +254,57 @@ func (a *Api) deleteVideo(c *gin.Context) {
 	}
 }
 
-func (a *Api) createOption(c *gin.Context) {
+func (a *Api) createSettings(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Parse input
-	model := &Option{}
+	model := &Settings{}
 	if BindModelFromForm(logPrefix, c, model) != nil {
 		return
 	}
 
 	// Write to database
-	status, msg, err := a.optionManager.Create(model)
+	status, msg, err := a.settingsManager.Create(model)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
 }
 
-func (a *Api) getOption(c *gin.Context) {
+func (a *Api) getSettings(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Parse input
-	model := &Option{}
+	model := &Settings{}
 	if BindModelFromURI(logPrefix, c, model) != nil {
 		return
 	}
 
 	// Read from database
-	model, status, msg, err := a.optionManager.Get(model.UserId)
+	model, status, msg, err := a.settingsManager.Get(model.UserId)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
 }
 
-func (a *Api) listOption(c *gin.Context) {
+func (a *Api) listSettings(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Read from database
-	models, status, msg, err := a.optionManager.List()
+	models, status, msg, err := a.settingsManager.List()
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {
 		return
 	}
 }
 
-func (a *Api) updateOption(c *gin.Context) {
+func (a *Api) updateSettings(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Parse input
-	model := &Option{}
+	model := &Settings{}
 	if BindModelFromForm(logPrefix, c, model) != nil {
 		return
 	}
@@ -313,24 +313,24 @@ func (a *Api) updateOption(c *gin.Context) {
 	}
 
 	// Write to database
-	status, msg, err := a.optionManager.Update(model)
+	status, msg, err := a.settingsManager.Update(model)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
 }
 
-func (a *Api) deleteOption(c *gin.Context) {
+func (a *Api) deleteSettings(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Parse input
-	model := &Option{}
+	model := &Settings{}
 	if BindModelFromURI(logPrefix, c, model) != nil {
 		return
 	}
 
 	// Write to database
-	status, msg, err := a.optionManager.Delete(model.UserId)
+	status, msg, err := a.settingsManager.Delete(model.UserId)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {
 		return
 	}
