@@ -18,6 +18,9 @@ const VideoView = ({ video, postEvent, interval }) => {
 
   const play = () => {
     setPlaying(true);
+    /* Uncomment to test faster */
+    //postEvent("done_watching_video", video.id);
+    //window.location.href="play";
   };
 
   return (
