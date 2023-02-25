@@ -1,21 +1,14 @@
 import React, { useEffect, useState } from "react";
 import PinInput from 'react-pin-input';
 
+import { ProblemTypes } from './enums.js'
 import './setup.scss'
 
 // TODO: clean this file up when I come back to pull views out for the settings page
 
-const OperationsTabView = ({ token, url, user, settings, advanceSetup }) => {
-  const allOperationsMap = new Map([
-    ["Addition", "+"],
-    ["Subtraction", "-"],
-  ]);
-  const revAllOperationsMap = new Map([
-    ["+", "Addition"],
-    ["-", "Subtraction"],
-  ]);
+const ProblemTypesTabView = ({ token, url, user, settings, advanceSetup }) => {
   const [error, setError] = useState(false);
-  const [operations, setOperations] = useState(settings.operations.split(",").map(function(op, i) { return revAllOperationsMap.get(op); }));
+  const [problemTypeBitmap, setProblemTypeBitmap] = useState(settings.problem_type_bitmap);
 
   const postSettings = async function(model) {
       try {
@@ -37,20 +30,14 @@ const OperationsTabView = ({ token, url, user, settings, advanceSetup }) => {
   };
 
   const handleCheckboxChange = (e) => {
-    let id = e.target.id;
-    let newSettings = [...operations, id];
-    if (operations.includes(id)) {
-      newSettings = operations.filter(x => x !== id);
-    }
-    setOperations(newSettings);
-    setError(newSettings.length < 1);
+    let newBitmap = problemTypeBitmap + ((2 * e.target.checked -1) * ProblemTypes[e.target.id]);
+    setProblemTypeBitmap(newBitmap);
+    setError(newBitmap < 1);
   };
 
   const handleSubmitClick = (e) => {
     // post updated settings
-    settings.operations = operations.map(function(op, i) {
-      return allOperationsMap.get(op);
-    }).join(",");
+    settings.problem_type_bitmap = problemTypeBitmap;
     postSettings(settings);
     // redirect to next setup step
     advanceSetup();
@@ -60,14 +47,13 @@ const OperationsTabView = ({ token, url, user, settings, advanceSetup }) => {
     <h2>Hi there! Let's do a little setup for your kid!</h2>
     <div className="setup-form">
       <h4>Which types of problems should we show? <span className={error ? "error" : ""}>Select one or more.</span></h4>
-      <ul id="operation-buttons">
-        {[...allOperationsMap.keys()].map(function(op, i) {
-            var id = op;
-            return (<li key={id}>
-              <input type="checkbox" id={id} onChange={handleCheckboxChange} checked={"checked" ? operations.includes(id) : ""}/>
-              <label htmlFor={id}>
-                <div className="operation-button">
-                  <span>{op}</span>
+      <ul id="problem-type-buttons">
+        {Object.keys(ProblemTypes).map(function(problemType, i) {
+            return (<li key={problemType}>
+              <input type="checkbox" id={problemType} onChange={handleCheckboxChange} checked={"checked" ? ((ProblemTypes[problemType] & problemTypeBitmap) > 0) : ""}/>
+              <label htmlFor={problemType}>
+                <div className="problem-type-button">
+                  <span>{problemType}</span>
                 </div>
               </label>
             </li>)
@@ -278,10 +264,10 @@ const StartPlayingTabView = () => {
 const SetupView = ({ token, url, user, settings }) => {
   const [activeTab, setActiveTab] = useState(null);
 
-  const allTabs = ["Choose Operations", "Add Videos", "Set Parent Pin", "Start Playing!"];
+  const allTabs = ["Choose Problems", "Add Videos", "Set Parent Pin", "Start Playing!"];
 
   if (activeTab == null) {
-    setActiveTab("Choose Operations");
+    setActiveTab("Choose Problems");
   }
 
   const advanceSetup = function() {
@@ -310,7 +296,7 @@ const SetupView = ({ token, url, user, settings }) => {
         )
       })}
     </div>
-    { (activeTab === "Choose Operations") && <div className="tab-content"><OperationsTabView token={token} url={url} user={user} settings={settings} advanceSetup={advanceSetup}/></div> }
+    { (activeTab === "Choose Problems") && <div className="tab-content"><ProblemTypesTabView token={token} url={url} user={user} settings={settings} advanceSetup={advanceSetup}/></div> }
     { (activeTab === "Add Videos") && <div className="tab-content"><VideosTabView token={token} url={url} user={user} advanceSetup={advanceSetup}/></div> }
     { (activeTab === "Set Parent Pin") && <div className="tab-content"><PinTabView token={token} url={url} user={user} advanceSetup={advanceSetup}/></div> }
     { (activeTab === "Start Playing!") && <div className="tab-content"><StartPlayingTabView /></div> }

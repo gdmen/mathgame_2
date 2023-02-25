@@ -58,7 +58,7 @@
           color: $color-error;
         }
       }
-      ul#operation-buttons {
+      ul#problem-type-buttons {
         display: flex;
         justify-content: flex-start;
         list-style-type: none;
@@ -67,21 +67,18 @@
           margin-right: 1em;
           input[type="checkbox"] {
             display: none;
-            &:checked + label .operation-button {
-              transform: scale(1.1);
+            &:checked + label .problem-type-button {
               background-color: $color-two;
-              z-index: -1;
             }
           }
           label {
             cursor: pointer;
-            .operation-button {
+            .problem-type-button {
               border: 1px solid gray;
               border-radius: 0.25em;
               display: flex;
               justify-content: center;
               padding: 0.5em 0.75em;
-              transition-duration: 0.2s;
             }
           }
         }

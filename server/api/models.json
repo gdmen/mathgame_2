@@ -91,16 +91,8 @@
           "sql": "BIGINT UNSIGNED PRIMARY KEY"
         },
         {
-          "name": "Operations", "type": "string",
-          "sql": "VARCHAR(256) NOT NULL DEFAULT '+'"
-        },
-        {
-          "name": "Fractions", "type": "bool",
-          "sql": "TINYINT NOT NULL DEFAULT 0"
-        },
-        {
-          "name": "Negatives", "type": "bool",
-          "sql": "TINYINT NOT NULL DEFAULT 0"
+          "name": "ProblemTypeBitmap", "type": "uint64",
+          "sql": "BIGINT UNSIGNED NOT NULL DEFAULT 0"
         },
         {
           "name": "TargetDifficulty", "type": "float64",

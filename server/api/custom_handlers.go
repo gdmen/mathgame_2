@@ -19,26 +19,6 @@ import (
 	"garydmenezes.com/mathgame/server/generator"
 )
 
-const (
-	// EventTypes
-	LOGGED_IN           = "logged_in"           // no value
-	DISPLAYED_PROBLEM   = "displayed_problem"   // int ProblemID
-	WORKING_ON_PROBLEM  = "working_on_problem"  // int Duration in seconds
-	ANSWERED_PROBLEM    = "answered_problem"    // string Answer
-	WATCHING_VIDEO      = "watching_video"      // int Duration in seconds
-	DONE_WATCHING_VIDEO = "done_watching_video" // int VideoID
-	// -end- EventTypes
-)
-
-var EventTypes = [...]string{
-	LOGGED_IN,
-	DISPLAYED_PROBLEM,
-	WORKING_ON_PROBLEM,
-	ANSWERED_PROBLEM,
-	WATCHING_VIDEO,
-	DONE_WATCHING_VIDEO,
-}
-
 func (a *Api) CustomValueQuery(sql string) (string, int, string, error) {
 	var value string
 	err := a.DB.QueryRow(sql).Scan(&value)
@@ -51,10 +31,20 @@ func (a *Api) CustomValueQuery(sql string) (string, int, string, error) {
 
 func (a *Api) generateProblem(logPrefix string, c *gin.Context, settings *Settings) (*Problem, error) {
 	model := &Problem{}
+	// TODO: this is temporary logic to make the generator compatible with the new ProblemTypeBitmap
+	fractions := (FRACTIONS & settings.ProblemTypeBitmap) > 0
+	negatives := (NEGATIVES & settings.ProblemTypeBitmap) > 0
+	operations := []string{}
+	if (ADDITION & settings.ProblemTypeBitmap) > 0 {
+		operations = append(operations, "+")
+	}
+	if (SUBTRACTION & settings.ProblemTypeBitmap) > 0 {
+		operations = append(operations, "-")
+	}
 	generator_opts := &generator.Options{
-		Operations:       strings.Split(settings.Operations, ","),
-		Fractions:        settings.Fractions,
-		Negatives:        settings.Negatives,
+		Operations:       operations,
+		Fractions:        fractions,
+		Negatives:        negatives,
 		TargetDifficulty: settings.TargetDifficulty,
 	}
 
@@ -278,7 +268,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	}
 
 	// Write the updated settings
-	glog.Infof("%s Option: %v", logPrefix, settings)
+	glog.Infof("%s Settings: %v", logPrefix, settings)
 	status, msg, err = a.settingsManager.Update(settings)
 	if HandleMngrResp(logPrefix, c, status, msg, err, settings) != nil {
 		return err
@@ -366,7 +356,7 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 		if HandleMngrResp(logPrefix, c, status, msg, err, settings) != nil {
 			return
 		}
-		glog.Infof("%s Option: %v", logPrefix, settings)
+		glog.Infof("%s Settings: %v", logPrefix, settings)
 		// Generate a new problem
 		problem, err := a.generateProblem(logPrefix, c, settings)
 		if err != nil {
