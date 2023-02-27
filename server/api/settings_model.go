@@ -13,7 +13,8 @@ const (
     CREATE TABLE settings (
         user_id BIGINT UNSIGNED PRIMARY KEY,
 	problem_type_bitmap BIGINT UNSIGNED NOT NULL DEFAULT 0,
-	target_difficulty DOUBLE NOT NULL DEFAULT 3
+	target_difficulty DOUBLE NOT NULL DEFAULT 3,
+	target_work_percentage DOUBLE NOT NULL DEFAULT 0.70
     ) DEFAULT CHARSET=utf8 ;`
 
 	createSettingsSQL = `INSERT INTO settings (user_id) VALUES (?);`
@@ -24,19 +25,20 @@ const (
 
 	listSettingsSQL = `SELECT * FROM settings;`
 
-	updateSettingsSQL = `UPDATE settings SET problem_type_bitmap=?, target_difficulty=? WHERE user_id=?;`
+	updateSettingsSQL = `UPDATE settings SET problem_type_bitmap=?, target_difficulty=?, target_work_percentage=? WHERE user_id=?;`
 
 	deleteSettingsSQL = `DELETE FROM settings WHERE user_id=?;`
 )
 
 type Settings struct {
-	UserId            uint32  `json:"user_id" uri:"user_id"`
-	ProblemTypeBitmap uint64  `json:"problem_type_bitmap" uri:"problem_type_bitmap" form:"problem_type_bitmap"`
-	TargetDifficulty  float64 `json:"target_difficulty" uri:"target_difficulty" form:"target_difficulty"`
+	UserId               uint32  `json:"user_id" uri:"user_id"`
+	ProblemTypeBitmap    uint64  `json:"problem_type_bitmap" uri:"problem_type_bitmap" form:"problem_type_bitmap"`
+	TargetDifficulty     float64 `json:"target_difficulty" uri:"target_difficulty" form:"target_difficulty"`
+	TargetWorkPercentage float64 `json:"target_work_percentage" uri:"target_work_percentage" form:"target_work_percentage"`
 }
 
 func (model Settings) String() string {
-	return fmt.Sprintf("UserId: %v, ProblemTypeBitmap: %v, TargetDifficulty: %v", model.UserId, model.ProblemTypeBitmap, model.TargetDifficulty)
+	return fmt.Sprintf("UserId: %v, ProblemTypeBitmap: %v, TargetDifficulty: %v, TargetWorkPercentage: %v", model.UserId, model.ProblemTypeBitmap, model.TargetDifficulty, model.TargetWorkPercentage)
 }
 
 type SettingsManager struct {
@@ -60,7 +62,7 @@ func (m *SettingsManager) Create(model *Settings) (int, string, error) {
 
 func (m *SettingsManager) Get(user_id uint32) (*Settings, int, string, error) {
 	model := &Settings{}
-	err := m.DB.QueryRow(getSettingsSQL, user_id).Scan(&model.UserId, &model.ProblemTypeBitmap, &model.TargetDifficulty)
+	err := m.DB.QueryRow(getSettingsSQL, user_id).Scan(&model.UserId, &model.ProblemTypeBitmap, &model.TargetDifficulty, &model.TargetWorkPercentage)
 	if err == sql.ErrNoRows {
 		msg := "Couldn't find a settings with that user_id"
 		return nil, http.StatusNotFound, msg, err
@@ -82,7 +84,7 @@ func (m *SettingsManager) List() (*[]Settings, int, string, error) {
 	}
 	for rows.Next() {
 		model := Settings{}
-		err = rows.Scan(&model.UserId, &model.ProblemTypeBitmap, &model.TargetDifficulty)
+		err = rows.Scan(&model.UserId, &model.ProblemTypeBitmap, &model.TargetDifficulty, &model.TargetWorkPercentage)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -108,7 +110,7 @@ func (m *SettingsManager) CustomList(sql string) (*[]Settings, int, string, erro
 	}
 	for rows.Next() {
 		model := Settings{}
-		err = rows.Scan(&model.UserId, &model.ProblemTypeBitmap, &model.TargetDifficulty)
+		err = rows.Scan(&model.UserId, &model.ProblemTypeBitmap, &model.TargetDifficulty, &model.TargetWorkPercentage)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -130,7 +132,7 @@ func (m *SettingsManager) Update(model *Settings) (int, string, error) {
 		return status, msg, err
 	}
 	// Update
-	_, err = m.DB.Exec(updateSettingsSQL, model.ProblemTypeBitmap, model.TargetDifficulty, model.UserId)
+	_, err = m.DB.Exec(updateSettingsSQL, model.ProblemTypeBitmap, model.TargetDifficulty, model.TargetWorkPercentage, model.UserId)
 	if err != nil {
 		msg := "Couldn't update settings in database"
 		return http.StatusInternalServerError, msg, err
