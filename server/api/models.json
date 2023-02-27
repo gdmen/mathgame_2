@@ -35,6 +35,10 @@
           "sql": "BIGINT UNSIGNED PRIMARY KEY UNIQUE"
         },
         {
+          "name": "ProblemTypeBitmap", "type": "uint64",
+          "sql": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
           "name": "Expression", "type": "string",
           "sql": "TEXT NOT NULL"
         },
@@ -45,6 +49,10 @@
         {
           "name": "Difficulty", "type": "float64",
           "sql": "FLOAT NOT NULL"
+        },
+        {
+          "name": "Disabled", "type": "bool",
+          "sql": "TINYINT NOT NULL DEFAULT 0"
         }
       ]
     },
