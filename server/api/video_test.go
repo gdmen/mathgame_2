@@ -31,11 +31,9 @@ func TestVideoBasic(t *testing.T) {
 	resp := httptest.NewRecorder()
 
 	video := Video{
-		Title:   "son of man",
-		URL:     "https://www.youtube.com/watch?v=-WcHPFUwd6U",
-		Start:   24,
-		End:     116,
-		Enabled: true,
+		Title:    "son of man",
+		URL:      "https://www.youtube.com/watch?v=-WcHPFUwd6U",
+		Disabled: false,
 	}
 	body, _ := json.Marshal(video)
 	req, _ := http.NewRequest("POST", "/api/v1/videos/", bytes.NewBuffer(body))
@@ -50,7 +48,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `{"id":1,"title":"son of man","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","start":24,"end":116,"enabled":true,"thumbnailurl":""}` {
+	if strings.TrimSpace(string(body)) != `{"id":1,"title":"son of man","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","thumbnailurl":"","disabled":false}` {
 		t.Fatal("ERROR: " + string(body))
 	}
 
@@ -69,7 +67,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `[{"id":1,"title":"son of man","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","start":24,"end":116,"enabled":true,"thumbnailurl":""}]` {
+	if strings.TrimSpace(string(body)) != `[{"id":1,"title":"son of man","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","thumbnailurl":"","disabled":false}]` {
 		t.Fatal("ERROR: " + string(body))
 	}
 
@@ -77,7 +75,7 @@ func TestVideoBasic(t *testing.T) {
 	resp = httptest.NewRecorder()
 
 	video.Title = "unda da sea"
-	video.Enabled = false
+	video.Disabled = true
 	body, _ = json.Marshal(video)
 	req, _ = http.NewRequest("POST", "/api/v1/videos/1", bytes.NewBuffer(body))
 
@@ -91,7 +89,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `{"id":1,"title":"unda da sea","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","start":24,"end":116,"enabled":false,"thumbnailurl":""}` {
+	if strings.TrimSpace(string(body)) != `{"id":1,"title":"unda da sea","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","thumbnailurl":"","disabled":true}` {
 		t.Fatal("ERROR: " + string(body))
 	}
 
@@ -110,7 +108,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `{"id":1,"title":"unda da sea","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","start":24,"end":116,"enabled":false,"thumbnailurl":""}` {
+	if strings.TrimSpace(string(body)) != `{"id":1,"title":"unda da sea","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","thumbnailurl":"","disabled":true}` {
 		t.Fatal("ERROR: " + string(body))
 	}
 

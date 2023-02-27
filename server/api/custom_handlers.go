@@ -85,14 +85,14 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint
 	}
 
 	// Get videos belonging to this user
-	videos, status, msg, err := a.videoManager.CustomList(fmt.Sprintf("SELECT * FROM videos INNER JOIN userHasVideos ON videos.id = userHasVideos.video_id WHERE userHasVideos.user_id=%d AND videos.enabled=1;", userId))
+	videos, status, msg, err := a.videoManager.CustomList(fmt.Sprintf("SELECT * FROM videos INNER JOIN userHasVideos ON videos.id = userHasVideos.video_id WHERE userHasVideos.user_id=%d AND videos.disabled=0;", userId))
 	if HandleMngrResp(logPrefix, c, status, msg, err, videos) != nil {
 		return 0, err
 	}
 
 	// If there are no videos for this user, select from all videos
 	if len(*videos) < 1 {
-		videos, status, msg, err = a.videoManager.CustomList("SELECT * FROM videos WHERE enabled=1;")
+		videos, status, msg, err = a.videoManager.CustomList("SELECT * FROM videos WHERE disabled=0;")
 		if HandleMngrResp(logPrefix, c, status, msg, err, videos) != nil {
 			return 0, err
 		}
@@ -108,11 +108,9 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint
 		msg := "Couldn't find any videos in the database, adding a default."
 		glog.Errorf("%s %s", logPrefix, msg)
 		video := &Video{
-			Title:   "You've Got a Friend in Me",
-			URL:     "https://www.youtube.com/watch?v=rUWxSEwctFU", //"https://www.youtube.com/watch?v=nMN4JZ8crVY",
-			Start:   0,
-			End:     9999,
-			Enabled: true,
+			Title:    "You've Got a Friend in Me",
+			URL:      "https://www.youtube.com/watch?v=rUWxSEwctFU", //"https://www.youtube.com/watch?v=nMN4JZ8crVY",
+			Disabled: false,
 		}
 		status, msg, err := a.videoManager.Create(video)
 		if HandleMngrResp(logPrefix, c, status, msg, err, video) != nil {
