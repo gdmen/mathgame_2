@@ -181,7 +181,6 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		// TODO: validate videoID
 
 		// Difficulty adjustment limits
-		workTarget := 0.70
 		epsilon := 0.05
 		var recentPast int = 900 // seconds aka 15 minutes. This assumes a 1 second event reporting interval.
 		var minDiff float64 = 3
@@ -205,19 +204,19 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			if HandleMngrResp(logPrefix, c, status, msg, err, value) != nil {
 				return err
 			}
-			workPercentage, err := strconv.ParseFloat(value, 32)
+			workPercentage, err := strconv.ParseFloat(value, 64)
 			glog.Infof("%s workPercentage: %v", logPrefix, workPercentage)
 			if err != nil {
 				return err
 			}
 			// Adjust work load. Levers are difficulty and target number of problems.
-			glog.Infof("%s workTarget: %v", logPrefix, workTarget)
+			glog.Infof("%s settings.TargetWorkPercentage: %v", logPrefix, settings.TargetWorkPercentage)
 
 			glog.Infof("%s starting difficulty & num problems: %v, %v", logPrefix, settings.TargetDifficulty, gamestate.Target)
 			// Only do something if we are not already on target
-			if math.Abs(workTarget-workPercentage) < epsilon {
+			if math.Abs(settings.TargetWorkPercentage-workPercentage) < epsilon {
 				glog.Infof("%s difficulty is on target", logPrefix)
-			} else if workTarget > workPercentage {
+			} else if settings.TargetWorkPercentage > workPercentage {
 				// Make it more difficult
 				if gamestate.Target < maxProbs {
 					gamestate.Target += 1
@@ -225,7 +224,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 					gamestate.Target -= 1
 					settings.TargetDifficulty += math.Max(0.1*settings.TargetDifficulty, 1)
 				}
-			} else if workTarget < workPercentage {
+			} else if settings.TargetWorkPercentage < workPercentage {
 				// Make it easier
 				if gamestate.Target > minProbs {
 					gamestate.Target -= 1

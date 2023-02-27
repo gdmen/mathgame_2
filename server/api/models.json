@@ -97,6 +97,10 @@
         {
           "name": "TargetDifficulty", "type": "float64",
           "sql": "DOUBLE NOT NULL DEFAULT 3"
+        },
+        {
+          "name": "TargetWorkPercentage", "type": "float64",
+          "sql": "DOUBLE NOT NULL DEFAULT 0.70"
         }
       ]
     },
