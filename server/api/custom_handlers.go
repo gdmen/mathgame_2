@@ -313,7 +313,6 @@ func (a *Api) customListEvent(c *gin.Context) {
 	}
 
 	// Get recent events belonging to the specified user
-	glog.Infof("%s HERE!", logPrefix)
 	glog.Infof(fmt.Sprintf("SELECT * FROM events WHERE user_id=%d AND timestamp > now() - interval %d second AND event_type IN (%s);", params.UserId, params.Seconds, strings.Join([]string{LOGGED_IN, DISPLAYED_PROBLEM, ANSWERED_PROBLEM, DONE_WATCHING_VIDEO}, ",")))
 	events, status, msg, err := a.eventManager.CustomList(fmt.Sprintf("SELECT * FROM events WHERE user_id=%d AND timestamp > now() - interval %d second AND event_type IN (\"%s\");", params.UserId, params.Seconds, strings.Join([]string{LOGGED_IN, DISPLAYED_PROBLEM, ANSWERED_PROBLEM, DONE_WATCHING_VIDEO}, "\",\"")))
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, events) != nil {
