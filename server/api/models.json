@@ -65,6 +65,10 @@
           "sql": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY"
         },
         {
+          "name": "UserId", "type": "uint32",
+          "sql": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
           "name": "Title", "type": "string",
           "sql": "VARCHAR(128) NOT NULL"
         },
@@ -153,24 +157,6 @@
         {
           "name": "Value", "type": "string",
           "sql": "TEXT NOT NULL"
-        }
-      ]
-    },
-    {
-      "name": "userHasVideo",
-      "table": "userHasVideo",
-      "fields": [
-        {
-          "name": "Id", "type": "uint32",
-          "sql": "BIGINT UNSIGNED PRIMARY KEY UNIQUE"
-        },
-        {
-          "name": "UserId", "type": "uint32",
-          "sql": "BIGINT UNSIGNED NOT NULL"
-        },
-        {
-          "name": "VideoId", "type": "uint32",
-          "sql": "BIGINT UNSIGNED NOT NULL"
         }
       ]
     }

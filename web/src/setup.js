@@ -165,7 +165,7 @@ const VideosTabView = ({ token, url, user, advanceSetup }) => {
   };
 
   const handleAddVideoClick = (e) => {
-    postVideo({"title": videoTitle, "url": videoUrl, "thumbnailurl": videoThumbnail});
+    postVideo({"user_id": user.id, "title": videoTitle, "url": videoUrl, "thumbnailurl": videoThumbnail});
   };
 
   return (<>
