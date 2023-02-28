@@ -49,7 +49,6 @@ func (a *Api) generateProblem(logPrefix string, c *gin.Context, settings *Settin
 	}
 
 	var err error
-	model.ProblemTypeBitmap = settings.ProblemTypeBitmap
 	model.Expression, model.Answer, model.Difficulty, err = generator.GenerateProblem(generator_opts)
 	if err != nil {
 		if err, ok := err.(*generator.OptionsError); ok {
@@ -62,6 +61,13 @@ func (a *Api) generateProblem(logPrefix string, c *gin.Context, settings *Settin
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
 		c.JSON(http.StatusBadRequest, GetError(msg))
 		return nil, err
+	}
+	model.ProblemTypeBitmap = 0
+	if strings.Contains(model.Expression, "+") {
+		model.ProblemTypeBitmap += ADDITION
+	}
+	if strings.Contains(model.Expression, "-") {
+		model.ProblemTypeBitmap += SUBTRACTION
 	}
 
 	// Use expression hash as model.Id
