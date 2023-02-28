@@ -9,6 +9,7 @@ import { LoginButton, LogoutButton } from './auth0.js'
 
 import { HomeView } from './home.js'
 import { SetupView } from './setup.js'
+import { SettingsView } from './settings.js'
 import { PlayView } from './play.js'
 import { CompanionView } from './companion.js'
 
@@ -40,6 +41,11 @@ const MainView = ({ token, url, isLoading, isAuthenticated, user, settings, post
         <Switch>
           <Route exact path="/">
             <HomeView isLoading={isLoading} isAuthenticated={isAuthenticated} user={user} settings={settings}/>
+          </Route>
+          <Route exact path="/settings">
+            {!isLoading && isAuthenticated &&
+              <SettingsView token={token} url={url} user={user} settings={settings}/>
+            }
           </Route>
           <Route path="/play">
             {!isLoading && isAuthenticated &&

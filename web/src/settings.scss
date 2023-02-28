@@ -1,0 +1,207 @@
+@import "styles.scss";
+
+#setup {
+  border-top: 1px gray;
+  margin: 0 auto;
+  max-width: $max-width;
+  padding: 0 $base-space;
+  text-align: center;
+  #setup-tabs {
+    border-bottom: 1px dotted lightgray;
+    display: flex;
+    justify-content: space-evenly;
+    .tab {
+      border-bottom: 0.25em solid white;
+      padding: $base-space 2*$base-space;
+      position: relative;
+      &.active {
+        border-color: $color-one-contrast;
+        .number {
+          background-color: $color-one-contrast;
+        }
+      }
+      .tab-click-catcher {
+        height: 100%;
+        left: 0;
+        position: absolute;
+        top: 0;
+        width: 100%;
+        &:hover {
+          cursor: pointer;
+        }
+      }
+      .number {
+        background-color: $color-inactive;
+        color: white;
+        border-radius: 50%;
+        display: inline-block;
+        height: 1.5em;
+        line-height: 1.5em;
+        margin-right: 1em;
+        width: 1.5em;
+      }
+      .label {
+      }
+    }
+  }
+  .tab-content {
+    padding: 2*$base-space;
+    h2 {
+      margin-bottom: $base-space;
+    }
+    .setup-form {
+      display: inline-block;
+      width: 80%;
+      h4 {
+        margin-bottom: $base-space;
+        span.error {
+          color: $color-error;
+        }
+      }
+      ul#problem-type-buttons {
+        display: flex;
+        justify-content: flex-start;
+        list-style-type: none;
+        li {
+          display: inline-block;
+          margin-right: 1em;
+          input[type="checkbox"] {
+            display: none;
+            &:checked + label .problem-type-button {
+              background-color: $color-two;
+            }
+          }
+          label {
+            cursor: pointer;
+            .problem-type-button {
+              border: 1px solid gray;
+              border-radius: 0.25em;
+              display: flex;
+              justify-content: center;
+              padding: 0.5em 0.75em;
+            }
+          }
+        }
+      }
+      button {
+        background-color: $color-one-contrast;
+        color: white;
+        font-weight: 400;
+        transition-duration: 0.1s;
+        &.submit {
+          display: block;
+          margin: 0 auto;
+          margin-top: 1.5*$base-space;
+          padding: 0.5em 0.75em;
+        }
+        &:active {
+          transform: scale(0.95);
+        }
+        &.error {
+          background-color: lightgray;
+          pointer-events: none;
+        }
+      }
+    }
+    .video-title {
+      background-color: whitesmoke;
+      left: 0;
+      opacity: 0.75;
+      padding: $base-space;
+      position: absolute;
+      text-align: center;
+      top: 0;
+      width: 100%;
+    }
+    ul#video-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1%;
+      li {
+        aspect-ratio: 16 / 9;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: 100% auto;
+        border: 1px solid gray;
+        border-radius: 0.25em;
+        flex: 0 0 32%;
+        height: auto;
+        margin-bottom: 1%;
+        overflow: hidden;
+        position: relative;
+        .video-title {
+          height: 2em;
+          line-height: 1em;
+          overflow: hidden;
+          padding: 0;
+          text-overflow: ellipsis;
+        }
+      }
+    }
+    #add-video-interface {
+      aspect-ratio: 16 / 9;
+      background-color: whitesmoke;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: 100% auto;
+      overflow: hidden;
+      position: relative;
+      width: 100%;
+      #video-inputs {
+        background: rgba(245, 245, 245, .75);
+        display: flex;
+        justify-content: center;
+        padding: $base-space;
+        position: absolute;
+        top: 50%;
+        width: 100%;
+        input {
+          border: 0.25em solid $color-one;
+          min-width: 20em;
+          padding: 0.25em 0.5em;
+          &.error {
+            border-color: $color-error;
+          }
+        }
+        button {
+          border-radius: 0.25em;
+          margin-left: 1em;
+          padding: 0.25em 0.5em;
+        }
+      }
+    }
+    #start-playing-button {
+      font-size: 1.5em;
+      margin-top: 2em;
+    }
+  }
+}
+
+@media only screen and (max-width: 870px) {
+  #setup {
+    #setup-tabs .tab {
+      padding: none;
+      .number {
+        margin-right: 0;
+      }
+      .label {
+        display: none;
+      }
+    }
+    .tab-content {
+      padding: $base-space $base-space/2;
+      .setup-form {
+        width: 100%;
+        #add-video-interface {
+          #video-title {
+            h3 {
+              font-size: 1em;
+            }
+          }
+          #video-inputs {
+          }
+        }
+      }
+    }
+  }
+}
