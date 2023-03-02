@@ -91,6 +91,7 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint
 	}
 
 	// Get videos belonging to this user
+	// TODO: this looks like a bug - I think userHasVideos doesn't exist any more
 	videos, status, msg, err := a.videoManager.CustomList(fmt.Sprintf("SELECT * FROM videos INNER JOIN userHasVideos ON videos.id = userHasVideos.video_id WHERE userHasVideos.user_id=%d AND videos.disabled=0;", userId))
 	if HandleMngrResp(logPrefix, c, status, msg, err, videos) != nil {
 		return 0, err
@@ -322,6 +323,53 @@ func (a *Api) customListEvent(c *gin.Context) {
 	glog.Infof(fmt.Sprintf("SELECT * FROM events WHERE user_id=%d AND timestamp > now() - interval %d second AND event_type IN (%s);", params.UserId, params.Seconds, strings.Join([]string{LOGGED_IN, DISPLAYED_PROBLEM, ANSWERED_PROBLEM, DONE_WATCHING_VIDEO}, ",")))
 	events, status, msg, err := a.eventManager.CustomList(fmt.Sprintf("SELECT * FROM events WHERE user_id=%d AND timestamp > now() - interval %d second AND event_type IN (\"%s\");", params.UserId, params.Seconds, strings.Join([]string{LOGGED_IN, DISPLAYED_PROBLEM, ANSWERED_PROBLEM, DONE_WATCHING_VIDEO}, "\",\"")))
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, events) != nil {
+		return
+	}
+}
+
+func (a *Api) customDeleteVideo(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Video{}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
+	auth0Id := GetAuth0IdFromContext(logPrefix, c, a.isTest)
+
+	// Get User
+	user, status, msg, err := a.userManager.Get(auth0Id)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, user) != nil {
+		return
+	}
+
+	// Get Gamestate
+	gamestate, status, msg, err := a.gamestateManager.Get(user.Id)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, gamestate) != nil {
+		return
+	}
+	glog.Infof("%s Gamestate: %v", logPrefix, gamestate)
+
+	if gamestate.VideoId == model.Id {
+		// Set a new reward video
+		videoId, err := a.selectVideo(logPrefix, c, user.Id)
+		if err != nil {
+			return
+		}
+		gamestate.VideoId = videoId
+		// Write the updated gamestate
+		glog.Infof("%s Gamestate: %v", logPrefix, gamestate)
+		status, msg, err = a.gamestateManager.Update(gamestate)
+		if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, gamestate) != nil {
+			return
+		}
+	}
+
+	// Write video to database
+	status, msg, err = a.videoManager.Delete(model.Id)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {
 		return
 	}
 }

@@ -4,6 +4,7 @@ package api // import "garydmenezes.com/mathgame/server/api"
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -27,16 +28,44 @@ func TestVideoBasic(t *testing.T) {
 	ResetTestApi(c)
 	r := TestApi.GetRouter()
 
-	// Create
+	// Create new user
+	user := &User{
+		Auth0Id:  "auth0id|test|1",
+		Email:    "test_1@email.com",
+		Username: "test_1",
+	}
 	resp := httptest.NewRecorder()
+	body, _ := json.Marshal(user)
+	req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/users?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusOK, resp.Code, resp)
+	}
+	body, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp_user := User{}
+	err = json.Unmarshal(body, &resp_user)
+	if err != nil {
+		t.Fatal(err)
+	}
+	user.Id = resp_user.Id
+	if resp_user != *user {
+		t.Fatalf("Model mismatch. Received: %v, but expected: %v", resp_user, user)
+	}
+
+	// Create
+	resp = httptest.NewRecorder()
 
 	video := Video{
 		Title:    "son of man",
 		URL:      "https://www.youtube.com/watch?v=-WcHPFUwd6U",
 		Disabled: false,
 	}
-	body, _ := json.Marshal(video)
-	req, _ := http.NewRequest("POST", "/api/v1/videos/", bytes.NewBuffer(body))
+	body, _ = json.Marshal(video)
+	req, _ = http.NewRequest("POST", fmt.Sprintf("/api/v1/videos/?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
 
 	r.ServeHTTP(resp, req)
 
@@ -55,7 +84,7 @@ func TestVideoBasic(t *testing.T) {
 	// List
 	resp = httptest.NewRecorder()
 
-	req, _ = http.NewRequest("GET", "/api/v1/videos/", nil)
+	req, _ = http.NewRequest("GET", fmt.Sprintf("/api/v1/videos/?test_auth0_id=%s", user.Auth0Id), nil)
 
 	r.ServeHTTP(resp, req)
 
@@ -77,7 +106,7 @@ func TestVideoBasic(t *testing.T) {
 	video.Title = "unda da sea"
 	video.Disabled = true
 	body, _ = json.Marshal(video)
-	req, _ = http.NewRequest("POST", "/api/v1/videos/1", bytes.NewBuffer(body))
+	req, _ = http.NewRequest("POST", fmt.Sprintf("/api/v1/videos/1?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
 
 	r.ServeHTTP(resp, req)
 
@@ -96,7 +125,7 @@ func TestVideoBasic(t *testing.T) {
 	// Get
 	resp = httptest.NewRecorder()
 
-	req, _ = http.NewRequest("GET", "/api/v1/videos/1", nil)
+	req, _ = http.NewRequest("GET", fmt.Sprintf("/api/v1/videos/1?test_auth0_id=%s", user.Auth0Id), nil)
 
 	r.ServeHTTP(resp, req)
 
@@ -115,18 +144,18 @@ func TestVideoBasic(t *testing.T) {
 	// Delete
 	resp = httptest.NewRecorder()
 
-	req, _ = http.NewRequest("DELETE", "/api/v1/videos/1", nil)
+	req, _ = http.NewRequest("DELETE", fmt.Sprintf("/api/v1/videos/1?test_auth0_id=%s", user.Auth0Id), nil)
 
 	r.ServeHTTP(resp, req)
 
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusNoContent, resp.Code, resp)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusOK, resp.Code, resp)
 	}
 
 	// List
 	resp = httptest.NewRecorder()
 
-	req, _ = http.NewRequest("GET", "/api/v1/videos/", nil)
+	req, _ = http.NewRequest("GET", fmt.Sprintf("/api/v1/videos/?test_auth0_id=%s", user.Auth0Id), nil)
 
 	r.ServeHTTP(resp, req)
 

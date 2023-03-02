@@ -1,56 +1,21 @@
 @import "styles.scss";
 
-#setup {
+$add-video-bg: linear-gradient(90deg, white 0%, rgb(245, 245, 245, 0.75) 5%, rgb(245, 245, 245, 0.75) 95%, white 100%);
+
+#settings {
   border-top: 1px gray;
   margin: 0 auto;
   max-width: $max-width;
   padding: 0 $base-space;
   text-align: center;
-  #setup-tabs {
-    border-bottom: 1px dotted lightgray;
-    display: flex;
-    justify-content: space-evenly;
-    .tab {
-      border-bottom: 0.25em solid white;
-      padding: $base-space 2*$base-space;
-      position: relative;
-      &.active {
-        border-color: $color-one-contrast;
-        .number {
-          background-color: $color-one-contrast;
-        }
-      }
-      .tab-click-catcher {
-        height: 100%;
-        left: 0;
-        position: absolute;
-        top: 0;
-        width: 100%;
-        &:hover {
-          cursor: pointer;
-        }
-      }
-      .number {
-        background-color: $color-inactive;
-        color: white;
-        border-radius: 50%;
-        display: inline-block;
-        height: 1.5em;
-        line-height: 1.5em;
-        margin-right: 1em;
-        width: 1.5em;
-      }
-      .label {
-      }
-    }
-  }
   .tab-content {
     padding: 2*$base-space;
     h2 {
       margin-bottom: $base-space;
     }
-    .setup-form {
+    .settings-form {
       display: inline-block;
+      text-align: left;
       width: 80%;
       h4 {
         margin-bottom: $base-space;
@@ -60,10 +25,12 @@
       }
       ul#problem-type-buttons {
         display: flex;
+        flex-wrap: wrap;
         justify-content: flex-start;
         list-style-type: none;
         li {
           display: inline-block;
+          margin-top: 1em;
           margin-right: 1em;
           input[type="checkbox"] {
             display: none;
@@ -103,104 +70,113 @@
         }
       }
     }
-    .video-title {
-      background-color: whitesmoke;
-      left: 0;
-      opacity: 0.75;
+    #video-inputs {
+      background: $add-video-bg;
+      display: flex;
+      justify-content: center;
       padding: $base-space;
-      position: absolute;
-      text-align: center;
-      top: 0;
-      width: 100%;
+      input {
+        border: 0.25em solid $color-one;
+        min-width: 20em;
+        padding: 0.25em 0.5em;
+        &.error {
+          border-color: $color-error;
+        }
+      }
+      button {
+        border-radius: 0.25em;
+        margin-left: 1em;
+        padding: 0.25em 0.5em;
+      }
     }
     ul#video-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1%;
       li {
-        aspect-ratio: 16 / 9;
-        background-position: center;
-        background-repeat: no-repeat;
-        background-size: 100% auto;
-        border: 1px solid gray;
-        border-radius: 0.25em;
-        flex: 0 0 32%;
-        height: auto;
-        margin-bottom: 1%;
-        overflow: hidden;
-        position: relative;
+        align-items: center;
+        display: flex;
+        height: 3em;
+        padding: 0;
+        justify-content: space-between;
+        margin-bottom: 0.25em;
+        &#new-video {
+          background: $add-video-bg;
+          height: 3em + $base-space;
+          padding-bottom: $base-space;
+        }
+        &#video-list-header {
+          border-bottom: 1px solid lightgray;
+          height: 1.5em;
+          .video-title {
+            margin-left: 0;
+          }
+        }
+        .video-number {
+          flex: 0 0 2em;
+          padding-left: 0.5em;
+        }
+        .video-thumbnail {
+          aspect-ratio: 16 / 9;
+          background-position: center;
+          background-repeat: no-repeat;
+          background-size: 100% auto;
+          display: table;
+          height: 100%;
+          .video-play {
+            display: table-cell;
+            font-size: 1.5em;
+            opacity: 0;
+            padding-top: 0.3em; // this is to fix the vertical alignment of the play html character
+            text-align: center;
+            text-decoration: none;
+            transition: opacity 0.1s;
+            vertical-align: middle;
+            &:hover {
+              background-color: whitesmoke;
+              color: $font-color;
+              cursor: pointer;
+              opacity: 0.7;
+            }
+          }
+        }
         .video-title {
-          height: 2em;
-          line-height: 1em;
+          flex: 1 1 auto;
+          margin-left: 0.5em;
           overflow: hidden;
           padding: 0;
           text-overflow: ellipsis;
+          white-space: nowrap;
         }
-      }
-    }
-    #add-video-interface {
-      aspect-ratio: 16 / 9;
-      background-color: whitesmoke;
-      background-position: center;
-      background-repeat: no-repeat;
-      background-size: 100% auto;
-      overflow: hidden;
-      position: relative;
-      width: 100%;
-      #video-inputs {
-        background: rgba(245, 245, 245, .75);
-        display: flex;
-        justify-content: center;
-        padding: $base-space;
-        position: absolute;
-        top: 50%;
-        width: 100%;
-        input {
-          border: 0.25em solid $color-one;
-          min-width: 20em;
-          padding: 0.25em 0.5em;
-          &.error {
-            border-color: $color-error;
+        .video-delete {
+          aspect-ratio: 1;
+          color: $color-error;
+          display: flex;
+          font-size: 2em;
+          flex-direction: column;
+          height: 100%;
+          justify-content: center;
+          text-align: center;
+          transition-duration: 0.1s;
+          &:active {
+            transform: scale(0.9);
+          }
+          &:hover {
+            cursor: pointer;
+          }
+          &.disabled {
+            color: lightgray;
+            pointer-events: none;
           }
         }
-        button {
-          border-radius: 0.25em;
-          margin-left: 1em;
-          padding: 0.25em 0.5em;
-        }
       }
-    }
-    #start-playing-button {
-      font-size: 1.5em;
-      margin-top: 2em;
     }
   }
 }
 
 @media only screen and (max-width: 870px) {
-  #setup {
-    #setup-tabs .tab {
-      padding: none;
-      .number {
-        margin-right: 0;
-      }
-      .label {
-        display: none;
-      }
-    }
+  #settings {
     .tab-content {
       padding: $base-space $base-space/2;
-      .setup-form {
+      .settings-form {
         width: 100%;
-        #add-video-interface {
-          #video-title {
-            h3 {
-              font-size: 1em;
-            }
-          }
-          #video-inputs {
-          }
-        }
       }
     }
   }
