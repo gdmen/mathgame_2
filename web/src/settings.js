@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 
 import { ProblemTypes } from './enums.js'
+import { RequirePin } from './pin.js'
 import './settings.scss'
 
 // TODO: clean this file up when I come back to pull views out for the settings page
@@ -233,6 +234,9 @@ const VideosSettingsView = ({ token, url, user }) => {
 }
 
 const SettingsView = ({ token, url, user, settings }) => {
+  if (!RequirePin(user.id)) {
+    return <div className="content-loading"></div>
+  }
   return (<div id="settings">
     <div className="tab-content"><ProblemTypesSettingsView token={token} url={url} user={user} settings={settings} /></div>
     

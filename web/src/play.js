@@ -5,12 +5,15 @@ import "katex/dist/katex.min.css"
 
 import { ProblemView } from './problem.js'
 import { VideoView } from './video.js'
+import { ClearSessionPin } from './pin.js'
 
 const PlayView = ({ token, url, user, postEvent, interval }) => {
   const [gamestate, setGamestate] = useState(null);
   const [problem, setProblem] = useState(null);
   const [latex, setLatex] = useState(null);
   const [video, setVideo] = useState(null);
+
+  ClearSessionPin();
 
   const getGamestate = useCallback(async () => {
     try {

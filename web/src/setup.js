@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import PinInput from 'react-pin-input';
 
 import { ProblemTypes } from './enums.js'
+import { SetSessionPin } from './pin.js'
 import './setup.scss'
 
 // TODO: clean this file up when I come back to pull views out for the settings page
@@ -230,6 +231,7 @@ const PinTabView = ({ token, url, user, advanceSetup }) => {
     // post updated settings
     user.pin = pin;
     postUser(user);
+    SetSessionPin(pin);
     // redirect to next setup step
     advanceSetup();
   };
@@ -298,7 +300,7 @@ const SetupView = ({ token, url, user, settings }) => {
     </div>
     { (activeTab === "Choose Problems") && <div className="tab-content"><ProblemTypesTabView token={token} url={url} user={user} settings={settings} advanceSetup={advanceSetup}/></div> }
     { (activeTab === "Add Videos") && <div className="tab-content"><VideosTabView token={token} url={url} user={user} advanceSetup={advanceSetup}/></div> }
-    { (activeTab === "Set Parent Pin") && <div className="tab-content"><PinTabView token={token} url={url} user={user} advanceSetup={advanceSetup}/></div> }
+    { (activeTab === "Set Parent Pin") && <div className="tab-content"><PinTabView token={token} url={url} user={user} advanceSetup={advanceSetup} /></div> }
     { (activeTab === "Start Playing!") && <div className="tab-content"><StartPlayingTabView /></div> }
   </div>)
 }

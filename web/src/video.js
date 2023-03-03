@@ -20,7 +20,7 @@ const VideoView = ({ video, postEvent, interval }) => {
     setPlaying(true);
     /* Uncomment to test faster */
     //postEvent("done_watching_video", video.id);
-    //window.location.href="play";
+    //window.location.pathname="play";
   };
 
   return (
@@ -40,7 +40,7 @@ const VideoView = ({ video, postEvent, interval }) => {
           }}
           onEnded={() => {
             postEvent("done_watching_video", video.id);
-            window.location.href="play";
+            window.location.pathname="play";
           }}
         />
         <div id="click-blocker" onClick={play}></div>

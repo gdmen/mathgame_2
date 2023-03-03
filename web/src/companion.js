@@ -6,6 +6,7 @@ import "katex/dist/katex.min.css"
 
 import { ProblemCompanionView } from './problem_companion.js'
 import { VideoCompanionView } from './video_companion.js'
+import { RequirePin } from './pin.js'
 
 class RefresherSingleton {
   constructor(getGamestate, getEvents, interval) {
@@ -191,6 +192,10 @@ const CompanionView = ({ token, url, user }) => {
   useEffect(() => {
     getEvents();
   }, [getEvents]);
+
+  if (!RequirePin(user.id)) {
+    return <div className="content-loading"></div>
+  }
 
   if (!gamestate || !problem) {
     return <div className="content-loading"></div>

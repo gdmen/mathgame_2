@@ -9,6 +9,7 @@ import { LoginButton, LogoutButton } from './auth0.js'
 
 import { HomeView } from './home.js'
 import { SetupView } from './setup.js'
+import { PinView, ClearSessionPin } from './pin.js'
 import { SettingsView } from './settings.js'
 import { PlayView } from './play.js'
 import { CompanionView } from './companion.js'
@@ -18,11 +19,14 @@ import './index.scss'
 const conf = require('./conf')
 const ApiUrl = conf.api_host + ':' + conf.api_port + '/api/v1'
 
-const NotFound = () => (
-  <div>
-    <h3>404 page not found</h3>
-  </div>
-)
+const NotFound = () => {
+  ClearSessionPin();
+  return (
+    <div>
+      <h3>404 page not found</h3>
+    </div>
+  )
+}
 
 const MainView = ({ token, url, isLoading, isAuthenticated, user, settings, postEvent }) => {
   if (isLoading || (isAuthenticated && settings == null)) {
@@ -32,7 +36,7 @@ const MainView = ({ token, url, isLoading, isAuthenticated, user, settings, post
   }
   // TODO: setup if: (pin not set OR no operations set OR no videos set)
   else if (settings != null && user.pin === "") {
-    return <SetupView token={token} url={url} user={user} settings={settings}/>
+    return <SetupView token={token} url={url} user={user} settings={settings} />
   }
   else {
     // TODO: in the following switch, if not auth'd, redirect to landing page
@@ -42,17 +46,22 @@ const MainView = ({ token, url, isLoading, isAuthenticated, user, settings, post
           <Route exact path="/">
             <HomeView isLoading={isLoading} isAuthenticated={isAuthenticated} user={user} settings={settings}/>
           </Route>
-          <Route exact path="/settings">
+          <Route exact path="/pin/:redirect_pathname">
             {!isLoading && isAuthenticated &&
-              <SettingsView token={token} url={url} user={user} settings={settings}/>
+              <PinView user={user} />
             }
           </Route>
-          <Route path="/play">
+          <Route exact path="/play">
             {!isLoading && isAuthenticated &&
               <PlayView token={token} url={url} user={user} postEvent={postEvent} interval={conf.event_reporting_interval} />
             }
           </Route>
-          <Route path="/companion/:student_id">
+          <Route exact path="/settings">
+            {!isLoading && isAuthenticated &&
+              <SettingsView token={token} url={url} user={user} settings={settings} />
+            }
+          </Route>
+          <Route exact path="/companion/:student_id">
             {!isLoading && isAuthenticated &&
               <CompanionView token={token} url={url} user={user} />
             }
@@ -166,6 +175,7 @@ const AppView = () => {
         <ul className="menu">
           <li>{user ? user.username : ""}</li>
           <li>
+            <button onClick={() => window.location.pathname = "settings"}>Adults</button>
             {isAuthenticated ? <LogoutButton /> : <LoginButton />}
           </li>
         </ul>
