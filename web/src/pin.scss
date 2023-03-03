@@ -1,0 +1,10 @@
+@import "styles.scss";
+
+.pin-form {
+  display: inline-block;
+  text-align: center;
+  width: 100%;
+  span.error {
+    color: $color-error;
+  }
+}
