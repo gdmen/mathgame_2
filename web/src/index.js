@@ -175,8 +175,8 @@ const AppView = () => {
         <ul className="menu">
           <li>{user ? user.username : ""}</li>
           <li>
-            <button onClick={() => window.location.pathname = "settings"}>Adults</button>
-            {isAuthenticated ? <LogoutButton /> : <LoginButton />}
+            { isAuthenticated ? <button onClick={() => window.location.pathname = "settings"}>Adults</button> : <></> }
+            { isAuthenticated ? <LogoutButton /> : <LoginButton /> }
           </li>
         </ul>
       </div>
