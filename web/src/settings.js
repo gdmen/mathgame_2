@@ -6,7 +6,7 @@ import './settings.scss'
 
 // TODO: clean this file up when I come back to pull views out for the settings page
 
-const ProblemTypesSettingsView = ({ token, url, user, settings }) => {
+const ProblemTypesSettingsView = ({ token, url, user, settings, errCallback }) => {
   const [error, setError] = useState(false);
   const [problemTypeBitmap, setProblemTypeBitmap] = useState(settings.problem_type_bitmap);
 
@@ -34,6 +34,7 @@ const ProblemTypesSettingsView = ({ token, url, user, settings }) => {
     setProblemTypeBitmap(newBitmap);
     let newError = newBitmap < 1;
     setError(newError);
+    errCallback(newError);
     if (!newError) {
       // post updated settings
       settings.problem_type_bitmap = newBitmap;
@@ -42,7 +43,6 @@ const ProblemTypesSettingsView = ({ token, url, user, settings }) => {
   };
 
   return (<>
-    <h2>Settings</h2>
     <div className="settings-form">
       <h4>Which types of problems should we show? <span className={error ? "error" : ""}>Select one or more.</span></h4>
       <ul id="problem-type-buttons">
@@ -61,7 +61,7 @@ const ProblemTypesSettingsView = ({ token, url, user, settings }) => {
   </>)
 }
 
-const VideosSettingsView = ({ token, url, user }) => {
+const VideosSettingsView = ({ token, url, user, errCallback }) => {
   const [error, setError] = useState(true);
   const [addError, setAddError] = useState(true);
   const [videos, setVideos] = useState(new Map());
@@ -92,13 +92,14 @@ const VideosSettingsView = ({ token, url, user }) => {
         }
         setVideos(newVideos);
         setError(newVideos.size < 3);
+        errCallback(newVideos.size < 3);
       } catch (e) {
         console.log(e.message);
       }
     };
 
     getVideos();
-  }, [token, url, user]);
+  }, [token, url, user, errCallback]);
 
   const fetchYouTubeMetadata = async function(url, okFcn, errFcn) {
       try {
@@ -151,6 +152,7 @@ const VideosSettingsView = ({ token, url, user }) => {
           setVideos(videos => new Map(videos.set(json.url, json)));
           setAddError(false);
           setError(videos.size < 3);
+          errCallback(videos.size < 3);
           if (video.url === videoUrl) {
             // If the video we just added is currently in the add video UX
             setVideoUrl("");
@@ -186,6 +188,7 @@ const VideosSettingsView = ({ token, url, user }) => {
             setAddError(false);
           }
           setError(videos.size < 3);
+          errCallback(videos.size < 3);
           setVideos(new Map(videos));
         }
       } catch (e) {
@@ -238,9 +241,10 @@ const SettingsView = ({ token, url, user, settings }) => {
     return <div className="content-loading"></div>
   }
   return (<div id="settings">
-    <div className="tab-content"><ProblemTypesSettingsView token={token} url={url} user={user} settings={settings} /></div>
+    <h2>Settings</h2>
+    <div className="tab-content"><ProblemTypesSettingsView token={token} url={url} user={user} settings={settings} errCallback={(e) => null} /></div>
     
-    <div className="tab-content"><VideosSettingsView token={token} url={url} user={user} /></div>
+    <div className="tab-content"><VideosSettingsView token={token} url={url} user={user} errCallback={(e) => null} /></div>
   </div>)
 }
 

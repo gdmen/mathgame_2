@@ -1,199 +1,47 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import PinInput from 'react-pin-input';
 
-import { ProblemTypes } from './enums.js'
+import { ProblemTypesSettingsView, VideosSettingsView } from './settings.js'
 import { SetSessionPin } from './pin.js'
+import './settings.scss'
 import './setup.scss'
 
 // TODO: clean this file up when I come back to pull views out for the settings page
 
 const ProblemTypesTabView = ({ token, url, user, settings, advanceSetup }) => {
   const [error, setError] = useState(false);
-  const [problemTypeBitmap, setProblemTypeBitmap] = useState(settings.problem_type_bitmap);
 
-  const postSettings = async function(model) {
-      try {
-        const settings = {
-            method: 'POST',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ' + token,
-            },
-            body: JSON.stringify(model),
-        };
-        const req = await fetch(url + "/settings/" + model.user_id, settings);
-        const json = await req.json();
-        return json;
-      } catch (e) {
-        console.log(e.message);
-      }
-  };
-
-  const handleCheckboxChange = (e) => {
-    let newBitmap = problemTypeBitmap + ((2 * e.target.checked -1) * ProblemTypes[e.target.id]);
-    setProblemTypeBitmap(newBitmap);
-    setError(newBitmap < 1);
+  const errCallback = (e) => {
+    setError(e);
   };
 
   const handleSubmitClick = (e) => {
-    // post updated settings
-    settings.problem_type_bitmap = problemTypeBitmap;
-    postSettings(settings);
     // redirect to next setup step
     advanceSetup();
   };
 
   return (<>
     <h2>Hi there! Let's do a little setup for your kid!</h2>
-    <div className="setup-form">
-      <h4>Which types of problems should we show? <span className={error ? "error" : ""}>Select one or more.</span></h4>
-      <ul id="problem-type-buttons">
-        {Object.keys(ProblemTypes).map(function(problemType, i) {
-            return (<li key={problemType}>
-              <input type="checkbox" id={problemType} onChange={handleCheckboxChange} checked={"checked" ? ((ProblemTypes[problemType] & problemTypeBitmap) > 0) : ""}/>
-              <label htmlFor={problemType}>
-                <div className="problem-type-button">
-                  <span>{problemType}</span>
-                </div>
-              </label>
-            </li>)
-        })}
-      </ul>
-      <button className={error ? "submit error" : "submit"} onClick={handleSubmitClick}>continue</button>
-    </div>
+    <ProblemTypesSettingsView token={token} url={url} user={user} settings={settings} errCallback={errCallback} />
+    <button className={error ? "submit error" : "submit"} onClick={handleSubmitClick}>continue</button>
   </>)
 }
 
 const VideosTabView = ({ token, url, user, advanceSetup }) => {
   const [error, setError] = useState(true);
-  const [addError, setAddError] = useState(true);
-  const [videos, setVideos] = useState(new Map());
-  const [videoUrl, setVideoUrl] = useState(null);
-  const [videoTitle, setVideoTitle] = useState(null);
-  const [videoThumbnail, setVideoThumbnail] = useState(null);
 
-  useEffect(() => {
-    const getVideos = async () => {
-      try {
-        if (token == null || url == null || user == null) {
-          return;
-        }
-        const settings = {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + token,
-            }
-        };
-        const req = await fetch(url+ "/videos", settings);
-        const json = await req.json();
-        let newVideos = new Map();
-        for (var i in json) {
-          let url = json[i].url;
-          newVideos.set(url, json[i]);
-        }
-        setVideos(newVideos);
-        setError(newVideos.size < 3);
-      } catch (e) {
-        console.log(e.message);
-      }
-    };
-
-    getVideos();
-  }, [token, url, user]);
+  const errCallback = (e) => {
+    setError(e);
+  };
 
   const handleSubmitClick = (e) => {
     // redirect to next setup step
     advanceSetup();
   };
 
-  const fetchYouTubeMetadata = async function(url, okFcn, errFcn) {
-      try {
-        const settings = {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-            },
-        };
-        const req = await fetch("https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(url), settings);
-        const json = await req.json();
-        okFcn(json);
-      } catch (e) {
-        console.log(e.message);
-        errFcn(e);
-      }
-  };
-
-  const handleAddVideoChange = (e) => {
-    let url = e.target.value;
-    setVideoUrl(url);
-    setVideoTitle(null);
-    setVideoThumbnail(null);
-    let okFcn = function (json) {
-      setVideoTitle(json.title);
-      setVideoThumbnail(json.thumbnail_url);
-      setAddError(videos.has(url));
-    }
-    let errFcn = function (e) {
-      setAddError(true);
-    }
-    fetchYouTubeMetadata(url, okFcn, errFcn);
-  }
-
-  const postVideo = async function(video) {
-      try {
-        const settings = {
-            method: 'POST',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ' + token,
-            },
-            body: JSON.stringify(video),
-        };
-        const req = await fetch(url + "/videos/", settings);
-        if (req.ok) {
-          setVideos(videos => new Map(videos.set(video.url, video)));
-          setAddError(true);
-          setError(videos.size < 3);
-        }
-      } catch (e) {
-        console.log(e.message);
-      }
-  };
-
-  const handleAddVideoClick = (e) => {
-    postVideo({"user_id": user.id, "title": videoTitle, "url": videoUrl, "thumbnailurl": videoThumbnail});
-  };
-
   return (<>
-    <div className="setup-form">
-      <h4>Add <span className={error ? "error" : ""}>at least three</span> <a href="http://www.youtube.com" target="_blank" rel="noopener noreferrer">YouTube</a> videos that your kid will love!</h4>
-      <ul id="video-list">
-        {[...videos.keys()].map(function(key, i) {
-            var id = i;
-            var video = videos.get(key);
-            return (<li key={id} style={{
-              backgroundImage: `url(${video.thumbnailurl})` 
-            }}>
-              <span className="video-title">{video.title}</span>
-            </li>)
-        })}
-      </ul>
-      <div id="add-video-interface" style={{
-          backgroundImage: `url(${videoThumbnail})` 
-      }}>
-        <div className={addError ? "video-title error": "video-title"}><h3>{videoTitle}</h3></div>
-        <div id="video-inputs">
-          <input type="text" placeholder="paste a YouTube link here" className={addError && videoUrl ? "error" : ""} onChange={handleAddVideoChange}/>
-          <button className={addError ? "error" : ""} onClick={handleAddVideoClick}>add</button>
-        </div>
-      </div>
-      <button className={error ? "submit error" : "submit"} onClick={handleSubmitClick}>continue</button>
-    </div>
+    <VideosSettingsView token={token} url={url} user={user} errCallback={errCallback} />
+    <button className={error ? "submit error" : "submit"} onClick={handleSubmitClick}>continue</button>
   </>)
 }
 

@@ -1,10 +1,14 @@
 import React from "react";
 import { SignupButton } from './auth0.js';
+
 import heroImage from './img/hero.png';
+import { ClearSessionPin } from './pin.js'
 
 import "./home.scss";
 
 const HomeView = ({ isLoading, isAuthenticated, user, settings }) => {
+  ClearSessionPin();
+
   if (isAuthenticated && user && settings) {
     // User is logged in; redirect to /play
     window.location.href="play";
