@@ -53,7 +53,7 @@ clean:
 	$(RM) ./web/build/*
 
 build-web:
-	cd web && npm run build && npm install; cd -
+	cd web && npm install && npm run build; cd -
 	ln -s ../../conf.json web/src/conf.json
 
 prod-web:
