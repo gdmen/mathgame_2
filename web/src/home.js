@@ -9,10 +9,6 @@ import "./home.scss";
 const HomeView = ({ isLoading, isAuthenticated, user, settings }) => {
   ClearSessionPin();
 
-  if (isAuthenticated && user && settings) {
-    // User is logged in; redirect to /play
-    window.location.href="play";
-  }
   return (
     <div id="landing-hero">
       <div className="hero-content">
@@ -21,7 +17,11 @@ const HomeView = ({ isLoading, isAuthenticated, user, settings }) => {
           <p>The Math Game is a simple and easy way for kids to practice math!<br/>Step 1: solve some math problems<br/>Step 2: watch a youtube video as a reward!</p>
           <p>You can set up your child's account in 5 minutes and then watch their progress!</p>
           <div className="button-container">
-            <SignupButton />
+            {
+              (isAuthenticated && user && settings && <button className="signup" onClick={() => window.location.pathname = "play"}><h3>Play Now!</h3></button>)
+              ||
+              <SignupButton />
+            }
           </div>
         </div>
         <div className="hero-image" style={{backgroundImage: `url(${heroImage})`}}></div>
