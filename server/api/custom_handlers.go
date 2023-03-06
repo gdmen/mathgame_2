@@ -190,14 +190,18 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		// Difficulty adjustment limits
 		epsilon := 0.05
 		var recentPast int = 900 // seconds aka 15 minutes. This assumes a 1 second event reporting interval.
+		var diffIncrease float64 = 0.05
 		var minDiff float64 = 3
-		var maxProbs uint32 = 20
+		var maxProbs uint32 = 30
 		var minProbs uint32 = 5
 		// End difficulty adjustment limits
 
-		if gamestate.Solved >= gamestate.Target {
-			// Calculate work % for the "recent past" of the user.
-			query := `SELECT work/total FROM
+		if gamestate.Solved < gamestate.Target {
+			msg := fmt.Sprintf("Done watching video, but there's an inconsistency in problems solved: %v < %v", gamestate.Solved, gamestate.Target)
+			glog.Errorf("%s %s: %v", logPrefix, msg, err)
+		}
+		// Calculate work % for the "recent past" of the user.
+		query := `SELECT work/total FROM
                                   (SELECT
                                   SUM(CASE WHEN event_type='working_on_problem' THEN value ELSE 0 END) AS work,
                                   SUM(value) AS total
@@ -207,56 +211,55 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
                                     WHERE user_id=%d AND event_type IN ('working_on_problem', 'watching_video')
                                     ORDER BY timestamp DESC LIMIT %d) AS X
                                   ) AS Y;`
-			value, status, msg, err := a.CustomValueQuery(fmt.Sprintf(query, user.Id, recentPast))
-			if HandleMngrResp(logPrefix, c, status, msg, err, value) != nil {
-				return err
-			}
-			workPercentage, err := strconv.ParseFloat(value, 64)
-			glog.Infof("%s workPercentage: %v", logPrefix, workPercentage)
-			if err != nil {
-				return err
-			}
-			// Adjust work load. Levers are difficulty and target number of problems.
-			glog.Infof("%s settings.TargetWorkPercentage: %v", logPrefix, settings.TargetWorkPercentage)
-
-			glog.Infof("%s starting difficulty & num problems: %v, %v", logPrefix, settings.TargetDifficulty, gamestate.Target)
-			// Only do something if we are not already on target
-			if math.Abs(settings.TargetWorkPercentage-workPercentage) < epsilon {
-				glog.Infof("%s difficulty is on target", logPrefix)
-			} else if settings.TargetWorkPercentage > workPercentage {
-				// Make it more difficult
-				if gamestate.Target < maxProbs {
-					gamestate.Target += 1
-				} else {
-					gamestate.Target -= 1
-					settings.TargetDifficulty += math.Max(0.1*settings.TargetDifficulty, 1)
-				}
-			} else if settings.TargetWorkPercentage < workPercentage {
-				// Make it easier
-				if gamestate.Target > minProbs {
-					gamestate.Target -= 1
-				} else {
-					gamestate.Target += 1
-					if settings.TargetDifficulty <= minDiff {
-						glog.Infof("%s difficulty of %v should not be below %v and we're already at minProbs. Will not make this easier.", logPrefix, settings.TargetDifficulty, minDiff)
-						settings.TargetDifficulty = minDiff
-					} else {
-						settings.TargetDifficulty = math.Max(minDiff, settings.TargetDifficulty-math.Max(0.1*settings.TargetDifficulty, 1))
-					}
-				}
-			}
-			glog.Infof("%s modified difficulty & num problems: %v, %v", logPrefix, settings.TargetDifficulty, gamestate.Target)
-
-			// Reset solved progress
-			gamestate.Solved = 0
-
-			// Set a new reward video
-			videoId, err := a.selectVideo(logPrefix, c, user.Id)
-			if err != nil {
-				return err
-			}
-			gamestate.VideoId = videoId
+		value, status, msg, err := a.CustomValueQuery(fmt.Sprintf(query, user.Id, recentPast))
+		if HandleMngrResp(logPrefix, c, status, msg, err, value) != nil {
+			return err
 		}
+		workPercentage, err := strconv.ParseFloat(value, 64)
+		glog.Infof("%s workPercentage: %v", logPrefix, workPercentage)
+		if err != nil {
+			return err
+		}
+		// Adjust work load. Levers are difficulty and target number of problems.
+		glog.Infof("%s settings.TargetWorkPercentage: %v", logPrefix, settings.TargetWorkPercentage)
+
+		glog.Infof("%s starting difficulty & num problems: %v, %v", logPrefix, settings.TargetDifficulty, gamestate.Target)
+		// Only do something if we are not already on target
+		if math.Abs(settings.TargetWorkPercentage-workPercentage) < epsilon {
+			glog.Infof("%s difficulty is on target", logPrefix)
+		} else if settings.TargetWorkPercentage > workPercentage {
+			// Make it more difficult
+			if gamestate.Target < maxProbs {
+				gamestate.Target += 1
+			} else {
+				gamestate.Target = uint32(math.Max(float64(minProbs), math.Ceil(float64(gamestate.Target)/2)))
+				settings.TargetDifficulty += math.Max(1, diffIncrease*settings.TargetDifficulty)
+			}
+		} else if settings.TargetWorkPercentage < workPercentage {
+			// Make it easier
+			if gamestate.Target > minProbs {
+				gamestate.Target = uint32(math.Max(float64(minProbs), math.Ceil(float64(gamestate.Target)/2)))
+			} else {
+				if settings.TargetDifficulty <= minDiff {
+					glog.Infof("%s difficulty of %v should not be below %v and we're already at minProbs. Will not make this easier.", logPrefix, settings.TargetDifficulty, minDiff)
+					settings.TargetDifficulty = minDiff
+				} else {
+					gamestate.Target += 1
+					settings.TargetDifficulty = math.Max(minDiff, settings.TargetDifficulty-math.Max(1, diffIncrease*settings.TargetDifficulty))
+				}
+			}
+		}
+		glog.Infof("%s modified difficulty & num problems: %v, %v", logPrefix, settings.TargetDifficulty, gamestate.Target)
+
+		// Reset solved progress
+		gamestate.Solved = 0
+
+		// Set a new reward video
+		videoId, err := a.selectVideo(logPrefix, c, user.Id)
+		if err != nil {
+			return err
+		}
+		gamestate.VideoId = videoId
 	} else {
 		msg := fmt.Sprintf("Invalid EventType: %s", event.EventType)
 		glog.Errorf("%s %s", logPrefix, msg)
