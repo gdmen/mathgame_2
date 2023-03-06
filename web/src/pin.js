@@ -9,8 +9,11 @@ const pinSessionStorageName = "math-game-pin"
 const SetSessionPin = function(pin) {
   sessionStorage.setItem(pinSessionStorageName, pin);
 }
+const GetSessionPin = function() {
+  return sessionStorage.getItem(pinSessionStorageName);
+}
 const RequirePin = function(correctPin) {
-  let sessionPin = sessionStorage.getItem(pinSessionStorageName);
+  let sessionPin = GetSessionPin();
   let valid = false;
   if (sessionPin !== null) {
     valid = sessionPin !== correctPin;
@@ -25,18 +28,24 @@ const ClearSessionPin = function() {
   sessionStorage.removeItem(pinSessionStorageName);
 }
 
-const PinView = ({ user, setSessionPin }) => {
+const PinView = ({ user, isSetup = false, errCallback =  () => void 0 }) => {
   const [error, setError] = useState(user.pin.length < 4);
   const { redirect_pathname } = useParams();
 
   const handlePinChange = (pin) => {
-    let err = pin.length < 4 || pin !== user.pin;
-    setError(err);
-    if (err) {
+    let newError = pin.length < 4;
+    if (!isSetup) {
+      newError |= pin !== user.pin;
+    }
+    setError(newError);
+    errCallback(newError);
+    if (newError) {
       return;
     }
     SetSessionPin(pin);
-    window.location.pathname = decodeURIComponent(redirect_pathname);
+    if (!isSetup) {
+      window.location.pathname = decodeURIComponent(redirect_pathname);
+    }
   };
 
   return (<>
@@ -44,6 +53,7 @@ const PinView = ({ user, setSessionPin }) => {
       <h4><span className={error ? "error" : ""}>Enter your four digit PIN code.</span></h4>
       <PinInput 
         autoSelect={true}
+        focus={true}
         inputMode="number"
         inputStyle={{borderRadius: '0.25em'}}
         length={4} 
@@ -56,6 +66,7 @@ const PinView = ({ user, setSessionPin }) => {
 
 export {
   SetSessionPin,
+  GetSessionPin,
   RequirePin,
   ClearSessionPin,
   PinView

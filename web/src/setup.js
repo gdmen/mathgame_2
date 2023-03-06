@@ -1,8 +1,7 @@
 import React, { useState } from "react";
-import PinInput from 'react-pin-input';
 
 import { ProblemTypesSettingsView, VideosSettingsView } from './settings.js'
-import { SetSessionPin } from './pin.js'
+import { GetSessionPin, PinView } from './pin.js'
 import './settings.scss'
 import './setup.scss'
 
@@ -46,14 +45,10 @@ const VideosTabView = ({ token, url, user, advanceSetup }) => {
 }
 
 const PinTabView = ({ token, url, user, advanceSetup }) => {
-  const [error, setError] = useState(user.pin.length < 4);
-  const [pin, setPin] = useState(user.pin);
+  const [error, setError] = useState(true);
 
-  const handlePinChange = (pin) => {
-    setError(pin.length < 4);
-    if (pin.length === 4) {
-      setPin(pin);
-    }
+  const errCallback = (e) => {
+    setError(e);
   };
 
   const postUser = async function(user) {
@@ -76,26 +71,17 @@ const PinTabView = ({ token, url, user, advanceSetup }) => {
   };
 
   const handleSubmitClick = (e) => {
-    // post updated settings
-    user.pin = pin;
+    // post updated PIN
+    user.pin = GetSessionPin();
     postUser(user);
-    SetSessionPin(pin);
     // redirect to next setup step
     advanceSetup();
   };
 
   return (<>
     <div className="setup-form">
-      <h4>Set a <span className={error ? "error" : ""}>four digit</span> PIN code! You'll need this PIN to edit these settings later!</h4>
-      <PinInput 
-        autoSelect={true}
-        initialValue={pin}
-        inputMode="number"
-        inputStyle={{borderRadius: '0.25em'}}
-        length={4} 
-        onChange={(value, index) => {handlePinChange(value);}}
-        type="numeric"
-      />
+      <h4>Set a PIN! You'll need to remember this to edit these settings later!</h4>
+      <PinView user={user} isSetup={true} errCallback={errCallback} />
       <button className={error ? "submit error" : "submit"} onClick={handleSubmitClick}>continue</button>
     </div>
   </>)
