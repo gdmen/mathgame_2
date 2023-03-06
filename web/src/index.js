@@ -34,7 +34,6 @@ const MainView = ({ token, url, isLoading, isAuthenticated, user, settings, post
       <div className="content-loading"></div>
     )
   }
-  // TODO: setup if: (pin not set OR no operations set OR no videos set)
   else if (settings != null && user.pin === "") {
     return <SetupView token={token} url={url} user={user} settings={settings} />
   }

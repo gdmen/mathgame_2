@@ -162,7 +162,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	} else if event.EventType == DISPLAYED_PROBLEM {
 		// TODO: validate problemID
 	} else if event.EventType == WORKING_ON_PROBLEM {
-		// TODO: valudate duration
+		// TODO: validate duration
 	} else if event.EventType == ANSWERED_PROBLEM {
 		// Get Problem
 		problem, status, msg, err := a.problemManager.Get(gamestate.ProblemId)

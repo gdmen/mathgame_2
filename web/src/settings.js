@@ -4,8 +4,6 @@ import { ProblemTypes } from './enums.js'
 import { RequirePin } from './pin.js'
 import './settings.scss'
 
-// TODO: clean this file up when I come back to pull views out for the settings page
-
 const ProblemTypesSettingsView = ({ token, url, user, settings, errCallback }) => {
   const [error, setError] = useState(settings.problem_type_bitmap < 1);
   const [problemTypeBitmap, setProblemTypeBitmap] = useState(settings.problem_type_bitmap);

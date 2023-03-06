@@ -5,8 +5,6 @@ import { GetSessionPin, PinView } from './pin.js'
 import './settings.scss'
 import './setup.scss'
 
-// TODO: clean this file up when I come back to pull views out for the settings page
-
 const ProblemTypesTabView = ({ token, url, user, settings, advanceSetup }) => {
   const [error, setError] = useState(false);
 
