@@ -91,8 +91,7 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint
 	}
 
 	// Get videos belonging to this user
-	// TODO: this looks like a bug - I think userHasVideos doesn't exist any more
-	videos, status, msg, err := a.videoManager.CustomList(fmt.Sprintf("SELECT * FROM videos INNER JOIN userHasVideos ON videos.id = userHasVideos.video_id WHERE userHasVideos.user_id=%d AND videos.disabled=0;", userId))
+	videos, status, msg, err := a.videoManager.CustomList(fmt.Sprintf("SELECT * FROM videos WHERE user_id=%d AND disabled=0;", userId))
 	if HandleMngrResp(logPrefix, c, status, msg, err, videos) != nil {
 		return 0, err
 	}

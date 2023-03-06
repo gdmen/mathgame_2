@@ -119,7 +119,7 @@ def main():
     with open(args.config, "r") as f:
         import json
         c = json.loads(f.read())
-    with open("handlers.go", "w") as f:
+    with open("handlers.generated.go", "w") as f:
         f.write(get_comment_and_imports())
         for m in c["models"]:
             f.write(get_handler_string(m))

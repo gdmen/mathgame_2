@@ -48,6 +48,7 @@ dev-docs: check-swagger
 clean:
 	$(RM) ./swagger.yaml
 	$(RM) ./bin/*
+	$(RM) ./server/api/*.generated.go
 	GOBIN=$(GOBIN) $(GOCLEAN) -testcache
 	$(GOMOD) tidy
 	$(RM) ./web/build/*

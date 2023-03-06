@@ -348,7 +348,7 @@ def main():
         import json
         c = json.loads(f.read())
     for m in c["models"]:
-        with open(m["name"]+"_model.go", "w") as f:
+        with open(m["name"]+"_model.generated.go", "w") as f:
             f.write(get_model_string(m))
 
 if __name__ == "__main__":
