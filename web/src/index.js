@@ -168,7 +168,7 @@ const AppView = () => {
   }, [token, user, genPostEventFcn]);
 
   return (
-    <div>
+    <div id="react-body">
       <div id="main-menu" className="clearfix">
         <a href="/"><h3>The Math Game</h3></a>
 
@@ -183,6 +183,16 @@ const AppView = () => {
 
       <div id="content">
             <MainView token={token} url={ApiUrl} isLoading={isLoading} isAuthenticated={isAuthenticated} user={appUser} settings={settings} postEvent={genPostEventFcn()}/>
+      </div>
+
+      <div id="footer">
+        { window.location.pathname !== "/play" &&
+          <>
+            <a href="https://github.com/gdmen/mathgame_2/issues/new" target="_blank" rel="noopener noreferrer">report an issue</a>
+            <span className="separator">|</span>
+            <a href="https://github.com/gdmen/mathgame_2" target="_blank" rel="noopener noreferrer">source code</a>
+          </>
+        }
       </div>
     </div>
   )
