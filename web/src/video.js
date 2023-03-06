@@ -16,12 +16,21 @@ const VideoView = ({ video, postEvent, interval }) => {
     return <div className="content-loading"></div>
   }
 
-  const play = () => {
-    setPlaying(true);
+  const playPause = () => {
+    setPlaying(!playing);
     /* Uncomment to test faster */
     //postEvent("done_watching_video", video.id);
     //window.location.pathname="play";
   };
+
+  document.body.onkeyup = function(e) {
+    if (e.key === " " ||
+        e.code === "Space" ||
+        e.keyCode === 32
+    ) {
+      playPause();
+    }
+  }
 
   return (
     <div id="video-container">
@@ -43,7 +52,7 @@ const VideoView = ({ video, postEvent, interval }) => {
             window.location.pathname="play";
           }}
         />
-        <div id="click-blocker" onClick={play}></div>
+        <div id="click-blocker" onClick={playPause}></div>
       </div>
     </div>
   )
