@@ -18,7 +18,7 @@ const HomeView = ({ isLoading, isAuthenticated, user, settings }) => {
           <p>You can set up your child's account in 5 minutes and then watch their progress!</p>
           <div className="button-container">
             {
-              (isAuthenticated && user && settings && <button className="signup" onClick={() => window.location.pathname = "play"}><h3>Play Now!</h3></button>)
+              (isAuthenticated && user && settings && <button className="signup" onClick={() => window.location.pathname = "play"}><h3>Play Now !</h3></button>)
               ||
               <SignupButton />
             }
