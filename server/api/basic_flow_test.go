@@ -127,39 +127,39 @@ func TestFlowBasic(t *testing.T) {
 		p := Problem{}
 		fetchProblem(t, r, u, gs.ProblemId, &p)
 		t.Logf("problem: %v", p)
-		gs = reportEvent(t, r, u, "displayed_problem", "")
-		gs = reportEvent(t, r, u, "working_on_problem", "15")
+		gs = reportEvent(t, r, u, DISPLAYED_PROBLEM, "")
+		gs = reportEvent(t, r, u, WORKING_ON_PROBLEM, "15")
 
 		// Have some incorrect answered for the first half of this round of problem solving
 		ns := gs.Solved
 		if gs.Solved < gs.Target/2 {
-			gs = reportEvent(t, r, u, "answered_problem", "definitely the wrong answer")
-			gs = reportEvent(t, r, u, "answered_problem", "-12323")
+			gs = reportEvent(t, r, u, ANSWERED_PROBLEM, "definitely the wrong answer")
+			gs = reportEvent(t, r, u, ANSWERED_PROBLEM, "-12323")
 			if gs.Solved != ns {
 				t.Fatal("Incorrect answers were treated as solved.")
 			}
 		}
 
 		// Answer correctly
-		gs = reportEvent(t, r, u, "answered_problem", p.Answer)
+		gs = reportEvent(t, r, u, ANSWERED_PROBLEM, p.Answer)
 		if gs.Solved != ns+1 {
 			t.Fatal("Correct answer was not incremented.")
 		}
 	}
 
 	// Do video stuff
-	gs = reportEvent(t, r, u, "watching_video", "10")
-	gs = reportEvent(t, r, u, "watching_video", "10")
-	gs = reportEvent(t, r, u, "watching_video", "10")
-	gs = reportEvent(t, r, u, "watching_video", "10")
-	gs = reportEvent(t, r, u, "watching_video", "10")
-	gs = reportEvent(t, r, u, "watching_video", "10")
-	gs = reportEvent(t, r, u, "watching_video", "10")
-	gs = reportEvent(t, r, u, "watching_video", "10")
+	gs = reportEvent(t, r, u, WATCHING_VIDEO, "10")
+	gs = reportEvent(t, r, u, WATCHING_VIDEO, "10")
+	gs = reportEvent(t, r, u, WATCHING_VIDEO, "10")
+	gs = reportEvent(t, r, u, WATCHING_VIDEO, "10")
+	gs = reportEvent(t, r, u, WATCHING_VIDEO, "10")
+	gs = reportEvent(t, r, u, WATCHING_VIDEO, "10")
+	gs = reportEvent(t, r, u, WATCHING_VIDEO, "10")
+	gs = reportEvent(t, r, u, WATCHING_VIDEO, "10")
 	if gs.Solved != gs.Target {
 		t.Fatal("We should still be in a problems-done-watching-video state.")
 	}
-	gs = reportEvent(t, r, u, "done_watching_video", fmt.Sprint(gs.VideoId))
+	gs = reportEvent(t, r, u, DONE_WATCHING_VIDEO, fmt.Sprint(gs.VideoId))
 	if gs.Solved != 0 {
 		t.Fatal("Solved should have been reset.")
 	}
