@@ -32,8 +32,8 @@ func (a *Api) CustomValueQuery(sql string) (string, int, string, error) {
 func (a *Api) generateProblem(logPrefix string, c *gin.Context, settings *Settings) (*Problem, error) {
 	model := &Problem{}
 	// TODO: this is temporary logic to make the generator compatible with the new ProblemTypeBitmap
-	fractions := (FRACTIONS & settings.ProblemTypeBitmap) > 0
-	negatives := (NEGATIVES & settings.ProblemTypeBitmap) > 0
+	fractions := false //(FRACTIONS & settings.ProblemTypeBitmap) > 0
+	negatives := false //(NEGATIVES & settings.ProblemTypeBitmap) > 0
 	operations := []string{}
 	if (ADDITION & settings.ProblemTypeBitmap) > 0 {
 		operations = append(operations, "+")

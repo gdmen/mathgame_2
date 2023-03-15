@@ -16,9 +16,9 @@ const (
 	// ProblemTypes are currently limited to 64 flags
 	ADDITION uint64 = 1 << iota
 	SUBTRACTION
-	MULTIPLICATION
-	DIVISION
-	FRACTIONS
-	NEGATIVES
+	//MULTIPLICATION
+	//DIVISION
+	//FRACTIONS
+	//NEGATIVES
 	// -end- ProblemTypes
 )
