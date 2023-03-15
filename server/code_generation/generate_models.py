@@ -1,6 +1,7 @@
 # generate_models.py
 
 import argparse
+import os
 import re
 
 CAMEL_TO_SNAKE_RE = re.compile(r'(?<!^)(?=[A-Z][a-z])')
@@ -342,13 +343,14 @@ import (
 def main():
     parser = argparse.ArgumentParser(description="Generate a go model for the math game.")
     parser.add_argument("-c", "--config", metavar="config", type=str, help="name of the config file (models.json)", required=True)
+    parser.add_argument("-o", "--output", metavar="output", type=str, help="name of the output directory", required=True)
     args = parser.parse_args()
     c = {}
     with open(args.config, "r") as f:
         import json
         c = json.loads(f.read())
     for m in c["models"]:
-        with open(m["name"]+"_model.generated.go", "w") as f:
+        with open(os.path.join(args.output,  m["name"]+"_model.generated.go"), "w") as f:
             f.write(get_model_string(m))
 
 if __name__ == "__main__":

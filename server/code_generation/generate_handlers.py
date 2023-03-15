@@ -1,6 +1,7 @@
 # generate_handlers.py
 
 import argparse
+import os
 import re
 
 def get_comment_and_imports() -> str:
@@ -114,12 +115,13 @@ func (a *Api) delete{0}(c *gin.Context) {{
 def main():
     parser = argparse.ArgumentParser(description="Generate API handlers for the math game.")
     parser.add_argument("-c", "--config", metavar="config", type=str, help="name of the config file (models.json)", required=True)
+    parser.add_argument("-o", "--output", metavar="output", type=str, help="name of the output directory", required=True)
     args = parser.parse_args()
     c = {}
     with open(args.config, "r") as f:
         import json
         c = json.loads(f.read())
-    with open("handlers.generated.go", "w") as f:
+    with open(os.path.join(args.output,  "handlers.generated.go"), "w") as f:
         f.write(get_comment_and_imports())
         for m in c["models"]:
             f.write(get_handler_string(m))

@@ -23,7 +23,8 @@ dev-web:
 	cd web && npm start
 
 build-api:
-	cd server/api && python3 generate_models.py -c models.json && python3 generate_handlers.py -c models.json && cd -
+	python3 server/code_generation/generate_models.py -c server/api/models.json -o server/api
+	python3 server/code_generation/generate_handlers.py -c server/api/models.json -o server/api
 	$(GOFMT) -s .
 	$(GOBUILD) -o ./bin/apiserver ./cmd/apiserver/main.go
 
