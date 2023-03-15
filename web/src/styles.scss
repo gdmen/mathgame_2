@@ -1,20 +1,25 @@
 // colors
-$color-one: #BEE8B7;
-$color-two: #D6F7D2;
+$color-one: #bee8b7;
+$color-two: #d6f7d2;
 $color-one-contrast: #007200;
-$color-inactive: #A9A9A9;
-$color-error: #DC143C;
+$color-inactive: #a9a9a9;
+$color-error: #dc143c;
 $background-color: white;
 $font-color: black;
 
 // fonts
-@import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&display=swap');
-$base-font-family: 'Josefin Sans', sans-serif;
-html,button {
+@import url("https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&display=swap");
+$base-font-family: "Josefin Sans", sans-serif;
+html,
+button {
   font-family: $base-font-family;
   font-size: 1em;
 }
-h1,h2,h3,h4,h5 {
+h1,
+h2,
+h3,
+h4,
+h5 {
   line-height: 1.25em;
 }
 h1 {
@@ -26,7 +31,8 @@ h2 {
 h3 {
   font-size: 1.5em;
 }
-p,button {
+p,
+button {
   font-weight: 300;
 }
 

@@ -12,7 +12,7 @@
     justify-content: space-evenly;
     .tab {
       border-bottom: 0.25em solid white;
-      padding: $base-space 2*$base-space;
+      padding: $base-space 2 * $base-space;
       position: relative;
       &.active {
         border-color: $color-one-contrast;
@@ -47,7 +47,7 @@
 }
 
 .tab-content {
-  padding: 2*$base-space;
+  padding: 2 * $base-space;
   h2 {
     margin-bottom: $base-space;
   }

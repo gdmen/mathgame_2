@@ -1,6 +1,12 @@
 @import "styles.scss";
 
-$add-video-bg: linear-gradient(90deg, white 0%, rgb(245, 245, 245, 0.75) 5%, rgb(245, 245, 245, 0.75) 95%, white 100%);
+$add-video-bg: linear-gradient(
+  90deg,
+  white 0%,
+  rgb(245, 245, 245, 0.75) 5%,
+  rgb(245, 245, 245, 0.75) 95%,
+  white 100%
+);
 
 #settings {
   border-top: 1px gray;
@@ -11,7 +17,7 @@ $add-video-bg: linear-gradient(90deg, white 0%, rgb(245, 245, 245, 0.75) 5%, rgb
 }
 
 .tab-content {
-  padding: 2*$base-space;
+  padding: 2 * $base-space;
   h2 {
     margin-bottom: $base-space;
   }
@@ -23,7 +29,7 @@ $add-video-bg: linear-gradient(90deg, white 0%, rgb(245, 245, 245, 0.75) 5%, rgb
     &.submit {
       display: block;
       margin: 0 auto;
-      margin-top: 1.5*$base-space;
+      margin-top: 1.5 * $base-space;
       padding: 0.5em 0.75em;
     }
     &:active {

@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react";
 
-import './problem.scss'
+import "./problem.scss";
 
-var ReactFitText = require('react-fittext');
+var ReactFitText = require("react-fittext");
 
 class EventReporterSingleton {
   constructor(postEvent, interval, postAnswer) {
@@ -37,7 +37,11 @@ class EventReporterSingleton {
   }
 
   wasIncorrectAnswer(problem_id) {
-    return this.lastAnswer !== "" && !this.answerChanged && this.lastProblemId === problem_id;
+    return (
+      this.lastAnswer !== "" &&
+      !this.answerChanged &&
+      this.lastProblemId === problem_id
+    );
   }
 
   answerWasSet() {
@@ -65,9 +69,9 @@ class EventReporterSingleton {
   }
 
   reportWorking() {
-      if (this.focus) {
-        this.postEvent("working_on_problem", this.interval);
-      }
+    if (this.focus) {
+      this.postEvent("working_on_problem", this.interval);
+    }
   }
 
   onFocus() {
@@ -86,43 +90,65 @@ const ProblemView = ({ gamestate, latex, postAnswer, postEvent, interval }) => {
     setAnswer("");
   }, [latex]);
 
-  if (gamestate == null || latex == null || postAnswer == null || postEvent == null || interval == null) {
-    return <div className="content-loading"></div>
+  if (
+    gamestate == null ||
+    latex == null ||
+    postAnswer == null ||
+    postEvent == null ||
+    interval == null
+  ) {
+    return <div className="content-loading"></div>;
   }
 
   postEvent("displayed_problem", gamestate.problem_id);
   var reporter = new EventReporterSingleton(postEvent, interval, postAnswer);
-  var progress = String(100.0 * gamestate.solved / gamestate.target) + "%";
-  return (<>
-    <div id="problem">
+  var progress = String((100.0 * gamestate.solved) / gamestate.target) + "%";
+  return (
+    <>
+      <div id="problem">
         <div className="progress">
-          <div className="progress-meter" style={{width: progress}}>
-          </div>
+          <div className="progress-meter" style={{ width: progress }}></div>
         </div>
         <ReactFitText compressor={0.75}>
-            <div id="problem-display" dangerouslySetInnerHTML={{__html: latex}}></div>
+          <div
+            id="problem-display"
+            dangerouslySetInnerHTML={{ __html: latex }}
+          ></div>
         </ReactFitText>
         <div id="problem-answer" className="input-group">
-            <input id="problem-answer-input" className="input-group-field" type="text"
-                value={answer}
-                onChange={(e) => { setAnswer(e.target.value); reporter.answerWasSet(); }}
-                onKeyDown={(e) => { if (e.key === "Enter") { reporter.reportAnswer(answer, gamestate.problem_id); }}}
-            />
-            <div>
-                <button onClick={() => { reporter.reportAnswer(answer, gamestate.problem_id); }}>
-                  <h3>submit</h3>
-                </button>
-            </div>
+          <input
+            id="problem-answer-input"
+            className="input-group-field"
+            type="text"
+            value={answer}
+            onChange={(e) => {
+              setAnswer(e.target.value);
+              reporter.answerWasSet();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                reporter.reportAnswer(answer, gamestate.problem_id);
+              }
+            }}
+          />
+          <div>
+            <button
+              onClick={() => {
+                reporter.reportAnswer(answer, gamestate.problem_id);
+              }}
+            >
+              <h3>submit</h3>
+            </button>
+          </div>
         </div>
-        { reporter.wasIncorrectAnswer(gamestate.problem_id) &&
-            <div className="label alert">
-              <div>Try Again!</div>
-            </div>
-        }
-    </div>
-  </>)
-}
+        {reporter.wasIncorrectAnswer(gamestate.problem_id) && (
+          <div className="label alert">
+            <div>Try Again!</div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+};
 
-export {
-  ProblemView
-}
+export { ProblemView };

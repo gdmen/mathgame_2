@@ -1,11 +1,11 @@
-import katex from 'katex';
+import katex from "katex";
 import React, { useCallback, useEffect, useState } from "react";
 
-import "katex/dist/katex.min.css"
+import "katex/dist/katex.min.css";
 
-import { ProblemView } from './problem.js'
-import { VideoView } from './video.js'
-import { ClearSessionPin } from './pin.js'
+import { ProblemView } from "./problem.js";
+import { VideoView } from "./video.js";
+import { ClearSessionPin } from "./pin.js";
 
 const PlayView = ({ token, url, user, postEvent, interval }) => {
   const [gamestate, setGamestate] = useState(null);
@@ -21,14 +21,14 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
         return;
       }
       const settings = {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-          },
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+        },
       };
-      const req = await fetch(url+ "/gamestates/" + user.id, settings);
+      const req = await fetch(url + "/gamestates/" + user.id, settings);
       const json = await req.json();
       setGamestate(json);
     } catch (e) {
@@ -42,14 +42,17 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
         return;
       }
       const settings = {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-          },
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+        },
       };
-      const req = await fetch(url+ "/problems/" + gamestate.problem_id, settings);
+      const req = await fetch(
+        url + "/problems/" + gamestate.problem_id,
+        settings
+      );
       const json = await req.json();
       setProblem(json);
       setLatex(katex.renderToString(json.expression));
@@ -64,14 +67,14 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
         return;
       }
       const settings = {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-          },
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+        },
       };
-      const req = await fetch(url+ "/videos/" + gamestate.video_id, settings);
+      const req = await fetch(url + "/videos/" + gamestate.video_id, settings);
       const json = await req.json();
       setVideo(json);
     } catch (e) {
@@ -96,15 +99,23 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
   };
 
   if (!gamestate || !problem) {
-    return <div className="content-loading"></div>
+    return <div className="content-loading"></div>;
   }
 
   if (gamestate.solved >= gamestate.target) {
-    return <VideoView video={video} postEvent={postEvent} interval={interval} />
+    return (
+      <VideoView video={video} postEvent={postEvent} interval={interval} />
+    );
   }
-  return <ProblemView gamestate={gamestate} latex={latex} postAnswer={postAnswer} postEvent={postEvent} interval={interval} />
-}
+  return (
+    <ProblemView
+      gamestate={gamestate}
+      latex={latex}
+      postAnswer={postAnswer}
+      postEvent={postEvent}
+      interval={interval}
+    />
+  );
+};
 
-export {
-  PlayView
-}
+export { PlayView };

@@ -1,18 +1,18 @@
 import React, { useState } from "react";
-import { useParams } from 'react-router-dom'
-import PinInput from 'react-pin-input';
+import { useParams } from "react-router-dom";
+import PinInput from "react-pin-input";
 
-import './pin.scss'
+import "./pin.scss";
 
-const pinSessionStorageName = "math-game-pin"
+const pinSessionStorageName = "math-game-pin";
 
-const SetSessionPin = function(pin) {
+const SetSessionPin = function (pin) {
   sessionStorage.setItem(pinSessionStorageName, pin);
-}
-const GetSessionPin = function() {
+};
+const GetSessionPin = function () {
   return sessionStorage.getItem(pinSessionStorageName);
-}
-const RequirePin = function(correctPin) {
+};
+const RequirePin = function (correctPin) {
   let sessionPin = GetSessionPin();
   let valid = false;
   if (sessionPin !== null) {
@@ -20,15 +20,16 @@ const RequirePin = function(correctPin) {
   }
   if (!valid) {
     ClearSessionPin();
-    window.location.pathname = "pin/" + encodeURIComponent(window.location.pathname);
+    window.location.pathname =
+      "pin/" + encodeURIComponent(window.location.pathname);
   }
   return valid;
-}
-const ClearSessionPin = function() {
+};
+const ClearSessionPin = function () {
   sessionStorage.removeItem(pinSessionStorageName);
-}
+};
 
-const PinView = ({ user, isSetup = false, errCallback =  () => void 0 }) => {
+const PinView = ({ user, isSetup = false, errCallback = () => void 0 }) => {
   const [error, setError] = useState(user.pin.length < 4);
   const { redirect_pathname } = useParams();
 
@@ -48,26 +49,28 @@ const PinView = ({ user, isSetup = false, errCallback =  () => void 0 }) => {
     }
   };
 
-  return (<>
-    <div className="pin-form">
-      <h4><span className={error ? "error" : ""}>Enter your four digit PIN code.</span></h4>
-      <PinInput 
-        autoSelect={true}
-        focus={true}
-        inputMode="number"
-        inputStyle={{borderRadius: '0.25em'}}
-        length={4} 
-        onChange={(value, index) => {handlePinChange(value);}}
-        type="numeric"
-      />
-    </div>
-  </>)
-}
+  return (
+    <>
+      <div className="pin-form">
+        <h4>
+          <span className={error ? "error" : ""}>
+            Enter your four digit PIN code.
+          </span>
+        </h4>
+        <PinInput
+          autoSelect={true}
+          focus={true}
+          inputMode="number"
+          inputStyle={{ borderRadius: "0.25em" }}
+          length={4}
+          onChange={(value, index) => {
+            handlePinChange(value);
+          }}
+          type="numeric"
+        />
+      </div>
+    </>
+  );
+};
 
-export {
-  SetSessionPin,
-  GetSessionPin,
-  RequirePin,
-  ClearSessionPin,
-  PinView
-}
+export { SetSessionPin, GetSessionPin, RequirePin, ClearSessionPin, PinView };

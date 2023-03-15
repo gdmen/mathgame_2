@@ -1,12 +1,12 @@
-import katex from 'katex';
+import katex from "katex";
 import React, { useCallback, useEffect, useState } from "react";
-import { useParams } from 'react-router-dom'
+import { useParams } from "react-router-dom";
 
-import "katex/dist/katex.min.css"
+import "katex/dist/katex.min.css";
 
-import { ProblemCompanionView } from './problem_companion.js'
-import { VideoCompanionView } from './video_companion.js'
-import { RequirePin } from './pin.js'
+import { ProblemCompanionView } from "./problem_companion.js";
+import { VideoCompanionView } from "./video_companion.js";
+import { RequirePin } from "./pin.js";
 
 class RefresherSingleton {
   constructor(getGamestate, getEvents, interval) {
@@ -45,10 +45,10 @@ class RefresherSingleton {
   }
 
   refreshData() {
-      if (this.focus) {
-        this.getGamestate();
-        this.getEvents();
-      }
+    if (this.focus) {
+      this.getGamestate();
+      this.getEvents();
+    }
   }
 
   onFocus() {
@@ -77,14 +77,14 @@ const CompanionView = ({ token, url, user }) => {
         return;
       }
       const settings = {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-          },
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+        },
       };
-      const req = await fetch(url+ "/gamestates/" + student_id, settings);
+      const req = await fetch(url + "/gamestates/" + student_id, settings);
       const json = await req.json();
       setGamestate(json);
     } catch (e) {
@@ -98,14 +98,17 @@ const CompanionView = ({ token, url, user }) => {
         return;
       }
       const settings = {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-          },
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+        },
       };
-      const req = await fetch(url+ "/problems/" + gamestate.problem_id, settings);
+      const req = await fetch(
+        url + "/problems/" + gamestate.problem_id,
+        settings
+      );
       const json = await req.json();
       setProblem(json);
       setAnswer(json["answer"]);
@@ -121,14 +124,14 @@ const CompanionView = ({ token, url, user }) => {
         return;
       }
       const settings = {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-          },
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+        },
       };
-      const req = await fetch(url+ "/videos/" + gamestate.video_id, settings);
+      const req = await fetch(url + "/videos/" + gamestate.video_id, settings);
       const json = await req.json();
       setVideo(json);
     } catch (e) {
@@ -138,18 +141,26 @@ const CompanionView = ({ token, url, user }) => {
 
   const getEvents = useCallback(async () => {
     try {
-      if (token == null || url == null || student_id == null || gamestate == null) {
+      if (
+        token == null ||
+        url == null ||
+        student_id == null ||
+        gamestate == null
+      ) {
         return;
       }
       const settings = {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-          },
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+        },
       };
-      const req = await fetch(url+ "/events/" + student_id + "/" + 3000, settings);
+      const req = await fetch(
+        url + "/events/" + student_id + "/" + 3000,
+        settings
+      );
       const json = await req.json();
 
       // Clean up, sort, and store events
@@ -194,21 +205,26 @@ const CompanionView = ({ token, url, user }) => {
   }, [getEvents]);
 
   if (!RequirePin(user.id)) {
-    return <div className="content-loading"></div>
+    return <div className="content-loading"></div>;
   }
 
   if (!gamestate || !problem) {
-    return <div className="content-loading"></div>
+    return <div className="content-loading"></div>;
   }
 
   new RefresherSingleton(getGamestate, getEvents, interval);
 
   if (gamestate.solved >= gamestate.target) {
-    return <VideoCompanionView video={video} />
+    return <VideoCompanionView video={video} />;
   }
-  return <ProblemCompanionView gamestate={gamestate} latex={latex} answer={answer} attempts={attempts}/>
-}
+  return (
+    <ProblemCompanionView
+      gamestate={gamestate}
+      latex={latex}
+      answer={answer}
+      attempts={attempts}
+    />
+  );
+};
 
-export {
-  CompanionView
-}
+export { CompanionView };

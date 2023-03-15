@@ -56,6 +56,7 @@ clean:
 
 build-web:
 	cd web && npm install && npm run build; cd -
+	cd web/src && npx prettier --write .; cd -
 	ln -s ../../conf.json web/src/conf.json
 
 prod-web:

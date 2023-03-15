@@ -28,11 +28,10 @@
     background-color: $color-one-contrast;
     color: white;
     font-weight: 400;
-    margin-top: 1.5*$base-space;
+    margin-top: 1.5 * $base-space;
   }
 }
 #problem-companion {
-
   display: flex;
   justify-content: space-between;
   margin: 0 auto;
@@ -40,17 +39,17 @@
   padding: 0 $base-space;
 
   #problem-mirror {
-    max-width: 0.7*$max-width;
+    max-width: 0.7 * $max-width;
     text-align: center;
     width: 70%;
     #problem-answer-companion {
-        font-size: 2em;
+      font-size: 2em;
     }
   }
 
   #problem-attempts {
     margin-left: 2em;
-    max-width: 0.3*$max-width;
+    max-width: 0.3 * $max-width;
     width: 30%;
     .problem-attempt {
     }

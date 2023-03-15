@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import ReactPlayer from 'react-player'
+import ReactPlayer from "react-player";
 
-import './video.scss'
+import "./video.scss";
 
 const VideoView = ({ video, postEvent, interval }) => {
   const [playing, setPlaying] = useState(false);
@@ -13,7 +13,7 @@ const VideoView = ({ video, postEvent, interval }) => {
   }, [elapsed]);
 
   if (video == null || postEvent == null || interval == null) {
-    return <div className="content-loading"></div>
+    return <div className="content-loading"></div>;
   }
 
   const playPause = () => {
@@ -23,20 +23,17 @@ const VideoView = ({ video, postEvent, interval }) => {
     //window.location.pathname="play";
   };
 
-  document.body.onkeyup = function(e) {
-    if (e.key === " " ||
-        e.code === "Space" ||
-        e.keyCode === 32
-    ) {
+  document.body.onkeyup = function (e) {
+    if (e.key === " " || e.code === "Space" || e.keyCode === 32) {
       playPause();
     }
-  }
+  };
 
   return (
     <div id="video-container">
       <div id="video">
         <ReactPlayer
-          className='react-player'
+          className="react-player"
           width="100%"
           height="100%"
           url={video.url}
@@ -49,15 +46,13 @@ const VideoView = ({ video, postEvent, interval }) => {
           }}
           onEnded={() => {
             postEvent("done_watching_video", video.id);
-            window.location.pathname="play";
+            window.location.pathname = "play";
           }}
         />
         <div id="click-blocker" onClick={playPause}></div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export {
-  VideoView
-}
+export { VideoView };
