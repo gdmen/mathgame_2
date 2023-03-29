@@ -349,6 +349,65 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	return nil
 }
 
+// also generate settings change events
+func (a *Api) customUpdateSettings(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Settings{}
+	if BindModelFromForm(logPrefix, c, model) != nil {
+		return
+	}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Write to database
+	status, msg, err := a.settingsManager.Update(model)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
+
+	// Get User
+	auth0Id := GetAuth0IdFromContext(logPrefix, c, a.isTest)
+	user, status, msg, err := a.userManager.Get(auth0Id)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, user) != nil {
+		return
+	}
+
+	// Get Settings
+	settings, status, msg, err := a.settingsManager.Get(user.Id)
+	if HandleMngrResp(logPrefix, c, status, msg, err, settings) != nil {
+		return
+	}
+	glog.Infof("%s Settings: %v", logPrefix, settings)
+
+	// Trigger events for all the changed settings
+	var events []*Event
+	if model.ProblemTypeBitmap != settings.ProblemTypeBitmap {
+		events = append(events, &Event{
+			EventType: SET_PROBLEM_TYPE_BITMAP,
+			Value:     strconv.FormatUint(model.ProblemTypeBitmap, 10),
+		})
+	}
+	if model.TargetDifficulty != settings.TargetDifficulty {
+		events = append(events, &Event{
+			EventType: SET_TARGET_DIFFICULTY,
+			Value:     strconv.FormatFloat(model.TargetDifficulty, 'E', -1, 64),
+		})
+	}
+	if model.TargetWorkPercentage != settings.TargetWorkPercentage {
+		events = append(events, &Event{
+			EventType: SET_TARGET_WORK_PERCENTAGE,
+			Value:     strconv.FormatFloat(model.TargetWorkPercentage, 'E', -1, 64),
+		})
+	}
+	if a.processEvents(logPrefix, c, events, false) != nil {
+		return
+	}
+}
+
 func (a *Api) customCreateEvent(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)

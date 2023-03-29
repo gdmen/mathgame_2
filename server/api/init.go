@@ -98,7 +98,7 @@ func (a *Api) GetRouter() *gin.Engine {
 		}
 		settings := v1.Group("/settings")
 		{
-			settings.POST("/:user_id", a.updateSettings)
+			settings.POST("/:user_id", a.customUpdateSettings)
 			settings.GET("/:user_id", a.getSettings)
 		}
 		gamestate := v1.Group("/gamestates")
