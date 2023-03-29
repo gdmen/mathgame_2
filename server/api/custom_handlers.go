@@ -363,12 +363,6 @@ func (a *Api) customUpdateSettings(c *gin.Context) {
 		return
 	}
 
-	// Write to database
-	status, msg, err := a.settingsManager.Update(model)
-	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
-		return
-	}
-
 	// Get User
 	auth0Id := GetAuth0IdFromContext(logPrefix, c, a.isTest)
 	user, status, msg, err := a.userManager.Get(auth0Id)
@@ -381,7 +375,12 @@ func (a *Api) customUpdateSettings(c *gin.Context) {
 	if HandleMngrResp(logPrefix, c, status, msg, err, settings) != nil {
 		return
 	}
-	glog.Infof("%s Settings: %v", logPrefix, settings)
+
+	// Write to database
+	status, msg, err = a.settingsManager.Update(model)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
 
 	// Trigger events for all the changed settings
 	var events []*Event
