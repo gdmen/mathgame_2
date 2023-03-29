@@ -132,8 +132,8 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint
 	return videoId, nil
 }
 
-// Do stuff based on the event and return an updated Gamestate{}
-func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, writeCtx bool) error {
+// Do stuff based on the event and write an updated Gamestate / any other side effects
+func (a *Api) processEvents(logPrefix string, c *gin.Context, events []*Event, writeCtx bool) error {
 	auth0Id := GetAuth0IdFromContext(logPrefix, c, a.isTest)
 
 	// Get User
@@ -156,8 +156,27 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	}
 	glog.Infof("%s Settings: %v", logPrefix, settings)
 
+	for _, event := range events {
+		err = a.processEvent(logPrefix, c, event, writeCtx, user, gamestate, settings)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, writeCtx bool, user *User, gamestate *Gamestate, settings *Settings) error {
+
 	if event.EventType == LOGGED_IN {
 		// no-op
+	} else if event.EventType == SET_TARGET_DIFFICULTY {
+		// TODO: validate
+	} else if event.EventType == SET_TARGET_WORK_PERCENTAGE {
+		// TODO: validate
+	} else if event.EventType == SET_PROBLEM_TYPE_BITMAP {
+		// TODO: validate
+	} else if event.EventType == SET_GAMESTATE_TARGET {
+		// TODO: validate
 	} else if event.EventType == DISPLAYED_PROBLEM {
 		// TODO: validate problemID
 	} else if event.EventType == WORKING_ON_PROBLEM {
@@ -197,7 +216,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 
 		if gamestate.Solved < gamestate.Target {
 			msg := fmt.Sprintf("Done watching video, but there's an inconsistency in problems solved: %v < %v", gamestate.Solved, gamestate.Target)
-			glog.Errorf("%s %s: %v", logPrefix, msg, err)
+			glog.Errorf("%s %s", logPrefix, msg)
 		}
 		// Calculate work % for the "recent past" of the user.
 		query := `SELECT work/total FROM
@@ -269,7 +288,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	// Write event to database
 	event.UserId = gamestate.UserId
 	event.Timestamp = time.Now()
-	status, msg, err = a.eventManager.Create(event)
+	status, msg, err := a.eventManager.Create(event)
 	if HandleMngrResp(logPrefix, c, status, msg, err, event) != nil {
 		return err
 	}
@@ -302,7 +321,7 @@ func (a *Api) customCreateEvent(c *gin.Context) {
 	}
 	glog.Infof("%s bound model: %v", logPrefix, event)
 
-	if a.processEvent(logPrefix, c, event, true) != nil {
+	if a.processEvents(logPrefix, c, []*Event{event}, true) != nil {
 		return
 	}
 }
@@ -399,7 +418,16 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 			return
 		}
 		// Write default new settings to database
-		default_settings := &Settings{UserId: user.Id}
+		const default_problem_type_bitmap uint64 = 0
+		const default_target_difficulty float64 = 3
+		const default_target_work_percentage float64 = 0.7
+		const default_gamestate_target uint32 = 10
+		default_settings := &Settings{
+			UserId:               user.Id,
+			ProblemTypeBitmap:    default_problem_type_bitmap,
+			TargetDifficulty:     default_target_difficulty,
+			TargetWorkPercentage: default_target_work_percentage,
+		}
 		status, msg, err := a.settingsManager.Create(default_settings)
 		if HandleMngrResp(logPrefix, c, status, msg, err, default_settings) != nil {
 			return
@@ -427,12 +455,39 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 			ProblemId: problem.Id,
 			VideoId:   videoId,
 			Solved:    0,
-			Target:    20,
+			Target:    default_gamestate_target,
 		}
 		status, msg, err = a.gamestateManager.Create(default_gamestate)
 		if HandleMngrResp(logPrefix, c, status, msg, err, default_gamestate) != nil {
 			return
 		}
+
+		// Trigger events for all the new settings
+		var events []*Event
+		events = append(events, &Event{
+			UserId:    user.Id,
+			EventType: SET_PROBLEM_TYPE_BITMAP,
+			Value:     strconv.FormatUint(default_problem_type_bitmap, 10),
+		})
+		events = append(events, &Event{
+			UserId:    user.Id,
+			EventType: SET_TARGET_DIFFICULTY,
+			Value:     strconv.FormatFloat(default_target_difficulty, 'E', -1, 64),
+		})
+		events = append(events, &Event{
+			UserId:    user.Id,
+			EventType: SET_TARGET_WORK_PERCENTAGE,
+			Value:     strconv.FormatFloat(default_target_work_percentage, 'E', -1, 64),
+		})
+		events = append(events, &Event{
+			UserId:    user.Id,
+			EventType: SET_GAMESTATE_TARGET,
+			Value:     strconv.FormatUint(uint64(default_gamestate_target), 10),
+		})
+		if a.processEvents(logPrefix, c, events, false) != nil {
+			return
+		}
+
 	}
 
 	event := &Event{
@@ -440,7 +495,7 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 		EventType: LOGGED_IN,
 	}
 
-	if a.processEvent(logPrefix, c, event, false) != nil {
+	if a.processEvents(logPrefix, c, []*Event{event}, false) != nil {
 		return
 	}
 }
