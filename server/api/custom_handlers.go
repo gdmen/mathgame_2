@@ -387,6 +387,7 @@ func (a *Api) customListEvent(c *gin.Context) {
 	}
 }
 
+// If the current reward video is deleted, we need to replace it
 func (a *Api) customDeleteVideo(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
