@@ -170,6 +170,27 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	changed_gamestate := false
 	changed_settings := false
 
+	// The main event to be processed as well as any side-effect events we add in this function
+	events := []*Event{event}
+
+	var changeGamestateTarget = func(val uint32) {
+		gamestate.Target = val
+		changed_gamestate = true
+		events = append(events, &Event{
+			EventType: SET_GAMESTATE_TARGET,
+			Value:     strconv.FormatUint(uint64(gamestate.Target), 10),
+		})
+	}
+
+	var changeTargetDifficulty = func(val float64) {
+		settings.TargetDifficulty = val
+		changed_settings = true
+		events = append(events, &Event{
+			EventType: SET_TARGET_DIFFICULTY,
+			Value:     strconv.FormatFloat(val, 'E', -1, 64),
+		})
+	}
+
 	if event.EventType == LOGGED_IN {
 		// no-op
 	} else if event.EventType == SET_TARGET_DIFFICULTY {
@@ -252,30 +273,23 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		} else if settings.TargetWorkPercentage > workPercentage {
 			// Make it more difficult
 			if gamestate.Target < maxProbs {
-				gamestate.Target += 1
-				changed_gamestate = true
+				changeGamestateTarget(gamestate.Target + 1)
 			} else {
-				gamestate.Target = uint32(math.Max(float64(minProbs), math.Ceil(float64(gamestate.Target)/2)))
-				changed_gamestate = true
-				settings.TargetDifficulty += math.Max(1, diffIncrease*settings.TargetDifficulty)
-				changed_settings = true
+				changeGamestateTarget(uint32(math.Max(float64(minProbs), math.Ceil(float64(gamestate.Target)/2))))
+				changeTargetDifficulty(settings.TargetDifficulty + math.Max(1, diffIncrease*settings.TargetDifficulty))
 			}
 		} else if settings.TargetWorkPercentage < workPercentage {
 			// Make it easier
 			if gamestate.Target > minProbs {
-				gamestate.Target = uint32(math.Max(float64(minProbs), math.Ceil(float64(gamestate.Target)/2)))
-				changed_gamestate = true
+				changeGamestateTarget(uint32(math.Max(float64(minProbs), math.Ceil(float64(gamestate.Target)/2))))
 			} else {
 				if settings.TargetDifficulty <= minDiff {
 					glog.Infof(
 						"%s difficulty of %v should not be below %v and we're already at minProbs. Will not make this easier.", logPrefix, settings.TargetDifficulty, minDiff)
-					settings.TargetDifficulty = minDiff
-					changed_settings = true
+					changeTargetDifficulty(minDiff)
 				} else {
-					gamestate.Target += 1
-					changed_gamestate = true
-					settings.TargetDifficulty = math.Max(minDiff, settings.TargetDifficulty-math.Max(1, diffIncrease*settings.TargetDifficulty))
-					changed_settings = true
+					changeGamestateTarget(gamestate.Target + 1)
+					changeTargetDifficulty(math.Max(minDiff, settings.TargetDifficulty-math.Max(1, diffIncrease*settings.TargetDifficulty)))
 				}
 			}
 		}
@@ -299,18 +313,20 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		return errors.New(msg)
 	}
 
-	// Write event to database
-	event.UserId = gamestate.UserId
-	event.Timestamp = time.Now()
-	status, msg, err := a.eventManager.Create(event)
-	if HandleMngrResp(logPrefix, c, status, msg, err, event) != nil {
-		return err
+	// Write all events to database
+	for _, e := range events {
+		e.UserId = gamestate.UserId
+		e.Timestamp = time.Now()
+		status, msg, err := a.eventManager.Create(e)
+		if HandleMngrResp(logPrefix, c, status, msg, err, e) != nil {
+			return err
+		}
 	}
 
 	// Write the updated settings
 	if changed_settings {
 		glog.Infof("%s Settings: %v", logPrefix, settings)
-		status, msg, err = a.settingsManager.Update(settings)
+		status, msg, err := a.settingsManager.Update(settings)
 		if HandleMngrResp(logPrefix, c, status, msg, err, settings) != nil {
 			return err
 		}
@@ -319,7 +335,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	// Write the updated gamestate
 	if changed_gamestate {
 		glog.Infof("%s Gamestate: %v", logPrefix, gamestate)
-		status, msg, err = a.gamestateManager.Update(gamestate)
+		status, msg, err := a.gamestateManager.Update(gamestate)
 		if HandleMngrResp(logPrefix, c, status, msg, err, gamestate) != nil {
 			return err
 		}
