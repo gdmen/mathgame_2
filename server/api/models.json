@@ -96,15 +96,15 @@
         },
         {
           "name": "ProblemTypeBitmap", "type": "uint64",
-          "sql": "BIGINT UNSIGNED NOT NULL DEFAULT 0"
+          "sql": "BIGINT UNSIGNED NOT NULL"
         },
         {
           "name": "TargetDifficulty", "type": "float64",
-          "sql": "DOUBLE NOT NULL DEFAULT 3"
+          "sql": "DOUBLE NOT NULL"
         },
         {
           "name": "TargetWorkPercentage", "type": "float64",
-          "sql": "DOUBLE NOT NULL DEFAULT 0.70"
+          "sql": "DOUBLE NOT NULL"
         }
       ]
     },

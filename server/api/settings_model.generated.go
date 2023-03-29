@@ -12,16 +12,16 @@ const (
 	CreateSettingsTableSQL = `
     CREATE TABLE settings (
         user_id BIGINT UNSIGNED PRIMARY KEY,
-	problem_type_bitmap BIGINT UNSIGNED NOT NULL DEFAULT 0,
-	target_difficulty DOUBLE NOT NULL DEFAULT 3,
-	target_work_percentage DOUBLE NOT NULL DEFAULT 0.70
+	problem_type_bitmap BIGINT UNSIGNED NOT NULL,
+	target_difficulty DOUBLE NOT NULL,
+	target_work_percentage DOUBLE NOT NULL
     ) DEFAULT CHARSET=utf8 ;`
 
-	createSettingsSQL = `INSERT INTO settings (user_id) VALUES (?);`
+	createSettingsSQL = `INSERT INTO settings (user_id, problem_type_bitmap, target_difficulty, target_work_percentage) VALUES (?, ?, ?, ?);`
 
 	getSettingsSQL = `SELECT * FROM settings WHERE user_id=?;`
 
-	getSettingsKeySQL = `SELECT  FROM settingss WHERE user_id=?;`
+	getSettingsKeySQL = `SELECT  FROM settingss WHERE user_id=? AND problem_type_bitmap=? AND target_difficulty=? AND target_work_percentage=?;`
 
 	listSettingsSQL = `SELECT * FROM settings;`
 
@@ -47,7 +47,7 @@ type SettingsManager struct {
 
 func (m *SettingsManager) Create(model *Settings) (int, string, error) {
 	status := http.StatusCreated
-	_, err := m.DB.Exec(createSettingsSQL, model.UserId)
+	_, err := m.DB.Exec(createSettingsSQL, model.UserId, model.ProblemTypeBitmap, model.TargetDifficulty, model.TargetWorkPercentage)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Duplicate entry") {
 			msg := "Couldn't add settings to database"
