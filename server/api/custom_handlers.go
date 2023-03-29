@@ -167,6 +167,9 @@ func (a *Api) processEvents(logPrefix string, c *gin.Context, events []*Event, w
 
 func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, writeCtx bool, user *User, gamestate *Gamestate, settings *Settings) error {
 
+	changed_gamestate := false
+	changed_settings := false
+
 	if event.EventType == LOGGED_IN {
 		// no-op
 	} else if event.EventType == SET_TARGET_DIFFICULTY {
@@ -199,6 +202,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 				return err
 			}
 			gamestate.ProblemId = problem.Id
+			changed_gamestate = true
 		}
 	} else if event.EventType == WATCHING_VIDEO {
 		// TODO: validate duration
@@ -249,21 +253,29 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			// Make it more difficult
 			if gamestate.Target < maxProbs {
 				gamestate.Target += 1
+				changed_gamestate = true
 			} else {
 				gamestate.Target = uint32(math.Max(float64(minProbs), math.Ceil(float64(gamestate.Target)/2)))
+				changed_gamestate = true
 				settings.TargetDifficulty += math.Max(1, diffIncrease*settings.TargetDifficulty)
+				changed_settings = true
 			}
 		} else if settings.TargetWorkPercentage < workPercentage {
 			// Make it easier
 			if gamestate.Target > minProbs {
 				gamestate.Target = uint32(math.Max(float64(minProbs), math.Ceil(float64(gamestate.Target)/2)))
+				changed_gamestate = true
 			} else {
 				if settings.TargetDifficulty <= minDiff {
-					glog.Infof("%s difficulty of %v should not be below %v and we're already at minProbs. Will not make this easier.", logPrefix, settings.TargetDifficulty, minDiff)
+					glog.Infof(
+						"%s difficulty of %v should not be below %v and we're already at minProbs. Will not make this easier.", logPrefix, settings.TargetDifficulty, minDiff)
 					settings.TargetDifficulty = minDiff
+					changed_settings = true
 				} else {
 					gamestate.Target += 1
+					changed_gamestate = true
 					settings.TargetDifficulty = math.Max(minDiff, settings.TargetDifficulty-math.Max(1, diffIncrease*settings.TargetDifficulty))
+					changed_settings = true
 				}
 			}
 		}
@@ -271,6 +283,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 
 		// Reset solved progress
 		gamestate.Solved = 0
+		changed_gamestate = true
 
 		// Set a new reward video
 		videoId, err := a.selectVideo(logPrefix, c, user.Id)
@@ -278,6 +291,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			return err
 		}
 		gamestate.VideoId = videoId
+		changed_gamestate = true
 	} else {
 		msg := fmt.Sprintf("Invalid EventType: %s", event.EventType)
 		glog.Errorf("%s %s", logPrefix, msg)
@@ -294,17 +308,26 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	}
 
 	// Write the updated settings
-	glog.Infof("%s Settings: %v", logPrefix, settings)
-	status, msg, err = a.settingsManager.Update(settings)
-	if HandleMngrResp(logPrefix, c, status, msg, err, settings) != nil {
-		return err
+	if changed_settings {
+		glog.Infof("%s Settings: %v", logPrefix, settings)
+		status, msg, err = a.settingsManager.Update(settings)
+		if HandleMngrResp(logPrefix, c, status, msg, err, settings) != nil {
+			return err
+		}
 	}
 
 	// Write the updated gamestate
-	glog.Infof("%s Gamestate: %v", logPrefix, gamestate)
-	status, msg, err = a.gamestateManager.Update(gamestate)
-	if (writeCtx && HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, gamestate) != nil) || HandleMngrResp(logPrefix, c, status, msg, err, gamestate) != nil {
-		return err
+	if changed_gamestate {
+		glog.Infof("%s Gamestate: %v", logPrefix, gamestate)
+		status, msg, err = a.gamestateManager.Update(gamestate)
+		if HandleMngrResp(logPrefix, c, status, msg, err, gamestate) != nil {
+			return err
+		}
+	}
+
+	// Write the gamestate to the response body
+	if writeCtx {
+		HandleMngrRespWriteCtx(logPrefix, c, 200, "", nil, gamestate)
 	}
 
 	return nil
