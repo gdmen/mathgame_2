@@ -265,12 +265,13 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		}
 		// Adjust work load. Levers are difficulty and target number of problems.
 		glog.Infof("%s settings.TargetWorkPercentage: %v", logPrefix, settings.TargetWorkPercentage)
+		targetWorkPercentage := float64(settings.TargetWorkPercentage) / 100.0
 
 		glog.Infof("%s starting difficulty & num problems: %v, %v", logPrefix, settings.TargetDifficulty, gamestate.Target)
 		// Only do something if we are not already on target
-		if math.Abs(settings.TargetWorkPercentage-workPercentage) < epsilon {
+		if math.Abs(targetWorkPercentage-workPercentage) < epsilon {
 			glog.Infof("%s difficulty is on target", logPrefix)
-		} else if settings.TargetWorkPercentage > workPercentage {
+		} else if targetWorkPercentage > workPercentage {
 			// Make it more difficult
 			if gamestate.Target < maxProbs {
 				changeGamestateTarget(gamestate.Target + 1)
@@ -278,7 +279,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 				changeGamestateTarget(uint32(math.Max(float64(minProbs), math.Ceil(float64(gamestate.Target)/2))))
 				changeTargetDifficulty(settings.TargetDifficulty + math.Max(1, diffIncrease*settings.TargetDifficulty))
 			}
-		} else if settings.TargetWorkPercentage < workPercentage {
+		} else if targetWorkPercentage < workPercentage {
 			// Make it easier
 			if gamestate.Target > minProbs {
 				changeGamestateTarget(uint32(math.Max(float64(minProbs), math.Ceil(float64(gamestate.Target)/2))))
@@ -399,7 +400,7 @@ func (a *Api) customUpdateSettings(c *gin.Context) {
 	if model.TargetWorkPercentage != settings.TargetWorkPercentage {
 		events = append(events, &Event{
 			EventType: SET_TARGET_WORK_PERCENTAGE,
-			Value:     strconv.FormatFloat(model.TargetWorkPercentage, 'E', -1, 64),
+			Value:     strconv.FormatUint(uint64(model.TargetWorkPercentage), 10),
 		})
 	}
 	if a.processEvents(logPrefix, c, events, false) != nil {
@@ -518,7 +519,7 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 		// Write default new settings to database
 		const default_problem_type_bitmap uint64 = 0
 		const default_target_difficulty float64 = 3
-		const default_target_work_percentage float64 = 0.7
+		const default_target_work_percentage uint8 = 70
 		const default_gamestate_target uint32 = 10
 		default_settings := &Settings{
 			UserId:               user.Id,
@@ -575,7 +576,7 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 		events = append(events, &Event{
 			UserId:    user.Id,
 			EventType: SET_TARGET_WORK_PERCENTAGE,
-			Value:     strconv.FormatFloat(default_target_work_percentage, 'E', -1, 64),
+			Value:     strconv.FormatUint(uint64(default_target_work_percentage), 10),
 		})
 		events = append(events, &Event{
 			UserId:    user.Id,

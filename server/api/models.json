@@ -103,8 +103,8 @@
           "sql": "DOUBLE NOT NULL"
         },
         {
-          "name": "TargetWorkPercentage", "type": "float64",
-          "sql": "DOUBLE NOT NULL"
+          "name": "TargetWorkPercentage", "type": "uint8",
+          "sql": "INT(3) NOT NULL"
         }
       ]
     },

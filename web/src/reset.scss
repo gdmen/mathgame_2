@@ -105,6 +105,11 @@ table {
 
 input {
   -webkit-appearance: none;
+  appearance: none;
   border-radius: 0;
   box-shadow: none;
+  &[type="range"] {
+    background: transparent;
+    cursor: pointer;
+  }
 }
