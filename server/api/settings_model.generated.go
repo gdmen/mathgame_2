@@ -14,7 +14,7 @@ const (
         user_id BIGINT UNSIGNED PRIMARY KEY,
 	problem_type_bitmap BIGINT UNSIGNED NOT NULL,
 	target_difficulty DOUBLE NOT NULL,
-	target_work_percentage DOUBLE NOT NULL
+	target_work_percentage INT(3) NOT NULL
     ) DEFAULT CHARSET=utf8 ;`
 
 	createSettingsSQL = `INSERT INTO settings (user_id, problem_type_bitmap, target_difficulty, target_work_percentage) VALUES (?, ?, ?, ?);`
@@ -34,7 +34,7 @@ type Settings struct {
 	UserId               uint32  `json:"user_id" uri:"user_id"`
 	ProblemTypeBitmap    uint64  `json:"problem_type_bitmap" uri:"problem_type_bitmap" form:"problem_type_bitmap"`
 	TargetDifficulty     float64 `json:"target_difficulty" uri:"target_difficulty" form:"target_difficulty"`
-	TargetWorkPercentage float64 `json:"target_work_percentage" uri:"target_work_percentage" form:"target_work_percentage"`
+	TargetWorkPercentage uint8   `json:"target_work_percentage" uri:"target_work_percentage" form:"target_work_percentage"`
 }
 
 func (model Settings) String() string {

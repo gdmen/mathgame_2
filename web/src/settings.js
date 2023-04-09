@@ -4,6 +4,25 @@ import { ProblemTypes } from "./enums.js";
 import { RequirePin } from "./pin.js";
 import "./settings.scss";
 
+const postSettings = async function (token, url, model) {
+  try {
+    const settings = {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + token,
+      },
+      body: JSON.stringify(model),
+    };
+    const req = await fetch(url + "/settings/" + model.user_id, settings);
+    const json = await req.json();
+    return json;
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 const ProblemTypesSettingsView = ({
   token,
   url,
@@ -18,25 +37,6 @@ const ProblemTypesSettingsView = ({
 
   errCallback(error);
 
-  const postSettings = async function (model) {
-    try {
-      const settings = {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + token,
-        },
-        body: JSON.stringify(model),
-      };
-      const req = await fetch(url + "/settings/" + model.user_id, settings);
-      const json = await req.json();
-      return json;
-    } catch (e) {
-      console.log(e.message);
-    }
-  };
-
   const handleCheckboxChange = (e) => {
     let newBitmap =
       problemTypeBitmap +
@@ -48,13 +48,13 @@ const ProblemTypesSettingsView = ({
     if (!newError) {
       // post updated settings
       settings.problem_type_bitmap = newBitmap;
-      postSettings(settings);
+      postSettings(token, url, settings);
     }
   };
 
   return (
     <>
-      <div className="settings-form">
+      <div id="problem-types-settings" className="settings-form">
         <h4>
           Which types of problems should we show?{" "}
           <span className={error ? "error" : ""}>Select one or more.</span>
@@ -82,6 +82,39 @@ const ProblemTypesSettingsView = ({
             );
           })}
         </ul>
+      </div>
+    </>
+  );
+};
+
+const TargetWorkPercentageSettingsView = ({ token, url, user, settings }) => {
+  const [targetWorkPercentage, setTargetWorkPercentage] = useState(
+    settings.target_work_percentage
+  );
+
+  const handleChange = (e) => {
+    let val = e.target.value;
+    setTargetWorkPercentage(val);
+    settings.target_work_percentage = parseInt(val);
+  };
+
+  const handleSubmit = (e) => {
+    // post updated settings
+    postSettings(token, url, settings);
+  };
+
+  return (
+    <>
+      <div id="target-work-percentage-settings" className="settings-form">
+        <h4>Percentage of time doing math:</h4>
+        <div>{targetWorkPercentage} %</div>
+        <input
+          type="range"
+          value={targetWorkPercentage}
+          onChange={handleChange}
+          onMouseUp={handleSubmit}
+          onBlur={handleSubmit}
+        />
       </div>
     </>
   );
@@ -335,6 +368,12 @@ const SettingsView = ({ token, url, user, settings }) => {
           user={user}
           settings={settings}
           errCallback={(e) => null}
+        />
+        <TargetWorkPercentageSettingsView
+          token={token}
+          url={url}
+          user={user}
+          settings={settings}
         />
       </div>
 
