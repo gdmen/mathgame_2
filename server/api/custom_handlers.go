@@ -115,7 +115,7 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint
 		glog.Errorf("%s %s", logPrefix, msg)
 		video := &Video{
 			Title:    "You've Got a Friend in Me",
-			URL:      "https://www.youtube.com/watch?v=rUWxSEwctFU", //"https://www.youtube.com/watch?v=nMN4JZ8crVY",
+			URL:      "https://www.youtube.com/watch?v=nMN4JZ8crVY",
 			Disabled: false,
 		}
 		status, msg, err := a.videoManager.Create(video)
@@ -225,6 +225,27 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			gamestate.ProblemId = problem.Id
 			changed_gamestate = true
 		}
+	} else if event.EventType == ERROR_PLAYING_VIDEO {
+		// Get the current video
+		video, status, msg, err := a.videoManager.Get(gamestate.VideoId)
+		if HandleMngrResp(logPrefix, c, status, msg, err, video) != nil {
+			return err
+		}
+		// Disable the current video
+		glog.Infof("%s Disabling video: %v", logPrefix, video)
+		video.Disabled = true
+		// Save the disabled video
+		status, msg, err = a.videoManager.Update(video)
+		if HandleMngrResp(logPrefix, c, status, msg, err, video) != nil {
+			return err
+		}
+		// Set a new reward video
+		videoId, err := a.selectVideo(logPrefix, c, user.Id)
+		if err != nil {
+			return err
+		}
+		gamestate.VideoId = videoId
+		changed_gamestate = true
 	} else if event.EventType == WATCHING_VIDEO {
 		// TODO: validate duration
 	} else if event.EventType == DONE_WATCHING_VIDEO {

@@ -7,6 +7,7 @@ const (
 	DISPLAYED_PROBLEM          = "displayed_problem"          // int ProblemID
 	WORKING_ON_PROBLEM         = "working_on_problem"         // int Duration in seconds
 	ANSWERED_PROBLEM           = "answered_problem"           // string Answer
+	ERROR_PLAYING_VIDEO        = "error_playing_video"        // string Error
 	WATCHING_VIDEO             = "watching_video"             // int Duration in seconds
 	DONE_WATCHING_VIDEO        = "done_watching_video"        // int VideoID
 	SET_TARGET_DIFFICULTY      = "set_target_difficulty"      // float64 Difficulty

@@ -159,6 +159,28 @@ $add-video-bg: linear-gradient(
           }
         }
       }
+      &.disabled {
+        .video-number {
+          opacity: 0.3;
+          text-decoration: line-through;
+        }
+        .video-thumbnail {
+          opacity: 0.3;
+          .video-play {
+            color: $font-color;
+            font-size : 1em;
+            opacity: 0.7;
+            padding-top: 0;
+            &:hover {
+              background-color: $background-color;
+            }
+          }
+        }
+        .video-title {
+          opacity: 0.3;
+          text-decoration: line-through;
+        }
+      }
       .video-title {
         flex: 1 1 auto;
         margin-left: 0.5em;

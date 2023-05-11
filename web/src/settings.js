@@ -318,7 +318,7 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
             var id = i + 1;
             var video = videos.get(key);
             return (
-              <li key={id}>
+              <li key={id} className={`${video.disabled ? "disabled" : ""}`}>
                 <span className="video-number">{id}</span>
                 <span
                   className="video-thumbnail"
@@ -332,16 +332,14 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    &#9654;
+                    { video.disabled ?
+                      <span>unavailable</span> : <span>&#9654;</span>
+                    }
                   </a>
                 </span>
                 <span className="video-title">{video.title}</span>
                 <span
-                  className={
-                    videos.size < 3 + 1
-                      ? "disabled video-delete"
-                      : "video-delete"
-                  }
+                  className={`video-delete ${!video.disabled && videos.size <= 3 ? "disabled" : ""}`}
                   data-video-url={video.url}
                   onClick={handleDeleteVideoClick}
                 >

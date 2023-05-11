@@ -48,6 +48,10 @@ const VideoView = ({ video, postEvent, interval }) => {
             postEvent("done_watching_video", video.id);
             window.location.pathname = "play";
           }}
+          onError={(e) => {
+            postEvent("error_playing_video", e);
+            window.location.pathname = "play";
+          }}
         />
         <div id="click-blocker" onClick={playPause}></div>
       </div>
