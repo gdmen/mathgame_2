@@ -125,7 +125,7 @@ const PinTabView = ({ token, url, user, advanceSetup }) => {
 const StartPlayingTabView = () => {
   return (
     <>
-      <h2>We're all set!</h2>
+      <h2>You're all set!</h2>
       <div className="setup-form">
         <h3>
           The Math Game will start easy and get harder to match your kid's math
