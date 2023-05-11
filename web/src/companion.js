@@ -76,7 +76,7 @@ const CompanionView = ({ token, url, user }) => {
       if (token == null || url == null || student_id == null) {
         return;
       }
-      const settings = {
+      const reqParams = {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -84,7 +84,7 @@ const CompanionView = ({ token, url, user }) => {
           Authorization: "Bearer " + token,
         },
       };
-      const req = await fetch(url + "/gamestates/" + student_id, settings);
+      const req = await fetch(url + "/gamestates/" + student_id, reqParams);
       const json = await req.json();
       setGamestate(json);
     } catch (e) {
@@ -97,7 +97,7 @@ const CompanionView = ({ token, url, user }) => {
       if (token == null || url == null || gamestate == null) {
         return;
       }
-      const settings = {
+      const reqParams = {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -107,7 +107,7 @@ const CompanionView = ({ token, url, user }) => {
       };
       const req = await fetch(
         url + "/problems/" + gamestate.problem_id,
-        settings
+        reqParams
       );
       const json = await req.json();
       setProblem(json);
@@ -123,7 +123,7 @@ const CompanionView = ({ token, url, user }) => {
       if (token == null || url == null || gamestate == null) {
         return;
       }
-      const settings = {
+      const reqParams = {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -131,7 +131,7 @@ const CompanionView = ({ token, url, user }) => {
           Authorization: "Bearer " + token,
         },
       };
-      const req = await fetch(url + "/videos/" + gamestate.video_id, settings);
+      const req = await fetch(url + "/videos/" + gamestate.video_id, reqParams);
       const json = await req.json();
       setVideo(json);
     } catch (e) {
@@ -149,7 +149,7 @@ const CompanionView = ({ token, url, user }) => {
       ) {
         return;
       }
-      const settings = {
+      const reqParams = {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -159,7 +159,7 @@ const CompanionView = ({ token, url, user }) => {
       };
       const req = await fetch(
         url + "/events/" + student_id + "/" + 3000,
-        settings
+        reqParams
       );
       const json = await req.json();
 
