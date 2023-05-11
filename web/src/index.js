@@ -170,10 +170,30 @@ const AppView = () => {
             Authorization: "Bearer " + token,
           },
         };
-        const req = await fetch(
+        var req = await fetch(
           ApiUrl + "/users/" + encodeURIComponent(user.sub),
           reqParams
         );
+        if (req.status === 404) {
+          // Looking up the auth0 user failed, so create this user in our database.
+          const reqParams = {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token,
+            },
+            body: JSON.stringify({
+              auth0_id: user.sub,
+              email: user.email,
+              username: user.name,
+            })
+          };
+          req = await fetch(
+            ApiUrl + "/users",
+            reqParams
+          );
+        }
         const json = await req.json();
         setAppUser(json);
         genPostEventFcn("logged_in", "");
