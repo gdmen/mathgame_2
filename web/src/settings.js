@@ -35,7 +35,9 @@ const ProblemTypesSettingsView = ({
     settings.problem_type_bitmap
   );
 
-  errCallback(error);
+  useEffect(() => {
+    errCallback(error);
+  }, [errCallback, error]);
 
   const handleCheckboxChange = (e) => {
     let newBitmap =
