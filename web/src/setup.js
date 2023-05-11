@@ -76,7 +76,7 @@ const PinTabView = ({ token, url, user, advanceSetup }) => {
 
   const postUser = async function (user) {
     try {
-      const settings = {
+      const reqParams = {
         method: "POST",
         headers: {
           Accept: "application/json",
@@ -87,7 +87,7 @@ const PinTabView = ({ token, url, user, advanceSetup }) => {
       };
       const req = await fetch(
         url + "/users/" + encodeURIComponent(user.auth0_id),
-        settings
+        reqParams
       );
       const json = await req.json();
       return json;

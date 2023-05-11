@@ -20,7 +20,7 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
       if (token == null || url == null || user == null) {
         return;
       }
-      const settings = {
+      const reqParams = {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -28,7 +28,7 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
           Authorization: "Bearer " + token,
         },
       };
-      const req = await fetch(url + "/gamestates/" + user.id, settings);
+      const req = await fetch(url + "/gamestates/" + user.id, reqParams);
       const json = await req.json();
       setGamestate(json);
     } catch (e) {
@@ -41,7 +41,7 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
       if (token == null || url == null || gamestate == null) {
         return;
       }
-      const settings = {
+      const reqParams = {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -51,7 +51,7 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
       };
       const req = await fetch(
         url + "/problems/" + gamestate.problem_id,
-        settings
+        reqParams
       );
       const json = await req.json();
       setProblem(json);
@@ -66,7 +66,7 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
       if (token == null || url == null || gamestate == null) {
         return;
       }
-      const settings = {
+      const reqParams = {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -74,7 +74,7 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
           Authorization: "Bearer " + token,
         },
       };
-      const req = await fetch(url + "/videos/" + gamestate.video_id, settings);
+      const req = await fetch(url + "/videos/" + gamestate.video_id, reqParams);
       const json = await req.json();
       setVideo(json);
     } catch (e) {

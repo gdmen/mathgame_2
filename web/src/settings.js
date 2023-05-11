@@ -6,7 +6,7 @@ import "./settings.scss";
 
 const postSettings = async function (token, url, model) {
   try {
-    const settings = {
+    const reqParams = {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -15,7 +15,7 @@ const postSettings = async function (token, url, model) {
       },
       body: JSON.stringify(model),
     };
-    const req = await fetch(url + "/settings/" + model.user_id, settings);
+    const req = await fetch(url + "/settings/" + model.user_id, reqParams);
     const json = await req.json();
     return json;
   } catch (e) {
@@ -134,7 +134,7 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
         if (token == null || url == null || user == null) {
           return;
         }
-        const settings = {
+        const reqParams = {
           method: "GET",
           headers: {
             Accept: "application/json",
@@ -142,7 +142,7 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
             Authorization: "Bearer " + token,
           },
         };
-        const req = await fetch(url + "/videos", settings);
+        const req = await fetch(url + "/videos", reqParams);
         const json = await req.json();
         let newVideos = new Map();
         for (var i in json) {
@@ -162,7 +162,7 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
 
   const fetchYouTubeMetadata = async function (url, okFcn, errFcn) {
     try {
-      const settings = {
+      const reqParams = {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -172,7 +172,7 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
       const req = await fetch(
         "https://www.youtube.com/oembed?format=json&url=" +
           encodeURIComponent(url),
-        settings
+        reqParams
       );
       const json = await req.json();
       okFcn(json);
@@ -200,7 +200,7 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
 
   const postVideo = async function (video) {
     try {
-      const settings = {
+      const reqParams = {
         method: "POST",
         headers: {
           Accept: "application/json",
@@ -209,7 +209,7 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
         },
         body: JSON.stringify(video),
       };
-      const req = await fetch(url + "/videos/", settings);
+      const req = await fetch(url + "/videos/", reqParams);
       if (req.ok) {
         const json = await req.json();
         setVideos((videos) => new Map(videos.set(json.url, json)));
@@ -240,7 +240,7 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
 
   const deleteVideo = async function (video) {
     try {
-      const settings = {
+      const reqParams = {
         method: "DELETE",
         headers: {
           Accept: "application/json",
@@ -248,7 +248,7 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
           Authorization: "Bearer " + token,
         },
       };
-      const req = await fetch(url + "/videos/" + video.id, settings);
+      const req = await fetch(url + "/videos/" + video.id, reqParams);
       if (req.ok) {
         videos.delete(video.url);
         if (video.url === videoUrl) {

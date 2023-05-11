@@ -97,7 +97,7 @@ const AppView = () => {
   const genPostEventFcn = useCallback(() => {
     return async function (event_type, value) {
       try {
-        const settings = {
+        const reqParams = {
           method: "POST",
           headers: {
             Accept: "application/json",
@@ -110,7 +110,7 @@ const AppView = () => {
           }),
         };
         console.log("reporting " + event_type + ":" + String(value));
-        const req = await fetch(ApiUrl + "/events", settings);
+        const req = await fetch(ApiUrl + "/events", reqParams);
         const json = await req.json();
         return json;
       } catch (e) {
@@ -137,7 +137,7 @@ const AppView = () => {
         if (token == null || appUser == null) {
           return;
         }
-        const settings = {
+        const reqParams = {
           method: "GET",
           headers: {
             Accept: "application/json",
@@ -145,7 +145,7 @@ const AppView = () => {
             Authorization: "Bearer " + token,
           },
         };
-        const req = await fetch(ApiUrl + "/settings/" + appUser.id, settings);
+        const req = await fetch(ApiUrl + "/settings/" + appUser.id, reqParams);
         const json = await req.json();
         setSettings(json);
       } catch (e) {
@@ -162,7 +162,7 @@ const AppView = () => {
         if (token == null || user == null || genPostEventFcn == null) {
           return;
         }
-        const settings = {
+        const reqParams = {
           method: "GET",
           headers: {
             Accept: "application/json",
@@ -172,7 +172,7 @@ const AppView = () => {
         };
         const req = await fetch(
           ApiUrl + "/users/" + encodeURIComponent(user.sub),
-          settings
+          reqParams
         );
         const json = await req.json();
         setAppUser(json);
