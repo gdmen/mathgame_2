@@ -134,11 +134,9 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint
 
 // Do stuff based on the event and write an updated Gamestate / any other side effects
 func (a *Api) processEvents(logPrefix string, c *gin.Context, events []*Event, writeCtx bool) error {
-	auth0Id := GetAuth0IdFromContext(logPrefix, c, a.isTest)
-
 	// Get User
-	user, status, msg, err := a.userManager.Get(auth0Id)
-	if HandleMngrResp(logPrefix, c, status, msg, err, user) != nil {
+	user, err := GetUserFromContext(logPrefix, c, a)
+	if err != nil {
 		return err
 	}
 
@@ -386,9 +384,8 @@ func (a *Api) customUpdateSettings(c *gin.Context) {
 	}
 
 	// Get User
-	auth0Id := GetAuth0IdFromContext(logPrefix, c, a.isTest)
-	user, status, msg, err := a.userManager.Get(auth0Id)
-	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, user) != nil {
+	user, err := GetUserFromContext(logPrefix, c, a)
+	if err != nil {
 		return
 	}
 
@@ -429,6 +426,24 @@ func (a *Api) customUpdateSettings(c *gin.Context) {
 	}
 }
 
+func (a *Api) customGetNumEnabledVideos(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Get User
+	user, err := GetUserFromContext(logPrefix, c, a)
+	if err != nil {
+		return
+	}
+
+	// Get a count of enabled videos for this user
+	sql := fmt.Sprintf("SELECT count(*) FROM videos WHERE user_id=%d AND disabled=0;", user.Id)
+	value, status, msg, err := a.CustomValueQuery(sql)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, value) != nil {
+		return
+	}
+}
+
 func (a *Api) customCreateEvent(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
@@ -460,8 +475,8 @@ func (a *Api) customListEvent(c *gin.Context) {
 	}
 
 	// Get recent events belonging to the specified user
-	glog.Infof(fmt.Sprintf("SELECT * FROM events WHERE user_id=%d AND timestamp > now() - interval %d second AND event_type IN (%s);", params.UserId, params.Seconds, strings.Join([]string{LOGGED_IN, DISPLAYED_PROBLEM, ANSWERED_PROBLEM, DONE_WATCHING_VIDEO}, ",")))
-	events, status, msg, err := a.eventManager.CustomList(fmt.Sprintf("SELECT * FROM events WHERE user_id=%d AND timestamp > now() - interval %d second AND event_type IN (\"%s\");", params.UserId, params.Seconds, strings.Join([]string{LOGGED_IN, DISPLAYED_PROBLEM, ANSWERED_PROBLEM, DONE_WATCHING_VIDEO}, "\",\"")))
+	sql := fmt.Sprintf("SELECT * FROM events WHERE user_id=%d AND timestamp > now() - interval %d second AND event_type IN (\"%s\");", params.UserId, params.Seconds, strings.Join([]string{LOGGED_IN, DISPLAYED_PROBLEM, ANSWERED_PROBLEM, DONE_WATCHING_VIDEO}, "\",\""))
+	events, status, msg, err := a.eventManager.CustomList(sql)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, events) != nil {
 		return
 	}
@@ -478,11 +493,9 @@ func (a *Api) customDeleteVideo(c *gin.Context) {
 		return
 	}
 
-	auth0Id := GetAuth0IdFromContext(logPrefix, c, a.isTest)
-
 	// Get User
-	user, status, msg, err := a.userManager.Get(auth0Id)
-	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, user) != nil {
+	user, err := GetUserFromContext(logPrefix, c, a)
+	if err != nil {
 		return
 	}
 

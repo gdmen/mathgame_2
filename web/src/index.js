@@ -172,10 +172,9 @@ const AppView = () => {
             Authorization: "Bearer " + token,
           },
         };
-        const req = await fetch(ApiUrl + "/videos", reqParams);
+        const req = await fetch(ApiUrl + "/videos/num_enabled", reqParams);
         const json = await req.json();
-        const enabled = json.filter(function(v) { return !v.disabled; });
-        setNumEnabledVideos(enabled.length);
+        setNumEnabledVideos(parseInt(json));
       } catch (e) {
         console.log(e.message);
       }

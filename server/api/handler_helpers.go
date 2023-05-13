@@ -21,6 +21,15 @@ func GetAuth0IdFromContext(logPrefix string, c *gin.Context, isTest bool) string
 	return claims.RegisteredClaims.Subject
 }
 
+func GetUserFromContext(logPrefix string, c *gin.Context, a *Api) (*User, error) {
+	auth0Id := GetAuth0IdFromContext(logPrefix, c, a.isTest)
+	user, status, msg, err := a.userManager.Get(auth0Id)
+	if HandleMngrResp(logPrefix, c, status, msg, err, user) != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
 func BindModelFromForm(logPrefix string, c *gin.Context, model interface{}) error {
 	err := c.ShouldBindJSON(model)
 	if err != nil {
