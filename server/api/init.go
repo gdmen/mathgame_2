@@ -23,14 +23,6 @@ var CREATE_TABLES_SQL = []string{
 	CreateEventTableSQL,
 }
 
-type Error struct {
-	Message string `json:"message" form:"message"`
-}
-
-func GetError(message string) map[string]interface{} {
-	return gin.H{"message": message}
-}
-
 type Api struct {
 	DB               *sql.DB
 	isTest           bool
@@ -64,6 +56,16 @@ func NewApi(db *sql.DB) (*Api, error) {
 	return a, nil
 }
 
+func (a *Api) genGetUserFn() common.GetUserFn {
+	return func(logPrefix string, c *gin.Context) (interface{}, error) {
+		user, status, msg, err := a.userManager.Get(c.MustGet(common.Auth0IdKey).(string))
+		if HandleMngrResp(logPrefix, c, status, msg, err, user) != nil {
+			return nil, err
+		}
+		return user, nil
+	}
+}
+
 func (a *Api) GetRouter() *gin.Engine {
 	router := gin.Default()
 	// - No origin allowed by default
@@ -83,9 +85,14 @@ func (a *Api) GetRouter() *gin.Engine {
 	// Use our auth0 jwt middleware
 	if !a.isTest {
 		router.Use(gin_adapter.Wrap(auth0.EnsureValidToken()))
+		router.Use(common.Auth0IdMiddleware())
 	} else {
-		router.Use(common.TestAuth0Middleware())
+		router.Use(common.TestAuth0IdMiddleware())
 	}
+
+	// Set up our user-fetching middleware
+	getUser := a.genGetUserFn()
+	userMiddleware := common.UserMiddleware(getUser)
 
 	v1 := router.Group("/api/v1")
 	{
@@ -93,28 +100,28 @@ func (a *Api) GetRouter() *gin.Engine {
 		{
 			user.POST("", a.customCreateOrUpdateUser)
 			user.POST("/", a.customCreateOrUpdateUser)
-			user.POST("/:auth0_id", a.updateUser)
-			user.GET("/:auth0_id", a.getUser)
+			user.POST("/:auth0_id", userMiddleware, a.updateUser)
+			user.GET("/:auth0_id", userMiddleware, a.getUser)
 		}
 		settings := v1.Group("/settings")
 		{
-			settings.POST("/:user_id", a.customUpdateSettings)
-			settings.GET("/:user_id", a.getSettings)
+			settings.POST("/:user_id", userMiddleware, a.customUpdateSettings)
+			settings.GET("/:user_id", userMiddleware, a.getSettings)
 		}
 		gamestate := v1.Group("/gamestates")
 		{
-			gamestate.GET("/:user_id", a.getGamestate)
+			gamestate.GET("/:user_id", userMiddleware, a.getGamestate)
 		}
 		video := v1.Group("/videos")
 		{
-			video.POST("", a.createVideo)
-			video.POST("/", a.createVideo)
-			video.POST("/:id", a.updateVideo)
-			video.DELETE("/:id", a.customDeleteVideo)
-			video.GET("/num_enabled", a.customGetNumEnabledVideos)
-			video.GET("/:id", a.getVideo)
-			video.GET("", a.listVideo)
-			video.GET("/", a.listVideo)
+			video.POST("", userMiddleware, a.createVideo)
+			video.POST("/", userMiddleware, a.createVideo)
+			video.POST("/:id", userMiddleware, a.updateVideo)
+			video.DELETE("/:id", userMiddleware, a.customDeleteVideo)
+			video.GET("/num_enabled", userMiddleware, a.customGetNumEnabledVideos)
+			video.GET("/:id", userMiddleware, a.getVideo)
+			video.GET("", userMiddleware, a.listVideo)
+			video.GET("/", userMiddleware, a.listVideo)
 		}
 		problem := v1.Group("/problems")
 		{
@@ -122,9 +129,9 @@ func (a *Api) GetRouter() *gin.Engine {
 		}
 		event := v1.Group("/events")
 		{
-			event.GET("/:user_id/:seconds", a.customListEvent)
-			event.POST("", a.customCreateEvent)
-			event.POST("/", a.customCreateEvent)
+			event.GET("/:user_id/:seconds", userMiddleware, a.customListEvent)
+			event.POST("", userMiddleware, a.customCreateEvent)
+			event.POST("/", userMiddleware, a.customCreateEvent)
 		}
 	}
 	return router

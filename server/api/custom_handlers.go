@@ -54,12 +54,12 @@ func (a *Api) generateProblem(logPrefix string, c *gin.Context, settings *Settin
 		if err, ok := err.(*generator.OptionsError); ok {
 			msg := "Failed options validation"
 			glog.Errorf("%s %s: %v", logPrefix, msg, err)
-			c.JSON(http.StatusBadRequest, GetError(msg))
+			c.JSON(http.StatusBadRequest, common.GetError(msg))
 			return nil, err
 		}
 		msg := "Couldn't generate problem"
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusBadRequest, GetError(msg))
+		c.JSON(http.StatusBadRequest, common.GetError(msg))
 		return nil, err
 	}
 	model.ProblemTypeBitmap = 0
@@ -135,10 +135,7 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint
 // Do stuff based on the event and write an updated Gamestate / any other side effects
 func (a *Api) processEvents(logPrefix string, c *gin.Context, events []*Event, writeCtx bool) error {
 	// Get User
-	user, err := GetUserFromContext(logPrefix, c, a)
-	if err != nil {
-		return err
-	}
+	user := GetUserFromContext(c)
 
 	// Get Gamestate
 	gamestate, status, msg, err := a.gamestateManager.Get(user.Id)
@@ -384,10 +381,7 @@ func (a *Api) customUpdateSettings(c *gin.Context) {
 	}
 
 	// Get User
-	user, err := GetUserFromContext(logPrefix, c, a)
-	if err != nil {
-		return
-	}
+	user := GetUserFromContext(c)
 
 	// Get Settings
 	settings, status, msg, err := a.settingsManager.Get(user.Id)
@@ -431,10 +425,7 @@ func (a *Api) customGetNumEnabledVideos(c *gin.Context) {
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Get User
-	user, err := GetUserFromContext(logPrefix, c, a)
-	if err != nil {
-		return
-	}
+	user := GetUserFromContext(c)
 
 	// Get a count of enabled videos for this user
 	sql := fmt.Sprintf("SELECT count(*) FROM videos WHERE user_id=%d AND disabled=0;", user.Id)
@@ -494,10 +485,7 @@ func (a *Api) customDeleteVideo(c *gin.Context) {
 	}
 
 	// Get User
-	user, err := GetUserFromContext(logPrefix, c, a)
-	if err != nil {
-		return
-	}
+	user := GetUserFromContext(c)
 
 	// Get Gamestate
 	gamestate, status, msg, err := a.gamestateManager.Get(user.Id)
@@ -539,7 +527,7 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 	}
 
 	// Write user to database
-	user.Auth0Id = GetAuth0IdFromContext(logPrefix, c, a.isTest)
+	user.Auth0Id = GetAuth0IdFromContext(c)
 	status, msg, err := a.userManager.Create(user)
 	if status != http.StatusCreated {
 		if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, user) != nil {
