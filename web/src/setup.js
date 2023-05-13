@@ -128,7 +128,7 @@ const StartPlayingTabView = () => {
       <h2>You're all set!</h2>
       <div className="setup-form">
         <h3>
-          The Math Game will start easy and get harder to match your kid's math
+          The Math Game will start <strong>easy</strong> and get harder to match <strong>your kid's</strong> math
           level!
         </h3>
         <button
