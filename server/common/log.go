@@ -29,3 +29,11 @@ func GetLogPrefix(c *gin.Context) string {
 	fcn := getFuncName(1)
 	return fmt.Sprintf("[rid=%s | fcn=%s]", rid, fcn)
 }
+
+type Error struct {
+	Message string `json:"message" form:"message"`
+}
+
+func GetError(message string) map[string]interface{} {
+	return gin.H{"message": message}
+}

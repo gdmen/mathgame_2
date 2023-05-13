@@ -4,30 +4,18 @@ package api // import "garydmenezes.com/mathgame/server/api"
 import (
 	"net/http"
 
-	"github.com/auth0/go-jwt-middleware/v2"
-	"github.com/auth0/go-jwt-middleware/v2/validator"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
 
 	"garydmenezes.com/mathgame/server/common"
 )
 
-func GetAuth0IdFromContext(logPrefix string, c *gin.Context, isTest bool) string {
-	if isTest {
-		return c.MustGet(common.Auth0IdKey).(string)
-	}
-
-	claims := c.Request.Context().Value(jwtmiddleware.ContextKey{}).(*validator.ValidatedClaims)
-	return claims.RegisteredClaims.Subject
+func GetAuth0IdFromContext(c *gin.Context) string {
+	return c.MustGet(common.Auth0IdKey).(string)
 }
 
-func GetUserFromContext(logPrefix string, c *gin.Context, a *Api) (*User, error) {
-	auth0Id := GetAuth0IdFromContext(logPrefix, c, a.isTest)
-	user, status, msg, err := a.userManager.Get(auth0Id)
-	if HandleMngrResp(logPrefix, c, status, msg, err, user) != nil {
-		return nil, err
-	}
-	return user, nil
+func GetUserFromContext(c *gin.Context) *User {
+	return c.MustGet(common.UserKey).(*User)
 }
 
 func BindModelFromForm(logPrefix string, c *gin.Context, model interface{}) error {
@@ -35,7 +23,7 @@ func BindModelFromForm(logPrefix string, c *gin.Context, model interface{}) erro
 	if err != nil {
 		msg := "Couldn't parse input JSON body"
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusBadRequest, GetError(msg))
+		c.JSON(http.StatusBadRequest, common.GetError(msg))
 		return err
 	}
 	glog.Infof("%s %s", logPrefix, model)
@@ -47,7 +35,7 @@ func BindModelFromURI(logPrefix string, c *gin.Context, model interface{}) error
 	if err != nil {
 		msg := "Couldn't parse URI"
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusBadRequest, GetError(msg))
+		c.JSON(http.StatusBadRequest, common.GetError(msg))
 		return err
 	}
 	glog.Infof("%s %s", logPrefix, model)
@@ -65,7 +53,7 @@ func HandleMngrRespWriteCtx(logPrefix string, c *gin.Context, status int, msg st
 func OptionalWriteHandleMngrResp(logPrefix string, c *gin.Context, status int, msg string, err error, model interface{}, writeCtx bool) error {
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(status, GetError(msg))
+		c.JSON(status, common.GetError(msg))
 		return err
 	}
 

@@ -25,10 +25,10 @@ swagger:meta
 */
 package docs
 
-import "garydmenezes.com/mathgame/server/api"
+import "garydmenezes.com/mathgame/server/common"
 
 //swagger:response error
 type ErrorResp struct {
 	//in:body
-	Body api.Error
+	Body common.Error
 }
