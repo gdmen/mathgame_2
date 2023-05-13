@@ -35,11 +35,12 @@ const MainView = ({
   isAuthenticated,
   user,
   settings,
+  numEnabledVideos,
   postEvent,
 }) => {
   if (isLoading || (isAuthenticated && settings == null)) {
     return <div className="content-loading"></div>;
-  } else if (settings != null && user.pin === "") {
+  } else if (settings != null && (user.pin === "" || numEnabledVideos < 3)) {
     return (
       <SetupView token={token} url={url} user={user} settings={settings} />
     );
@@ -93,6 +94,7 @@ const AppView = () => {
   const [token, setToken] = useState(null);
   const [appUser, setAppUser] = useState(null);
   const [settings, setSettings] = useState(null);
+  const [numEnabledVideos, setNumEnabledVideos] = useState(null);
 
   const genPostEventFcn = useCallback(() => {
     return async function (event_type, value) {
@@ -154,6 +156,32 @@ const AppView = () => {
     };
 
     getSettings();
+  }, [token, appUser]);
+
+  useEffect(() => {
+    const getNumEnabledVideos = async () => {
+      try {
+        if (token == null || appUser == null) {
+          return;
+        }
+        const reqParams = {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+          },
+        };
+        const req = await fetch(ApiUrl + "/videos", reqParams);
+        const json = await req.json();
+        const enabled = json.filter(function(v) { return !v.disabled; });
+        setNumEnabledVideos(enabled.length);
+      } catch (e) {
+        console.log(e.message);
+      }
+    };
+
+    getNumEnabledVideos();
   }, [token, appUser]);
 
   useEffect(() => {
@@ -235,6 +263,7 @@ const AppView = () => {
           isAuthenticated={isAuthenticated}
           user={appUser}
           settings={settings}
+          numEnabledVideos={numEnabledVideos}
           postEvent={genPostEventFcn()}
         />
       </div>
