@@ -130,6 +130,13 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
   const [videoTitle, setVideoTitle] = useState("");
   const [videoThumbnail, setVideoThumbnail] = useState("");
 
+  const getEnabledVideoCount = (videos) => {
+    return (new Map(
+      [...videos].filter(
+        ([k, v]) => !v.disabled
+    ))).size;
+  };
+
   useEffect(() => {
     const getVideos = async () => {
       try {
@@ -146,14 +153,16 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
         };
         const req = await fetch(url + "/videos", reqParams);
         const json = await req.json();
+
         let newVideos = new Map();
         for (var i in json) {
           let url = json[i].url;
           newVideos.set(url, json[i]);
         }
         setVideos(newVideos);
-        setError(newVideos.size < 3);
-        errCallback(newVideos.size < 3);
+        var numEnabled = getEnabledVideoCount(newVideos);
+        setError(numEnabled < 3);
+        errCallback(numEnabled < 3);
       } catch (e) {
         console.log(e.message);
       }
@@ -214,12 +223,14 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
       const req = await fetch(url + "/videos/", reqParams);
       if (req.ok) {
         const json = await req.json();
-        setVideos((videos) => new Map(videos.set(json.url, json)));
+        var newVideos = new Map(videos.set(json.url, json));
+        setVideos(newVideos);
+        var numEnabled = getEnabledVideoCount(newVideos);
+        setError(numEnabled < 3);
+        errCallback(numEnabled < 3);
         setAddError(false);
-        setError(videos.size < 3);
-        errCallback(videos.size < 3);
         if (video.url === videoUrl) {
-          // If the video we just added is currently in the add video UX
+          // If the video we just added is currently in the add video UI, clear out that UI
           setVideoUrl("");
           setVideoTitle(null);
           setVideoThumbnail(null);
@@ -254,12 +265,13 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
       if (req.ok) {
         videos.delete(video.url);
         if (video.url === videoUrl) {
-          // If we're deleting the video currently in the add video UX
+          // If we're deleting the video currently in the add video UI
           setAddError(false);
         }
-        setError(videos.size < 3);
-        errCallback(videos.size < 3);
         setVideos(new Map(videos));
+        var numEnabled = getEnabledVideoCount(videos);
+        setError(numEnabled < 3);
+        errCallback(numEnabled < 3);
       }
     } catch (e) {
       console.log(e.message);
