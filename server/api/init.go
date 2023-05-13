@@ -111,6 +111,7 @@ func (a *Api) GetRouter() *gin.Engine {
 			video.POST("/", a.createVideo)
 			video.POST("/:id", a.updateVideo)
 			video.DELETE("/:id", a.customDeleteVideo)
+			video.GET("/num_enabled", a.customGetNumEnabledVideos)
 			video.GET("/:id", a.getVideo)
 			video.GET("", a.listVideo)
 			video.GET("/", a.listVideo)
