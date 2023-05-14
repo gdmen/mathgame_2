@@ -21,15 +21,15 @@ const (
 
 	createEventSQL = `INSERT INTO events (user_id, event_type, value) VALUES (?, ?, ?);`
 
-	getEventSQL = `SELECT * FROM events WHERE id=?;`
+	getEventSQL = `SELECT * FROM events WHERE id=? AND user_id=?;`
 
 	getEventKeySQL = `SELECT id FROM events WHERE user_id=? AND event_type=? AND value=?;`
 
-	listEventSQL = `SELECT * FROM events;`
+	listEventSQL = `SELECT * FROM events WHERE user_id=?;`
 
-	updateEventSQL = `UPDATE events SET timestamp=?, user_id=?, event_type=?, value=? WHERE id=?;`
+	updateEventSQL = `UPDATE events SET timestamp=?, user_id=?, event_type=?, value=? WHERE id=? AND user_id=?;`
 
-	deleteEventSQL = `DELETE FROM events WHERE id=?;`
+	deleteEventSQL = `DELETE FROM events WHERE id=? AND user_id=?;`
 )
 
 type Event struct {
@@ -77,9 +77,9 @@ func (m *EventManager) Create(model *Event) (int, string, error) {
 	return status, "", nil
 }
 
-func (m *EventManager) Get(id uint32) (*Event, int, string, error) {
+func (m *EventManager) Get(id uint32, user_id uint32) (*Event, int, string, error) {
 	model := &Event{}
-	err := m.DB.QueryRow(getEventSQL, id).Scan(&model.Id, &model.Timestamp, &model.UserId, &model.EventType, &model.Value)
+	err := m.DB.QueryRow(getEventSQL, id, user_id).Scan(&model.Id, &model.Timestamp, &model.UserId, &model.EventType, &model.Value)
 	if err == sql.ErrNoRows {
 		msg := "Couldn't find a event with that id"
 		return nil, http.StatusNotFound, msg, err
@@ -90,9 +90,9 @@ func (m *EventManager) Get(id uint32) (*Event, int, string, error) {
 	return model, http.StatusOK, "", nil
 }
 
-func (m *EventManager) List() (*[]Event, int, string, error) {
+func (m *EventManager) List(user_id uint32) (*[]Event, int, string, error) {
 	models := []Event{}
-	rows, err := m.DB.Query(listEventSQL)
+	rows, err := m.DB.Query(listEventSQL, user_id)
 
 	defer rows.Close()
 	if err != nil {
@@ -142,14 +142,14 @@ func (m *EventManager) CustomList(sql string) (*[]Event, int, string, error) {
 	return &models, http.StatusOK, "", nil
 }
 
-func (m *EventManager) Update(model *Event) (int, string, error) {
+func (m *EventManager) Update(model *Event, user_id uint32) (int, string, error) {
 	// Check for 404s
-	_, status, msg, err := m.Get(model.Id)
+	_, status, msg, err := m.Get(model.Id, user_id)
 	if err != nil {
 		return status, msg, err
 	}
 	// Update
-	_, err = m.DB.Exec(updateEventSQL, model.Timestamp, model.UserId, model.EventType, model.Value, model.Id)
+	_, err = m.DB.Exec(updateEventSQL, model.Timestamp, model.UserId, model.EventType, model.Value, model.Id, user_id)
 	if err != nil {
 		msg := "Couldn't update event in database"
 		return http.StatusInternalServerError, msg, err
@@ -157,8 +157,8 @@ func (m *EventManager) Update(model *Event) (int, string, error) {
 	return http.StatusOK, "", nil
 }
 
-func (m *EventManager) Delete(id uint32) (int, string, error) {
-	result, err := m.DB.Exec(deleteEventSQL, id)
+func (m *EventManager) Delete(id uint32, user_id uint32) (int, string, error) {
+	result, err := m.DB.Exec(deleteEventSQL, id, user_id)
 	if err != nil {
 		msg := "Couldn't delete event in database"
 		return http.StatusInternalServerError, msg, err

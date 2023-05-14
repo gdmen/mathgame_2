@@ -24,7 +24,7 @@ const (
 
 	getGamestateKeySQL = `SELECT  FROM gamestates WHERE user_id=? AND problem_id=? AND video_id=? AND solved=? AND target=?;`
 
-	listGamestateSQL = `SELECT * FROM gamestates;`
+	listGamestateSQL = `SELECT * FROM gamestates WHERE user_id=?;`
 
 	updateGamestateSQL = `UPDATE gamestates SET problem_id=?, video_id=?, solved=?, target=? WHERE user_id=?;`
 
@@ -75,9 +75,9 @@ func (m *GamestateManager) Get(user_id uint32) (*Gamestate, int, string, error) 
 	return model, http.StatusOK, "", nil
 }
 
-func (m *GamestateManager) List() (*[]Gamestate, int, string, error) {
+func (m *GamestateManager) List(user_id uint32) (*[]Gamestate, int, string, error) {
 	models := []Gamestate{}
-	rows, err := m.DB.Query(listGamestateSQL)
+	rows, err := m.DB.Query(listGamestateSQL, user_id)
 
 	defer rows.Close()
 	if err != nil {

@@ -19,9 +19,13 @@ import (
 
 def get_handler_string(m: dict) -> str:
     key_name = ""
+    has_user_fk = False
     for f in m["fields"]:
         if "PRIMARY KEY" in f["sql"]:
             key_name = f["name"]
+        if f["name"] == "UserId":
+            has_user_fk = True
+    has_additional_user_fk =  has_user_fk and key_name != "UserId"
     s = '''
 func (a *Api) create{0}(c *gin.Context) {{
 	logPrefix := common.GetLogPrefix(c)
@@ -32,6 +36,8 @@ func (a *Api) create{0}(c *gin.Context) {{
 	if BindModelFromForm(logPrefix, c, model) != nil {{
 		return
 	}}
+
+    {7}
 
 	// Write to database
 	status, msg, err := a.{1}Manager.Create(model)
@@ -50,8 +56,10 @@ func (a *Api) get{0}(c *gin.Context) {{
 		return
 	}}
 
+    {3}
+
 	// Read from database
-	model, status, msg, err := a.{1}Manager.Get(model.{2})
+	model, status, msg, err := a.{1}Manager.Get(model.{2}{4})
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {{
 		return
 	}}
@@ -61,8 +69,10 @@ func (a *Api) list{0}(c *gin.Context) {{
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
+    {5}
+
 	// Read from database
-	models, status, msg, err := a.{1}Manager.List()
+	models, status, msg, err := a.{1}Manager.List({6})
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {{
 		return
 	}}
@@ -81,8 +91,11 @@ func (a *Api) update{0}(c *gin.Context) {{
 		return
 	}}
 
+    {3}
+    {7}
+
 	// Write to database
-	status, msg, err := a.{1}Manager.Update(model)
+	status, msg, err := a.{1}Manager.Update(model{4})
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {{
 		return
 	}}
@@ -98,8 +111,10 @@ func (a *Api) delete{0}(c *gin.Context) {{
 		return
 	}}
 
+    {3}
+
 	// Write to database
-	status, msg, err := a.{1}Manager.Delete(model.{2})
+	status, msg, err := a.{1}Manager.Delete(model.{2}{4})
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {{
 		return
 	}}
@@ -107,7 +122,12 @@ func (a *Api) delete{0}(c *gin.Context) {{
 '''.format(
         m["name"].capitalize(),
         m["name"],
-        key_name
+        key_name,
+        "user := GetUserFromContext(c)" if has_additional_user_fk else "",
+        ", user.Id" if has_additional_user_fk else "",
+        "user := GetUserFromContext(c)" if has_user_fk else "",
+        "user.Id" if has_user_fk else "",
+        "model.UserId = GetUserFromContext(c).Id" if has_user_fk else ""
     )
 
     return s

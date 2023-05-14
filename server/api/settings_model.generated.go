@@ -23,7 +23,7 @@ const (
 
 	getSettingsKeySQL = `SELECT  FROM settingss WHERE user_id=? AND problem_type_bitmap=? AND target_difficulty=? AND target_work_percentage=?;`
 
-	listSettingsSQL = `SELECT * FROM settings;`
+	listSettingsSQL = `SELECT * FROM settings WHERE user_id=?;`
 
 	updateSettingsSQL = `UPDATE settings SET problem_type_bitmap=?, target_difficulty=?, target_work_percentage=? WHERE user_id=?;`
 
@@ -73,9 +73,9 @@ func (m *SettingsManager) Get(user_id uint32) (*Settings, int, string, error) {
 	return model, http.StatusOK, "", nil
 }
 
-func (m *SettingsManager) List() (*[]Settings, int, string, error) {
+func (m *SettingsManager) List(user_id uint32) (*[]Settings, int, string, error) {
 	models := []Settings{}
-	rows, err := m.DB.Query(listSettingsSQL)
+	rows, err := m.DB.Query(listSettingsSQL, user_id)
 
 	defer rows.Close()
 	if err != nil {
