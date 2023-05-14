@@ -50,14 +50,16 @@ func TestAuth0IdMiddleware() gin.HandlerFunc {
 
 type GetUserFn func(string, *gin.Context) (interface{}, error)
 
-func UserMiddleware(getUser GetUserFn) gin.HandlerFunc {
+func UserMiddleware(getUser GetUserFn, strict bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		logPrefix := GetLogPrefix(c)
 		user, err := getUser(logPrefix, c)
 		if err != nil {
 			msg := "Couldn't find a user associated with this token."
 			glog.Errorf("%s %s: %s", logPrefix, msg, err)
-			c.AbortWithStatusJSON(http.StatusNotFound, GetError(msg))
+			if strict {
+				c.AbortWithStatusJSON(http.StatusNotFound, GetError(msg))
+			}
 		}
 		c.Set(UserKey, user)
 	}

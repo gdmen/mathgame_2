@@ -59,10 +59,11 @@ func NewApi(db *sql.DB) (*Api, error) {
 func (a *Api) genGetUserFn() common.GetUserFn {
 	return func(logPrefix string, c *gin.Context) (interface{}, error) {
 		user, status, msg, err := a.userManager.Get(c.MustGet(common.Auth0IdKey).(string))
-		if HandleMngrResp(logPrefix, c, status, msg, err, user) != nil {
-			return nil, err
+		// We don't use the standard handler helpers here because we don't want to write error statuses if we don't find the user.
+		if err != nil {
+			glog.Infof("%s %d: %s", logPrefix, status, msg)
 		}
-		return user, nil
+		return user, err
 	}
 }
 
@@ -92,14 +93,15 @@ func (a *Api) GetRouter() *gin.Engine {
 
 	// Set up our user-fetching middleware
 	getUser := a.genGetUserFn()
-	userMiddleware := common.UserMiddleware(getUser)
+	userMiddleware := common.UserMiddleware(getUser, true)
+	userMiddlewareLenient := common.UserMiddleware(getUser, false)
 
 	v1 := router.Group("/api/v1")
 	{
 		user := v1.Group("/users")
 		{
-			user.POST("", a.customCreateOrUpdateUser)
-			user.POST("/", a.customCreateOrUpdateUser)
+			user.POST("", userMiddlewareLenient, a.customCreateOrUpdateUser)
+			user.POST("/", userMiddlewareLenient, a.customCreateOrUpdateUser)
 			user.POST("/:auth0_id", userMiddleware, a.updateUser)
 			user.GET("/:auth0_id", userMiddleware, a.getUser)
 		}
