@@ -526,8 +526,14 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 		return
 	}
 
+	// If ctx_user is not nil, the user already exists in our database
+	ctx_user := GetUserFromContextLenient(c)
+	if ctx_user != nil {
+		user.Auth0Id = ctx_user.Auth0Id
+	} else {
+		user.Auth0Id = GetAuth0IdFromContext(c)
+	}
 	// Write user to database
-	user.Auth0Id = GetAuth0IdFromContext(c)
 	status, msg, err := a.userManager.Create(user)
 	if status != http.StatusCreated {
 		if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, user) != nil {
@@ -538,6 +544,7 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 		if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, user) != nil {
 			return
 		}
+		SetUserInContext(c, user)
 		// Write default new settings to database
 		const default_problem_type_bitmap uint64 = 0
 		const default_target_difficulty float64 = 3

@@ -14,8 +14,18 @@ func GetAuth0IdFromContext(c *gin.Context) string {
 	return c.MustGet(common.Auth0IdKey).(string)
 }
 
+func SetUserInContext(c *gin.Context, user *User) {
+	c.Set(common.UserKey, user)
+}
 func GetUserFromContext(c *gin.Context) *User {
 	return c.MustGet(common.UserKey).(*User)
+}
+func GetUserFromContextLenient(c *gin.Context) *User {
+	user := c.MustGet(common.UserKey)
+	if user != nil {
+		return user.(*User)
+	}
+	return nil
 }
 
 func BindModelFromForm(logPrefix string, c *gin.Context, model interface{}) error {
@@ -50,7 +60,7 @@ func HandleMngrRespWriteCtx(logPrefix string, c *gin.Context, status int, msg st
 	return OptionalWriteHandleMngrResp(logPrefix, c, status, msg, err, model, true)
 }
 
-func OptionalWriteHandleMngrResp(logPrefix string, c *gin.Context, status int, msg string, err error, model interface{}, writeCtx bool) error {
+func OptionalWriteHandleMngrResp(logPrefix string, c *gin.Context, status int, msg string, err error, model interface{}, writeModel bool) error {
 	if err != nil {
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
 		c.JSON(status, common.GetError(msg))
@@ -58,7 +68,7 @@ func OptionalWriteHandleMngrResp(logPrefix string, c *gin.Context, status int, m
 	}
 
 	glog.Infof("%s (HTTP %d) %T: %+v", logPrefix, status, model, model)
-	if writeCtx {
+	if writeModel {
 		glog.Infof("%s writing to reponse body: %v", logPrefix, model)
 		c.JSON(status, model)
 	}
