@@ -23,10 +23,14 @@ def get_model_string(m: dict) -> str:
     auto_incr_sql_fields = []
     create_sql_fields = []
     unique_sql_fields = []
+    has_user_fk = False
     for f in m["fields"]:
         if "PRIMARY KEY" in f["sql"]:
             key_name = f["name"]
             key_type = f["type"]
+        if f["name"] == "UserId":
+            has_user_fk = True
+    has_additional_user_fk =  has_user_fk and key_name != "UserId"
     for f in m["fields"]:
         if any(x in f["sql"] for x in ["TIMESTAMP", "DATE", "DATETIME"]):
             import_time = True
@@ -90,11 +94,12 @@ import (
 
     # get SQL
     s += '''
-    get{0}SQL = `SELECT * FROM {1} WHERE {2}=?;`
+    get{0}SQL = `SELECT * FROM {1} WHERE {2}=?{3};`
 '''.format(
         m["name"].capitalize(),
         m["table"],
-        camel_to_snake(key_name)
+        camel_to_snake(key_name),
+        " AND user_id=?" if has_additional_user_fk else ""
     )
 
     # get key SQL
@@ -109,29 +114,32 @@ import (
 
     # list SQL
     s += '''
-    list{0}SQL = `SELECT * FROM {1};`
+    list{0}SQL = `SELECT * FROM {1}{2};`
 '''.format(
         m["name"].capitalize(),
-        m["table"]
+        m["table"],
+        " WHERE user_id=?" if has_user_fk else ""
     )
 
     # update SQL
     s += '''
-    update{0}SQL = `UPDATE {1} SET {2} WHERE {3}=?;`
+    update{0}SQL = `UPDATE {1} SET {2} WHERE {3}=?{4};`
 '''.format(
         m["name"].capitalize(),
         m["table"],
         ", ".join([f+"=?" for f in non_key_sql_fields]),
-        camel_to_snake(key_name)
+        camel_to_snake(key_name),
+        " AND user_id=?" if has_additional_user_fk else ""
     )
 
     # delete SQL
     s += '''
-    delete{0}SQL = `DELETE FROM {1} WHERE {2}=?;`
+    delete{0}SQL = `DELETE FROM {1} WHERE {2}=?{3};`
 '''.format(
         m["name"].capitalize(),
         m["table"],
-        camel_to_snake(key_name)
+        camel_to_snake(key_name),
+        " AND user_id=?" if has_additional_user_fk else ""
     )
 
     # const end
@@ -225,9 +233,9 @@ import (
 
     # manager.Get()
     s += '''
-    func (m *{0}Manager) Get({1} {2}) (*{0}, int, string, error) {{
+    func (m *{0}Manager) Get({1} {2}{5}) (*{0}, int, string, error) {{
         model := &{0}{{}}
-        err := m.DB.QueryRow(get{0}SQL, {1}).Scan({3})
+        err := m.DB.QueryRow(get{0}SQL, {1}{6}).Scan({3})
         if err == sql.ErrNoRows {{
             msg := "Couldn't find a {4} with that {1}"
             return nil, http.StatusNotFound, msg, err
@@ -242,7 +250,9 @@ import (
         camel_to_snake(key_name),
         key_type,
         ", ".join(["&model." + n for n in struct_fields]),
-        m["name"]
+        m["name"],
+        ", user_id uint32" if has_additional_user_fk else "",
+        ", user_id" if has_additional_user_fk else ""
     )
 
     # manager.List() and manager.CustomList(sql)
@@ -276,11 +286,14 @@ import (
 
     # manager.List()
     s += '''
-    func (m *{0}Manager) List() (*[]{0}, int, string, error) {{
+    func (m *{0}Manager) List({1}) (*[]{0}, int, string, error) {{
         models := []{0}{{}}
-        rows, err := m.DB.Query(list{0}SQL)
+        rows, err := m.DB.Query(list{0}SQL{2})
 '''.format(
-        m["name"].capitalize())
+        m["name"].capitalize(),
+        "user_id uint32" if has_user_fk else "",
+        ", user_id" if has_user_fk else ""
+    )
     s += list_code
 
     # manager.CustomList()
@@ -294,14 +307,14 @@ import (
 
     # manager.Update()
     s += '''
-    func (m *{0}Manager) Update(model *{0}) (int, string, error) {{
+    func (m *{0}Manager) Update(model *{0}{4}) (int, string, error) {{
         // Check for 404s
-        _, status, msg, err := m.Get(model.{1})
+        _, status, msg, err := m.Get(model.{1}{5})
         if err != nil {{
             return status, msg, err
         }}
         // Update
-        _, err = m.DB.Exec(update{0}SQL, {2})
+        _, err = m.DB.Exec(update{0}SQL, {2}{5})
         if err != nil {{
 			msg := "Couldn't update {3} in database"
 			return http.StatusInternalServerError, msg, err
@@ -312,13 +325,15 @@ import (
         m["name"].capitalize(),
         key_name,
         ", ".join(["model." + n for n in non_key_struct_fields + [key_name]]),
-        m["name"]
+        m["name"],
+        ", user_id uint32" if has_additional_user_fk else "",
+        ", user_id" if has_additional_user_fk else ""
     )
 
     # manager.Delete()
     s += '''
-    func (m *{0}Manager) Delete({1} {2}) (int, string, error) {{
-        result, err := m.DB.Exec(delete{0}SQL, {1})
+    func (m *{0}Manager) Delete({1} {2}{4}) (int, string, error) {{
+        result, err := m.DB.Exec(delete{0}SQL, {1}{5})
         if err != nil {{
             msg := "Couldn't delete {3} in database"
             return http.StatusInternalServerError, msg, err
@@ -335,7 +350,9 @@ import (
         m["name"].capitalize(),
         camel_to_snake(key_name),
         key_type,
-        m["name"]
+        m["name"],
+        ", user_id uint32" if has_additional_user_fk else "",
+        ", user_id" if has_additional_user_fk else ""
     )
 
     return s

@@ -21,15 +21,15 @@ const (
 
 	createVideoSQL = `INSERT INTO videos (user_id, title, url, thumbnailurl) VALUES (?, ?, ?, ?);`
 
-	getVideoSQL = `SELECT * FROM videos WHERE id=?;`
+	getVideoSQL = `SELECT * FROM videos WHERE id=? AND user_id=?;`
 
 	getVideoKeySQL = `SELECT id FROM videos WHERE user_id=? AND title=? AND url=? AND thumbnailurl=?;`
 
-	listVideoSQL = `SELECT * FROM videos;`
+	listVideoSQL = `SELECT * FROM videos WHERE user_id=?;`
 
-	updateVideoSQL = `UPDATE videos SET user_id=?, title=?, url=?, thumbnailurl=?, disabled=? WHERE id=?;`
+	updateVideoSQL = `UPDATE videos SET user_id=?, title=?, url=?, thumbnailurl=?, disabled=? WHERE id=? AND user_id=?;`
 
-	deleteVideoSQL = `DELETE FROM videos WHERE id=?;`
+	deleteVideoSQL = `DELETE FROM videos WHERE id=? AND user_id=?;`
 )
 
 type Video struct {
@@ -78,9 +78,9 @@ func (m *VideoManager) Create(model *Video) (int, string, error) {
 	return status, "", nil
 }
 
-func (m *VideoManager) Get(id uint32) (*Video, int, string, error) {
+func (m *VideoManager) Get(id uint32, user_id uint32) (*Video, int, string, error) {
 	model := &Video{}
-	err := m.DB.QueryRow(getVideoSQL, id).Scan(&model.Id, &model.UserId, &model.Title, &model.URL, &model.ThumbnailURL, &model.Disabled)
+	err := m.DB.QueryRow(getVideoSQL, id, user_id).Scan(&model.Id, &model.UserId, &model.Title, &model.URL, &model.ThumbnailURL, &model.Disabled)
 	if err == sql.ErrNoRows {
 		msg := "Couldn't find a video with that id"
 		return nil, http.StatusNotFound, msg, err
@@ -91,9 +91,9 @@ func (m *VideoManager) Get(id uint32) (*Video, int, string, error) {
 	return model, http.StatusOK, "", nil
 }
 
-func (m *VideoManager) List() (*[]Video, int, string, error) {
+func (m *VideoManager) List(user_id uint32) (*[]Video, int, string, error) {
 	models := []Video{}
-	rows, err := m.DB.Query(listVideoSQL)
+	rows, err := m.DB.Query(listVideoSQL, user_id)
 
 	defer rows.Close()
 	if err != nil {
@@ -143,14 +143,14 @@ func (m *VideoManager) CustomList(sql string) (*[]Video, int, string, error) {
 	return &models, http.StatusOK, "", nil
 }
 
-func (m *VideoManager) Update(model *Video) (int, string, error) {
+func (m *VideoManager) Update(model *Video, user_id uint32) (int, string, error) {
 	// Check for 404s
-	_, status, msg, err := m.Get(model.Id)
+	_, status, msg, err := m.Get(model.Id, user_id)
 	if err != nil {
 		return status, msg, err
 	}
 	// Update
-	_, err = m.DB.Exec(updateVideoSQL, model.UserId, model.Title, model.URL, model.ThumbnailURL, model.Disabled, model.Id)
+	_, err = m.DB.Exec(updateVideoSQL, model.UserId, model.Title, model.URL, model.ThumbnailURL, model.Disabled, model.Id, user_id)
 	if err != nil {
 		msg := "Couldn't update video in database"
 		return http.StatusInternalServerError, msg, err
@@ -158,8 +158,8 @@ func (m *VideoManager) Update(model *Video) (int, string, error) {
 	return http.StatusOK, "", nil
 }
 
-func (m *VideoManager) Delete(id uint32) (int, string, error) {
-	result, err := m.DB.Exec(deleteVideoSQL, id)
+func (m *VideoManager) Delete(id uint32, user_id uint32) (int, string, error) {
+	result, err := m.DB.Exec(deleteVideoSQL, id, user_id)
 	if err != nil {
 		msg := "Couldn't delete video in database"
 		return http.StatusInternalServerError, msg, err

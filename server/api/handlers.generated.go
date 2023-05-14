@@ -182,6 +182,8 @@ func (a *Api) createVideo(c *gin.Context) {
 		return
 	}
 
+	model.UserId = GetUserFromContext(c).Id
+
 	// Write to database
 	status, msg, err := a.videoManager.Create(model)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
@@ -199,8 +201,10 @@ func (a *Api) getVideo(c *gin.Context) {
 		return
 	}
 
+	user := GetUserFromContext(c)
+
 	// Read from database
-	model, status, msg, err := a.videoManager.Get(model.Id)
+	model, status, msg, err := a.videoManager.Get(model.Id, user.Id)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
@@ -210,8 +214,10 @@ func (a *Api) listVideo(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
+	user := GetUserFromContext(c)
+
 	// Read from database
-	models, status, msg, err := a.videoManager.List()
+	models, status, msg, err := a.videoManager.List(user.Id)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {
 		return
 	}
@@ -230,8 +236,11 @@ func (a *Api) updateVideo(c *gin.Context) {
 		return
 	}
 
+	user := GetUserFromContext(c)
+	model.UserId = GetUserFromContext(c).Id
+
 	// Write to database
-	status, msg, err := a.videoManager.Update(model)
+	status, msg, err := a.videoManager.Update(model, user.Id)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
@@ -247,8 +256,10 @@ func (a *Api) deleteVideo(c *gin.Context) {
 		return
 	}
 
+	user := GetUserFromContext(c)
+
 	// Write to database
-	status, msg, err := a.videoManager.Delete(model.Id)
+	status, msg, err := a.videoManager.Delete(model.Id, user.Id)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {
 		return
 	}
@@ -263,6 +274,8 @@ func (a *Api) createSettings(c *gin.Context) {
 	if BindModelFromForm(logPrefix, c, model) != nil {
 		return
 	}
+
+	model.UserId = GetUserFromContext(c).Id
 
 	// Write to database
 	status, msg, err := a.settingsManager.Create(model)
@@ -292,8 +305,10 @@ func (a *Api) listSettings(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
+	user := GetUserFromContext(c)
+
 	// Read from database
-	models, status, msg, err := a.settingsManager.List()
+	models, status, msg, err := a.settingsManager.List(user.Id)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {
 		return
 	}
@@ -311,6 +326,8 @@ func (a *Api) updateSettings(c *gin.Context) {
 	if BindModelFromURI(logPrefix, c, model) != nil {
 		return
 	}
+
+	model.UserId = GetUserFromContext(c).Id
 
 	// Write to database
 	status, msg, err := a.settingsManager.Update(model)
@@ -346,6 +363,8 @@ func (a *Api) createGamestate(c *gin.Context) {
 		return
 	}
 
+	model.UserId = GetUserFromContext(c).Id
+
 	// Write to database
 	status, msg, err := a.gamestateManager.Create(model)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
@@ -374,8 +393,10 @@ func (a *Api) listGamestate(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
+	user := GetUserFromContext(c)
+
 	// Read from database
-	models, status, msg, err := a.gamestateManager.List()
+	models, status, msg, err := a.gamestateManager.List(user.Id)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {
 		return
 	}
@@ -393,6 +414,8 @@ func (a *Api) updateGamestate(c *gin.Context) {
 	if BindModelFromURI(logPrefix, c, model) != nil {
 		return
 	}
+
+	model.UserId = GetUserFromContext(c).Id
 
 	// Write to database
 	status, msg, err := a.gamestateManager.Update(model)
@@ -428,6 +451,8 @@ func (a *Api) createEvent(c *gin.Context) {
 		return
 	}
 
+	model.UserId = GetUserFromContext(c).Id
+
 	// Write to database
 	status, msg, err := a.eventManager.Create(model)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
@@ -445,8 +470,10 @@ func (a *Api) getEvent(c *gin.Context) {
 		return
 	}
 
+	user := GetUserFromContext(c)
+
 	// Read from database
-	model, status, msg, err := a.eventManager.Get(model.Id)
+	model, status, msg, err := a.eventManager.Get(model.Id, user.Id)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
@@ -456,8 +483,10 @@ func (a *Api) listEvent(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
+	user := GetUserFromContext(c)
+
 	// Read from database
-	models, status, msg, err := a.eventManager.List()
+	models, status, msg, err := a.eventManager.List(user.Id)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {
 		return
 	}
@@ -476,8 +505,11 @@ func (a *Api) updateEvent(c *gin.Context) {
 		return
 	}
 
+	user := GetUserFromContext(c)
+	model.UserId = GetUserFromContext(c).Id
+
 	// Write to database
-	status, msg, err := a.eventManager.Update(model)
+	status, msg, err := a.eventManager.Update(model, user.Id)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
@@ -493,8 +525,10 @@ func (a *Api) deleteEvent(c *gin.Context) {
 		return
 	}
 
+	user := GetUserFromContext(c)
+
 	// Write to database
-	status, msg, err := a.eventManager.Delete(model.Id)
+	status, msg, err := a.eventManager.Delete(model.Id, user.Id)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {
 		return
 	}
