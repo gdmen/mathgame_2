@@ -305,6 +305,19 @@ import (
         m["name"].capitalize())
     s += list_code
 
+    # manager.CustomSql()
+    s += '''
+    func (m *{0}Manager) CustomSql(sql string) (int, string, error) {{
+        _, err := m.DB.Query(sql)
+        if err != nil {{
+			msg := "Couldn't run sql for {0} in database"
+			return http.StatusBadRequest, msg, err
+        }}
+        return http.StatusOK, "", nil
+    }}
+'''.format(
+        m["name"].capitalize())
+
     # manager.Update()
     s += '''
     func (m *{0}Manager) Update(model *{0}{4}) (int, string, error) {{

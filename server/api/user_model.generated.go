@@ -134,6 +134,15 @@ func (m *UserManager) CustomList(sql string) (*[]User, int, string, error) {
 	return &models, http.StatusOK, "", nil
 }
 
+func (m *UserManager) CustomSql(sql string) (int, string, error) {
+	_, err := m.DB.Query(sql)
+	if err != nil {
+		msg := "Couldn't run sql for User in database"
+		return http.StatusBadRequest, msg, err
+	}
+	return http.StatusOK, "", nil
+}
+
 func (m *UserManager) Update(model *User) (int, string, error) {
 	// Check for 404s
 	_, status, msg, err := m.Get(model.Auth0Id)
