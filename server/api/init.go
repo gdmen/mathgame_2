@@ -122,8 +122,8 @@ func (a *Api) GetRouter() *gin.Engine {
 			video.DELETE("/:id", userMiddleware, a.customDeleteVideo)
 			video.GET("/num_enabled", userMiddleware, a.customGetNumEnabledVideos)
 			video.GET("/:id", userMiddleware, a.getVideo)
-			video.GET("", userMiddleware, a.listVideo)
-			video.GET("/", userMiddleware, a.listVideo)
+			video.GET("", userMiddleware, a.customListVideo)
+			video.GET("/", userMiddleware, a.customListVideo)
 		}
 		problem := v1.Group("/problems")
 		{

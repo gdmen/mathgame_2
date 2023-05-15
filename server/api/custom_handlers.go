@@ -91,7 +91,7 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint
 	}
 
 	// Get videos belonging to this user
-	videos, status, msg, err := a.videoManager.CustomList(fmt.Sprintf("SELECT * FROM videos WHERE user_id=%d AND disabled=0;", userId))
+	videos, status, msg, err := a.videoManager.CustomList(fmt.Sprintf("SELECT * FROM videos WHERE user_id=%d AND disabled=0 AND deleted=0;", userId))
 	if HandleMngrResp(logPrefix, c, status, msg, err, videos) != nil {
 		return 0, err
 	}
@@ -111,7 +111,7 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint
 
 	// If there are no videos at all in the database, add a default and use that
 	if len(videoIds) < 1 {
-		msg := "Couldn't find any videos in the database, adding a default."
+		msg := "Couldn't find any videos for this user, adding a default."
 		glog.Errorf("%s %s", logPrefix, msg)
 		video := &Video{
 			Title:    "You've Got a Friend in Me",
@@ -510,8 +510,23 @@ func (a *Api) customDeleteVideo(c *gin.Context) {
 	}
 
 	// Write video to database
-	status, msg, err = a.videoManager.Delete(model.Id, user.Id)
+	sql := fmt.Sprintf("UPDATE videos SET deleted=1 WHERE id=%d AND user_id=%d;", model.Id, user.Id)
+	status, msg, err = a.videoManager.CustomSql(sql)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {
+		return
+	}
+}
+
+func (a *Api) customListVideo(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	user := GetUserFromContext(c)
+
+	// Read from database
+	sql := fmt.Sprintf("SELECT * FROM videos WHERE user_id=%d AND deleted=0;", user.Id)
+	models, status, msg, err := a.videoManager.CustomList(sql)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {
 		return
 	}
 }

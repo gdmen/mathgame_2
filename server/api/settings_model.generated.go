@@ -125,6 +125,15 @@ func (m *SettingsManager) CustomList(sql string) (*[]Settings, int, string, erro
 	return &models, http.StatusOK, "", nil
 }
 
+func (m *SettingsManager) CustomSql(sql string) (int, string, error) {
+	_, err := m.DB.Query(sql)
+	if err != nil {
+		msg := "Couldn't run sql for Settings in database"
+		return http.StatusBadRequest, msg, err
+	}
+	return http.StatusOK, "", nil
+}
+
 func (m *SettingsManager) Update(model *Settings) (int, string, error) {
 	// Check for 404s
 	_, status, msg, err := m.Get(model.UserId)

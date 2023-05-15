@@ -129,6 +129,15 @@ func (m *ProblemManager) CustomList(sql string) (*[]Problem, int, string, error)
 	return &models, http.StatusOK, "", nil
 }
 
+func (m *ProblemManager) CustomSql(sql string) (int, string, error) {
+	_, err := m.DB.Query(sql)
+	if err != nil {
+		msg := "Couldn't run sql for Problem in database"
+		return http.StatusBadRequest, msg, err
+	}
+	return http.StatusOK, "", nil
+}
+
 func (m *ProblemManager) Update(model *Problem) (int, string, error) {
 	// Check for 404s
 	_, status, msg, err := m.Get(model.Id)

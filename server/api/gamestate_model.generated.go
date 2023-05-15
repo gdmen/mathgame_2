@@ -127,6 +127,15 @@ func (m *GamestateManager) CustomList(sql string) (*[]Gamestate, int, string, er
 	return &models, http.StatusOK, "", nil
 }
 
+func (m *GamestateManager) CustomSql(sql string) (int, string, error) {
+	_, err := m.DB.Query(sql)
+	if err != nil {
+		msg := "Couldn't run sql for Gamestate in database"
+		return http.StatusBadRequest, msg, err
+	}
+	return http.StatusOK, "", nil
+}
+
 func (m *GamestateManager) Update(model *Gamestate) (int, string, error) {
 	// Check for 404s
 	_, status, msg, err := m.Get(model.UserId)
