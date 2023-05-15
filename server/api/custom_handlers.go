@@ -96,14 +96,6 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint
 		return 0, err
 	}
 
-	// If there are no videos for this user, select from all videos
-	if len(*videos) < 1 {
-		videos, status, msg, err = a.videoManager.CustomList("SELECT * FROM videos WHERE disabled=0;")
-		if HandleMngrResp(logPrefix, c, status, msg, err, videos) != nil {
-			return 0, err
-		}
-	}
-
 	var videoIds []uint32
 	for _, v := range *videos {
 		videoIds = append(videoIds, v.Id)
