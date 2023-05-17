@@ -420,7 +420,7 @@ func (a *Api) customGetNumEnabledVideos(c *gin.Context) {
 	user := GetUserFromContext(c)
 
 	// Get a count of enabled videos for this user
-	sql := fmt.Sprintf("SELECT count(*) FROM videos WHERE user_id=%d AND disabled=0;", user.Id)
+	sql := fmt.Sprintf("SELECT count(*) FROM videos WHERE user_id=%d AND disabled=0 AND deleted=0;", user.Id)
 	value, status, msg, err := a.CustomValueQuery(sql)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, value) != nil {
 		return
