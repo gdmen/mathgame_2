@@ -44,30 +44,29 @@
       }
     }
   }
-}
-
-.tab-content {
-  padding: 2 * $base-space;
-  h2 {
-    margin-bottom: $base-space;
-  }
-  .setup-form {
-    display: inline-block;
-    width: 80%;
-    h4 {
+  .tab-content {
+    padding: 2 * $base-space;
+    h2 {
       margin-bottom: $base-space;
-      span.error {
-        color: $color-error;
+    }
+    .setup-form {
+      display: inline-block;
+      width: 80%;
+      h4 {
+        margin-bottom: $base-space;
+        span.error {
+          color: $color-error;
+        }
       }
     }
-  }
-  strong {
-    font-style: italic;
-    font-weight: bold;
-  }
-  #start-playing-button {
-    font-size: 1.5em;
-    margin-top: 2em;
+    strong {
+      font-style: italic;
+      font-weight: bold;
+    }
+    #start-playing-button {
+      font-size: 1.5em;
+      margin-top: 2em;
+    }
   }
 }
 
