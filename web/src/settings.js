@@ -381,6 +381,9 @@ const SettingsView = ({ token, url, user, settings }) => {
           settings={settings}
           errCallback={(e) => null}
         />
+      </div>
+
+      <div className="tab-content">
         <TargetWorkPercentageSettingsView
           token={token}
           url={url}
