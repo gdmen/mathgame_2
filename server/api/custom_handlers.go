@@ -85,7 +85,7 @@ func (a *Api) generateProblem(logPrefix string, c *gin.Context, settings *Settin
 	return model, nil
 }
 
-func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint32, error) {
+func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32, exclusions map[uint32]bool) (uint32, error) {
 	if a.isTest {
 		return 1, nil
 	}
@@ -98,6 +98,9 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32) (uint
 
 	var videoIds []uint32
 	for _, v := range *videos {
+		if _, ok := exclusions[v.Id]; ok {
+			continue
+		}
 		videoIds = append(videoIds, v.Id)
 	}
 
@@ -227,7 +230,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			return err
 		}
 		// Set a new reward video
-		videoId, err := a.selectVideo(logPrefix, c, user.Id)
+		videoId, err := a.selectVideo(logPrefix, c, user.Id, map[uint32]bool{gamestate.VideoId: true})
 		if err != nil {
 			return err
 		}
@@ -309,7 +312,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		changed_gamestate = true
 
 		// Set a new reward video
-		videoId, err := a.selectVideo(logPrefix, c, user.Id)
+		videoId, err := a.selectVideo(logPrefix, c, user.Id, map[uint32]bool{gamestate.VideoId: true})
 		if err != nil {
 			return err
 		}
@@ -488,7 +491,7 @@ func (a *Api) customDeleteVideo(c *gin.Context) {
 
 	if gamestate.VideoId == model.Id {
 		// Set a new reward video
-		videoId, err := a.selectVideo(logPrefix, c, user.Id)
+		videoId, err := a.selectVideo(logPrefix, c, user.Id, map[uint32]bool{gamestate.VideoId: true})
 		if err != nil {
 			return
 		}
@@ -579,7 +582,7 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 			return
 		}
 		// Set a new reward video
-		videoId, err := a.selectVideo(logPrefix, c, user.Id)
+		videoId, err := a.selectVideo(logPrefix, c, user.Id, map[uint32]bool{})
 		if err != nil {
 			return
 		}
