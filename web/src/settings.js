@@ -131,10 +131,7 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
   const [videoThumbnail, setVideoThumbnail] = useState("");
 
   const getEnabledVideoCount = (videos) => {
-    return (new Map(
-      [...videos].filter(
-        ([k, v]) => !v.disabled
-    ))).size;
+    return new Map([...videos].filter(([k, v]) => !v.disabled)).size;
   };
 
   useEffect(() => {
@@ -344,14 +341,18 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    { video.disabled ?
-                      <span>unavailable</span> : <span>&#9654;</span>
-                    }
+                    {video.disabled ? (
+                      <span>unavailable</span>
+                    ) : (
+                      <span>&#9654;</span>
+                    )}
                   </a>
                 </span>
                 <span className="video-title">{video.title}</span>
                 <span
-                  className={`video-delete ${!video.disabled && videos.size <= 3 ? "disabled" : ""}`}
+                  className={`video-delete ${
+                    !video.disabled && videos.size <= 3 ? "disabled" : ""
+                  }`}
                   data-video-url={video.url}
                   onClick={handleDeleteVideoClick}
                 >
