@@ -34,6 +34,10 @@ sudo systemctl daemon-reload
 sudo service mathgame-api restart
 sudo service mathgame-web restart
 
+# Refresh let's encrypt cert
+sudo certbot renew
+sudo service mathgame-web restart
+
 # Production logs
 journalctl -u mathgame-api -b
 journalctl -u mathgame-web -b
