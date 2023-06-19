@@ -33,6 +33,7 @@ sudo cp deploy/mathgame-web.service /etc/systemd/system
 sudo systemctl daemon-reload
 sudo service mathgame-api restart
 sudo service mathgame-web restart
+! MANUALLY RUN NEW MIGRATIONS FROM server/api/migrations !
 
 # Refresh let's encrypt cert
 sudo certbot renew
