@@ -372,7 +372,7 @@ const SettingsView = ({ token, url, user, settings }) => {
     return <div className="content-loading"></div>;
   }
   return (
-    <div id="settings">
+    <div id="settings" className="settings">
       <h2>Settings</h2>
       <div className="tab-content">
         <ProblemTypesSettingsView

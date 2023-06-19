@@ -171,7 +171,7 @@ const SetupView = ({ token, url, user, settings }) => {
   };
 
   return (
-    <div id="setup">
+    <div id="setup" className="settings">
       <div id="setup-tabs">
         {allTabs.map(function (tab, i) {
           var id = "tab" + i;
