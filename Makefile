@@ -60,7 +60,7 @@ build-web:
 	ln -s ../../conf.json web/src/conf.json
 
 prod-web:
-	cd web && serve -s build -l 443 --ssl-cert "/etc/letsencrypt/live/cowabunga.online/fullchain.pem" --ssl-key "/etc/letsencrypt/live/cowabunga.online/privkey.pem"
+	cd web && serve -s build -l 443 --ssl-cert "/etc/letsencrypt/live/mikeymath.org/fullchain.pem" --ssl-key "/etc/letsencrypt/live/mikeymath.org/privkey.pem"
 
 prod-api:
 	GIN_MODE=release $(GOBIN)/apiserver

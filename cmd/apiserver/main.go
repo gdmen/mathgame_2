@@ -39,7 +39,7 @@ func main() {
 	}
 	api_router := api.GetRouter()
 	if gin.Mode() == gin.ReleaseMode {
-		api_router.RunTLS(fmt.Sprintf(":%s", c.ApiPort), "/etc/letsencrypt/live/cowabunga.online/fullchain.pem", "/etc/letsencrypt/live/cowabunga.online/privkey.pem")
+		api_router.RunTLS(fmt.Sprintf(":%s", c.ApiPort), "/etc/letsencrypt/live/mikeymath.org/fullchain.pem", "/etc/letsencrypt/live/mikeymath.org/privkey.pem")
 	} else {
 		api_router.Run(fmt.Sprintf(":%s", c.ApiPort))
 	}
