@@ -19,6 +19,10 @@ import (
 	"garydmenezes.com/mathgame/server/generator"
 )
 
+const (
+	nullVideoId = math.MaxUint32
+)
+
 func (a *Api) CustomValueQuery(sql string) (string, int, string, error) {
 	var value string
 	err := a.DB.QueryRow(sql).Scan(&value)
@@ -104,20 +108,11 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32, exclu
 		videoIds = append(videoIds, v.Id)
 	}
 
-	// If there are no videos at all in the database, add a default and use that
+	// If there are no videos at all in the database, do nothing
 	if len(videoIds) < 1 {
-		msg := "Couldn't find any videos for this user, adding a default."
+		msg := fmt.Sprintf("Couldn't find any videos for this user (%d): silently do nothing.", userId)
 		glog.Errorf("%s %s", logPrefix, msg)
-		video := &Video{
-			Title:    "You've Got a Friend in Me",
-			URL:      "https://www.youtube.com/watch?v=nMN4JZ8crVY",
-			Disabled: false,
-		}
-		status, msg, err := a.videoManager.Create(video)
-		if HandleMngrResp(logPrefix, c, status, msg, err, video) != nil {
-			return 0, err
-		}
-		videoIds = append(videoIds, video.Id)
+		return nullVideoId, nil
 	}
 
 	// Select video
@@ -361,6 +356,37 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	return nil
 }
 
+// also select a video if setup is done and no video is selected
+func (a *Api) customGetGamestate(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Gamestate{}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Read from database
+	model, status, msg, err := a.gamestateManager.Get(model.UserId)
+	if HandleMngrResp(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
+
+	// Select a video if setup is done and no video is already selected
+	if model.VideoId == nullVideoId {
+		videoId, err := a.selectVideo(logPrefix, c, model.UserId, map[uint32]bool{})
+		if HandleMngrResp(logPrefix, c, status, msg, err, model) != nil {
+			return
+		}
+		model.VideoId = videoId
+		status, msg, err = a.gamestateManager.Update(model)
+	}
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
+}
+
 // also generate settings change events
 func (a *Api) customUpdateSettings(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
@@ -581,17 +607,12 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 		if err != nil {
 			return
 		}
-		// Set a new reward video
-		videoId, err := a.selectVideo(logPrefix, c, user.Id, map[uint32]bool{})
-		if err != nil {
-			return
-		}
 
 		// Write default new gamestate to database
 		default_gamestate := &Gamestate{
 			UserId:    user.Id,
 			ProblemId: problem.Id,
-			VideoId:   videoId,
+			VideoId:   nullVideoId, // the user hasn't added videos yet
 			Solved:    0,
 			Target:    default_gamestate_target,
 		}
