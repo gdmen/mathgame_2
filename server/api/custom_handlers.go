@@ -361,6 +361,24 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	return nil
 }
 
+// also select a video if no video is selected
+func (a *Api) customGetGamestate(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Gamestate{}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Read from database
+	model, status, msg, err := a.gamestateManager.Get(model.UserId)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
+}
+
 // also generate settings change events
 func (a *Api) customUpdateSettings(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
@@ -581,17 +599,12 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 		if err != nil {
 			return
 		}
-		// Set a new reward video
-		videoId, err := a.selectVideo(logPrefix, c, user.Id, map[uint32]bool{})
-		if err != nil {
-			return
-		}
 
 		// Write default new gamestate to database
 		default_gamestate := &Gamestate{
 			UserId:    user.Id,
 			ProblemId: problem.Id,
-			VideoId:   videoId,
+			VideoId:   -1, // the user hasn't added videos yet
 			Solved:    0,
 			Target:    default_gamestate_target,
 		}

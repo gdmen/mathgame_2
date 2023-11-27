@@ -112,7 +112,7 @@ func (a *Api) GetRouter() *gin.Engine {
 		}
 		gamestate := v1.Group("/gamestates")
 		{
-			gamestate.GET("/:user_id", userMiddleware, a.getGamestate)
+			gamestate.GET("/:user_id", userMiddleware, a.customGetGamestate)
 		}
 		video := v1.Group("/videos")
 		{
