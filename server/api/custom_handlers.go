@@ -374,6 +374,19 @@ func (a *Api) customGetGamestate(c *gin.Context) {
 
 	// Read from database
 	model, status, msg, err := a.gamestateManager.Get(model.UserId)
+        if HandleMngrResp(logPrefix, c, status, msg, err, model) != nil {
+                return
+        }
+
+        // Select a video if no video is already selected
+        if model.VideoId == -1 {
+            videoId, err := a.selectVideo(logPrefix, c, model.UserId, map[uint32]bool{})
+            if err != nil {
+              return err
+            }
+            model.VideoId = videoId;
+            status, msg, err = a.gamestateManager.Update(gamestate)
+        }
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
