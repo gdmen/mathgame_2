@@ -154,6 +154,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 
 	changed_gamestate := false
 	changed_settings := false
+	changed_problem_settings := false
 
 	// The main event to be processed as well as any side-effect events we add in this function
 	events := []*Event{event}
@@ -180,10 +181,12 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		// no-op
 	} else if event.EventType == SET_TARGET_DIFFICULTY {
 		// TODO: validate
+		changed_problem_settings = true
 	} else if event.EventType == SET_TARGET_WORK_PERCENTAGE {
 		// TODO: validate
 	} else if event.EventType == SET_PROBLEM_TYPE_BITMAP {
 		// TODO: validate
+		changed_problem_settings = true
 	} else if event.EventType == SET_GAMESTATE_TARGET {
 		// TODO: validate
 	} else if event.EventType == DISPLAYED_PROBLEM {
@@ -203,12 +206,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			// Update counts
 			gamestate.Solved += 1
 			// Generate a new problem
-			problem, err := a.generateProblem(logPrefix, c, settings)
-			if err != nil {
-				return err
-			}
-			gamestate.ProblemId = problem.Id
-			changed_gamestate = true
+			changed_problem_settings = true
 		}
 	} else if event.EventType == ERROR_PLAYING_VIDEO {
 		// Get the current video
@@ -318,6 +316,16 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		glog.Errorf("%s %s", logPrefix, msg)
 		c.JSON(http.StatusBadRequest, msg)
 		return errors.New(msg)
+	}
+
+	// Generate a new problem
+	if changed_problem_settings {
+		problem, err := a.generateProblem(logPrefix, c, settings)
+		if err != nil {
+			return err
+		}
+		gamestate.ProblemId = problem.Id
+		changed_gamestate = true
 	}
 
 	// Write all events to database
