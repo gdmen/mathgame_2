@@ -48,6 +48,11 @@ class EventReporterSingleton {
     this.answerChanged = true;
   }
 
+  newProblemWasDisplayed() {
+    this.answerChanged = true;
+    this.lastAnswer = "";
+  }
+
   tearDownListeners() {
     window.removeEventListener("focus", this.onFocus);
     window.removeEventListener("blur", this.onBlur);
@@ -102,6 +107,7 @@ const ProblemView = ({ gamestate, latex, postAnswer, postEvent, interval }) => {
 
   postEvent("displayed_problem", gamestate.problem_id);
   var reporter = new EventReporterSingleton(postEvent, interval, postAnswer);
+  reporter.newProblemWasDisplayed();
   var progress = String((100.0 * gamestate.solved) / gamestate.target) + "%";
   return (
     <>
