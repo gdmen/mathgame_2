@@ -18,7 +18,7 @@ const (
 	thumbnailurl VARCHAR(256) NOT NULL,
 	disabled TINYINT NOT NULL DEFAULT 0,
 	deleted TINYINT NOT NULL DEFAULT 0
-    ) DEFAULT CHARSET=utf8 ;`
+    ) DEFAULT CHARSET=utf8mb4 ;`
 
 	createVideoSQL = `INSERT INTO videos (user_id, title, url, thumbnailurl) VALUES (?, ?, ?, ?);`
 

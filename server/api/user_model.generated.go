@@ -16,7 +16,7 @@ const (
 	email VARCHAR(320) NOT NULL,
 	username VARCHAR(128) NOT NULL,
 	pin VARCHAR(4) NOT NULL DEFAULT ''
-    ) DEFAULT CHARSET=utf8 ;`
+    ) DEFAULT CHARSET=utf8mb4 ;`
 
 	createUserSQL = `INSERT INTO users (auth0_id, email, username) VALUES (?, ?, ?);`
 

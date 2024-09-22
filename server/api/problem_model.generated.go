@@ -17,7 +17,7 @@ const (
 	answer TEXT NOT NULL,
 	difficulty FLOAT NOT NULL,
 	disabled TINYINT NOT NULL DEFAULT 0
-    ) DEFAULT CHARSET=utf8 ;`
+    ) DEFAULT CHARSET=utf8mb4 ;`
 
 	createProblemSQL = `INSERT INTO problems (id, problem_type_bitmap, expression, answer, difficulty) VALUES (?, ?, ?, ?, ?);`
 

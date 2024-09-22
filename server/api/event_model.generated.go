@@ -17,7 +17,7 @@ const (
 	user_id BIGINT UNSIGNED NOT NULL,
 	event_type VARCHAR(32) NOT NULL,
 	value TEXT NOT NULL
-    ) DEFAULT CHARSET=utf8 ;`
+    ) DEFAULT CHARSET=utf8mb4 ;`
 
 	createEventSQL = `INSERT INTO events (user_id, event_type, value) VALUES (?, ?, ?);`
 
