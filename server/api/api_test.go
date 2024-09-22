@@ -37,7 +37,7 @@ func TestMain(m *testing.M) {
 }
 
 func ResetTestApi(c *common.Config) {
-	connectStr := fmt.Sprintf("%s:%s@tcp(%s:%s)/?charset=utf8&parseTime=true&time_zone=UTC", c.MySQLUser, c.MySQLPass, c.MySQLHost, c.MySQLPort)
+	connectStr := fmt.Sprintf("%s:%s@tcp(%s:%s)/?charset=utf8mb4&parseTime=true&time_zone=UTC", c.MySQLUser, c.MySQLPass, c.MySQLHost, c.MySQLPort)
 	db, err := sql.Open("mysql", connectStr)
 	if err != nil {
 		fmt.Printf("Couldn't connect to db: %v", err)
@@ -47,7 +47,7 @@ func ResetTestApi(c *common.Config) {
 	db.Exec(fmt.Sprintf("CREATE DATABASE %s;", c.MySQLDatabase))
 	db.Close()
 	// Reconnect specifically to the test database
-	connectStr = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=true", c.MySQLUser, c.MySQLPass, c.MySQLHost, c.MySQLPort, c.MySQLDatabase)
+	connectStr = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=true", c.MySQLUser, c.MySQLPass, c.MySQLHost, c.MySQLPort, c.MySQLDatabase)
 	db, err = sql.Open("mysql", connectStr)
 	if err != nil {
 		fmt.Printf("Couldn't connect to db: %v", err)

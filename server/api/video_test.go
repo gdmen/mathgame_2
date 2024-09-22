@@ -170,4 +170,30 @@ func TestVideoBasic(t *testing.T) {
 	if strings.TrimSpace(string(body)) != "[]" {
 		t.Fatal("ERROR: " + string(body))
 	}
+
+	// Create with a title that has non-BMP unicode characters
+	resp = httptest.NewRecorder()
+
+	video = Video{
+		Title:    "14 years old defeating 16 Blue Belts with Foot Locks! 🤯",
+		URL:      "https://www.youtube.com/watch?v=B5YmbhNoD00",
+		Disabled: false,
+	}
+	body, _ = json.Marshal(video)
+	req, _ = http.NewRequest("POST", fmt.Sprintf("/api/v1/videos/?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
+
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusCreated, resp.Code, resp)
+	}
+
+	body, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(body)) != `{"id":2,"user_id":1,"title":"14 years old defeating 16 Blue Belts with Foot Locks! 🤯","url":"https://www.youtube.com/watch?v=B5YmbhNoD00","thumbnailurl":"","disabled":false,"deleted":false}` {
+		t.Fatal("ERROR: " + string(body))
+	}
+
 }

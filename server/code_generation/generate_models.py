@@ -75,7 +75,7 @@ import (
     Create{0}TableSQL = `
     CREATE TABLE {1} (
         {2}
-    ) DEFAULT CHARSET=utf8 ;`
+    ) DEFAULT CHARSET=utf8mb4 ;`
 '''.format(
         m["name"].capitalize(),
         m["table"],

@@ -15,7 +15,7 @@ const (
 	problem_type_bitmap BIGINT UNSIGNED NOT NULL,
 	target_difficulty DOUBLE NOT NULL,
 	target_work_percentage INT(3) NOT NULL
-    ) DEFAULT CHARSET=utf8 ;`
+    ) DEFAULT CHARSET=utf8mb4 ;`
 
 	createSettingsSQL = `INSERT INTO settings (user_id, problem_type_bitmap, target_difficulty, target_work_percentage) VALUES (?, ?, ?, ?);`
 

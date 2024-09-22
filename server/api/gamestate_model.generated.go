@@ -16,7 +16,7 @@ const (
 	video_id BIGINT UNSIGNED NOT NULL,
 	solved INT(5) NOT NULL,
 	target INT(5) NOT NULL
-    ) DEFAULT CHARSET=utf8 ;`
+    ) DEFAULT CHARSET=utf8mb4 ;`
 
 	createGamestateSQL = `INSERT INTO gamestates (user_id, problem_id, video_id, solved, target) VALUES (?, ?, ?, ?, ?);`
 
