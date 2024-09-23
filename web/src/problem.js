@@ -35,20 +35,22 @@ class EventReporterSingleton {
   }
 
   wasIncorrectAnswer(problem_id) {
-    return (
+    var res =
       this.lastAnswer !== "" &&
       !this.answerChanged &&
-      this.lastProblemId === problem_id
-    );
+      this.lastProblemId === problem_id;
+    return res;
   }
 
   answerWasSet() {
     this.answerChanged = true;
   }
 
-  newProblemWasDisplayed() {
-    this.answerChanged = true;
-    this.lastAnswer = "";
+  problemWasDisplayed(problem_id) {
+    if (this.lastProblemId != problem_id) {
+      this.answerChanged = true;
+      this.lastAnswer = "";
+    }
   }
 
   tearDown() {
@@ -111,7 +113,7 @@ const ProblemView = ({ gamestate, latex, postAnswer, postEvent, interval }) => {
 
   postEvent("displayed_problem", gamestate.problem_id);
   var reporter = new EventReporterSingleton(postEvent, interval, postAnswer);
-  reporter.newProblemWasDisplayed();
+  reporter.problemWasDisplayed(gamestate.problem_id);
   var progress = String((100.0 * gamestate.solved) / gamestate.target) + "%";
   return (
     <>
