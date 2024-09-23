@@ -5,10 +5,11 @@ import "./problem.scss";
 var ReactFitText = require("react-fittext");
 
 class EventReporterSingleton {
+
   constructor(postEvent, interval, postAnswer) {
     var singleton = EventReporterSingleton._instance;
     if (singleton) {
-      singleton.setUpListeners();
+      singleton.setUp();
       return singleton;
     }
     EventReporterSingleton._instance = this;
@@ -20,16 +21,14 @@ class EventReporterSingleton {
     this.lastProblemId = null;
     this.answerChanged = false;
 
-    this.setUpListeners();
-
-    setInterval(this.reportWorking.bind(this), this.interval);
+    this.setUp();
   }
 
   reportAnswer(answer, problem_id) {
     if (answer === "" || answer === this.lastAnswer) {
       return;
     }
-    this.tearDownListeners();
+    this.tearDown();
     this.lastAnswer = answer;
     this.lastProblemId = problem_id;
     this.answerChanged = false;
@@ -53,18 +52,21 @@ class EventReporterSingleton {
     this.lastAnswer = "";
   }
 
-  tearDownListeners() {
+  tearDown() {
     window.removeEventListener("focus", this.onFocus);
     window.removeEventListener("blur", this.onBlur);
+    clearInterval(this.intervalId)
     this.listenersAlive = false;
     // turn off the reporting loop
     this.onBlur();
   }
 
-  setUpListeners() {
+  setUp() {
     if (!this.listenersAlive) {
       window.addEventListener("focus", this.onFocus.bind(this));
       window.addEventListener("blur", this.onBlur.bind(this));
+      clearInterval(this.intervalId)
+      this.intervalId = setInterval(this.reportWorking.bind(this), this.interval);
       this.listenersAlive = true;
     }
     // Call this.onFocus when the window loads

@@ -19,8 +19,10 @@ const VideoView = ({ video, postEvent, interval }) => {
   const playPause = () => {
     setPlaying(!playing);
     /* Uncomment to test faster */
-    //postEvent("done_watching_video", video.id);
-    //window.location.pathname="play";
+    //if (!playing && elapsed > 1000) {
+    //  postEvent("done_watching_video", video.id);
+    //  window.location.pathname="play";
+    //}
   };
 
   document.body.onkeyup = function (e) {
