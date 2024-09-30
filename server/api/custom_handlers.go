@@ -16,7 +16,7 @@ import (
 	"github.com/golang/glog"
 
 	"garydmenezes.com/mathgame/server/common"
-	"garydmenezes.com/mathgame/server/generator"
+	generator "garydmenezes.com/mathgame/server/gpt_generator"
 )
 
 const (
