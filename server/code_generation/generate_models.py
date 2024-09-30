@@ -284,6 +284,36 @@ import (
         ", ".join(["&model." + n for n in struct_fields])
     )
 
+    # manager.CustomIdList(sql)
+    list_id_code = '''
+        defer rows.Close()
+        if err != nil {{
+            msg := "Couldn't get {1} from database"
+            return nil, http.StatusInternalServerError, msg, err
+        }}
+        for rows.Next() {{
+            var {2} {3}
+            err = rows.Scan(&{2})
+            if err != nil {{
+                msg := "Couldn't scan row from database"
+                return nil, http.StatusInternalServerError, msg, err
+            }}
+            ids = append(ids, {2})
+        }}
+        err = rows.Err()
+        if err != nil {{
+            msg := "Error scanning rows from database"
+            return nil, http.StatusInternalServerError, msg, err
+        }}
+        return &ids, http.StatusOK, "", nil
+    }}
+'''.format(
+        m["name"].capitalize(),
+        m["table"],
+        camel_to_snake(key_name),
+        key_type
+    )
+
     # manager.List()
     s += '''
     func (m *{0}Manager) List({1}) (*[]{0}, int, string, error) {{
@@ -304,6 +334,19 @@ import (
 '''.format(
         m["name"].capitalize())
     s += list_code
+
+    # manager.CustomIdList()
+    s += '''
+    func (m *{0}Manager) CustomIdList(sql string) (*[]{2}, int, string, error) {{
+        ids := []{2}{{}}
+        sql = "SELECT {1} FROM problems WHERE " + sql
+        rows, err := m.DB.Query(sql)
+'''.format(
+        m["name"].capitalize(),
+        camel_to_snake(key_name),
+        key_type
+    )
+    s += list_id_code
 
     # manager.CustomSql()
     s += '''

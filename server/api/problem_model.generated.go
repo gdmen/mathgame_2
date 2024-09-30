@@ -15,19 +15,21 @@ const (
 	problem_type_bitmap BIGINT UNSIGNED NOT NULL,
 	expression TEXT NOT NULL,
 	answer TEXT NOT NULL,
+	explanation TEXT,
 	difficulty FLOAT NOT NULL,
-	disabled TINYINT NOT NULL DEFAULT 0
+	disabled TINYINT NOT NULL DEFAULT 0,
+	generator VARCHAR(64) NOT NULL
     ) DEFAULT CHARSET=utf8mb4 ;`
 
-	createProblemSQL = `INSERT INTO problems (id, problem_type_bitmap, expression, answer, difficulty) VALUES (?, ?, ?, ?, ?);`
+	createProblemSQL = `INSERT INTO problems (id, problem_type_bitmap, expression, answer, explanation, difficulty, generator) VALUES (?, ?, ?, ?, ?, ?, ?);`
 
 	getProblemSQL = `SELECT * FROM problems WHERE id=?;`
 
-	getProblemKeySQL = `SELECT  FROM problems WHERE id=? AND problem_type_bitmap=? AND expression=? AND answer=? AND difficulty=?;`
+	getProblemKeySQL = `SELECT  FROM problems WHERE id=? AND problem_type_bitmap=? AND expression=? AND answer=? AND explanation=? AND difficulty=? AND generator=?;`
 
 	listProblemSQL = `SELECT * FROM problems;`
 
-	updateProblemSQL = `UPDATE problems SET problem_type_bitmap=?, expression=?, answer=?, difficulty=?, disabled=? WHERE id=?;`
+	updateProblemSQL = `UPDATE problems SET problem_type_bitmap=?, expression=?, answer=?, explanation=?, difficulty=?, disabled=?, generator=? WHERE id=?;`
 
 	deleteProblemSQL = `DELETE FROM problems WHERE id=?;`
 )
@@ -37,12 +39,14 @@ type Problem struct {
 	ProblemTypeBitmap uint64  `json:"problem_type_bitmap" uri:"problem_type_bitmap" form:"problem_type_bitmap"`
 	Expression        string  `json:"expression" uri:"expression" form:"expression"`
 	Answer            string  `json:"answer" uri:"answer" form:"answer"`
+	Explanation       string  `json:"explanation" uri:"explanation" form:"explanation"`
 	Difficulty        float64 `json:"difficulty" uri:"difficulty" form:"difficulty"`
 	Disabled          bool    `json:"disabled" uri:"disabled" form:"disabled"`
+	Generator         string  `json:"generator" uri:"generator" form:"generator"`
 }
 
 func (model Problem) String() string {
-	return fmt.Sprintf("Id: %v, ProblemTypeBitmap: %v, Expression: %v, Answer: %v, Difficulty: %v, Disabled: %v", model.Id, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Difficulty, model.Disabled)
+	return fmt.Sprintf("Id: %v, ProblemTypeBitmap: %v, Expression: %v, Answer: %v, Explanation: %v, Difficulty: %v, Disabled: %v, Generator: %v", model.Id, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Explanation, model.Difficulty, model.Disabled, model.Generator)
 }
 
 type ProblemManager struct {
@@ -51,7 +55,7 @@ type ProblemManager struct {
 
 func (m *ProblemManager) Create(model *Problem) (int, string, error) {
 	status := http.StatusCreated
-	_, err := m.DB.Exec(createProblemSQL, model.Id, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Difficulty)
+	_, err := m.DB.Exec(createProblemSQL, model.Id, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Explanation, model.Difficulty, model.Generator)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Duplicate entry") {
 			msg := "Couldn't add problem to database"
@@ -66,7 +70,7 @@ func (m *ProblemManager) Create(model *Problem) (int, string, error) {
 
 func (m *ProblemManager) Get(id uint32) (*Problem, int, string, error) {
 	model := &Problem{}
-	err := m.DB.QueryRow(getProblemSQL, id).Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Difficulty, &model.Disabled)
+	err := m.DB.QueryRow(getProblemSQL, id).Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Explanation, &model.Difficulty, &model.Disabled, &model.Generator)
 	if err == sql.ErrNoRows {
 		msg := "Couldn't find a problem with that id"
 		return nil, http.StatusNotFound, msg, err
@@ -88,7 +92,7 @@ func (m *ProblemManager) List() (*[]Problem, int, string, error) {
 	}
 	for rows.Next() {
 		model := Problem{}
-		err = rows.Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Difficulty, &model.Disabled)
+		err = rows.Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Explanation, &model.Difficulty, &model.Disabled, &model.Generator)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -114,7 +118,7 @@ func (m *ProblemManager) CustomList(sql string) (*[]Problem, int, string, error)
 	}
 	for rows.Next() {
 		model := Problem{}
-		err = rows.Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Difficulty, &model.Disabled)
+		err = rows.Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Explanation, &model.Difficulty, &model.Disabled, &model.Generator)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -127,6 +131,33 @@ func (m *ProblemManager) CustomList(sql string) (*[]Problem, int, string, error)
 		return nil, http.StatusInternalServerError, msg, err
 	}
 	return &models, http.StatusOK, "", nil
+}
+
+func (m *ProblemManager) CustomIdList(sql string) (*[]uint32, int, string, error) {
+	ids := []uint32{}
+	sql = "SELECT id FROM problems WHERE " + sql
+	rows, err := m.DB.Query(sql)
+
+	defer rows.Close()
+	if err != nil {
+		msg := "Couldn't get problems from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	for rows.Next() {
+		var id uint32
+		err = rows.Scan(&id)
+		if err != nil {
+			msg := "Couldn't scan row from database"
+			return nil, http.StatusInternalServerError, msg, err
+		}
+		ids = append(ids, id)
+	}
+	err = rows.Err()
+	if err != nil {
+		msg := "Error scanning rows from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	return &ids, http.StatusOK, "", nil
 }
 
 func (m *ProblemManager) CustomSql(sql string) (int, string, error) {
@@ -145,7 +176,7 @@ func (m *ProblemManager) Update(model *Problem) (int, string, error) {
 		return status, msg, err
 	}
 	// Update
-	_, err = m.DB.Exec(updateProblemSQL, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Difficulty, model.Disabled, model.Id)
+	_, err = m.DB.Exec(updateProblemSQL, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Explanation, model.Difficulty, model.Disabled, model.Generator, model.Id)
 	if err != nil {
 		msg := "Couldn't update problem in database"
 		return http.StatusInternalServerError, msg, err

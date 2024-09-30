@@ -60,7 +60,7 @@ func mulInputDiff(maxDiff float64) float64 {
 
 func mul(a *Problem, b *Problem, opts *Options) *Problem {
 	prob := &Problem{}
-	prob.Expr = fmt.Sprintf("%s*%s", a.Expr, b.Expr)
+	prob.Expr = fmt.Sprintf("(%s)*(%s)", a.Expr, b.Expr)
 	a_v, b_v := a.GetAns(), b.GetAns()
 	prob.SetAns(a_v.Mul(a_v, b_v))
 	prob.Diff = (a.Diff * b.Diff) * mulDiffMultiplier

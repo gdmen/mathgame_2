@@ -13,6 +13,8 @@ type Config struct {
 	MySQLPass     string `json:"mysql_pass"`
 	ApiHost       string `json:"api_host"`
 	ApiPort       string `json:"api_port"`
+	OpenAiApiKey  string `json:"openai_api_key"`
+	Debug         bool   `json:"debug"`
 }
 
 func ReadConfig(path string) (*Config, error) {

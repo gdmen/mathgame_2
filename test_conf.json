@@ -9,5 +9,6 @@
         "auth0_domain": "",
         "auth0_clientId": "",
         "auth0_audience": "",
-        "event_reporting_interval": 1000
+        "event_reporting_interval": 1000,
+        "openai_api_key": ""
 }

@@ -5,8 +5,7 @@ import (
 	"math"
 	"math/big"
 	"math/rand"
-
-	"github.com/golang/glog"
+	//"github.com/golang/glog"
 )
 
 const (
@@ -32,9 +31,9 @@ func getNumberDiff(n float64) float64 {
 }
 
 func generateNumber(maxDiff float64, opts *Options) (*big.Rat, float64) {
-	logPrefix := "[generateNumber]"
-	glog.Infof("%s fcn start", logPrefix)
-	glog.Infof("%s maxDiff: %d\n", logPrefix, maxDiff)
+	//logPrefix := "[generateNumber]"
+	//glog.Infof("%s fcn start", logPrefix)
+	//glog.Infof("%s maxDiff: %d\n", logPrefix, maxDiff)
 	// Difficulty is exponentially related to number size
 	var denom int64
 	denom = 1

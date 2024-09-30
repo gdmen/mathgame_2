@@ -7,8 +7,7 @@ import (
 	"math/big"
 	"math/rand"
 	"regexp"
-
-	"github.com/golang/glog"
+	//"github.com/golang/glog"
 )
 
 const (
@@ -126,14 +125,14 @@ func GenerateProblem(opts *Options) (string, string, float64, error) {
 }
 
 func doStep(a *Problem, iteration int, opts *Options) *Problem {
-	logPrefix := "[doStep]"
-	glog.Infof("%s fcn start", logPrefix)
+	//logPrefix := "[doStep]"
+	//glog.Infof("%s fcn start", logPrefix)
 	remainDiff := opts.TargetDifficulty - a.Diff
-	glog.Infof("%s iteration: %d\n", logPrefix, iteration)
-	glog.Infof("%s remainDiff: %f\n", logPrefix, remainDiff)
-	glog.Infof("%s min reasonable: %f\n", logPrefix, getNumberDiff(opts.TargetDifficulty/math.Log(float64(iteration))))
+	//glog.Infof("%s iteration: %d\n", logPrefix, iteration)
+	//glog.Infof("%s remainDiff: %f\n", logPrefix, remainDiff)
+	//glog.Infof("%s min reasonable: %f\n", logPrefix, getNumberDiff(opts.TargetDifficulty/math.Log(float64(iteration))))
 	if iteration > 1 && remainDiff <= getNumberDiff(opts.TargetDifficulty/math.Log(float64(iteration))) {
-		glog.Infof("%s returning_a: %s\n", logPrefix, a)
+		//glog.Infof("%s returning_a: %s\n", logPrefix, a)
 		return a
 	}
 	possOps := []Operation{}
@@ -146,7 +145,7 @@ func doStep(a *Problem, iteration int, opts *Options) *Problem {
 		maxBDiff := randOp.getInputDiff(remainDiff)
 		b := generateNumberProblem(maxBDiff, opts)
 		n := randOp.do(a, b, opts)
-		glog.Infof("%s randOp %s: %s\n", logPrefix, randOp.String(), n)
+		//glog.Infof("%s randOp %s: %s\n", logPrefix, randOp.String(), n)
 		if n.Diff-opts.TargetDifficulty <= targetDelta {
 			return n
 		}
@@ -154,6 +153,6 @@ func doStep(a *Problem, iteration int, opts *Options) *Problem {
 		possOps[i] = possOps[len(possOps)-1]
 		possOps = possOps[:len(possOps)-1]
 	}
-	glog.Infof("%s returning_z: %s\n", logPrefix, a)
+	//glog.Infof("%s returning_z: %s\n", logPrefix, a)
 	return a
 }

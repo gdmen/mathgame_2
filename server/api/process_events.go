@@ -13,6 +13,10 @@ import (
 	"github.com/golang/glog"
 )
 
+const (
+	maxTarget = 20
+)
+
 // Do stuff based on the event and write an updated Gamestate / any other side effects
 func (a *Api) processEvents(logPrefix string, c *gin.Context, events []*Event, writeCtx bool) error {
 	// Get User
@@ -78,6 +82,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	} else if event.EventType == SET_PROBLEM_TYPE_BITMAP {
 		// TODO: validate
 		changed_problem_settings = true
+		a.generateProblemsBackground(logPrefix, c, settings)
 	} else if event.EventType == SET_GAMESTATE_TARGET {
 		// TODO: validate
 	} else if event.EventType == DISPLAYED_PROBLEM {
@@ -96,7 +101,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		} else { // Answer was correct
 			// Update counts
 			gamestate.Solved += 1
-			// Generate a new problem
+			// Select a new problem
 			changed_problem_settings = true
 		}
 	} else if event.EventType == ERROR_PLAYING_VIDEO {
@@ -130,7 +135,6 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		var recentPast int = 900 // seconds aka 15 minutes. This assumes a 1 second event reporting interval.
 		var diffIncrease float64 = 0.05
 		var minDiff float64 = 3
-		var maxProbs uint32 = 30
 		var minProbs uint32 = 5
 		// End difficulty adjustment limits
 
@@ -168,7 +172,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			glog.Infof("%s difficulty is on target", logPrefix)
 		} else if targetWorkPercentage > workPercentage {
 			// Make it more difficult
-			if gamestate.Target < maxProbs {
+			if gamestate.Target < uint32(maxTarget) {
 				changeGamestateTarget(gamestate.Target + 1)
 			} else {
 				changeGamestateTarget(uint32(math.Max(float64(minProbs), math.Ceil(float64(gamestate.Target)/2))))
@@ -209,9 +213,9 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		return errors.New(msg)
 	}
 
-	// Generate a new problem
+	// Select a new problem
 	if changed_problem_settings {
-		problem, err := a.generateProblem(logPrefix, c, settings)
+		problem, err := a.selectProblem(logPrefix, c, settings, gamestate.ProblemId)
 		if err != nil {
 			return err
 		}
