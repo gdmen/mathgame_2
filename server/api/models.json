@@ -47,6 +47,10 @@
           "sql": "TEXT NOT NULL"
         },
         {
+          "name": "Explanation", "type": "string",
+          "sql": "TEXT"
+        },
+        {
           "name": "Difficulty", "type": "float64",
           "sql": "FLOAT NOT NULL"
         },
