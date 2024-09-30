@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -16,11 +17,14 @@ import (
 	"github.com/golang/glog"
 
 	"garydmenezes.com/mathgame/server/common"
-	"garydmenezes.com/mathgame/server/generator"
+	llm_generator "garydmenezes.com/mathgame/server/llm_generator"
 )
 
 const (
-	nullVideoId = math.MaxUint32
+	nullVideoId        = math.MaxUint32
+	maxProbs    uint32 = 30
+	// difficulty epsilon as a multiple
+	problemSelectionEpsilon = 0.1
 )
 
 func (a *Api) CustomValueQuery(sql string) (string, int, string, error) {
@@ -33,59 +37,84 @@ func (a *Api) CustomValueQuery(sql string) (string, int, string, error) {
 	return value, http.StatusOK, "", nil
 }
 
-func (a *Api) generateProblem(logPrefix string, c *gin.Context, settings *Settings) (*Problem, error) {
-	model := &Problem{}
-	// TODO: this is temporary logic to make the generator compatible with the new ProblemTypeBitmap
-	fractions := false //(FRACTIONS & settings.ProblemTypeBitmap) > 0
-	negatives := false //(NEGATIVES & settings.ProblemTypeBitmap) > 0
-	operations := []string{}
-	if (ADDITION & settings.ProblemTypeBitmap) > 0 {
-		operations = append(operations, "+")
+func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings) (*Problem, error) {
+	// Get all problems with this ProblemTypeBitmap and similar Difficulty
+	// TODO: the problemtypebitmap should actually select for all problems that fit into this bitmap
+	//       e.g. if problemtypebitmatp = 5, then it should select for any of (1, 4, 5)
+	permutations := GetProblemTypePermutations(5)
+	diffLowerBound := settings.TargetDifficulty * (1 - problemSelectionEpsilon)
+	diffUpperBound := settings.TargetDifficulty * (1 + problemSelectionEpsilon)
+	sql := fmt.Sprintf(
+		"SELECT * FROM problems WHERE problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0;",
+		strings.Replace(strings.Trim(fmt.Sprint(permutations), "[]"), " ", ",", -1),
+		diffLowerBound,
+		diffUpperBound,
+	)
+	fmt.Printf("sql: %s\n", sql)
+	problems, status, msg, err := a.problemManager.CustomList(sql)
+	if HandleMngrResp(logPrefix, c, status, msg, err, problems) != nil {
+		return nil, err
 	}
-	if (SUBTRACTION & settings.ProblemTypeBitmap) > 0 {
-		operations = append(operations, "-")
+	if uint32(len(*problems)) >= maxProbs*2 {
+		glog.Infof("%s returning random problem because there are already %d problems", logPrefix, len(*problems))
+		return &(*problems)[rand.Intn(len(*problems))], nil
 	}
-	generator_opts := &generator.Options{
-		Operations:       operations,
-		Fractions:        fractions,
-		Negatives:        negatives,
-		TargetDifficulty: settings.TargetDifficulty,
+	// If difficulty is less than 5 and only using basic operations, use the heuristic generator.
+
+	// Otherwise use the GPT generator.
+
+	previousExpressions := []string{}
+	for _, p := range *problems {
+		previousExpressions = append(previousExpressions, p.Expression)
+	}
+
+	return a.generateProblem(logPrefix, c, settings, previousExpressions)
+
+}
+
+func (a *Api) generateProblem(logPrefix string, c *gin.Context, settings *Settings, previousExpressions []string) (*Problem, error) {
+	var model *Problem
+	generator_opts := &llm_generator.Options{
+		Features:            ProblemTypeToFeatures(ProblemType(settings.ProblemTypeBitmap)),
+		TargetDifficulty:    settings.TargetDifficulty,
+		PreviousExpressions: previousExpressions,
+		NumProblems:         5, // this lets us reduce the number of OpenAI calls we need to make
 	}
 
 	var err error
-	model.Expression, model.Answer, model.Difficulty, err = generator.GenerateProblem(generator_opts)
+	var generator_problems []llm_generator.Problem
+	generator_problems, err = llm_generator.GenerateProblem(generator_opts)
 	if err != nil {
-		if err, ok := err.(*generator.OptionsError); ok {
-			msg := "Failed options validation"
-			glog.Errorf("%s %s: %v", logPrefix, msg, err)
-			c.JSON(http.StatusBadRequest, common.GetError(msg))
-			return nil, err
-		}
 		msg := "Couldn't generate problem"
 		glog.Errorf("%s %s: %v", logPrefix, msg, err)
-		c.JSON(http.StatusBadRequest, common.GetError(msg))
-		return nil, err
-	}
-	model.ProblemTypeBitmap = 0
-	if strings.Contains(model.Expression, "+") {
-		model.ProblemTypeBitmap += ADDITION
-	}
-	if strings.Contains(model.Expression, "-") {
-		model.ProblemTypeBitmap += SUBTRACTION
-	}
-
-	// Use expression hash as model.Id
-	h := fnv.New32a()
-	h.Write([]byte(model.Expression))
-	model.Id = h.Sum32()
-
-	// Write to database
-	// TODO: collisions here will return the wrong Expre/Ans for the given problem id after returning a 200 for a duplicate?
-	status, msg, err := a.problemManager.Create(model)
-	if HandleMngrResp(logPrefix, c, status, msg, err, model) != nil {
+		c.JSON(http.StatusInternalServerError, common.GetError(msg))
 		return nil, err
 	}
 
+	re_whitespace := regexp.MustCompile(`\s+`)
+	for _, p := range generator_problems {
+		glog.Infof("%s generated problem: %v", logPrefix, p)
+		model = &Problem{}
+		model.ProblemTypeBitmap = uint64(FeaturesToProblemType(p.Features))
+		model.Expression = re_whitespace.ReplaceAllString(p.Expression, "")
+		model.Answer = p.Answer
+		model.Explanation = p.Explanation
+		model.Difficulty = p.Difficulty
+
+		// Use expression hash as model.Id
+		h := fnv.New32a()
+		h.Write([]byte(model.Expression))
+		model.Id = h.Sum32()
+
+		// Write to database
+		// TODO: collisions here will return the wrong Expre/Ans for the given problem id after returning a 200 for a duplicate?
+		status, msg, err := a.problemManager.Create(model)
+		if HandleMngrResp(logPrefix, c, status, msg, err, model) != nil {
+			return nil, err
+		}
+	}
+
+	// Just return the last problem added
 	return model, nil
 }
 
@@ -205,7 +234,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		} else { // Answer was correct
 			// Update counts
 			gamestate.Solved += 1
-			// Generate a new problem
+			// Select a new problem
 			changed_problem_settings = true
 		}
 	} else if event.EventType == ERROR_PLAYING_VIDEO {
@@ -239,7 +268,6 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		var recentPast int = 900 // seconds aka 15 minutes. This assumes a 1 second event reporting interval.
 		var diffIncrease float64 = 0.05
 		var minDiff float64 = 3
-		var maxProbs uint32 = 30
 		var minProbs uint32 = 5
 		// End difficulty adjustment limits
 
@@ -318,9 +346,9 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		return errors.New(msg)
 	}
 
-	// Generate a new problem
+	// Select a new problem
 	if changed_problem_settings {
-		problem, err := a.generateProblem(logPrefix, c, settings)
+		problem, err := a.selectProblem(logPrefix, c, settings)
 		if err != nil {
 			return err
 		}
@@ -610,8 +638,8 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 			return
 		}
 		glog.Infof("%s Settings: %v", logPrefix, settings)
-		// Generate a new problem
-		problem, err := a.generateProblem(logPrefix, c, settings)
+		// Select a new problem
+		problem, err := a.selectProblem(logPrefix, c, settings)
 		if err != nil {
 			return
 		}
