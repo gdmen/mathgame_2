@@ -19,16 +19,6 @@ const (
 	nullVideoId = math.MaxUint32
 )
 
-func (a *Api) CustomValueQuery(sql string) (string, int, string, error) {
-	var value string
-	err := a.DB.QueryRow(sql).Scan(&value)
-	if err != nil {
-		msg := "Couldn't get value from database"
-		return "", http.StatusInternalServerError, msg, err
-	}
-	return value, http.StatusOK, "", nil
-}
-
 func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32, exclusions map[uint32]bool) (uint32, error) {
 	if a.isTest {
 		return 1, nil
@@ -288,7 +278,7 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 		}
 		SetUserInContext(c, user)
 		// Write default new settings to database
-		const default_problem_type_bitmap uint64 = 0
+		const default_problem_type_bitmap uint64 = 1
 		const default_target_difficulty float64 = 3
 		const default_target_work_percentage uint8 = 70
 		const default_gamestate_target uint32 = 10
@@ -308,8 +298,8 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 			return
 		}
 		glog.Infof("%s Settings: %v", logPrefix, settings)
-		// Generate a new problem
-		problem, err := a.generateProblem(logPrefix, c, settings)
+		// Select a new problem
+		problem, err := a.selectProblem(logPrefix, c, settings, 0)
 		if err != nil {
 			return
 		}

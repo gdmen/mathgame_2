@@ -47,12 +47,20 @@
           "sql": "TEXT NOT NULL"
         },
         {
+          "name": "Explanation", "type": "string",
+          "sql": "TEXT"
+        },
+        {
           "name": "Difficulty", "type": "float64",
           "sql": "FLOAT NOT NULL"
         },
         {
           "name": "Disabled", "type": "bool",
           "sql": "TINYINT NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "Generator", "type": "string",
+          "sql": "VARCHAR(64) NOT NULL"
         }
       ]
     },

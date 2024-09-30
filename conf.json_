@@ -10,5 +10,6 @@
         "auth0_clientId": "",
         "auth0_audience": "",
         "event_reporting_interval": 1000,
-        "debug_quickplay": false
+        "debug_quickplay": false,
+        "openai_api_key": ""
 }

@@ -17,13 +17,82 @@ const (
 	// -end- EventTypes
 )
 
+type ProblemType uint64
+
 const (
 	// ProblemTypes are currently limited to 64 flags
-	ADDITION uint64 = 1 << iota
+	ADDITION ProblemType = 1 << iota
 	SUBTRACTION
-	//MULTIPLICATION
-	//DIVISION
-	//FRACTIONS
-	//NEGATIVES
+	MULTIPLICATION
+	DIVISION
+	FRACTIONS
+	NEGATIVES
 	// -end- ProblemTypes
 )
+
+// Map to associate ProblemType values with string names
+var problemTypeNames = map[ProblemType]string{
+	ADDITION:       "addition",
+	SUBTRACTION:    "subtraction",
+	MULTIPLICATION: "multiplication",
+	DIVISION:       "division",
+	FRACTIONS:      "fractions",
+	NEGATIVES:      "negatives",
+}
+
+// Map to associate string names with ProblemType values
+var problemTypeValues = map[string]ProblemType{
+	"addition":       ADDITION,
+	"subtraction":    SUBTRACTION,
+	"multiplication": MULTIPLICATION,
+	"division":       DIVISION,
+	"fractions":      FRACTIONS,
+	"negatives":      NEGATIVES,
+}
+
+// Convert a ProblemType Bitmap into an array of string features
+func ProblemTypeToFeatures(pt ProblemType) []string {
+	features := []string{}
+	for k, v := range problemTypeNames {
+		if (k & pt) > 0 {
+			features = append(features, v)
+		}
+	}
+	return features
+}
+
+// Convert an array of string features into a ProblemType Bitmap
+func FeaturesToProblemType(features []string) ProblemType {
+	pt := ProblemType(0)
+	for _, v := range features {
+		pt |= problemTypeValues[v]
+	}
+	return pt
+}
+
+// Convert a ProblemType Bitmap into a list of all permutations
+// e.g. pt = 5 -> 101 in binary -> [1,4,5]
+func GetProblemTypePermutations(pt ProblemType) []ProblemType {
+	var positions []int
+
+	// Find all positions of 1 bits in pt
+	for i := 0; i < 64; i++ {
+		if (pt & (1 << i)) != 0 {
+			positions = append(positions, i)
+		}
+	}
+
+	return getProblemTypePermutationsHelper(ProblemType(0), positions, 0)
+}
+
+func getProblemTypePermutationsHelper(p ProblemType, positions []int, i int) []ProblemType {
+	if i >= len(positions) {
+		if p == 0 {
+			return []ProblemType{}
+		}
+		return []ProblemType{p}
+	}
+	p1 := getProblemTypePermutationsHelper(p, positions, i+1)
+	p2 := getProblemTypePermutationsHelper(p|ProblemType(1<<positions[i]), positions, i+1)
+	return append(p1, p2...)
+}
