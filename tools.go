@@ -1,3 +1,4 @@
+//go:build tools
 // +build tools
 
 // Package tools records tool dependencies. It cannot actually be compiled.
