@@ -171,6 +171,52 @@
           "sql": "TEXT NOT NULL"
         }
       ]
+    },
+    {
+      "name": "job",
+      "table": "jobs",
+      "fields": [
+        {
+          "name": "Id", "type": "string",
+          "sql": "VARCHAR(26) NOT NULL PRIMARY KEY"
+        },
+        {
+          "name": "Fingerprint", "type": "string",
+          "sql": "VARCHAR(8) NOT NULL UNIQUE KEY"
+        },
+        {
+          "name": "Type", "type": "string",
+          "sql": "VARCHAR(50) NOT NULL"
+        },
+        {
+          "name": "Payload", "type": "string",
+          "sql": "JSON NOT NULL"
+        },
+        {
+          "name": "Retries", "type": "uint8",
+          "sql": "TINYINT(3) NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "MaxRetries", "type": "uint8",
+          "sql": "TINYINT(3) NOT NULL DEFAULT 10"
+        },
+        {
+          "name": "TimeoutSeconds", "type": "uint16",
+          "sql": "INT(11) NOT NULL DEFAULT 60"
+        },
+        {
+          "name": "CreatedAt", "type": "time.Time",
+          "sql": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+        },
+        {
+          "name": "ScheduledAt", "type": "time.Time",
+          "sql": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP KEY"
+        },
+        {
+          "name": "ClaimedAt", "type": "time.Time",
+          "sql": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+        }
+      ]
     }
   ]
 }

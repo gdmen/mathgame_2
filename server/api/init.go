@@ -33,6 +33,7 @@ type Api struct {
 	settingsManager  *SettingsManager
 	gamestateManager *GamestateManager
 	eventManager     *EventManager
+	jobManager       *JobManager
 }
 
 func NewApi(db *sql.DB) (*Api, error) {
@@ -54,6 +55,7 @@ func NewApi(db *sql.DB) (*Api, error) {
 	a.settingsManager = &SettingsManager{DB: db}
 	a.gamestateManager = &GamestateManager{DB: db}
 	a.eventManager = &EventManager{DB: db}
+	a.jobManager = &JobManager{DB: db}
 	return a, nil
 }
 
