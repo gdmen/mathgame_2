@@ -41,14 +41,6 @@ func (a *Api) getSatisfyingProblems(logPrefix string, c *gin.Context, settings *
 	return problems, nil
 }
 
-func (a *Api) getPreviousExpressions(logPrefix string, c *gin.Context, problems *[]Problem) []string {
-	previousExpressions := []string{}
-	for _, p := range *problems {
-		previousExpressions = append(previousExpressions, p.Expression)
-	}
-	return previousExpressions
-}
-
 func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings) (*Problem, error) {
 	problems, err := a.getSatisfyingProblems(logPrefix, c, settings)
 	if err != nil {
@@ -61,23 +53,21 @@ func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings
 	}
 
 	glog.Infof("%s generating new problems because there are only %d problems", logPrefix, len(*problems))
-	previousExpressions := []string{} //a.getPreviousExpressions(logPrefix, c, problems)
 
-	go a.generateProblem(logPrefix, c, settings, previousExpressions, maxProbs)
-	return a.generateProblem(logPrefix, c, settings, previousExpressions, 1)
+	go a.generateProblem(logPrefix, c, settings, maxProbs)
+	return a.generateProblem(logPrefix, c, settings, 1)
 
 }
 
-func (a *Api) generateProblem(logPrefix string, c *gin.Context, settings *Settings, previousExpressions []string, numProblems int) (*Problem, error) {
+func (a *Api) generateProblem(logPrefix string, c *gin.Context, settings *Settings, numProblems int) (*Problem, error) {
 	var model *Problem
 	// TODO: If difficulty is less than 5 and only using basic operations, use the heuristic generator.
 
 	// Otherwise use the GPT generator.
 	generatorOpts := &llm_generator.Options{
-		Features:            ProblemTypeToFeatures(ProblemType(settings.ProblemTypeBitmap)),
-		TargetDifficulty:    settings.TargetDifficulty,
-		PreviousExpressions: previousExpressions,
-		NumProblems:         numProblems, // we still return just one problem, but this lets us reduce the number of OpenAI calls we need to make
+		Features:         ProblemTypeToFeatures(ProblemType(settings.ProblemTypeBitmap)),
+		TargetDifficulty: settings.TargetDifficulty,
+		NumProblems:      numProblems, // we still return just one problem, but this lets us reduce the number of OpenAI calls we need to make
 	}
 
 	var err error

@@ -79,12 +79,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		// TODO: validate
 		changed_problem_settings = true
 		// Run a background process to generate some new problems
-		problems, err := a.getSatisfyingProblems(logPrefix, c, settings)
-		if err != nil {
-			return err
-		}
-		previousExpressions := a.getPreviousExpressions(logPrefix, c, problems)
-		go a.generateProblem(logPrefix, c, settings, previousExpressions, maxProbs*2)
+		go a.generateProblem(logPrefix, c, settings, maxProbs*2)
 	} else if event.EventType == SET_GAMESTATE_TARGET {
 		// TODO: validate
 	} else if event.EventType == DISPLAYED_PROBLEM {

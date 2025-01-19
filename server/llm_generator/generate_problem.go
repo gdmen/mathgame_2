@@ -13,7 +13,8 @@ import (
 	"garydmenezes.com/mathgame/server/common"
 )
 
-const PROMPT = `
+const (
+	PROMPT_QUESTION = `
 Generate math questions in this format:
 {
   "features": ["addition", "multiplication"]
@@ -26,7 +27,10 @@ where "question" is the math question, "answer" is the correct answer, "explanat
 Return these problems as a valid JSON list with no additional text.
 Do not wrap the JSON in markdown or any other JSON markers.
 `
-const OPENAI_URL = "https://api.openai.com/v1/completions"
+	PROMPT_QUANTITY   = "Produce %d unique problems in this format that may include these features %s and is the appropriate difficulty for a %g year old."
+	PROMPT_VALIDATION = "return only the answer to: %s"
+	OPENAI_URL        = "https://api.openai.com/v1/completions"
+)
 
 func GenerateProblem(opts *Options) ([]Problem, error) {
 	c, err := common.ReadConfig("conf.json")
@@ -40,15 +44,8 @@ func GenerateProblem(opts *Options) ([]Problem, error) {
 		glog.Fatal(err)
 	}
 
-	sort.Strings(opts.PreviousExpressions)
-	_, err = json.Marshal(opts.PreviousExpressions)
-	if err != nil {
-		glog.Fatal(err)
-	}
-
-	prompt := PROMPT + fmt.Sprintf(
-		"\nProduce %d unique problems in this format that may include these features %s and is the appropriate difficulty for a %g year old.", //ABSOLUTELY DO NOT produce any of the following expressions: %s",
-		opts.NumProblems, featuresJson, opts.TargetDifficulty, // previousExpressionsJson,
+	prompt := PROMPT_QUESTION + "\n" + fmt.Sprintf(PROMPT_QUANTITY,
+		opts.NumProblems, featuresJson, opts.TargetDifficulty,
 	)
 	// log the prompt
 	glog.Infof("OpenAI Prompt: %s\n", prompt)
