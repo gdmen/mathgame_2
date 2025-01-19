@@ -13,6 +13,10 @@ import (
 	"github.com/golang/glog"
 )
 
+const (
+	maxTarget = 20
+)
+
 // Do stuff based on the event and write an updated Gamestate / any other side effects
 func (a *Api) processEvents(logPrefix string, c *gin.Context, events []*Event, writeCtx bool) error {
 	// Get User
@@ -78,8 +82,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	} else if event.EventType == SET_PROBLEM_TYPE_BITMAP {
 		// TODO: validate
 		changed_problem_settings = true
-		// Run a background process to generate some new problems
-		go a.generateProblem(logPrefix, c, settings, maxProbs*2)
+		a.generateProblemsBackground(logPrefix, c, settings)
 	} else if event.EventType == SET_GAMESTATE_TARGET {
 		// TODO: validate
 	} else if event.EventType == DISPLAYED_PROBLEM {
@@ -169,7 +172,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			glog.Infof("%s difficulty is on target", logPrefix)
 		} else if targetWorkPercentage > workPercentage {
 			// Make it more difficult
-			if gamestate.Target < uint32(maxProbs) {
+			if gamestate.Target < uint32(maxTarget) {
 				changeGamestateTarget(gamestate.Target + 1)
 			} else {
 				changeGamestateTarget(uint32(math.Max(float64(minProbs), math.Ceil(float64(gamestate.Target)/2))))

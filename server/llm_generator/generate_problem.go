@@ -14,6 +14,7 @@ import (
 )
 
 const (
+	OPENAI_URL      = "https://api.openai.com/v1/completions"
 	PROMPT_QUESTION = `
 Generate math questions in this format:
 {
@@ -27,12 +28,13 @@ where "question" is the math question, "answer" is the correct answer, "explanat
 Return these problems as a valid JSON list with no additional text.
 Do not wrap the JSON in markdown or any other JSON markers.
 `
-	PROMPT_QUANTITY   = "Produce %d unique problems in this format that may include these features %s and is the appropriate difficulty for a %g year old."
-	PROMPT_VALIDATION = "return only the answer to: %s"
-	OPENAI_URL        = "https://api.openai.com/v1/completions"
+	PROMPT_QUANTITY = "Produce %d unique problems in this format that may include these features %s and is the appropriate difficulty for a %g year old."
+	MAX_QUANTITY    = 20
 )
 
 func GenerateProblem(opts *Options) ([]Problem, error) {
+	opts.NumProblems = common.Min(opts.NumProblems, MAX_QUANTITY)
+
 	c, err := common.ReadConfig("conf.json")
 	if err != nil {
 		glog.Fatal(err)
@@ -48,7 +50,7 @@ func GenerateProblem(opts *Options) ([]Problem, error) {
 	prompt := PROMPT_QUESTION + "\n" + fmt.Sprintf(PROMPT_QUANTITY,
 		opts.NumProblems, featuresJson, opts.TargetDifficulty,
 	)
-	glog.Infof("OpenAI question prompt: %s\n", prompt)
+	glog.Infof("OpenAI GPT4oMini question prompt: %s\n", prompt)
 
 	client := openai.NewClient(c.OpenAiApiKey)
 	resp, err := client.CreateChatCompletion(
@@ -76,33 +78,5 @@ func GenerateProblem(opts *Options) ([]Problem, error) {
 		glog.Errorf("OpenAI content error: %v | %s\n", err, resp.Choices[0].Message.Content)
 		return []Problem{}, err
 	}
-
-	// Validate question(s)
-	validated := []Problem{}
-	for _, p := range problems {
-		prompt = fmt.Sprintf(PROMPT_VALIDATION, p.Expression)
-		glog.Infof("OpenAI validation prompt: %s\n", prompt)
-
-		resp, err := client.CreateChatCompletion(
-			context.Background(),
-			openai.ChatCompletionRequest{
-				Model: openai.GPT4oMini,
-				Messages: []openai.ChatCompletionMessage{
-					{
-						Role:    openai.ChatMessageRoleUser,
-						Content: prompt,
-					},
-				},
-			},
-		)
-
-		if err != nil {
-			glog.Infof("OpenAI error when validating: %v\n", err)
-			continue
-		}
-		glog.Infof("OpenAI validation resp: %s", resp.Choices[0].Message.Content)
-		validated = append(validated, p)
-	}
-
 	return problems, nil
 }

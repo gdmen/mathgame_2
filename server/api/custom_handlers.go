@@ -278,7 +278,7 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 		}
 		SetUserInContext(c, user)
 		// Write default new settings to database
-		const default_problem_type_bitmap uint64 = 0
+		const default_problem_type_bitmap uint64 = 1
 		const default_target_difficulty float64 = 3
 		const default_target_work_percentage uint8 = 70
 		const default_gamestate_target uint32 = 10
