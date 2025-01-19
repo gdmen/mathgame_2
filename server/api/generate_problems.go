@@ -27,6 +27,7 @@ func (a *Api) getSatisfyingProblems(logPrefix string, c *gin.Context, settings *
 	permutations := GetProblemTypePermutations(ProblemType(settings.ProblemTypeBitmap))
 	diffLowerBound := settings.TargetDifficulty * (1 - problemSelectionEpsilon)
 	diffUpperBound := settings.TargetDifficulty * (1 + problemSelectionEpsilon)
+        // TODO: only return a list of IDs instead of full problems
 	sql := fmt.Sprintf(
 		"SELECT * FROM problems WHERE problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0;",
 		strings.Replace(strings.Trim(fmt.Sprint(permutations), "[]"), " ", ",", -1),

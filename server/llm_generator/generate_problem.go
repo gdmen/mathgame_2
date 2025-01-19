@@ -44,11 +44,11 @@ func GenerateProblem(opts *Options) ([]Problem, error) {
 		glog.Fatal(err)
 	}
 
+	// Request question(s)
 	prompt := PROMPT_QUESTION + "\n" + fmt.Sprintf(PROMPT_QUANTITY,
 		opts.NumProblems, featuresJson, opts.TargetDifficulty,
 	)
-	// log the prompt
-	glog.Infof("OpenAI Prompt: %s\n", prompt)
+	glog.Infof("OpenAI question prompt: %s\n", prompt)
 
 	client := openai.NewClient(c.OpenAiApiKey)
 	resp, err := client.CreateChatCompletion(
@@ -73,8 +73,35 @@ func GenerateProblem(opts *Options) ([]Problem, error) {
 	var problems []Problem
 	err = json.Unmarshal([]byte(resp.Choices[0].Message.Content), &problems)
 	if err != nil {
-		glog.Errorf("OpenAI content error: %v\n", err)
+		glog.Errorf("OpenAI content error: %v | %s\n", err, resp.Choices[0].Message.Content)
 		return []Problem{}, err
+	}
+
+	// Validate question(s)
+	validated := []Problem{}
+	for _, p := range problems {
+		prompt = fmt.Sprintf(PROMPT_VALIDATION, p.Expression)
+		glog.Infof("OpenAI validation prompt: %s\n", prompt)
+
+		resp, err := client.CreateChatCompletion(
+			context.Background(),
+			openai.ChatCompletionRequest{
+				Model: openai.GPT4oMini,
+				Messages: []openai.ChatCompletionMessage{
+					{
+						Role:    openai.ChatMessageRoleUser,
+						Content: prompt,
+					},
+				},
+			},
+		)
+
+		if err != nil {
+			glog.Infof("OpenAI error when validating: %v\n", err)
+			continue
+		}
+		glog.Infof("OpenAI validation resp: %s", resp.Choices[0].Message.Content)
+		validated = append(validated, p)
 	}
 
 	return problems, nil
