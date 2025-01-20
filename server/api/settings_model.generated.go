@@ -125,6 +125,33 @@ func (m *SettingsManager) CustomList(sql string) (*[]Settings, int, string, erro
 	return &models, http.StatusOK, "", nil
 }
 
+func (m *SettingsManager) CustomIdList(sql string) (*[]uint32, int, string, error) {
+	ids := []uint32{}
+	sql = "SELECT user_id FROM problems WHERE " + sql
+	rows, err := m.DB.Query(sql)
+
+	defer rows.Close()
+	if err != nil {
+		msg := "Couldn't get settings from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	for rows.Next() {
+		var user_id uint32
+		err = rows.Scan(&user_id)
+		if err != nil {
+			msg := "Couldn't scan row from database"
+			return nil, http.StatusInternalServerError, msg, err
+		}
+		ids = append(ids, user_id)
+	}
+	err = rows.Err()
+	if err != nil {
+		msg := "Error scanning rows from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	return &ids, http.StatusOK, "", nil
+}
+
 func (m *SettingsManager) CustomSql(sql string) (int, string, error) {
 	_, err := m.DB.Query(sql)
 	if err != nil {

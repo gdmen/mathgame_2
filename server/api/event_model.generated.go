@@ -142,6 +142,33 @@ func (m *EventManager) CustomList(sql string) (*[]Event, int, string, error) {
 	return &models, http.StatusOK, "", nil
 }
 
+func (m *EventManager) CustomIdList(sql string) (*[]uint32, int, string, error) {
+	ids := []uint32{}
+	sql = "SELECT id FROM problems WHERE " + sql
+	rows, err := m.DB.Query(sql)
+
+	defer rows.Close()
+	if err != nil {
+		msg := "Couldn't get events from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	for rows.Next() {
+		var id uint32
+		err = rows.Scan(&id)
+		if err != nil {
+			msg := "Couldn't scan row from database"
+			return nil, http.StatusInternalServerError, msg, err
+		}
+		ids = append(ids, id)
+	}
+	err = rows.Err()
+	if err != nil {
+		msg := "Error scanning rows from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	return &ids, http.StatusOK, "", nil
+}
+
 func (m *EventManager) CustomSql(sql string) (int, string, error) {
 	_, err := m.DB.Query(sql)
 	if err != nil {

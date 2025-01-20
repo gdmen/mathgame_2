@@ -3,6 +3,7 @@ package api // import "garydmenezes.com/mathgame/server/api"
 
 import (
 	"database/sql"
+	"net/http"
 	"strings"
 
 	"github.com/gin-contrib/cors"
@@ -54,6 +55,16 @@ func NewApi(db *sql.DB) (*Api, error) {
 	a.gamestateManager = &GamestateManager{DB: db}
 	a.eventManager = &EventManager{DB: db}
 	return a, nil
+}
+
+func (a *Api) CustomValueQuery(sql string) (string, int, string, error) {
+	var value string
+	err := a.DB.QueryRow(sql).Scan(&value)
+	if err != nil {
+		msg := "Couldn't get value from database"
+		return "", http.StatusInternalServerError, msg, err
+	}
+	return value, http.StatusOK, "", nil
 }
 
 func (a *Api) genGetUserFn() common.GetUserFn {

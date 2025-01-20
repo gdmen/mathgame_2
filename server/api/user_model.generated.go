@@ -134,6 +134,33 @@ func (m *UserManager) CustomList(sql string) (*[]User, int, string, error) {
 	return &models, http.StatusOK, "", nil
 }
 
+func (m *UserManager) CustomIdList(sql string) (*[]string, int, string, error) {
+	ids := []string{}
+	sql = "SELECT auth0_id FROM problems WHERE " + sql
+	rows, err := m.DB.Query(sql)
+
+	defer rows.Close()
+	if err != nil {
+		msg := "Couldn't get users from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	for rows.Next() {
+		var auth0_id string
+		err = rows.Scan(&auth0_id)
+		if err != nil {
+			msg := "Couldn't scan row from database"
+			return nil, http.StatusInternalServerError, msg, err
+		}
+		ids = append(ids, auth0_id)
+	}
+	err = rows.Err()
+	if err != nil {
+		msg := "Error scanning rows from database"
+		return nil, http.StatusInternalServerError, msg, err
+	}
+	return &ids, http.StatusOK, "", nil
+}
+
 func (m *UserManager) CustomSql(sql string) (int, string, error) {
 	_, err := m.DB.Query(sql)
 	if err != nil {
