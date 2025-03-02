@@ -7,6 +7,8 @@ import { ProblemView } from "./problem.js";
 import { VideoView } from "./video.js";
 import { ClearSessionPin } from "./pin.js";
 
+const conf = require("./conf");
+
 const PlayView = ({ token, url, user, postEvent, interval }) => {
   const [gamestate, setGamestate] = useState(null);
   const [problem, setProblem] = useState(null);
@@ -103,19 +105,36 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
   }
 
   if (gamestate.solved >= gamestate.target) {
-    return (
-      <VideoView video={video} postEvent={postEvent} interval={interval} />
-    );
+    if (conf.debug_quickplay) {
+      postEvent("watching_video", 5000).then(() => {
+        postEvent("done_watching_video", gamestate.video_id).then(() => {
+          window.location.pathname = "play";
+        });
+      });
+    } else {
+      return (
+        <VideoView video={video} postEvent={postEvent} interval={interval} />
+      );
+    }
+  } else {
+    if (conf.debug_quickplay) {
+      postEvent("working_on_problem", 1000).then(() => {
+        postAnswer(problem.answer, gamestate.problem_id).then(() => {
+          window.location.pathname = "play";
+        });
+      });
+    } else {
+      return (
+        <ProblemView
+          gamestate={gamestate}
+          latex={latex}
+          postAnswer={postAnswer}
+          postEvent={postEvent}
+          interval={interval}
+        />
+      );
+    }
   }
-  return (
-    <ProblemView
-      gamestate={gamestate}
-      latex={latex}
-      postAnswer={postAnswer}
-      postEvent={postEvent}
-      interval={interval}
-    />
-  );
 };
 
 export { PlayView };
