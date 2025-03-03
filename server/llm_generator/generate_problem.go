@@ -16,15 +16,23 @@ import (
 const (
 	OPENAI_URL      = "https://api.openai.com/v1/completions"
 	PROMPT_QUESTION = `
-Generate math questions in this format:
+Generate math questions in the format of this example:
 {
   "features": ["addition", "multiplication"]
   "expression": "3 + 2 * 3",
   "answer": "9",
-  "explanation": "Following the order of operations (PEMDAS/BODMAS), you first perform the multiplication: 2×3=6 Then add 3+6=9",
+  "explanation": "\\text{Following the order of operations (PEMDAS/BODMAS), you first perform the multiplication: }2×3=6\\text{ Then add }3+6=9",
   "difficulty": 8.3,
 }
-where "question" is the math question, "answer" is the correct answer with no other text, "explanation" is the explanation for the correct answer, "features" are the allowed features that were actually used in this problem, and "difficulty" is an age in years - this problem should be the appropriate difficulty for people of that age.
+or this example:
+{
+  "features": ["addition", "multiplication", "word"]
+  "expression": "\\text{If a car travels at a speed of }60\\text{ miles per hour for }2\\text{ hours, how far does it travel?}"
+  "answer": "120",
+  "explanation": "\\text{The distance traveled is calculated by multiplying the speed by the time: }60\\text{ miles/hour }* 2\\text{ hours }= 120\\text{ miles.}",
+  "difficulty": 15
+}
+where "question" is the math question with non-mathematical text wrapped in LaTeX \\text{} tags as shown, "answer" is the correct answer with no other text, "explanation" is the explanation for the correct answer with non-mathematical text wrapped in LaTeX \\text{} tags as shown, "features" are the allowed features that were actually used in this problem, and "difficulty" is an age in years - this problem should be the appropriate difficulty for people of that age.
 Return these problems as a valid JSON list with no additional text.
 Do not wrap the JSON in markdown or any other JSON markers.
 `

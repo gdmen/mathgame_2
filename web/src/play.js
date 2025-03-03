@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useState } from "react";
 
 import "katex/dist/katex.min.css";
 
-import { ProblemView } from "./problem.js";
+import { ProblemView, IsWordProblem } from "./problem.js";
 import { VideoView } from "./video.js";
 import { ClearSessionPin } from "./pin.js";
 
@@ -38,6 +38,13 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
     }
   }, [token, url, user]);
 
+  const preprocessExpression = (expression) => {
+    function replacer(match, offset, string) {
+      return match.replace(/\s/g, " }\\text{");
+    }
+    return expression.replace(/\\text\{[^\}]+\}/g, replacer);
+  };
+
   const getProblem = useCallback(async () => {
     try {
       if (token == null || url == null || gamestate == null) {
@@ -57,7 +64,11 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
       );
       const json = await req.json();
       setProblem(json);
-      setLatex(katex.renderToString(json.expression));
+      setLatex(
+        katex.renderToString(preprocessExpression(json.expression), {
+          displayMode: false,
+        })
+      );
     } catch (e) {
       console.log(e.message);
     }
@@ -128,6 +139,7 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
         <ProblemView
           gamestate={gamestate}
           latex={latex}
+          isWordProblem={IsWordProblem(problem)}
           postAnswer={postAnswer}
           postEvent={postEvent}
           interval={interval}

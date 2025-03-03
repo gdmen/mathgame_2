@@ -1,8 +1,14 @@
 import React, { useEffect, useState } from "react";
+import { Textfit } from "react-textfit";
+import parse from "html-react-parser";
 
 import "./problem.scss";
 
-var ReactFitText = require("react-fittext");
+import { ProblemTypes } from "./enums.js";
+
+const IsWordProblem = (problem) => {
+  return Boolean(problem.problem_type_bitmap & ProblemTypes.WORD);
+};
 
 class EventReporterSingleton {
   constructor(postEvent, interval, postAnswer) {
@@ -94,7 +100,14 @@ class EventReporterSingleton {
   }
 }
 
-const ProblemView = ({ gamestate, latex, postAnswer, postEvent, interval }) => {
+const ProblemView = ({
+  gamestate,
+  latex,
+  isWordProblem,
+  postAnswer,
+  postEvent,
+  interval,
+}) => {
   const [answer, setAnswer] = useState("");
 
   useEffect(() => {
@@ -111,6 +124,8 @@ const ProblemView = ({ gamestate, latex, postAnswer, postEvent, interval }) => {
     return <div className="content-loading"></div>;
   }
 
+  var minFontSize = 50;
+
   postEvent("displayed_problem", gamestate.problem_id);
   var reporter = new EventReporterSingleton(postEvent, interval, postAnswer);
   reporter.problemWasDisplayed(gamestate.problem_id);
@@ -121,12 +136,14 @@ const ProblemView = ({ gamestate, latex, postAnswer, postEvent, interval }) => {
         <div className="progress">
           <div className="progress-meter" style={{ width: progress }}></div>
         </div>
-        <ReactFitText compressor={0.75}>
-          <div
-            id="problem-display"
-            dangerouslySetInnerHTML={{ __html: latex }}
-          ></div>
-        </ReactFitText>
+        <div
+          id="problem-display"
+          className={isWordProblem ? "word-problem" : ""}
+        >
+          <Textfit mode="multi" min={minFontSize}>
+            {parse(latex)}
+          </Textfit>
+        </div>
         <div id="problem-answer" className="input-group">
           <input
             id="problem-answer-input"
@@ -163,4 +180,4 @@ const ProblemView = ({ gamestate, latex, postAnswer, postEvent, interval }) => {
   );
 };
 
-export { ProblemView };
+export { ProblemView, IsWordProblem };

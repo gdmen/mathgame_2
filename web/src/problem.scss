@@ -31,6 +31,24 @@
     margin-top: 1.5 * $base-space;
   }
 }
+#problem-display {
+  margin: 1em 0;
+  &.word-problem {
+    .katex {
+      .base {
+        display: block;
+        text-wrap: wrap;
+        width: 100%;
+      }
+      .mord {
+        display: inline-block;
+      }
+    }
+  }
+  .alert {
+    margin-top: 0.5em;
+  }
+}
 #problem-companion {
   display: flex;
   justify-content: space-between;

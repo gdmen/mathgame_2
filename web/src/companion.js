@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 
 import "katex/dist/katex.min.css";
 
+import { IsWordProblem } from "./problem.js";
 import { ProblemCompanionView } from "./problem_companion.js";
 import { VideoCompanionView } from "./video_companion.js";
 import { RequirePin } from "./pin.js";
@@ -221,6 +222,7 @@ const CompanionView = ({ token, url, user }) => {
     <ProblemCompanionView
       gamestate={gamestate}
       latex={latex}
+      isWordProblem={IsWordProblem(problem)}
       answer={answer}
       attempts={attempts}
     />

@@ -1,8 +1,8 @@
 import React from "react";
+import { Textfit } from "react-textfit";
+import parse from "html-react-parser";
 
 import "./problem.scss";
-
-var ReactFitText = require("react-fittext");
 
 const AttemptTime = ({ timestamp }) => {
   var diff = Math.ceil((Date.now() - Date.parse(timestamp)) / 1000);
@@ -42,12 +42,14 @@ const ProblemCompanionView = ({ gamestate, latex, answer, attempts }) => {
         <div className="progress">
           <div className="progress-meter" style={{ width: progress }}></div>
         </div>
-        <ReactFitText compressor={0.75}>
-          <div
-            id="problem-display"
-            dangerouslySetInnerHTML={{ __html: latex }}
-          ></div>
-        </ReactFitText>
+        <div
+          id="problem-display"
+          className={isWordProblem ? "word-problem" : ""}
+        >
+          <Textfit mode="multi" min={minFontSize}>
+            {parse(latex)}
+          </Textfit>
+        </div>
         <div id="problem-answer-companion">Answer: {answer}</div>
       </div>
       <div id="problem-attempts">
