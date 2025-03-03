@@ -27,6 +27,7 @@ const (
 	DIVISION
 	FRACTIONS
 	NEGATIVES
+	WORD
 	// -end- ProblemTypes
 )
 
@@ -38,6 +39,7 @@ var problemTypeNames = map[ProblemType]string{
 	DIVISION:       "division",
 	FRACTIONS:      "fractions",
 	NEGATIVES:      "negatives",
+	WORD:           "word",
 }
 
 // Map to associate string names with ProblemType values
@@ -48,6 +50,7 @@ var problemTypeValues = map[string]ProblemType{
 	"division":       DIVISION,
 	"fractions":      FRACTIONS,
 	"negatives":      NEGATIVES,
+	"word":           WORD,
 }
 
 // Convert a ProblemType Bitmap into an array of string features

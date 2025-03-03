@@ -5,6 +5,7 @@ const ProblemTypes = {
   DIVISION: Math.pow(2, 3),
   FRACTIONS: Math.pow(2, 4),
   NEGATIVES: Math.pow(2, 5),
+  WORD: Math.pow(2, 6),
 };
 
 export { ProblemTypes };

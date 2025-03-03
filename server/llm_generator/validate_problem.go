@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	PROMPT_VALIDATION = "Return only the answer and no other text: %s"
+	PROMPT_VALIDATION = "Return only the numeric answer and no other text: %s"
 )
 
 func ValidateProblem(p *Problem) error {
