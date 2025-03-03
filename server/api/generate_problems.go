@@ -7,7 +7,6 @@ import (
 	"hash/fnv"
 	"math/rand"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -189,7 +188,6 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 			return nil, err
 		}
 
-		re_whitespace := regexp.MustCompile(`\s+`)
 		for _, p := range generatorProblems {
 			glog.Infof("%s generated problem: %v", logPrefix, p)
 
@@ -197,7 +195,7 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 			model = &Problem{}
 			model.Generator = "llm_0.0"
 			model.ProblemTypeBitmap = uint64(FeaturesToProblemType(p.Features))
-			model.Expression = re_whitespace.ReplaceAllString(p.Expression, "")
+			model.Expression = strings.TrimSpace(p.Expression)
 			model.Answer = p.Answer
 			model.Explanation = p.Explanation
 			model.Difficulty = p.Difficulty
@@ -209,10 +207,10 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 
 			// Check for collisions
 			_, status, _, err := a.problemManager.Get(model.Id)
-			// There is no collision iff we receive a 404
+			// There is certainly no collision iff we receive a 404
 			if status != http.StatusNotFound {
 				//glog.Infof("%s could not verify uniqueness of problem: (%d: %v)", logPrefix, status, err)
-				//model = nil
+				model = nil
 				continue
 			}
 			uniqueIds[model.Id] = true
@@ -236,8 +234,7 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 		}
 	}
 
-	glog.Infof("%s generator numProblems requested: %d vs unique problems generated: %d", logPrefix, numProblems, len(uniqueIds))
-	glog.Infof("%s generator numProblems requested: %d vs new problems generated: %d", logPrefix, numProblems, newCount)
+	glog.Infof("%s generator numProblems requested: %d vs unique problems generated: %d and new problems generated: %d", logPrefix, numProblems, len(uniqueIds), newCount)
 
 	// Just return the last problem added
 	if model == nil {

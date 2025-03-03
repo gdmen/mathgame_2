@@ -24,11 +24,11 @@ Generate math questions in this format:
   "explanation": "Following the order of operations (PEMDAS/BODMAS), you first perform the multiplication: 2×3=6 Then add 3+6=9",
   "difficulty": 8.3,
 }
-where "question" is the math question, "answer" is the correct answer, "explanation" is the explanation for the correct answer, "features" are the allowed features that were actually used in this problem, and "difficulty" is an age in years - this problem should be the appropriate difficulty for people of that age.
+where "question" is the math question, "answer" is the correct answer with no other text, "explanation" is the explanation for the correct answer, "features" are the allowed features that were actually used in this problem, and "difficulty" is an age in years - this problem should be the appropriate difficulty for people of that age.
 Return these problems as a valid JSON list with no additional text.
 Do not wrap the JSON in markdown or any other JSON markers.
 `
-	PROMPT_QUANTITY = "Produce %d unique problems in this format that may include these features %s and is the appropriate difficulty for a %g year old."
+	PROMPT_QUANTITY = "Produce %d unique %sproblems in this format that may include these features %s and is the appropriate difficulty for a %g year old."
 	MAX_QUANTITY    = 20
 )
 
@@ -47,8 +47,15 @@ func GenerateProblem(opts *Options) ([]Problem, error) {
 	}
 
 	// Request question(s)
+	var ptype string
+	for _, x := range opts.Features {
+		if x == "word" {
+			ptype = "word-"
+			break
+		}
+	}
 	prompt := PROMPT_QUESTION + "\n" + fmt.Sprintf(PROMPT_QUANTITY,
-		opts.NumProblems, featuresJson, opts.TargetDifficulty,
+		opts.NumProblems, ptype, featuresJson, opts.TargetDifficulty,
 	)
 	glog.Infof("OpenAI GPT4oMini question prompt: %s\n", prompt)
 
