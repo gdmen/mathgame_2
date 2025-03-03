@@ -12,7 +12,7 @@ import { SetupView } from "./setup.js";
 import { PinView, ClearSessionPin } from "./pin.js";
 import { SettingsView } from "./settings.js";
 import { PlayView } from "./play.js";
-//import { CompanionView } from './companion.js'
+import { CompanionView } from "./companion.js";
 
 import "./index.scss";
 
@@ -79,6 +79,11 @@ const MainView = ({
                 user={user}
                 settings={settings}
               />
+            )}
+          </Route>
+          <Route exact path="/companion/:student_id">
+            {!isLoading && isAuthenticated && (
+              <CompanionView token={token} url={url} user={user} />
             )}
           </Route>
           <Route path="*" component={NotFound} />

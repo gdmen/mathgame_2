@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 
 import "katex/dist/katex.min.css";
 
-import { IsWordProblem } from "./problem.js";
+import { IsWordProblem, PreprocessExpression } from "./problem.js";
 import { ProblemCompanionView } from "./problem_companion.js";
 import { VideoCompanionView } from "./video_companion.js";
 import { RequirePin } from "./pin.js";
@@ -113,7 +113,7 @@ const CompanionView = ({ token, url, user }) => {
       const json = await req.json();
       setProblem(json);
       setAnswer(json["answer"]);
-      setLatex(katex.renderToString(json.expression));
+      setLatex(katex.renderToString(PreprocessExpression(json.expression)));
     } catch (e) {
       console.log(e.message);
     }

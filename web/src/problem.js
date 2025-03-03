@@ -9,6 +9,12 @@ import { ProblemTypes } from "./enums.js";
 const IsWordProblem = (problem) => {
   return Boolean(problem.problem_type_bitmap & ProblemTypes.WORD);
 };
+const PreprocessExpression = (expression) => {
+  function replacer(match, offset, string) {
+    return match.replace(/\s/g, " }\\text{");
+  }
+  return expression.replace(/\\text\{[^\}]+\}/g, replacer);
+};
 
 class EventReporterSingleton {
   constructor(postEvent, interval, postAnswer) {
@@ -117,6 +123,7 @@ const ProblemView = ({
   if (
     gamestate == null ||
     latex == null ||
+    isWordProblem == null ||
     postAnswer == null ||
     postEvent == null ||
     interval == null
@@ -180,4 +187,4 @@ const ProblemView = ({
   );
 };
 
-export { ProblemView, IsWordProblem };
+export { ProblemView, IsWordProblem, PreprocessExpression };
