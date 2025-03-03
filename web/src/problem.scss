@@ -30,6 +30,9 @@
     font-weight: 400;
     margin-top: 1.5 * $base-space;
   }
+  .alert {
+    margin-top: 0.5em;
+  }
 }
 #problem-display {
   margin: 1em 0;
@@ -44,9 +47,6 @@
         display: inline-block;
       }
     }
-  }
-  .alert {
-    margin-top: 0.5em;
   }
 }
 #problem-companion {

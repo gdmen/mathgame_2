@@ -273,7 +273,7 @@ const AppView = () => {
         {window.location.pathname !== "/play" && (
           <>
             <a
-              href="https://github.com/gdmen/mathgame_2/issues/new"
+              href="https://forms.gle/r8uUSwyAoNivga3TA"
               target="_blank"
               rel="noopener noreferrer"
             >
