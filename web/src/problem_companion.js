@@ -25,15 +25,24 @@ const AttemptTime = ({ timestamp }) => {
   return <span className="attempt-time">({diff} second ago)</span>;
 };
 
-const ProblemCompanionView = ({ gamestate, latex, answer, attempts }) => {
+const ProblemCompanionView = ({
+  gamestate,
+  latex,
+  isWordProblem,
+  answer,
+  attempts,
+}) => {
   if (
     gamestate == null ||
     latex == null ||
+    isWordProblem == null ||
     answer == null ||
     attempts == null
   ) {
     return <div className="content-loading"></div>;
   }
+
+  var minFontSize = 50;
 
   var progress = String((100.0 * gamestate.solved) / gamestate.target) + "%";
   return (
@@ -50,7 +59,7 @@ const ProblemCompanionView = ({ gamestate, latex, answer, attempts }) => {
             {parse(latex)}
           </Textfit>
         </div>
-        <div id="problem-answer-companion">Answer: {answer}</div>
+        <div id="problem-answer-companion">Correct Answer: {answer}</div>
       </div>
       <div id="problem-attempts">
         <div id="problem-attempts-header">attempts</div>
