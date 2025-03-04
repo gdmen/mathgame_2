@@ -330,21 +330,25 @@ import (
     s += '''
     func (m *{0}Manager) CustomList(sql string) (*[]{0}, int, string, error) {{
         models := []{0}{{}}
+        sql = "SELECT * FROM {1} WHERE " + sql
         rows, err := m.DB.Query(sql)
 '''.format(
-        m["name"].capitalize())
+        m["name"].capitalize(),
+        m["table"]
+    )
     s += list_code
 
     # manager.CustomIdList()
     s += '''
     func (m *{0}Manager) CustomIdList(sql string) (*[]{2}, int, string, error) {{
         ids := []{2}{{}}
-        sql = "SELECT {1} FROM problems WHERE " + sql
+        sql = "SELECT {1} FROM {3} WHERE " + sql
         rows, err := m.DB.Query(sql)
 '''.format(
         m["name"].capitalize(),
         camel_to_snake(key_name),
-        key_type
+        key_type,
+        m["table"]
     )
     s += list_id_code
 

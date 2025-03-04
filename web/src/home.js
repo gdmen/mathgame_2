@@ -21,9 +21,7 @@ const HomeView = ({ isLoading, isAuthenticated, user, settings }) => {
             <br />
             Step 2: watch a youtube video as a reward
           </p>
-          <p>
-            You can set up your child's account in 5 minutes!
-          </p>
+          <p>You can set up your child's account in 5 minutes!</p>
           <div className="button-container">
             {(isAuthenticated && user && settings && (
               <button

@@ -109,6 +109,7 @@ func (m *ProblemManager) List() (*[]Problem, int, string, error) {
 
 func (m *ProblemManager) CustomList(sql string) (*[]Problem, int, string, error) {
 	models := []Problem{}
+	sql = "SELECT * FROM problems WHERE " + sql
 	rows, err := m.DB.Query(sql)
 
 	defer rows.Close()
