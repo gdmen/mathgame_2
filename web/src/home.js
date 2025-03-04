@@ -15,15 +15,14 @@ const HomeView = ({ isLoading, isAuthenticated, user, settings }) => {
         <div className="hero-copy">
           <h1>Have fun learning math!</h1>
           <p>
-            The Math Game is a simple and easy way for kids to practice math!
+            Mikey's Math Game is a simple and easy way to practice math!
             <br />
             Step 1: solve some math problems
             <br />
-            Step 2: watch a youtube video as a reward!
+            Step 2: watch a youtube video as a reward
           </p>
           <p>
-            You can set up your child's account in 5 minutes and then watch
-            their progress!
+            You can set up your child's account in 5 minutes!
           </p>
           <div className="button-container">
             {(isAuthenticated && user && settings && (
