@@ -19,7 +19,7 @@ const ProblemTypesTabView = ({ token, url, user, settings, advanceSetup }) => {
 
   return (
     <>
-      <h2>Hi there! Let's do a little setup for your kid!</h2>
+      <h2>Hi there! Let's do a little setup for your child!</h2>
       <ProblemTypesSettingsView
         token={token}
         url={url}
@@ -128,8 +128,8 @@ const StartPlayingTabView = () => {
       <h2>You're all set!</h2>
       <div className="setup-form">
         <h3>
-          The Math Game will start <strong>easy</strong> and get harder to match{" "}
-          <strong>your kid's</strong> math level!
+          Mikey's Math Game will start <strong>easy</strong> and get harder to match{" "}
+          <strong>your child's</strong> math level!
         </h3>
         <button
           id="start-playing-button"

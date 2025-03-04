@@ -238,7 +238,7 @@ const AppView = () => {
     <div id="react-body">
       <div id="main-menu" className="clearfix">
         <a href="/">
-          <h3>The Math Game</h3>
+          <h3>Mikey's Math Game</h3>
         </a>
 
         <ul className="menu">

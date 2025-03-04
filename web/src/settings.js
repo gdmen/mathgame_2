@@ -291,7 +291,7 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
           >
             YouTube
           </a>{" "}
-          videos that your kid will love!
+          videos that your child will love!
         </h4>
         <div id="video-inputs">
           <input
