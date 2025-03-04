@@ -299,7 +299,7 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 		}
 		glog.Infof("%s Settings: %v", logPrefix, settings)
 		// Select a new problem
-		problem, err := a.selectProblem(logPrefix, c, settings, 0)
+		problem, err := a.selectProblem(logPrefix, c, settings, &([]uint32{0}))
 		if err != nil {
 			return
 		}
