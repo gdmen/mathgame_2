@@ -25,7 +25,7 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32, exclu
 	}
 
 	// Get videos belonging to this user
-	videos, status, msg, err := a.videoManager.CustomList(fmt.Sprintf("SELECT * FROM videos WHERE user_id=%d AND disabled=0 AND deleted=0;", userId))
+	videos, status, msg, err := a.videoManager.CustomList(fmt.Sprintf("user_id=%d AND disabled=0 AND deleted=0;", userId))
 	if HandleMngrResp(logPrefix, c, status, msg, err, videos) != nil {
 		return 0, err
 	}
@@ -183,7 +183,7 @@ func (a *Api) customListEvent(c *gin.Context) {
 	}
 
 	// Get recent events belonging to the specified user
-	sql := fmt.Sprintf("SELECT * FROM events WHERE user_id=%d AND timestamp > now() - interval %d second AND event_type IN (\"%s\");", params.UserId, params.Seconds, strings.Join([]string{LOGGED_IN, DISPLAYED_PROBLEM, ANSWERED_PROBLEM, DONE_WATCHING_VIDEO}, "\",\""))
+	sql := fmt.Sprintf("user_id=%d AND timestamp > now() - interval %d second AND event_type IN (\"%s\");", params.UserId, params.Seconds, strings.Join([]string{LOGGED_IN, DISPLAYED_PROBLEM, ANSWERED_PROBLEM, DONE_WATCHING_VIDEO}, "\",\""))
 	events, status, msg, err := a.eventManager.CustomList(sql)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, events) != nil {
 		return
@@ -241,7 +241,7 @@ func (a *Api) customListVideo(c *gin.Context) {
 	user := GetUserFromContext(c)
 
 	// Read from database
-	sql := fmt.Sprintf("SELECT * FROM videos WHERE user_id=%d AND deleted=0;", user.Id)
+	sql := fmt.Sprintf("user_id=%d AND deleted=0;", user.Id)
 	models, status, msg, err := a.videoManager.CustomList(sql)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {
 		return

@@ -101,6 +101,7 @@ func (m *SettingsManager) List(user_id uint32) (*[]Settings, int, string, error)
 
 func (m *SettingsManager) CustomList(sql string) (*[]Settings, int, string, error) {
 	models := []Settings{}
+	sql = "SELECT * FROM settings WHERE " + sql
 	rows, err := m.DB.Query(sql)
 
 	defer rows.Close()
@@ -127,7 +128,7 @@ func (m *SettingsManager) CustomList(sql string) (*[]Settings, int, string, erro
 
 func (m *SettingsManager) CustomIdList(sql string) (*[]uint32, int, string, error) {
 	ids := []uint32{}
-	sql = "SELECT user_id FROM problems WHERE " + sql
+	sql = "SELECT user_id FROM settings WHERE " + sql
 	rows, err := m.DB.Query(sql)
 
 	defer rows.Close()

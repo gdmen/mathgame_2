@@ -103,6 +103,7 @@ func (m *GamestateManager) List(user_id uint32) (*[]Gamestate, int, string, erro
 
 func (m *GamestateManager) CustomList(sql string) (*[]Gamestate, int, string, error) {
 	models := []Gamestate{}
+	sql = "SELECT * FROM gamestates WHERE " + sql
 	rows, err := m.DB.Query(sql)
 
 	defer rows.Close()
@@ -129,7 +130,7 @@ func (m *GamestateManager) CustomList(sql string) (*[]Gamestate, int, string, er
 
 func (m *GamestateManager) CustomIdList(sql string) (*[]uint32, int, string, error) {
 	ids := []uint32{}
-	sql = "SELECT user_id FROM problems WHERE " + sql
+	sql = "SELECT user_id FROM gamestates WHERE " + sql
 	rows, err := m.DB.Query(sql)
 
 	defer rows.Close()

@@ -121,6 +121,7 @@ func (m *VideoManager) List(user_id uint32) (*[]Video, int, string, error) {
 
 func (m *VideoManager) CustomList(sql string) (*[]Video, int, string, error) {
 	models := []Video{}
+	sql = "SELECT * FROM videos WHERE " + sql
 	rows, err := m.DB.Query(sql)
 
 	defer rows.Close()
@@ -147,7 +148,7 @@ func (m *VideoManager) CustomList(sql string) (*[]Video, int, string, error) {
 
 func (m *VideoManager) CustomIdList(sql string) (*[]uint32, int, string, error) {
 	ids := []uint32{}
-	sql = "SELECT id FROM problems WHERE " + sql
+	sql = "SELECT id FROM videos WHERE " + sql
 	rows, err := m.DB.Query(sql)
 
 	defer rows.Close()

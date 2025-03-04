@@ -128,8 +128,8 @@ const StartPlayingTabView = () => {
       <h2>You're all set!</h2>
       <div className="setup-form">
         <h3>
-          Mikey's Math Game will start <strong>easy</strong> and get harder to match{" "}
-          <strong>your child's</strong> math level!
+          Mikey's Math Game will start <strong>easy</strong> and get harder to
+          match <strong>your child's</strong> math level!
         </h3>
         <button
           id="start-playing-button"

@@ -110,6 +110,7 @@ func (m *UserManager) List() (*[]User, int, string, error) {
 
 func (m *UserManager) CustomList(sql string) (*[]User, int, string, error) {
 	models := []User{}
+	sql = "SELECT * FROM users WHERE " + sql
 	rows, err := m.DB.Query(sql)
 
 	defer rows.Close()
@@ -136,7 +137,7 @@ func (m *UserManager) CustomList(sql string) (*[]User, int, string, error) {
 
 func (m *UserManager) CustomIdList(sql string) (*[]string, int, string, error) {
 	ids := []string{}
-	sql = "SELECT auth0_id FROM problems WHERE " + sql
+	sql = "SELECT auth0_id FROM users WHERE " + sql
 	rows, err := m.DB.Query(sql)
 
 	defer rows.Close()
