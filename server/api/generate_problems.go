@@ -24,30 +24,32 @@ const (
 )
 
 // Get all problem ids that satisfy this ProblemTypeBitmap and have similar Difficulty
-func (a *Api) getSatisfyingProblemIds(logPrefix string, c *gin.Context, settings *Settings, prevId uint32) (*[]uint32, error) {
+func (a *Api) getSatisfyingProblemIds(logPrefix string, c *gin.Context, settings *Settings, prevIds *[]uint32) (*[]uint32, error) {
 	permutations := GetProblemTypePermutations(ProblemType(settings.ProblemTypeBitmap))
 	if len(permutations) == 0 {
 		return &([]uint32{}), nil
 	}
 	diffLowerBound := settings.TargetDifficulty * (1 - problemSelectionEpsilon)
 	diffUpperBound := settings.TargetDifficulty * (1 + problemSelectionEpsilon)
-	sql := fmt.Sprintf(
-		"id != %d AND problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0;",
-		prevId,
+	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0;",
 		strings.Replace(strings.Trim(fmt.Sprint(permutations), "[]"), " ", ",", -1),
 		diffLowerBound,
 		diffUpperBound,
 	)
-	glog.Infof("sql: %s\n", sql)
-	problem_ids, status, msg, err := a.problemManager.CustomIdList(sql)
-	if HandleMngrResp(logPrefix, c, status, msg, err, problem_ids) != nil {
+	if len(*prevIds) > 0 {
+		idFilter := fmt.Sprintf("id NOT IN (%s) AND ", strings.Replace(strings.Trim(fmt.Sprint(*prevIds), "[]"), " ", ",", -1))
+		sql = idFilter + sql
+	}
+	glog.Infof("getSatisfyingProblemIds sql: select * from problems where %s\n", sql)
+	problemIds, status, msg, err := a.problemManager.CustomIdList(sql)
+	if HandleMngrResp(logPrefix, c, status, msg, err, problemIds) != nil {
 		return nil, err
 	}
-	return problem_ids, nil
+	return problemIds, nil
 }
 
-func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings, prevId uint32) (*Problem, error) {
-	pids, err := a.getSatisfyingProblemIds(logPrefix, c, settings, prevId)
+func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings, prevIds *[]uint32) (*Problem, error) {
+	pids, err := a.getSatisfyingProblemIds(logPrefix, c, settings, prevIds)
 	if err != nil {
 		return nil, err
 	}
