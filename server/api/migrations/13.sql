@@ -1,1 +1,1 @@
-alter table problems ADD explanation TEXT after answer;
+alter table problems ADD explanation TEXT NOT NULL after answer;
