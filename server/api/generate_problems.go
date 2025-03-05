@@ -26,9 +26,20 @@ const (
 // Get all problem ids that satisfy this ProblemTypeBitmap and have similar Difficulty
 func (a *Api) getSatisfyingProblemIds(logPrefix string, c *gin.Context, settings *Settings, prevIds *[]uint32) (*[]uint32, error) {
 	permutations := GetProblemTypePermutations(ProblemType(settings.ProblemTypeBitmap))
+	// Special case to guarantee word problems if they're turned on
+	if (ProblemType(settings.ProblemTypeBitmap) & WORD) != 0 {
+		res := []ProblemType{}
+		for _, pt := range permutations {
+			if (pt & WORD) != 0 {
+				res = append(res, pt)
+			}
+		}
+		permutations = res
+	}
 	if len(permutations) == 0 {
 		return &([]uint32{}), nil
 	}
+
 	diffLowerBound := settings.TargetDifficulty * (1 - problemSelectionEpsilon)
 	diffUpperBound := settings.TargetDifficulty * (1 + problemSelectionEpsilon)
 	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0;",
