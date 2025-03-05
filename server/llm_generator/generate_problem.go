@@ -32,7 +32,7 @@ or this example:
   "explanation": "\\text{The distance traveled is calculated by multiplying the speed by the time: }60\\text{ miles/hour }* 2\\text{ hours }= 120\\text{ miles.}",
   "difficulty": 15
 }
-where "question" is the math question with non-mathematical text wrapped in LaTeX \\text{} tags as shown, "answer" is the correct answer with no other text, "explanation" is the explanation for the correct answer with non-mathematical text wrapped in LaTeX \\text{} tags as shown, "features" are the allowed features that were actually used in this problem, and "difficulty" is an age in years - this problem should be the appropriate difficulty for people of that age.
+where "question" is the math question in LaTeX math mode e.g. it might use \\text{} tags as shown, "answer" is the correct answer with no other text, "explanation" is the explanation for the correct answer in LaTeX math mode e.g. it might use \\text{} tags as shown, "features" are the allowed features that were actually used in this problem, and "difficulty" is an age in years - this problem should be the appropriate difficulty for people of that age.
 Return these problems as a valid JSON list with no additional text.
 Do not wrap the JSON in markdown or any other JSON markers.
 `
