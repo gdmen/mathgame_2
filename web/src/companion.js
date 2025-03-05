@@ -70,7 +70,7 @@ const CompanionView = ({ token, url, user }) => {
   const [answer, setAnswer] = useState(null);
   const [attempts, setAttempts] = useState(null);
   const { student_id } = useParams();
-  const interval = 1000;
+  const interval = 30000;
 
   const getGamestate = useCallback(async () => {
     try {
