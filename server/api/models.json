@@ -43,6 +43,10 @@
           "sql": "TEXT NOT NULL"
         },
         {
+          "name": "ExpressionHtml", "type": "string",
+          "sql": "TEXT"
+        },
+        {
           "name": "Answer", "type": "string",
           "sql": "TEXT NOT NULL"
         },

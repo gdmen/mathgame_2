@@ -14,6 +14,7 @@ const (
         id BIGINT UNSIGNED PRIMARY KEY UNIQUE,
 	problem_type_bitmap BIGINT UNSIGNED NOT NULL,
 	expression TEXT NOT NULL,
+	expression_html TEXT,
 	answer TEXT NOT NULL,
 	explanation TEXT,
 	difficulty FLOAT NOT NULL,
@@ -21,15 +22,15 @@ const (
 	generator VARCHAR(64) NOT NULL
     ) DEFAULT CHARSET=utf8mb4 ;`
 
-	createProblemSQL = `INSERT INTO problems (id, problem_type_bitmap, expression, answer, explanation, difficulty, generator) VALUES (?, ?, ?, ?, ?, ?, ?);`
+	createProblemSQL = `INSERT INTO problems (id, problem_type_bitmap, expression, expression_html, answer, explanation, difficulty, generator) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`
 
 	getProblemSQL = `SELECT * FROM problems WHERE id=?;`
 
-	getProblemKeySQL = `SELECT  FROM problems WHERE id=? AND problem_type_bitmap=? AND expression=? AND answer=? AND explanation=? AND difficulty=? AND generator=?;`
+	getProblemKeySQL = `SELECT  FROM problems WHERE id=? AND problem_type_bitmap=? AND expression=? AND expression_html=? AND answer=? AND explanation=? AND difficulty=? AND generator=?;`
 
 	listProblemSQL = `SELECT * FROM problems;`
 
-	updateProblemSQL = `UPDATE problems SET problem_type_bitmap=?, expression=?, answer=?, explanation=?, difficulty=?, disabled=?, generator=? WHERE id=?;`
+	updateProblemSQL = `UPDATE problems SET problem_type_bitmap=?, expression=?, expression_html=?, answer=?, explanation=?, difficulty=?, disabled=?, generator=? WHERE id=?;`
 
 	deleteProblemSQL = `DELETE FROM problems WHERE id=?;`
 )
@@ -38,6 +39,7 @@ type Problem struct {
 	Id                uint32  `json:"id" uri:"id"`
 	ProblemTypeBitmap uint64  `json:"problem_type_bitmap" uri:"problem_type_bitmap" form:"problem_type_bitmap"`
 	Expression        string  `json:"expression" uri:"expression" form:"expression"`
+	ExpressionHtml    string  `json:"expression_html" uri:"expression_html" form:"expression_html"`
 	Answer            string  `json:"answer" uri:"answer" form:"answer"`
 	Explanation       string  `json:"explanation" uri:"explanation" form:"explanation"`
 	Difficulty        float64 `json:"difficulty" uri:"difficulty" form:"difficulty"`
@@ -46,7 +48,7 @@ type Problem struct {
 }
 
 func (model Problem) String() string {
-	return fmt.Sprintf("Id: %v, ProblemTypeBitmap: %v, Expression: %v, Answer: %v, Explanation: %v, Difficulty: %v, Disabled: %v, Generator: %v", model.Id, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Explanation, model.Difficulty, model.Disabled, model.Generator)
+	return fmt.Sprintf("Id: %v, ProblemTypeBitmap: %v, Expression: %v, ExpressionHtml: %v, Answer: %v, Explanation: %v, Difficulty: %v, Disabled: %v, Generator: %v", model.Id, model.ProblemTypeBitmap, model.Expression, model.ExpressionHtml, model.Answer, model.Explanation, model.Difficulty, model.Disabled, model.Generator)
 }
 
 type ProblemManager struct {
@@ -55,7 +57,7 @@ type ProblemManager struct {
 
 func (m *ProblemManager) Create(model *Problem) (int, string, error) {
 	status := http.StatusCreated
-	_, err := m.DB.Exec(createProblemSQL, model.Id, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Explanation, model.Difficulty, model.Generator)
+	_, err := m.DB.Exec(createProblemSQL, model.Id, model.ProblemTypeBitmap, model.Expression, model.ExpressionHtml, model.Answer, model.Explanation, model.Difficulty, model.Generator)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Duplicate entry") {
 			msg := "Couldn't add problem to database"
@@ -70,7 +72,7 @@ func (m *ProblemManager) Create(model *Problem) (int, string, error) {
 
 func (m *ProblemManager) Get(id uint32) (*Problem, int, string, error) {
 	model := &Problem{}
-	err := m.DB.QueryRow(getProblemSQL, id).Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Explanation, &model.Difficulty, &model.Disabled, &model.Generator)
+	err := m.DB.QueryRow(getProblemSQL, id).Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.ExpressionHtml, &model.Answer, &model.Explanation, &model.Difficulty, &model.Disabled, &model.Generator)
 	if err == sql.ErrNoRows {
 		msg := "Couldn't find a problem with that id"
 		return nil, http.StatusNotFound, msg, err
@@ -92,7 +94,7 @@ func (m *ProblemManager) List() (*[]Problem, int, string, error) {
 	}
 	for rows.Next() {
 		model := Problem{}
-		err = rows.Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Explanation, &model.Difficulty, &model.Disabled, &model.Generator)
+		err = rows.Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.ExpressionHtml, &model.Answer, &model.Explanation, &model.Difficulty, &model.Disabled, &model.Generator)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -119,7 +121,7 @@ func (m *ProblemManager) CustomList(sql string) (*[]Problem, int, string, error)
 	}
 	for rows.Next() {
 		model := Problem{}
-		err = rows.Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Explanation, &model.Difficulty, &model.Disabled, &model.Generator)
+		err = rows.Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.ExpressionHtml, &model.Answer, &model.Explanation, &model.Difficulty, &model.Disabled, &model.Generator)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -177,7 +179,7 @@ func (m *ProblemManager) Update(model *Problem) (int, string, error) {
 		return status, msg, err
 	}
 	// Update
-	_, err = m.DB.Exec(updateProblemSQL, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Explanation, model.Difficulty, model.Disabled, model.Generator, model.Id)
+	_, err = m.DB.Exec(updateProblemSQL, model.ProblemTypeBitmap, model.Expression, model.ExpressionHtml, model.Answer, model.Explanation, model.Difficulty, model.Disabled, model.Generator, model.Id)
 	if err != nil {
 		msg := "Couldn't update problem in database"
 		return http.StatusInternalServerError, msg, err
