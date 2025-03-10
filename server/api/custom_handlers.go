@@ -83,6 +83,25 @@ func (a *Api) customGetGamestate(c *gin.Context) {
 	}
 }
 
+// also generate HTML to display
+func (a *Api) customGetProblem(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Problem{}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Read from database
+	model, status, msg, err := a.problemManager.Get(model.Id)
+	model.ExpressionHtml = 
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
+}
+
 // also generate settings change events
 func (a *Api) customUpdateSettings(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
