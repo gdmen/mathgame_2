@@ -14,6 +14,8 @@ const (
 	SET_TARGET_WORK_PERCENTAGE = "set_target_work_percentage" // float64 Work Percentage
 	SET_PROBLEM_TYPE_BITMAP    = "set_problem_type_bitmap"    // uint64 ProblemType Bitmap
 	SET_GAMESTATE_TARGET       = "set_gamestate_target"       // uint32 Target num problems
+	BAD_PROBLEM_SYSTEM         = "bad_problem_system"         // int ProblemID
+	BAD_PROBLEM_USER           = "bad_problem_user"           // int ProblemID
 	// -end- EventTypes
 )
 

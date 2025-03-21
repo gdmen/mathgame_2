@@ -39,6 +39,7 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
   }, [token, url, user]);
 
   const getProblem = useCallback(async () => {
+    var json = null;
     try {
       if (token == null || url == null || gamestate == null) {
         return;
@@ -55,11 +56,19 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
         url + "/problems/" + gamestate.problem_id,
         reqParams
       );
-      const json = await req.json();
+      json = await req.json();
       setProblem(json);
+    } catch (e) {
+      console.log(e.message);
+    }
+    try {
       setLatex(katex.renderToString(PreprocessExpression(json.expression)));
     } catch (e) {
       console.log(e.message);
+      // handle rendering error
+      postEvent("bad_problem_system", gamestate.problem_id).then(() => {
+        window.location.pathname = "play";
+      });
     }
   }, [token, url, gamestate]);
 

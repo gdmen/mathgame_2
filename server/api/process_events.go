@@ -206,6 +206,21 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		}
 		gamestate.VideoId = videoId
 		changed_gamestate = true
+	} else if event.EventType == BAD_PROBLEM_SYSTEM || event.EventType == BAD_PROBLEM_USER {
+		// 1. set problem_id disabled
+		problem, status, msg, err := a.problemManager.Get(gamestate.ProblemId)
+		if HandleMngrResp(logPrefix, c, status, msg, err, problem) != nil {
+			return err
+		}
+		glog.Infof("%s Disabling problem: %v", logPrefix, problem)
+		problem.Disabled = true
+		// Write to database
+		status, msg, err = a.problemManager.Update(problem)
+		if HandleMngrResp(logPrefix, c, status, msg, err, problem) != nil {
+			return err
+		}
+		// 2. select a new problem
+		changed_problem_settings = true
 	} else {
 		msg := fmt.Sprintf("Invalid EventType: %s", event.EventType)
 		glog.Errorf("%s %s", logPrefix, msg)
