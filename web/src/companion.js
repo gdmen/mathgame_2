@@ -172,7 +172,7 @@ const CompanionView = ({ token, url, user }) => {
         var e = json[i];
         if (e.event_type === "answered_problem") {
           attempts_buffer.push(e);
-        } else if (e.event_type === "displayed_problem") {
+        } else if (e.event_type === "selected_problem") {
           if (e.value !== gamestate.problem_id.toString()) {
             break;
           }

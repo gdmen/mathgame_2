@@ -133,7 +133,6 @@ const ProblemView = ({
 
   var minFontSize = 50;
 
-  postEvent("displayed_problem", gamestate.problem_id);
   var reporter = new EventReporterSingleton(postEvent, interval, postAnswer);
   reporter.problemWasDisplayed(gamestate.problem_id);
   var progress = String((100.0 * gamestate.solved) / gamestate.target) + "%";

@@ -127,7 +127,7 @@ func TestFlowBasic(t *testing.T) {
 		p := Problem{}
 		fetchProblem(t, r, u, gs.ProblemId, &p)
 		t.Logf("problem: %v", p)
-		gs = reportEvent(t, r, u, DISPLAYED_PROBLEM, "")
+		gs = reportEvent(t, r, u, SELECTED_PROBLEM, "")
 		gs = reportEvent(t, r, u, WORKING_ON_PROBLEM, "15")
 
 		// Have some incorrect answered for the first half of this round of problem solving

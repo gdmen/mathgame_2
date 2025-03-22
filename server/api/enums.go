@@ -4,7 +4,7 @@ package api // import "garydmenezes.com/mathgame/server/api"
 const (
 	// EventTypes
 	LOGGED_IN                  = "logged_in"                  // no value
-	DISPLAYED_PROBLEM          = "displayed_problem"          // int ProblemID
+	SELECTED_PROBLEM = "selected_problem"          // int ProblemID
 	WORKING_ON_PROBLEM         = "working_on_problem"         // int Duration in seconds
 	ANSWERED_PROBLEM           = "answered_problem"           // string Answer
 	ERROR_PLAYING_VIDEO        = "error_playing_video"        // string Error
