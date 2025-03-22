@@ -85,7 +85,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		a.generateProblemsBackground(logPrefix, c, settings)
 	} else if event.EventType == SET_GAMESTATE_TARGET {
 		// TODO: validate
-	} else if event.EventType == DISPLAYED_PROBLEM {
+	} else if event.EventType == SELECTED_PROBLEM {
 		// TODO: validate problemID
 	} else if event.EventType == WORKING_ON_PROBLEM {
 		// TODO: validate duration
@@ -231,7 +231,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	// Select a new problem
 	if changed_problem_settings {
 		// Get the most recent problem ids
-		sql := fmt.Sprintf("user_id=%d AND event_type='displayed_problem' AND timestamp >= NOW() - INTERVAL 30 MINUTE;", user.Id)
+		sql := fmt.Sprintf("user_id=%d AND event_type='selected_problem' LIMIT 20;", user.Id)
 		glog.Infof("recent problem ids sql: select * from events where %s\n", sql)
 		prevProblems, _, msg, err := a.eventManager.CustomList(sql)
 		if err != nil {
