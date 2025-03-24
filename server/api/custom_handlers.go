@@ -339,6 +339,11 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 			EventType: SET_GAMESTATE_TARGET,
 			Value:     strconv.FormatUint(uint64(default_gamestate_target), 10),
 		})
+		events = append(events, &Event{
+			UserId:    user.Id,
+			EventType: SELECTED_PROBLEM,
+			Value:     strconv.FormatUint(uint64(problem.Id), 10),
+		})
 		if a.processEvents(logPrefix, c, events, false) != nil {
 			return
 		}
