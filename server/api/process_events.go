@@ -49,7 +49,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 
 	changed_gamestate := false
 	changed_settings := false
-	changed_problem_settings := false
+	select_new_problem := false
 
 	// The main event to be processed as well as any side-effect events we add in this function
 	events := []*Event{event}
@@ -76,12 +76,12 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		// no-op
 	} else if event.EventType == SET_TARGET_DIFFICULTY {
 		// TODO: validate
-		changed_problem_settings = true
+		select_new_problem = true
 	} else if event.EventType == SET_TARGET_WORK_PERCENTAGE {
 		// TODO: validate
 	} else if event.EventType == SET_PROBLEM_TYPE_BITMAP {
 		// TODO: validate
-		changed_problem_settings = true
+		select_new_problem = true
 		a.generateProblemsBackground(logPrefix, c, settings)
 	} else if event.EventType == SET_GAMESTATE_TARGET {
 		// TODO: validate
@@ -102,7 +102,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			// Update counts
 			gamestate.Solved += 1
 			// Select a new problem
-			changed_problem_settings = true
+			select_new_problem = true
 		}
 	} else if event.EventType == ERROR_PLAYING_VIDEO {
 		// Get the current video
@@ -220,7 +220,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			return err
 		}
 		// 2. select a new problem
-		changed_problem_settings = true
+		select_new_problem = true
 	} else {
 		msg := fmt.Sprintf("Invalid EventType: %s", event.EventType)
 		glog.Errorf("%s %s", logPrefix, msg)
@@ -229,7 +229,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	}
 
 	// Select a new problem
-	if changed_problem_settings {
+	if select_new_problem {
 		// Get the most recent problem ids
 		sql := fmt.Sprintf("user_id=%d AND event_type='selected_problem' LIMIT 20;", user.Id)
 		glog.Infof("recent problem ids sql: select * from events where %s\n", sql)
@@ -279,6 +279,19 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		glog.Infof("%s Gamestate: %v", logPrefix, gamestate)
 		status, msg, err := a.gamestateManager.Update(gamestate)
 		if HandleMngrResp(logPrefix, c, status, msg, err, gamestate) != nil {
+			return err
+		}
+	}
+	if select_new_problem {
+		err := a.processEvent(logPrefix, c,
+			&Event{
+				UserId:    user.Id,
+				EventType: SELECTED_PROBLEM,
+				Value:     strconv.FormatUint(uint64(gamestate.ProblemId), 10),
+			},
+			false, user, gamestate, settings,
+		)
+		if err != nil {
 			return err
 		}
 	}
