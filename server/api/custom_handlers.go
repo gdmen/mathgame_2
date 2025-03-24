@@ -183,7 +183,7 @@ func (a *Api) customListEvent(c *gin.Context) {
 	}
 
 	// Get recent events belonging to the specified user
-	sql := fmt.Sprintf("user_id=%d AND timestamp > now() - interval %d second AND event_type IN (\"%s\");", params.UserId, params.Seconds, strings.Join([]string{LOGGED_IN, SELECTED_PROBLEM, ANSWERED_PROBLEM, DONE_WATCHING_VIDEO}, "\",\""))
+	sql := fmt.Sprintf("user_id=%d AND timestamp > now() - interval %d second AND event_type IN (\"%s\");", params.UserId, params.Seconds, strings.Join([]string{LOGGED_IN, SELECTED_PROBLEM, ANSWERED_PROBLEM, SOLVED_PROBLEM, DONE_WATCHING_VIDEO}, "\",\""))
 	events, status, msg, err := a.eventManager.CustomList(sql)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, events) != nil {
 		return
