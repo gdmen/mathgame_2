@@ -99,6 +99,10 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			msg := fmt.Sprintf("Incorrect answer: {%s}, expected: {%s}", event.Value, problem.Answer)
 			glog.Infof("%s %s", logPrefix, msg)
 		} else { // Answer was correct
+			events = append(events, &Event{
+				EventType: SOLVED_PROBLEM,
+				Value:     strconv.FormatUint(uint64(gamestate.ProblemId), 10),
+			})
 			// Update counts
 			gamestate.Solved += 1
 			// Select a new problem

@@ -7,6 +7,7 @@ const (
 	SELECTED_PROBLEM           = "selected_problem"           // int ProblemID
 	WORKING_ON_PROBLEM         = "working_on_problem"         // int Duration in seconds
 	ANSWERED_PROBLEM           = "answered_problem"           // string Answer
+	SOLVED_PROBLEM             = "solved_problem"             // int ProblemID
 	ERROR_PLAYING_VIDEO        = "error_playing_video"        // string Error
 	WATCHING_VIDEO             = "watching_video"             // int Duration in seconds
 	DONE_WATCHING_VIDEO        = "done_watching_video"        // int VideoID
