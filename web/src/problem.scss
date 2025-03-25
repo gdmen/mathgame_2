@@ -29,6 +29,42 @@
     color: white;
     font-weight: 400;
     margin-top: 1.5 * $base-space;
+    &.submitting {
+      color: $color-one-contrast;
+      .loader-wrap .loader {
+        display: inline-block;
+      }
+    }
+    h3 {
+      position: relative;
+    }
+    .loader-wrap {
+      position: absolute;
+      height: 100%;
+      width: 100%;
+      top: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      .loader {
+        display: none;
+        width: 1.5em;
+        height: 1.5em;
+        border: 5px solid #FFF;
+        border-bottom-color: transparent;
+        border-radius: 50%;
+        box-sizing: border-box;
+        animation: rotation 1s linear infinite;
+      }
+      @keyframes rotation {
+        0% {
+            transform: rotate(0deg);
+        }
+        100% {
+            transform: rotate(360deg);
+        }
+      }
+    }
   }
   .alert {
     margin-top: 0.5em;
