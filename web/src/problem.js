@@ -37,13 +37,14 @@ class EventReporterSingleton {
 
   reportAnswer(answer, problem_id) {
     if (answer === "" || answer === this.lastAnswer) {
-      return;
+      return false;
     }
     this.tearDown();
     this.lastAnswer = answer;
     this.lastProblemId = problem_id;
     this.answerChanged = false;
     this.postAnswer(answer);
+    return true;
   }
 
   wasIncorrectAnswer(problem_id) {
@@ -115,10 +116,15 @@ const ProblemView = ({
   interval,
 }) => {
   const [answer, setAnswer] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     setAnswer("");
   }, [latex]);
+
+  useEffect(() => {
+    setSubmitting(false);
+  }, [gamestate]);
 
   if (
     gamestate == null ||
@@ -162,21 +168,31 @@ const ProblemView = ({
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                reporter.reportAnswer(answer, gamestate.problem_id);
+                setSubmitting(
+                  reporter.reportAnswer(answer, gamestate.problem_id)
+                );
               }
             }}
           />
           <div>
             <button
+              className={submitting ? "submitting" : ""}
               onClick={() => {
-                reporter.reportAnswer(answer, gamestate.problem_id);
+                setSubmitting(
+                  reporter.reportAnswer(answer, gamestate.problem_id)
+                );
               }}
             >
-              <h3>submit</h3>
+              <h3>
+                <span id="submit-text">submit</span>
+                <span className="loader-wrap">
+                  <span className="loader"></span>
+                </span>
+              </h3>
             </button>
           </div>
         </div>
-        {reporter.wasIncorrectAnswer(gamestate.problem_id) && (
+        {!submitting && reporter.wasIncorrectAnswer(gamestate.problem_id) && (
           <div className="label alert">
             <div>Try Again!</div>
           </div>
