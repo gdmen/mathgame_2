@@ -170,6 +170,9 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
 
   const fetchYouTubeMetadata = async function (url, okFcn, errFcn) {
     try {
+      if (url.includes("youtube.com/playlist")) {
+        throw new Error("playlist url");
+      }
       const reqParams = {
         method: "GET",
         headers: {
