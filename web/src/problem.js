@@ -16,34 +16,28 @@ const PreprocessExpression = (expression) => {
   return expression.replace(/\\text\{[^\}]+\}/g, replacer);
 };
 
-class EventReporterSingleton {
-  constructor(postEvent, interval, postAnswer) {
-    var singleton = EventReporterSingleton._instance;
+class AnswerTracker {
+  constructor(eventReporter) {
+    var singleton = AnswerTracker._instance;
     if (singleton) {
-      singleton.setUp();
       return singleton;
     }
-    EventReporterSingleton._instance = this;
+    AnswerTracker._instance = this;
 
-    this.postEvent = postEvent;
-    this.interval = interval;
-    this.postAnswer = postAnswer;
+    this.eventReporter = eventReporter;
     this.lastAnswer = "";
     this.lastProblemId = null;
     this.answerChanged = false;
-
-    this.setUp();
   }
 
   reportAnswer(answer, problem_id) {
     if (answer === "" || answer === this.lastAnswer) {
       return false;
     }
-    this.tearDown();
     this.lastAnswer = answer;
     this.lastProblemId = problem_id;
     this.answerChanged = false;
-    this.postAnswer(answer);
+    this.eventReporter.postEvent("answered_problem", answer);
     return true;
   }
 
@@ -65,54 +59,13 @@ class EventReporterSingleton {
       this.lastAnswer = "";
     }
   }
-
-  tearDown() {
-    window.removeEventListener("focus", this.onFocus);
-    window.removeEventListener("blur", this.onBlur);
-    clearInterval(this.intervalId);
-    this.listenersAlive = false;
-    // turn off the reporting loop
-    this.onBlur();
-  }
-
-  setUp() {
-    if (!this.listenersAlive) {
-      window.addEventListener("focus", this.onFocus.bind(this));
-      window.addEventListener("blur", this.onBlur.bind(this));
-      clearInterval(this.intervalId);
-      this.intervalId = setInterval(
-        this.reportWorking.bind(this),
-        this.interval
-      );
-      this.listenersAlive = true;
-    }
-    // Call this.onFocus when the window loads
-    if (document.hasFocus()) {
-      this.onFocus();
-    }
-  }
-
-  reportWorking() {
-    if (this.focus) {
-      this.postEvent("working_on_problem", this.interval);
-    }
-  }
-
-  onFocus() {
-    this.focus = true;
-  }
-
-  onBlur() {
-    this.focus = false;
-  }
 }
 
 const ProblemView = ({
   gamestate,
   latex,
   isWordProblem,
-  postAnswer,
-  postEvent,
+  eventReporter,
   interval,
 }) => {
   const [answer, setAnswer] = useState("");
@@ -130,8 +83,6 @@ const ProblemView = ({
     gamestate == null ||
     latex == null ||
     isWordProblem == null ||
-    postAnswer == null ||
-    postEvent == null ||
     interval == null
   ) {
     return <div className="content-loading"></div>;
@@ -139,8 +90,9 @@ const ProblemView = ({
 
   var minFontSize = 50;
 
-  var reporter = new EventReporterSingleton(postEvent, interval, postAnswer);
-  reporter.problemWasDisplayed(gamestate.problem_id);
+  var answerTracker = new AnswerTracker(eventReporter);
+  answerTracker.problemWasDisplayed(gamestate.problem_id);
+  eventReporter.add("working_on_problem", interval);
   var progress = String((100.0 * gamestate.solved) / gamestate.target) + "%";
   return (
     <>
@@ -164,12 +116,12 @@ const ProblemView = ({
             value={answer}
             onChange={(e) => {
               setAnswer(e.target.value);
-              reporter.answerWasSet();
+              answerTracker.answerWasSet();
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 setSubmitting(
-                  reporter.reportAnswer(answer, gamestate.problem_id)
+                  answerTracker.reportAnswer(answer, gamestate.problem_id)
                 );
               }
             }}
@@ -179,7 +131,7 @@ const ProblemView = ({
               className={submitting ? "submitting" : ""}
               onClick={() => {
                 setSubmitting(
-                  reporter.reportAnswer(answer, gamestate.problem_id)
+                  answerTracker.reportAnswer(answer, gamestate.problem_id)
                 );
               }}
             >
@@ -192,11 +144,12 @@ const ProblemView = ({
             </button>
           </div>
         </div>
-        {!submitting && reporter.wasIncorrectAnswer(gamestate.problem_id) && (
-          <div className="label alert">
-            <div>Try Again!</div>
-          </div>
-        )}
+        {!submitting &&
+          answerTracker.wasIncorrectAnswer(gamestate.problem_id) && (
+            <div className="label alert">
+              <div>Try Again!</div>
+            </div>
+          )}
       </div>
     </>
   );

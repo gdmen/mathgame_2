@@ -9,6 +9,89 @@ import { ClearSessionPin } from "./pin.js";
 
 const conf = require("./conf");
 
+class EventReporterSingleton {
+  constructor(postEvent) {
+    var singleton = EventReporterSingleton._instance;
+    if (singleton) {
+      singleton.setUp();
+      return singleton;
+    }
+    EventReporterSingleton._instance = this;
+
+    this.postEvent = postEvent;
+    // events to report in the format {event_type:interval}
+    this.events = new Map();
+    this.intervalIds = [];
+
+    this.setUp();
+  }
+
+  // Add an event to be sent on an interval
+  add(event_type, interval) {
+    this.events.set(event_type, interval);
+    this.tearDown();
+    this.setUp();
+  }
+
+  // Clear all intervals
+  clear() {
+    this.events.clear();
+    this.tearDown();
+    this.setUp();
+  }
+
+  tearDown() {
+    window.removeEventListener("focus", this.onFocus);
+    window.removeEventListener("blur", this.onBlur);
+    this.intervalIds.forEach((i) => {
+      clearInterval(i);
+    });
+    this.intervalIds = [];
+    this.listenersAlive = false;
+    // turn off the reporting loop
+    this.onBlur();
+  }
+
+  setUp() {
+    if (!this.listenersAlive) {
+      window.addEventListener("focus", this.onFocus.bind(this));
+      window.addEventListener("blur", this.onBlur.bind(this));
+      this.intervalIds.forEach((i) => {
+        clearInterval(i);
+      });
+      for (let [event_type, interval] of this.events) {
+        this.intervalIds.push(
+          setInterval(
+            this.genIntervalEventFcn(event_type, interval).bind(this),
+            interval
+          )
+        );
+      }
+      this.listenersAlive = true;
+    }
+    // Call this.onFocus when the window loads
+    if (document.hasFocus()) {
+      this.onFocus();
+    }
+  }
+
+  genIntervalEventFcn(event_type, interval) {
+    return function () {
+      if (this.focus) {
+        this.postEvent(event_type, interval);
+      }
+    };
+  }
+
+  onFocus() {
+    this.focus = true;
+  }
+
+  onBlur() {
+    this.focus = false;
+  }
+}
+
 const PlayView = ({ token, url, user, postEvent, interval }) => {
   const [gamestate, setGamestate] = useState(null);
   const [problem, setProblem] = useState(null);
@@ -105,9 +188,14 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
     getVideo();
   }, [getVideo]);
 
-  const postAnswer = async (answer) => {
-    setGamestate(await postEvent("answered_problem", answer));
-  };
+  const eventReporter = new EventReporterSingleton(
+    async (event_type, value) => {
+      let gamestate = await postEvent(event_type, value);
+      if (event_type == "answered_problem") {
+        setGamestate(gamestate);
+      }
+    }
+  );
 
   if (!gamestate || !problem) {
     return <div className="content-loading"></div>;
@@ -120,26 +208,32 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
           window.location.pathname = "play";
         });
       });
+      return null;
     } else {
+      eventReporter.clear();
       return (
-        <VideoView video={video} postEvent={postEvent} interval={interval} />
+        <VideoView
+          video={video}
+          eventReporter={eventReporter}
+          interval={interval}
+        />
       );
     }
   } else {
     if (conf.debug_quickplay) {
       postEvent("working_on_problem", 1000).then(() => {
-        postAnswer(problem.answer, gamestate.problem_id).then(() => {
+        postEvent("answered_problem", problem.answer).then(() => {
           window.location.pathname = "play";
         });
       });
+      return null;
     } else {
       return (
         <ProblemView
           gamestate={gamestate}
           latex={latex}
           isWordProblem={IsWordProblem(problem)}
-          postAnswer={postAnswer}
-          postEvent={postEvent}
+          eventReporter={eventReporter}
           interval={interval}
         />
       );

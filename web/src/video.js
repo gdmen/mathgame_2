@@ -3,7 +3,7 @@ import ReactPlayer from "react-player";
 
 import "./video.scss";
 
-const VideoView = ({ video, postEvent, interval }) => {
+const VideoView = ({ video, eventReporter, interval }) => {
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
@@ -12,7 +12,7 @@ const VideoView = ({ video, postEvent, interval }) => {
     elapsedRef.current = elapsed;
   }, [elapsed]);
 
-  if (video == null || postEvent == null || interval == null) {
+  if (video == null || eventReporter == null || interval == null) {
     return <div className="content-loading"></div>;
   }
 
@@ -20,7 +20,7 @@ const VideoView = ({ video, postEvent, interval }) => {
     setPlaying(!playing);
     /* Uncomment to test faster */
     //if (!playing && elapsed > 1000) {
-    //  postEvent("done_watching_video", video.id);
+    //  eventReporter.postEvent("done_watching_video", video.id);
     //  window.location.pathname="play";
     //}
   };
@@ -43,16 +43,21 @@ const VideoView = ({ video, postEvent, interval }) => {
           progressInterval={interval}
           onProgress={(e) => {
             var playedMillis = 1000 * e.playedSeconds;
-            postEvent("watching_video", playedMillis - elapsedRef.current);
+            eventReporter.postEvent(
+              "watching_video",
+              playedMillis - elapsedRef.current
+            );
             setElapsed(playedMillis);
           }}
           onEnded={() => {
-            postEvent("done_watching_video", video.id).then(() => {
-              window.location.pathname = "play";
-            });
+            eventReporter
+              .postEvent("done_watching_video", video.id)
+              .then(() => {
+                window.location.pathname = "play";
+              });
           }}
           onError={(e) => {
-            postEvent("error_playing_video", e).then(() => {
+            eventReporter.postEvent("error_playing_video", e).then(() => {
               window.location.pathname = "play";
             });
           }}
