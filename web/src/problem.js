@@ -37,6 +37,7 @@ class AnswerTracker {
     this.lastAnswer = answer;
     this.lastProblemId = problem_id;
     this.answerChanged = false;
+    this.eventReporter.remove("working_on_problem");
     this.eventReporter.postEvent("answered_problem", answer);
     return true;
   }
@@ -92,11 +93,14 @@ const ProblemView = ({
 
   var answerTracker = new AnswerTracker(eventReporter);
   answerTracker.problemWasDisplayed(gamestate.problem_id);
-  eventReporter.add("working_on_problem", interval);
+  if (!submitting) {
+    console.log("adding working_on_problem");
+    eventReporter.add("working_on_problem");
+  }
   var progress = String((100.0 * gamestate.solved) / gamestate.target) + "%";
   return (
     <>
-      <div id="problem">
+      <div id="problem" className={submitting ? "submitting" : ""}>
         <div className="progress">
           <div className="progress-meter" style={{ width: progress }}></div>
         </div>
@@ -114,25 +118,28 @@ const ProblemView = ({
             className="input-group-field"
             type="text"
             value={answer}
+            readOnly={submitting}
+            autoFocus
             onChange={(e) => {
               setAnswer(e.target.value);
               answerTracker.answerWasSet();
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                setSubmitting(
-                  answerTracker.reportAnswer(answer, gamestate.problem_id)
-                );
+                !submitting &&
+                  setSubmitting(
+                    answerTracker.reportAnswer(answer, gamestate.problem_id)
+                  );
               }
             }}
           />
           <div>
             <button
-              className={submitting ? "submitting" : ""}
               onClick={() => {
-                setSubmitting(
-                  answerTracker.reportAnswer(answer, gamestate.problem_id)
-                );
+                !submitting &&
+                  setSubmitting(
+                    answerTracker.reportAnswer(answer, gamestate.problem_id)
+                  );
               }}
             >
               <h3>

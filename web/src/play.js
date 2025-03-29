@@ -10,43 +10,49 @@ import { ClearSessionPin } from "./pin.js";
 const conf = require("./conf");
 
 class EventReporterSingleton {
-  constructor(postEvent) {
+  constructor(postEvent, interval) {
     var singleton = EventReporterSingleton._instance;
     if (singleton) {
       singleton.setUp();
       return singleton;
     }
     EventReporterSingleton._instance = this;
+    this.intervalId = null;
+    this.events = new Set();
 
     this.postEvent = postEvent;
-    // events to report in the format {event_type:interval}
-    this.events = new Map();
-    this.intervalIds = [];
+    this.interval = interval;
 
     this.setUp();
   }
 
-  // Add an event to be sent on an interval
-  add(event_type, interval) {
-    this.events.set(event_type, interval);
-    this.tearDown();
-    this.setUp();
+  add(event_type) {
+    this.events.add(event_type);
   }
 
-  // Clear all intervals
+  remove(event_type) {
+    this.events.delete(event_type);
+  }
+
   clear() {
     this.events.clear();
-    this.tearDown();
-    this.setUp();
+  }
+
+  executeInterval() {
+    if (!this.focus) {
+      return;
+    }
+    this.events.forEach(
+      function (event_type) {
+        this.postEvent(event_type, this.interval);
+      }.bind(this)
+    );
   }
 
   tearDown() {
     window.removeEventListener("focus", this.onFocus);
     window.removeEventListener("blur", this.onBlur);
-    this.intervalIds.forEach((i) => {
-      clearInterval(i);
-    });
-    this.intervalIds = [];
+    clearInterval(this.intervalId);
     this.listenersAlive = false;
     // turn off the reporting loop
     this.onBlur();
@@ -56,31 +62,17 @@ class EventReporterSingleton {
     if (!this.listenersAlive) {
       window.addEventListener("focus", this.onFocus.bind(this));
       window.addEventListener("blur", this.onBlur.bind(this));
-      this.intervalIds.forEach((i) => {
-        clearInterval(i);
-      });
-      for (let [event_type, interval] of this.events) {
-        this.intervalIds.push(
-          setInterval(
-            this.genIntervalEventFcn(event_type, interval).bind(this),
-            interval
-          )
-        );
-      }
+      clearInterval(this.intervalId);
+      this.intervalId = setInterval(
+        this.executeInterval.bind(this),
+        this.interval
+      );
       this.listenersAlive = true;
     }
     // Call this.onFocus when the window loads
     if (document.hasFocus()) {
       this.onFocus();
     }
-  }
-
-  genIntervalEventFcn(event_type, interval) {
-    return function () {
-      if (this.focus) {
-        this.postEvent(event_type, interval);
-      }
-    };
   }
 
   onFocus() {
@@ -194,8 +186,10 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
       if (event_type == "answered_problem") {
         setGamestate(gamestate);
       }
-    }
+    },
+    interval
   );
+  eventReporter.clear();
 
   if (!gamestate || !problem) {
     return <div className="content-loading"></div>;
@@ -210,7 +204,6 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
       });
       return null;
     } else {
-      eventReporter.clear();
       return (
         <VideoView
           video={video}
