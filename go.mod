@@ -1,6 +1,6 @@
 module garydmenezes.com/mathgame
 
-go 1.18
+go 1.24.2
 
 require (
 	github.com/auth0/go-jwt-middleware/v2 v2.0.1
