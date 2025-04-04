@@ -13,6 +13,8 @@ type Config struct {
 	MySQLPass     string `json:"mysql_pass"`
 	ApiHost       string `json:"api_host"`
 	ApiPort       string `json:"api_port"`
+	AuthDuration int `json:"auth_duration"`
+	AuthSecretKey []byte `json:"auth_secret_key"`
 	OpenAiApiKey  string `json:"openai_api_key"`
 	Debug         bool   `json:"debug"`
 }

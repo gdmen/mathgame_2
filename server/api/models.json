@@ -5,24 +5,68 @@
       "table": "users",
       "fields": [
         {
-          "name": "Auth0Id", "type": "string",
-          "sql": "VARCHAR(225) NOT NULL PRIMARY KEY"
-        },
-        {
           "name": "Id", "type": "uint32",
-          "sql": "BIGINT UNSIGNED AUTO_INCREMENT UNIQUE"
+          "sql": "BIGINT UNSIGNED PRIMARY_KEY UNIQUE"
         },
         {
           "name": "Email", "type": "string",
-          "sql": "VARCHAR(320) NOT NULL"
+          "sql": "TEXT NOT NULL UNIQUE"
         },
         {
-          "name": "Username", "type": "string",
-          "sql": "VARCHAR(128) NOT NULL"
+          "name": "Password", "type": "string",
+          "sql": "TEXT"
+        },
+        {
+          "name": "Name", "type": "string",
+          "sql": "TEXT"
         },
         {
           "name": "Pin", "type": "string",
-          "sql": "VARCHAR(4) NOT NULL DEFAULT ''"
+          "sql": "TEXT NOT NULL DEFAULT ''"
+        }
+      ]
+    },
+    {
+      "name": "confirmation",
+      "table": "confirmations",
+      "fields": [
+        {
+          "name": "Id", "type": "uint32",
+          "sql": "BIGINT UNSIGNED PRIMARY KEY UNIQUE"
+        },
+        {
+          "name": "UserId", "type": "uint32",
+          "sql": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "Key", "type": "string",
+          "sql": "TEXT NOT NULL"
+        },
+        {
+          "name": "Expiration", "type": "time.Time",
+          "sql": "TIMESTAMP NOT NULL"
+        },
+        {
+          "name": "ConfirmationType", "type": "string",
+          "sql": "TEXT NOT NULL"
+        },
+        {
+          "name": "Completed", "type": "bool",
+          "sql": "TINYINT NOT NULL DEFAULT 0"
+        }
+      ]
+    },
+    {
+      "name": "revocation",
+      "table": "revocations",
+      "fields": [
+        {
+          "name": "UserId", "type": "uint32",
+          "sql": "BIGINT UNSIGNED NOT NULL UNIQUE"
+        },
+        {
+          "name": "Timestamp", "type": "time.Time",
+          "sql": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
         }
       ]
     },

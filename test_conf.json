@@ -9,6 +9,8 @@
         "auth0_domain": "",
         "auth0_clientId": "",
         "auth0_audience": "",
+        "auth_duration": 1,
+        "auth_secret_key": "secretkey",
         "event_reporting_interval": 1000,
         "openai_api_key": ""
 }
