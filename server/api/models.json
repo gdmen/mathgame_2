@@ -27,6 +27,32 @@
       ]
     },
     {
+      "name": "newuser",
+      "table": "newusers",
+      "fields": [
+        {
+          "name": "Id", "type": "uint32",
+          "sql": "BIGINT UNSIGNED PRIMARY_KEY UNIQUE"
+        },
+        {
+          "name": "Email", "type": "string",
+          "sql": "TEXT NOT NULL UNIQUE"
+        },
+        {
+          "name": "Username", "type": "string",
+          "sql": "TEXT NOT NULL"
+        },
+        {
+          "name": "Hash", "type": "string",
+          "sql": "TEXT NOT NULL"
+        },
+        {
+          "name": "Pin", "type": "string",
+          "sql": "TEXT NOT NULL DEFAULT ''"
+        }
+      ]
+    },
+    {
       "name": "problem",
       "table": "problems",
       "fields": [
