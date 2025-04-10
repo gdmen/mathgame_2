@@ -5,19 +5,19 @@
       "table": "users",
       "fields": [
         {
-          "name": "Auth0Id", "type": "string",
-          "sql": "VARCHAR(225) NOT NULL PRIMARY KEY"
-        },
-        {
           "name": "Id", "type": "uint32",
-          "sql": "BIGINT UNSIGNED AUTO_INCREMENT UNIQUE"
+          "sql": "BIGINT UNSIGNED PRIMARY KEY UNIQUE"
         },
         {
           "name": "Email", "type": "string",
-          "sql": "VARCHAR(320) NOT NULL"
+          "sql": "VARCHAR(320) NOT NULL UNIQUE"
         },
         {
-          "name": "Username", "type": "string",
+          "name": "Password", "type": "string",
+          "sql": "TEXT"
+        },
+        {
+          "name": "Name", "type": "string",
           "sql": "VARCHAR(128) NOT NULL"
         },
         {

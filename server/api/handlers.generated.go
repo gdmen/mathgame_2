@@ -36,7 +36,7 @@ func (a *Api) getUser(c *gin.Context) {
 	}
 
 	// Read from database
-	model, status, msg, err := a.userManager.Get(model.Auth0Id)
+	model, status, msg, err := a.userManager.Get(model.Id)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
@@ -84,7 +84,7 @@ func (a *Api) deleteUser(c *gin.Context) {
 	}
 
 	// Write to database
-	status, msg, err := a.userManager.Delete(model.Auth0Id)
+	status, msg, err := a.userManager.Delete(model.Id)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {
 		return
 	}
