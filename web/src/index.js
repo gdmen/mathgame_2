@@ -134,9 +134,10 @@ const AppView = () => {
         console.log(e.message);
       }
     };
-
-    getToken();
-  }, [getAccessTokenSilently]);
+    if (isAuthenticated) {
+      getToken();
+    }
+  }, [isAuthenticated, getAccessTokenSilently]);
 
   useEffect(() => {
     const getSettings = async () => {
@@ -301,6 +302,7 @@ ReactDOM.render(
       clientId={conf.auth0_clientId}
       domain={conf.auth0_domain}
       redirectUri={window.location.origin}
+      cacheLocation="localstorage"
     >
       <AppView />
     </Auth0Provider>
