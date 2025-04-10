@@ -27,6 +27,28 @@
       ]
     },
     {
+      "name": "password_reset",
+      "table": "password_resets",
+      "fields": [
+        {
+          "name": "UserId", "type": "uint32",
+          "sql": "BIGINT UNSIGNED PRIMARY KEY"
+        },
+        {
+          "name": "Key", "type": "string",
+          "sql": "TEXT"
+        },
+        {
+          "name": "ExpiresAt", "type": "time.Time",
+          "sql": "TIMESTAMP NOT NULL"
+        },
+        {
+          "name": "CompletedAt", "type": "time.Time",
+          "sql": "TIMESTAMP"
+        }
+      ]
+    },
+    {
       "name": "problem",
       "table": "problems",
       "fields": [

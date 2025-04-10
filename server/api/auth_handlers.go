@@ -13,4 +13,5 @@ func (a *Api) authEmail(c *gin.Context) {
 		return
 	}
 
+	// Send a password setting email
 }
