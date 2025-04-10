@@ -109,6 +109,14 @@ func (a *Api) GetRouter() *gin.Engine {
 
 	v1 := router.Group("/api/v1")
 	{
+		auth := v1.Group("/auth")
+		{
+			auth.POST("", a.authLogin)
+			auth.POST("/", a.authLogin)
+			auth.POST("/email", a.authEmail)
+			auth.GET("/confirm/:key", a.authConfirm)
+			auth.POST("/password", a.authPassword)
+		}
 		user := v1.Group("/users")
 		{
 			user.POST("", userMiddlewareLenient, a.customCreateOrUpdateUser)
