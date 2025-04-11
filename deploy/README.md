@@ -1,6 +1,14 @@
 # Ubuntu 22.04
-sudo apt-get update
-sudo apt install golang-go
+sudo apt-get purge golang*
+sudo rm -rf /usr/local/go
+wget -c https://go.dev/dl/go1.24.2.linux-amd64.tar.gz
+tar -C /usr/local -xzf go1.24.2.linux-amd64.tar.gz
+```
+# set PATH so it includes /usr/local/go/bin if it exists
+if [ -d "/usr/local/go/bin" ] ; then
+    PATH="/usr/local/go/bin:$PATH"
+fi
+```
 sudo apt install make
 
 sudo apt-get install nodejs npm
