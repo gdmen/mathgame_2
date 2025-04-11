@@ -1,5 +1,4 @@
 import React from "react";
-import { Textfit } from "react-textfit";
 import parse from "html-react-parser";
 
 import "./problem.scss";
@@ -25,24 +24,15 @@ const AttemptTime = ({ timestamp }) => {
   return <span className="attempt-time">({diff} second ago)</span>;
 };
 
-const ProblemCompanionView = ({
-  gamestate,
-  latex,
-  isWordProblem,
-  answer,
-  attempts,
-}) => {
+const ProblemCompanionView = ({ gamestate, latex, answer, attempts }) => {
   if (
     gamestate == null ||
     latex == null ||
-    isWordProblem == null ||
     answer == null ||
     attempts == null
   ) {
     return <div className="content-loading"></div>;
   }
-
-  var minFontSize = 50;
 
   var progress = String((100.0 * gamestate.solved) / gamestate.target) + "%";
   return (
@@ -51,14 +41,7 @@ const ProblemCompanionView = ({
         <div className="progress">
           <div className="progress-meter" style={{ width: progress }}></div>
         </div>
-        <div
-          id="problem-display"
-          className={isWordProblem ? "word-problem" : ""}
-        >
-          <Textfit mode="multi" min={minFontSize}>
-            {parse(latex)}
-          </Textfit>
-        </div>
+        <div id="problem-display">{parse(latex)}</div>
         <div id="problem-answer-companion">Correct Answer: {answer}</div>
       </div>
       <div id="problem-attempts">

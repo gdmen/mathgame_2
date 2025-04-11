@@ -1,14 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Textfit } from "react-textfit";
 import parse from "html-react-parser";
 
 import "./problem.scss";
 
 import { ProblemTypes } from "./enums.js";
 
-const IsWordProblem = (problem) => {
-  return Boolean(problem.problem_type_bitmap & ProblemTypes.WORD);
-};
 const PreprocessExpression = (expression) => {
   function replacer(match, offset, string) {
     return match.replace(/\s/g, " }\\text{");
@@ -62,13 +58,7 @@ class AnswerTracker {
   }
 }
 
-const ProblemView = ({
-  gamestate,
-  latex,
-  isWordProblem,
-  eventReporter,
-  interval,
-}) => {
+const ProblemView = ({ gamestate, latex, eventReporter, interval }) => {
   const [answer, setAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -80,16 +70,9 @@ const ProblemView = ({
     setSubmitting(false);
   }, [gamestate]);
 
-  if (
-    gamestate == null ||
-    latex == null ||
-    isWordProblem == null ||
-    interval == null
-  ) {
+  if (gamestate == null || latex == null || interval == null) {
     return <div className="content-loading"></div>;
   }
-
-  var minFontSize = 50;
 
   var answerTracker = new AnswerTracker(eventReporter);
   answerTracker.problemWasDisplayed(gamestate.problem_id);
@@ -104,14 +87,7 @@ const ProblemView = ({
         <div className="progress">
           <div className="progress-meter" style={{ width: progress }}></div>
         </div>
-        <div
-          id="problem-display"
-          className={isWordProblem ? "word-problem" : ""}
-        >
-          <Textfit mode="multi" min={minFontSize}>
-            {parse(latex)}
-          </Textfit>
-        </div>
+        <div id="problem-display">{parse(latex)}</div>
         <div id="problem-answer" className="input-group">
           <input
             id="problem-answer-input"
@@ -162,4 +138,4 @@ const ProblemView = ({
   );
 };
 
-export { ProblemView, IsWordProblem, PreprocessExpression };
+export { ProblemView, PreprocessExpression };

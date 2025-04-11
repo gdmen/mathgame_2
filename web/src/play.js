@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useState } from "react";
 
 import "katex/dist/katex.min.css";
 
-import { ProblemView, IsWordProblem, PreprocessExpression } from "./problem.js";
+import { ProblemView, PreprocessExpression } from "./problem.js";
 import { VideoView } from "./video.js";
 import { ClearSessionPin } from "./pin.js";
 
@@ -225,7 +225,6 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
         <ProblemView
           gamestate={gamestate}
           latex={latex}
-          isWordProblem={IsWordProblem(problem)}
           eventReporter={eventReporter}
           interval={interval}
         />
