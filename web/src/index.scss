@@ -26,6 +26,12 @@ body,
     color: inherit;
     text-decoration: none;
   }
+  .title {
+    display: flex;
+    img {
+      height: 5em;
+    }
+  }
 }
 
 #content {

@@ -14,6 +14,8 @@ import { SettingsView } from "./settings.js";
 import { PlayView } from "./play.js";
 import { CompanionView } from "./companion.js";
 
+import logoImage from "./img/stevie_varin.png";
+
 import "./index.scss";
 
 const conf = require("./conf");
@@ -188,7 +190,8 @@ const AppView = () => {
   return (
     <div id="react-body">
       <div id="main-menu" className="clearfix">
-        <a href="/">
+        <a className="title" href="/">
+          <img src={logoImage} alt="logo" />
           <h3>Mikey's Math Game</h3>
         </a>
 
