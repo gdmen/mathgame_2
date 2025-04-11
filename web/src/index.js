@@ -140,62 +140,12 @@ const AppView = () => {
   }, [isAuthenticated, getAccessTokenSilently]);
 
   useEffect(() => {
-    const getSettings = async () => {
+    const getPageLoadData = async () => {
       try {
-        if (token == null || appUser == null) {
+        if (token == null || user == null) {
           return;
         }
-        const reqParams = {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + token,
-          },
-        };
-        const req = await fetch(ApiUrl + "/settings/" + appUser.id, reqParams);
-        const json = await req.json();
-        setSettings(json);
-      } catch (e) {
-        console.log(e.message);
-      }
-    };
-
-    getSettings();
-  }, [token, appUser]);
-
-  useEffect(() => {
-    const getNumEnabledVideos = async () => {
-      try {
-        if (token == null || appUser == null) {
-          return;
-        }
-        const reqParams = {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + token,
-          },
-        };
-        const req = await fetch(ApiUrl + "/videos/num_enabled", reqParams);
-        const json = await req.json();
-        setNumEnabledVideos(parseInt(json));
-      } catch (e) {
-        console.log(e.message);
-      }
-    };
-
-    getNumEnabledVideos();
-  }, [token, appUser]);
-
-  useEffect(() => {
-    const getAppUser = async () => {
-      try {
-        if (token == null || user == null || genPostEventFcn == null) {
-          return;
-        }
-        const reqParams = {
+        var reqParams = {
           method: "GET",
           headers: {
             Accept: "application/json",
@@ -204,36 +154,36 @@ const AppView = () => {
           },
         };
         var req = await fetch(
-          ApiUrl + "/users/" + encodeURIComponent(user.sub),
+          ApiUrl + "/users/pageload/" + encodeURIComponent(user.sub),
           reqParams
         );
         if (req.status === 404) {
           // Looking up the auth0 user failed, so create this user in our database.
-          const reqParams = {
-            method: "POST",
-            headers: {
-              Accept: "application/json",
-              "Content-Type": "application/json",
-              Authorization: "Bearer " + token,
-            },
-            body: JSON.stringify({
-              auth0_id: user.sub,
-              email: user.email,
-              username: user.name,
-            }),
-          };
-          req = await fetch(ApiUrl + "/users", reqParams);
+          reqParams.method = "POST";
+          reqParams.body = JSON.stringify({
+            auth0_id: user.sub,
+            email: user.email,
+            username: user.name,
+          });
+          await fetch(ApiUrl + "/users", reqParams);
+          reqParams.method = "GET";
+          reqParams.body = null;
+          req = await fetch(
+            ApiUrl + "/users/pageload/" + encodeURIComponent(user.sub),
+            reqParams
+          );
         }
         const json = await req.json();
-        setAppUser(json);
-        genPostEventFcn("logged_in", "");
+        setAppUser(json["user"]);
+        setSettings(json["settings"]);
+        setNumEnabledVideos(parseInt(json["num_videos_enabled"]));
       } catch (e) {
         console.log(e.message);
       }
     };
 
-    getAppUser();
-  }, [token, user, genPostEventFcn]);
+    getPageLoadData();
+  }, [token, user]);
 
   return (
     <div id="react-body">

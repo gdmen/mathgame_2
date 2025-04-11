@@ -26,6 +26,7 @@ func RequestIdMiddleware() gin.HandlerFunc {
 
 func Auth0IdMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		c.Set(Auth0IdKey, nil)
 		claims := c.Request.Context().Value(jwtmiddleware.ContextKey{}).(*validator.ValidatedClaims)
 		c.Set(Auth0IdKey, claims.RegisteredClaims.Subject)
 	}
@@ -38,6 +39,7 @@ type TestAuth0 struct {
 func TestAuth0IdMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		logPrefix := GetLogPrefix(c)
+		c.Set(Auth0IdKey, nil)
 		model := &TestAuth0{}
 		err := c.Bind(model)
 		if err != nil {
@@ -53,6 +55,7 @@ type GetUserFn func(string, *gin.Context) (interface{}, error)
 func UserMiddleware(getUser GetUserFn, strict bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		logPrefix := GetLogPrefix(c)
+		c.Set(UserKey, nil)
 		user, err := getUser(logPrefix, c)
 		if err != nil {
 			msg := "Couldn't find a user associated with this token."

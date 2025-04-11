@@ -114,6 +114,7 @@ func (a *Api) GetRouter() *gin.Engine {
 			user.POST("", userMiddlewareLenient, a.customCreateOrUpdateUser)
 			user.POST("/", userMiddlewareLenient, a.customCreateOrUpdateUser)
 			user.POST("/:auth0_id", userMiddleware, a.updateUser)
+			user.GET("/pageload/:auth0_id", userMiddleware, a.customGetPageLoadData)
 			user.GET("/:auth0_id", userMiddleware, a.getUser)
 		}
 		settings := v1.Group("/settings")
@@ -131,7 +132,6 @@ func (a *Api) GetRouter() *gin.Engine {
 			video.POST("/", userMiddleware, a.createVideo)
 			video.POST("/:id", userMiddleware, a.updateVideo)
 			video.DELETE("/:id", userMiddleware, a.customDeleteVideo)
-			video.GET("/num_enabled", userMiddleware, a.customGetNumEnabledVideos)
 			video.GET("/:id", userMiddleware, a.getVideo)
 			video.GET("", userMiddleware, a.customListVideo)
 			video.GET("/", userMiddleware, a.customListVideo)
