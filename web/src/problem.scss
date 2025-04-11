@@ -77,16 +77,15 @@
 }
 #problem-display {
   margin: 1em 0;
-  &.word-problem {
-    .katex {
-      .base {
-        display: block;
-        text-wrap: wrap;
-        width: 100%;
-      }
-      .mord {
-        display: inline-block;
-      }
+  .katex {
+    font-size: min(10vw, 3em);
+    .base {
+      display: inline;
+      white-space: wrap;
+      width: 100%;
+    }
+    .mord {
+      display: inline-block;
     }
   }
 }
