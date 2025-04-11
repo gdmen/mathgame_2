@@ -300,9 +300,9 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		}
 	}
 
-	// Write the gamestate to the response body
+	// Write the Play data to the response body
 	if writeCtx {
-		HandleMngrRespWriteCtx(logPrefix, c, 200, "", nil, gamestate)
+		a.helpGetPlayData(logPrefix, c, gamestate)
 	}
 
 	return nil

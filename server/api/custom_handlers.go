@@ -20,10 +20,6 @@ const (
 )
 
 func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32, exclusions map[uint32]bool) (uint32, error) {
-	if a.isTest {
-		return 1, nil
-	}
-
 	// Get videos belonging to this user
 	videos, status, msg, err := a.videoManager.CustomList(fmt.Sprintf("user_id=%d AND disabled=0 AND deleted=0;", userId))
 	if HandleMngrResp(logPrefix, c, status, msg, err, videos) != nil {
@@ -167,14 +163,52 @@ func (a *Api) customGetPageLoadData(c *gin.Context) {
 	}
 
 	// Write out the data
-	data := struct {
-		User             interface{} `json:"user"`
-		Settings         interface{} `json:"settings"`
-		NumVideosEnabled interface{} `json:"num_videos_enabled"`
-	}{
+	data := PageLoadData{
 		User:             user,
 		Settings:         settings,
 		NumVideosEnabled: value,
+	}
+	HandleMngrRespWriteCtx(logPrefix, c, http.StatusOK, "", nil, data)
+}
+
+// Get all user info that the client uses on the play page
+func (a *Api) customGetPlayData(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	gamestate := &Gamestate{}
+	if BindModelFromURI(logPrefix, c, gamestate) != nil {
+		return
+	}
+
+	// Read from database
+	gamestate, status, msg, err := a.gamestateManager.Get(gamestate.UserId)
+	if HandleMngrResp(logPrefix, c, status, msg, err, gamestate) != nil {
+		return
+	}
+
+	a.helpGetPlayData(logPrefix, c, gamestate)
+}
+
+func (a *Api) helpGetPlayData(logPrefix string, c *gin.Context, gamestate *Gamestate) {
+	// Get Problem
+	problem, status, msg, err := a.problemManager.Get(gamestate.ProblemId)
+	if HandleMngrResp(logPrefix, c, status, msg, err, problem) != nil {
+		return
+	}
+
+	// Get Video
+	video, status, msg, err := a.videoManager.Get(gamestate.VideoId, gamestate.UserId)
+	if HandleMngrResp(logPrefix, c, status, msg, err, video) != nil {
+		return
+	}
+
+	// Write out the data
+	data := PlayData{
+		Gamestate: gamestate,
+		Problem:   problem,
+		Video:     video,
 	}
 	HandleMngrRespWriteCtx(logPrefix, c, http.StatusOK, "", nil, data)
 }
