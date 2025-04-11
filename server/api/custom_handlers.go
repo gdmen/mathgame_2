@@ -137,19 +137,46 @@ func (a *Api) customUpdateSettings(c *gin.Context) {
 	}
 }
 
-func (a *Api) customGetNumEnabledVideos(c *gin.Context) {
+// Get all user info that the client uses on page load
+func (a *Api) customGetPageLoadData(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Get User
-	user := GetUserFromContext(c)
+	user := &User{}
+	if BindModelFromURI(logPrefix, c, user) != nil {
+		return
+	}
+	// Read from database
+	user, status, msg, err := a.userManager.Get(user.Auth0Id)
+	if HandleMngrResp(logPrefix, c, status, msg, err, user) != nil {
+		return
+	}
+
+	// Get Settings
+	settings, status, msg, err := a.settingsManager.Get(user.Id)
+	if HandleMngrResp(logPrefix, c, status, msg, err, settings) != nil {
+		return
+	}
 
 	// Get a count of enabled videos for this user
 	sql := fmt.Sprintf("SELECT count(*) FROM videos WHERE user_id=%d AND disabled=0 AND deleted=0;", user.Id)
 	value, status, msg, err := a.CustomValueQuery(sql)
-	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, value) != nil {
+	if HandleMngrResp(logPrefix, c, status, msg, err, value) != nil {
 		return
 	}
+
+	// Write out the data
+	data := struct {
+		User             interface{} `json:"user"`
+		Settings         interface{} `json:"settings"`
+		NumVideosEnabled interface{} `json:"num_videos_enabled"`
+	}{
+		User:             user,
+		Settings:         settings,
+		NumVideosEnabled: value,
+	}
+	HandleMngrRespWriteCtx(logPrefix, c, http.StatusOK, "", nil, data)
 }
 
 func (a *Api) customCreateEvent(c *gin.Context) {
