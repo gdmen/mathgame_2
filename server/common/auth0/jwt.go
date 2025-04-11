@@ -15,11 +15,9 @@ import (
 	"github.com/auth0/go-jwt-middleware/v2"
 	"github.com/auth0/go-jwt-middleware/v2/jwks"
 	"github.com/auth0/go-jwt-middleware/v2/validator"
-)
 
-// TODO: move these to _conf.json
-const AUTH0_DOMAIN = "compteam.auth0.com"
-const AUTH0_AUDIENCE = "mathgame"
+	"garydmenezes.com/mathgame/server/common"
+)
 
 // CustomClaims contains custom data we want from the token.
 type CustomClaims struct {
@@ -46,7 +44,12 @@ func (c CustomClaims) HasScope(expectedScope string) bool {
 
 // EnsureValidToken is a middleware that will check the validity of our JWT.
 func EnsureValidToken() func(next http.Handler) http.Handler {
-	issuerURL, err := url.Parse("https://" + AUTH0_DOMAIN + "/")
+	c, err := common.ReadConfig("conf.json")
+	if err != nil {
+		log.Fatalf("Failed to read config: %v", err)
+	}
+
+	issuerURL, err := url.Parse("https://" + c.Auth0Domain + "/")
 	if err != nil {
 		log.Fatalf("Failed to parse the issuer url: %v", err)
 	}
@@ -57,7 +60,7 @@ func EnsureValidToken() func(next http.Handler) http.Handler {
 		provider.KeyFunc,
 		validator.RS256,
 		issuerURL.String(),
-		[]string{AUTH0_AUDIENCE},
+		[]string{c.Auth0Audience},
 		validator.WithCustomClaims(
 			func() validator.CustomClaims {
 				return &CustomClaims{}
