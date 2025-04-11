@@ -109,12 +109,13 @@ func (a *Api) GetRouter() *gin.Engine {
 
 	v1 := router.Group("/api/v1")
 	{
+		v1.GET("/pageload/:auth0_id", userMiddleware, a.customGetPageLoadData)
+		v1.GET("/play/:user_id", userMiddleware, a.customGetPlayData)
 		user := v1.Group("/users")
 		{
 			user.POST("", userMiddlewareLenient, a.customCreateOrUpdateUser)
 			user.POST("/", userMiddlewareLenient, a.customCreateOrUpdateUser)
 			user.POST("/:auth0_id", userMiddleware, a.updateUser)
-			user.GET("/pageload/:auth0_id", userMiddleware, a.customGetPageLoadData)
 			user.GET("/:auth0_id", userMiddleware, a.getUser)
 		}
 		settings := v1.Group("/settings")

@@ -68,16 +68,16 @@ func reportEvent(t *testing.T, r *gin.Engine, user *User, eventType string, valu
 		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusOK, resp.Code, resp)
 	}
 
-	gamestate := &Gamestate{}
+	pd := &PlayData{}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = json.Unmarshal(body, gamestate)
+	err = json.Unmarshal(body, pd)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return gamestate
+	return pd.Gamestate
 }
 
 func TestFlowBasic(t *testing.T) {
@@ -115,6 +115,23 @@ func TestFlowBasic(t *testing.T) {
 	u.Id = resp_user.Id
 	if resp_user != *u {
 		t.Fatalf("Model mismatch. Received: %v, but expected: %v", resp_user, u)
+	}
+
+	// Add two videos
+	for i := 0; i < 2; i++ {
+		v := &Video{
+			UserId:       u.Id,
+			Title:        "Sesame Street: We're The A Team -A Song",
+			URL:          fmt.Sprintf("https://www.youtube.com/watch?v=rm_3bfAEpII%v", i),
+			ThumbnailURL: "https://i.ytimg.com/vi/rm_3bfAEpII/hqdefault.jpg",
+		}
+		resp = httptest.NewRecorder()
+		body, _ = json.Marshal(v)
+		req, _ = http.NewRequest("POST", fmt.Sprintf("/api/v1/videos?test_auth0_id=%s", u.Auth0Id), bytes.NewBuffer(body))
+		r.ServeHTTP(resp, req)
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusOK, resp.Code, resp)
+		}
 	}
 
 	// Get gamestate

@@ -92,99 +92,61 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
 
   ClearSessionPin();
 
-  const getGamestate = useCallback(async () => {
-    try {
-      if (token == null || url == null || user == null) {
-        return;
+  useEffect(() => {
+    const getPlayData = async () => {
+      try {
+        if (token == null || url == null || user == null) {
+          return;
+        }
+        var reqParams = {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+          },
+        };
+        var req = await fetch(url + "/play/" + user.id, reqParams);
+        const json = await req.json();
+        setGamestate(json["gamestate"]);
+        setProblem(json["problem"]);
+        setVideo(json["video"]);
+      } catch (e) {
+        console.log(e.message);
       }
-      const reqParams = {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + token,
-        },
-      };
-      const req = await fetch(url + "/gamestates/" + user.id, reqParams);
-      const json = await req.json();
-      setGamestate(json);
-    } catch (e) {
-      console.log(e.message);
-    }
+    };
+
+    getPlayData();
   }, [token, url, user]);
 
-  const getProblem = useCallback(async () => {
-    var json = null;
-    try {
-      if (token == null || url == null || gamestate == null) {
-        return;
+  useEffect(() => {
+    const renderLatex = async () => {
+      try {
+        if (gamestate == null || problem == null) {
+          return;
+        }
+        setLatex(
+          katex.renderToString(PreprocessExpression(problem.expression))
+        );
+      } catch (e) {
+        console.log(e.message);
+        // handle rendering error
+        postEvent("bad_problem_system", gamestate.problem_id).then(() => {
+          window.location.pathname = "play";
+        });
       }
-      const reqParams = {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + token,
-        },
-      };
-      const req = await fetch(
-        url + "/problems/" + gamestate.problem_id,
-        reqParams
-      );
-      json = await req.json();
-      setProblem(json);
-    } catch (e) {
-      console.log(e.message);
-    }
-    try {
-      setLatex(katex.renderToString(PreprocessExpression(json.expression)));
-    } catch (e) {
-      console.log(e.message);
-      // handle rendering error
-      postEvent("bad_problem_system", gamestate.problem_id).then(() => {
-        window.location.pathname = "play";
-      });
-    }
-  }, [token, url, gamestate]);
+    };
 
-  const getVideo = useCallback(async () => {
-    try {
-      if (token == null || url == null || gamestate == null) {
-        return;
-      }
-      const reqParams = {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + token,
-        },
-      };
-      const req = await fetch(url + "/videos/" + gamestate.video_id, reqParams);
-      const json = await req.json();
-      setVideo(json);
-    } catch (e) {
-      console.log(e.message);
-    }
-  }, [token, url, gamestate]);
-
-  useEffect(() => {
-    getGamestate();
-  }, [getGamestate]);
-
-  useEffect(() => {
-    getProblem();
-  }, [getProblem]);
-
-  useEffect(() => {
-    getVideo();
-  }, [getVideo]);
+    renderLatex();
+  }, [gamestate, problem]);
 
   const eventReporter = new EventReporterSingleton(
     async (event_type, value) => {
-      let gamestate = await postEvent(event_type, value);
+      let json = await postEvent(event_type, value);
       if (event_type == "answered_problem") {
-        setGamestate(gamestate);
+        setGamestate(json["gamestate"]);
+        setProblem(json["problem"]);
+        setVideo(json["video"]);
       }
     },
     interval

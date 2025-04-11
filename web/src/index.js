@@ -154,7 +154,7 @@ const AppView = () => {
           },
         };
         var req = await fetch(
-          ApiUrl + "/users/pageload/" + encodeURIComponent(user.sub),
+          ApiUrl + "/pageload/" + encodeURIComponent(user.sub),
           reqParams
         );
         if (req.status === 404) {
@@ -169,7 +169,7 @@ const AppView = () => {
           reqParams.method = "GET";
           reqParams.body = null;
           req = await fetch(
-            ApiUrl + "/users/pageload/" + encodeURIComponent(user.sub),
+            ApiUrl + "/pageload/" + encodeURIComponent(user.sub),
             reqParams
           );
         }
