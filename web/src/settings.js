@@ -4,7 +4,7 @@ import { ProblemTypes } from "./enums.js";
 import { RequirePin } from "./pin.js";
 import "./settings.scss";
 
-const postSettings = async function (token, url, model) {
+const postSettings = async function (token, apiUrl, model) {
   try {
     const reqParams = {
       method: "POST",
@@ -15,7 +15,7 @@ const postSettings = async function (token, url, model) {
       },
       body: JSON.stringify(model),
     };
-    const req = await fetch(url + "/settings/" + model.user_id, reqParams);
+    const req = await fetch(apiUrl + "/settings/" + model.user_id, reqParams);
     const json = await req.json();
     return json;
   } catch (e) {
@@ -25,7 +25,7 @@ const postSettings = async function (token, url, model) {
 
 const ProblemTypesSettingsView = ({
   token,
-  url,
+  apiUrl,
   user,
   settings,
   errCallback,
@@ -50,7 +50,7 @@ const ProblemTypesSettingsView = ({
     if (!newError) {
       // post updated settings
       settings.problem_type_bitmap = newBitmap;
-      postSettings(token, url, settings);
+      postSettings(token, apiUrl, settings);
     }
   };
 
@@ -89,7 +89,12 @@ const ProblemTypesSettingsView = ({
   );
 };
 
-const TargetWorkPercentageSettingsView = ({ token, url, user, settings }) => {
+const TargetWorkPercentageSettingsView = ({
+  token,
+  apiUrl,
+  user,
+  settings,
+}) => {
   const [targetWorkPercentage, setTargetWorkPercentage] = useState(
     settings.target_work_percentage
   );
@@ -102,7 +107,7 @@ const TargetWorkPercentageSettingsView = ({ token, url, user, settings }) => {
 
   const handleSubmit = (e) => {
     // post updated settings
-    postSettings(token, url, settings);
+    postSettings(token, apiUrl, settings);
   };
 
   return (
@@ -122,7 +127,7 @@ const TargetWorkPercentageSettingsView = ({ token, url, user, settings }) => {
   );
 };
 
-const VideosSettingsView = ({ token, url, user, errCallback }) => {
+const VideosSettingsView = ({ token, apiUrl, user, errCallback }) => {
   const [error, setError] = useState(true);
   const [addError, setAddError] = useState(true);
   const [videos, setVideos] = useState(new Map());
@@ -137,7 +142,7 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
   useEffect(() => {
     const getVideos = async () => {
       try {
-        if (token == null || url == null || user == null) {
+        if (token == null || apiUrl == null || user == null) {
           return;
         }
         const reqParams = {
@@ -148,7 +153,7 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
             Authorization: "Bearer " + token,
           },
         };
-        const req = await fetch(url + "/videos", reqParams);
+        const req = await fetch(apiUrl + "/videos", reqParams);
         const json = await req.json();
 
         let newVideos = new Map();
@@ -166,7 +171,7 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
     };
 
     getVideos();
-  }, [token, url, user, errCallback]);
+  }, [token, apiUrl, user, errCallback]);
 
   const fetchYouTubeMetadata = async function (url, okFcn, errFcn) {
     try {
@@ -217,7 +222,7 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
         },
         body: JSON.stringify(video),
       };
-      const req = await fetch(url + "/videos/", reqParams);
+      const req = await fetch(apiUrl + "/videos/", reqParams);
       if (req.ok) {
         const json = await req.json();
         var newVideos = new Map(videos.set(json.url, json));
@@ -258,7 +263,7 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
           Authorization: "Bearer " + token,
         },
       };
-      const req = await fetch(url + "/videos/" + video.id, reqParams);
+      const req = await fetch(apiUrl + "/videos/" + video.id, reqParams);
       if (req.ok) {
         videos.delete(video.url);
         if (video.url === videoUrl) {
@@ -367,7 +372,7 @@ const VideosSettingsView = ({ token, url, user, errCallback }) => {
   );
 };
 
-const SettingsView = ({ token, url, user, settings }) => {
+const SettingsView = ({ token, apiUrl, user, settings }) => {
   if (!RequirePin(user.id)) {
     return <div className="content-loading"></div>;
   }
@@ -377,7 +382,7 @@ const SettingsView = ({ token, url, user, settings }) => {
       <div className="tab-content">
         <ProblemTypesSettingsView
           token={token}
-          url={url}
+          apiUrl={apiUrl}
           user={user}
           settings={settings}
           errCallback={(e) => null}
@@ -387,7 +392,7 @@ const SettingsView = ({ token, url, user, settings }) => {
       <div className="tab-content">
         <TargetWorkPercentageSettingsView
           token={token}
-          url={url}
+          apiUrl={apiUrl}
           user={user}
           settings={settings}
         />
@@ -396,7 +401,7 @@ const SettingsView = ({ token, url, user, settings }) => {
       <div className="tab-content">
         <VideosSettingsView
           token={token}
-          url={url}
+          apiUrl={apiUrl}
           user={user}
           errCallback={(e) => null}
         />
