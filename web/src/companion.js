@@ -61,7 +61,7 @@ class RefresherSingleton {
   }
 }
 
-const CompanionView = ({ token, url, user }) => {
+const CompanionView = ({ token, apiUrl, user }) => {
   const [gamestate, setGamestate] = useState(null);
   const [problem, setProblem] = useState(null);
   const [video, setVideo] = useState(null);
@@ -74,7 +74,7 @@ const CompanionView = ({ token, url, user }) => {
 
   const getGamestate = useCallback(async () => {
     try {
-      if (token == null || url == null || student_id == null) {
+      if (token == null || apiUrl == null || student_id == null) {
         return;
       }
       const reqParams = {
@@ -85,17 +85,17 @@ const CompanionView = ({ token, url, user }) => {
           Authorization: "Bearer " + token,
         },
       };
-      const req = await fetch(url + "/gamestates/" + student_id, reqParams);
+      const req = await fetch(apiUrl + "/gamestates/" + student_id, reqParams);
       const json = await req.json();
       setGamestate(json);
     } catch (e) {
       console.log(e.message);
     }
-  }, [token, url, student_id]);
+  }, [token, apiUrl, student_id]);
 
   const getProblem = useCallback(async () => {
     try {
-      if (token == null || url == null || gamestate == null) {
+      if (token == null || apiUrl == null || gamestate == null) {
         return;
       }
       const reqParams = {
@@ -107,7 +107,7 @@ const CompanionView = ({ token, url, user }) => {
         },
       };
       const req = await fetch(
-        url + "/problems/" + gamestate.problem_id,
+        apiUrl + "/problems/" + gamestate.problem_id,
         reqParams
       );
       const json = await req.json();
@@ -117,11 +117,11 @@ const CompanionView = ({ token, url, user }) => {
     } catch (e) {
       console.log(e.message);
     }
-  }, [token, url, gamestate]);
+  }, [token, apiUrl, gamestate]);
 
   const getVideo = useCallback(async () => {
     try {
-      if (token == null || url == null || gamestate == null) {
+      if (token == null || apiUrl == null || gamestate == null) {
         return;
       }
       const reqParams = {
@@ -132,19 +132,22 @@ const CompanionView = ({ token, url, user }) => {
           Authorization: "Bearer " + token,
         },
       };
-      const req = await fetch(url + "/videos/" + gamestate.video_id, reqParams);
+      const req = await fetch(
+        apiUrl + "/videos/" + gamestate.video_id,
+        reqParams
+      );
       const json = await req.json();
       setVideo(json);
     } catch (e) {
       console.log(e.message);
     }
-  }, [token, url, gamestate]);
+  }, [token, apiUrl, gamestate]);
 
   const getEvents = useCallback(async () => {
     try {
       if (
         token == null ||
-        url == null ||
+        apiUrl == null ||
         student_id == null ||
         gamestate == null
       ) {
@@ -159,7 +162,7 @@ const CompanionView = ({ token, url, user }) => {
         },
       };
       const req = await fetch(
-        url + "/events/" + student_id + "/" + 3000,
+        apiUrl + "/events/" + student_id + "/" + 3000,
         reqParams
       );
       const json = await req.json();
@@ -187,7 +190,7 @@ const CompanionView = ({ token, url, user }) => {
     } catch (e) {
       console.log(e.message);
     }
-  }, [token, url, student_id, gamestate]);
+  }, [token, apiUrl, student_id, gamestate]);
 
   useEffect(() => {
     getGamestate();

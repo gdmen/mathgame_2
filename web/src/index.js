@@ -30,7 +30,7 @@ const NotFound = () => {
 
 const MainView = ({
   token,
-  url,
+  apiUrl,
   isLoading,
   isAuthenticated,
   user,
@@ -42,7 +42,12 @@ const MainView = ({
     return <div className="content-loading"></div>;
   } else if (settings != null && (user.pin === "" || numEnabledVideos < 3)) {
     return (
-      <SetupView token={token} url={url} user={user} settings={settings} />
+      <SetupView
+        token={token}
+        apiUrl={apiUrl}
+        user={user}
+        settings={settings}
+      />
     );
   } else {
     // TODO: in the following switch, if not auth'd, redirect to landing page
@@ -64,7 +69,7 @@ const MainView = ({
             {!isLoading && isAuthenticated && (
               <PlayView
                 token={token}
-                url={url}
+                apiUrl={apiUrl}
                 user={user}
                 postEvent={postEvent}
                 interval={conf.event_reporting_interval}
@@ -75,7 +80,7 @@ const MainView = ({
             {!isLoading && isAuthenticated && (
               <SettingsView
                 token={token}
-                url={url}
+                apiUrl={apiUrl}
                 user={user}
                 settings={settings}
               />
@@ -83,7 +88,7 @@ const MainView = ({
           </Route>
           <Route exact path="/companion/:student_id">
             {!isLoading && isAuthenticated && (
-              <CompanionView token={token} url={url} user={user} />
+              <CompanionView token={token} apiUrl={apiUrl} user={user} />
             )}
           </Route>
           <Route path="*" component={NotFound} />
@@ -210,7 +215,7 @@ const AppView = () => {
       <div id="content">
         <MainView
           token={token}
-          url={ApiUrl}
+          apiUrl={ApiUrl}
           isLoading={isLoading}
           isAuthenticated={isAuthenticated}
           user={appUser}

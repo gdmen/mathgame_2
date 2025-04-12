@@ -84,7 +84,7 @@ class EventReporterSingleton {
   }
 }
 
-const PlayView = ({ token, url, user, postEvent, interval }) => {
+const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
   const [gamestate, setGamestate] = useState(null);
   const [problem, setProblem] = useState(null);
   const [latex, setLatex] = useState(null);
@@ -95,7 +95,7 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
   useEffect(() => {
     const getPlayData = async () => {
       try {
-        if (token == null || url == null || user == null) {
+        if (token == null || apiUrl == null || user == null) {
           return;
         }
         var reqParams = {
@@ -106,7 +106,7 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
             Authorization: "Bearer " + token,
           },
         };
-        var req = await fetch(url + "/play/" + user.id, reqParams);
+        var req = await fetch(apiUrl + "/play/" + user.id, reqParams);
         const json = await req.json();
         setGamestate(json["gamestate"]);
         setProblem(json["problem"]);
@@ -117,7 +117,7 @@ const PlayView = ({ token, url, user, postEvent, interval }) => {
     };
 
     getPlayData();
-  }, [token, url, user]);
+  }, [token, apiUrl, user]);
 
   useEffect(() => {
     const renderLatex = async () => {

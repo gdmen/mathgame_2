@@ -5,7 +5,13 @@ import { GetSessionPin, PinView } from "./pin.js";
 import "./settings.scss";
 import "./setup.scss";
 
-const ProblemTypesTabView = ({ token, url, user, settings, advanceSetup }) => {
+const ProblemTypesTabView = ({
+  token,
+  apiUrl,
+  user,
+  settings,
+  advanceSetup,
+}) => {
   const [error, setError] = useState(false);
 
   const errCallback = (e) => {
@@ -22,7 +28,7 @@ const ProblemTypesTabView = ({ token, url, user, settings, advanceSetup }) => {
       <h2>Hi there! Let's do a little setup for your child!</h2>
       <ProblemTypesSettingsView
         token={token}
-        url={url}
+        apiUrl={apiUrl}
         user={user}
         settings={settings}
         errCallback={errCallback}
@@ -37,7 +43,7 @@ const ProblemTypesTabView = ({ token, url, user, settings, advanceSetup }) => {
   );
 };
 
-const VideosTabView = ({ token, url, user, advanceSetup }) => {
+const VideosTabView = ({ token, apiUrl, user, advanceSetup }) => {
   const [error, setError] = useState(true);
 
   const errCallback = (e) => {
@@ -53,7 +59,7 @@ const VideosTabView = ({ token, url, user, advanceSetup }) => {
     <>
       <VideosSettingsView
         token={token}
-        url={url}
+        apiUrl={apiUrl}
         user={user}
         errCallback={errCallback}
       />
@@ -67,7 +73,7 @@ const VideosTabView = ({ token, url, user, advanceSetup }) => {
   );
 };
 
-const PinTabView = ({ token, url, user, advanceSetup }) => {
+const PinTabView = ({ token, apiUrl, user, advanceSetup }) => {
   const [error, setError] = useState(true);
 
   const errCallback = (e) => {
@@ -86,7 +92,7 @@ const PinTabView = ({ token, url, user, advanceSetup }) => {
         body: JSON.stringify(user),
       };
       const req = await fetch(
-        url + "/users/" + encodeURIComponent(user.auth0_id),
+        apiUrl + "/users/" + encodeURIComponent(user.auth0_id),
         reqParams
       );
       const json = await req.json();
@@ -144,7 +150,7 @@ const StartPlayingTabView = () => {
   );
 };
 
-const SetupView = ({ token, url, user, settings }) => {
+const SetupView = ({ token, apiUrl, user, settings }) => {
   const [activeTab, setActiveTab] = useState(null);
 
   const allTabs = [
@@ -193,7 +199,7 @@ const SetupView = ({ token, url, user, settings }) => {
         <div className="tab-content">
           <ProblemTypesTabView
             token={token}
-            url={url}
+            apiUrl={apiUrl}
             user={user}
             settings={settings}
             advanceSetup={advanceSetup}
@@ -204,7 +210,7 @@ const SetupView = ({ token, url, user, settings }) => {
         <div className="tab-content">
           <VideosTabView
             token={token}
-            url={url}
+            apiUrl={apiUrl}
             user={user}
             advanceSetup={advanceSetup}
           />
@@ -214,7 +220,7 @@ const SetupView = ({ token, url, user, settings }) => {
         <div className="tab-content">
           <PinTabView
             token={token}
-            url={url}
+            apiUrl={apiUrl}
             user={user}
             advanceSetup={advanceSetup}
           />
