@@ -48,7 +48,29 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32, exclu
 	return videoId, nil
 }
 
-// also select a video if setup is done and no video is selected
+func (a *Api) selectVideoIfNull(logPrefix string, c *gin.Context, gamestate *Gamestate, writeCtx bool) error {
+	var status int
+	var msg string
+	var err error
+	// Select a video if setup is done and no video is already selected
+	if gamestate.VideoId == nullVideoId {
+		videoId, err := a.selectVideo(logPrefix, c, gamestate.UserId, map[uint32]bool{})
+		if err != nil {
+			return err
+		}
+		gamestate.VideoId = videoId
+		status, msg, err = a.gamestateManager.Update(gamestate)
+	}
+	handleFcn := HandleMngrResp
+	if writeCtx {
+		handleFcn = HandleMngrRespWriteCtx
+	}
+	if handleFcn(logPrefix, c, status, msg, err, gamestate) != nil {
+		return err
+	}
+	return nil
+}
+
 func (a *Api) customGetGamestate(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
@@ -65,18 +87,7 @@ func (a *Api) customGetGamestate(c *gin.Context) {
 		return
 	}
 
-	// Select a video if setup is done and no video is already selected
-	if model.VideoId == nullVideoId {
-		videoId, err := a.selectVideo(logPrefix, c, model.UserId, map[uint32]bool{})
-		if HandleMngrResp(logPrefix, c, status, msg, err, model) != nil {
-			return
-		}
-		model.VideoId = videoId
-		status, msg, err = a.gamestateManager.Update(model)
-	}
-	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
-		return
-	}
+	a.selectVideoIfNull(logPrefix, c, model, true)
 }
 
 // also generate settings change events
@@ -195,6 +206,11 @@ func (a *Api) helpGetPlayData(logPrefix string, c *gin.Context, gamestate *Games
 	// Get Problem
 	problem, status, msg, err := a.problemManager.Get(gamestate.ProblemId)
 	if HandleMngrResp(logPrefix, c, status, msg, err, problem) != nil {
+		return
+	}
+
+	err = a.selectVideoIfNull(logPrefix, c, gamestate, false)
+	if err != nil {
 		return
 	}
 
