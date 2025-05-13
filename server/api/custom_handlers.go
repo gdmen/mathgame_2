@@ -342,6 +342,10 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 	} else {
 		user.Auth0Id = GetAuth0IdFromContext(c)
 	}
+	a.saveUser(logPrefix, c, user)
+}
+
+func (a *Api) saveUser(logPrefix string, c *gin.Context, user *User) {
 	// Write user to database
 	status, msg, err := a.userManager.Create(user)
 	if status != http.StatusCreated {
