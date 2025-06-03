@@ -35,8 +35,9 @@ or this example:
   "explanation": "\\text{The distance traveled is calculated by multiplying the speed by the time: }60\\text{ miles/hour }* 2\\text{ hours }= 120\\text{ miles.}",
   "difficulty": 15
 }
-where "question" is the math question in LaTeX math mode e.g. it might use \\text{} tags as shown, "answer" is the correct answer with no other text, "explanation" is the explanation for the correct answer in LaTeX math mode e.g. it might use \\text{} tags as shown, "features" are the allowed features that were actually used in this problem, and "difficulty" is an age in years - this problem should be the appropriate difficulty for people of that age.
-The "answer" should NOT be in LaTeX format. It should be purely numeric, possibly including mathematical symbols like / and -.
+where "question" is the math question in LaTeX math mode e.g. it might use \\text{} tags as shown, "answer" is the correct answer with no other text, "explanation" is the explanation for the correct answer in LaTeX math mode e.g. it might use \\text{} tags as shown, "features" are the allowed features that were actually used in this problem, and "difficulty" is an age in years - this problem should be the appropriate difficulty for people of that age. If NOT a word problem, do not use any LaTeX. For example, fractions should be returned as e.g. 1/2 in this case. If it IS a word problem, fractions can be returned as e.g. \frac{1}{2}.
+Return the answers to fractional expressions as fractions, not decimals.
+The "answer" should NEVER be in LaTeX format. It should be purely numeric, possibly including mathematical symbols like / and -.
 Return these problems as a valid JSON list with no additional text.
 Do not wrap the JSON in markdown or any other JSON markers.
 `
@@ -98,7 +99,8 @@ func GenerateProblem(opts *Options) ([]Problem, error) {
 		return []Problem{}, err
 	}
 	// Make sure word problems are labeled as such
-	for _, p := range problems {
+	for i := range problems {
+		p := &problems[i]
 		if !slices.Contains(p.Features, "word") && strings.ContainsAny(p.Expression, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") {
 			p.Features = append(p.Features, "word")
 		}

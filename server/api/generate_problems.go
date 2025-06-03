@@ -18,7 +18,7 @@ import (
 
 const (
 	// difficulty comparison epsilon as a multiple
-	problemSelectionEpsilon = 0.1
+	problemSelectionEpsilon = 0.3
 	// minimum number of problems we want to select from
 	minSelectionPool = 100
 )

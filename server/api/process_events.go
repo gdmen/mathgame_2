@@ -235,7 +235,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	// Select a new problem
 	if select_new_problem {
 		// Get the most recent problem ids
-		sql := fmt.Sprintf("user_id=%d AND event_type='selected_problem' LIMIT 20;", user.Id)
+		sql := fmt.Sprintf("user_id=%d AND event_type='%s' ORDER BY timestamp DESC LIMIT 20;", user.Id, SELECTED_PROBLEM)
 		glog.Infof("recent problem ids sql: select * from events where %s\n", sql)
 		prevProblems, _, msg, err := a.eventManager.CustomList(sql)
 		if err != nil {
