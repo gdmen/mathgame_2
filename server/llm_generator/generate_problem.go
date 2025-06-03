@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
+	"strings"
 
 	"github.com/golang/glog"
 	openai "github.com/sashabaranov/go-openai"
@@ -14,6 +16,7 @@ import (
 )
 
 const (
+	VERSION         = "llm_0.1"
 	OPENAI_URL      = "https://api.openai.com/v1/completions"
 	PROMPT_QUESTION = `
 Generate math questions in the format of this example:
@@ -33,6 +36,7 @@ or this example:
   "difficulty": 15
 }
 where "question" is the math question in LaTeX math mode e.g. it might use \\text{} tags as shown, "answer" is the correct answer with no other text, "explanation" is the explanation for the correct answer in LaTeX math mode e.g. it might use \\text{} tags as shown, "features" are the allowed features that were actually used in this problem, and "difficulty" is an age in years - this problem should be the appropriate difficulty for people of that age.
+The "answer" should NOT be in LaTeX format. It should be purely numeric, possibly including mathematical symbols like / and -.
 Return these problems as a valid JSON list with no additional text.
 Do not wrap the JSON in markdown or any other JSON markers.
 `
@@ -56,6 +60,7 @@ func GenerateProblem(opts *Options) ([]Problem, error) {
 
 	// Request question(s)
 	var ptype string
+	ptype = "problems that are NOT word-"
 	for _, x := range opts.Features {
 		if x == "word" {
 			ptype = "word-"
@@ -71,7 +76,6 @@ func GenerateProblem(opts *Options) ([]Problem, error) {
 	resp, err := client.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
-			//Model: openai.GPT3Dot5TurboInstruct,
 			Model: openai.GPT4oMini,
 			Messages: []openai.ChatCompletionMessage{
 				{
@@ -92,6 +96,12 @@ func GenerateProblem(opts *Options) ([]Problem, error) {
 	if err != nil {
 		glog.Errorf("OpenAI content error: %v | %s\n", err, resp.Choices[0].Message.Content)
 		return []Problem{}, err
+	}
+	// Make sure word problems are labeled as such
+	for _, p := range problems {
+		if !slices.Contains(p.Features, "word") && strings.ContainsAny(p.Expression, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") {
+			p.Features = append(p.Features, "word")
+		}
 	}
 	return problems, nil
 }
