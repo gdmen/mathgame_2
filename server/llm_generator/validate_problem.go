@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/golang/glog"
 	openai "github.com/sashabaranov/go-openai"
@@ -17,6 +18,12 @@ const (
 )
 
 func ValidateProblem(p *Problem) error {
+	if strings.ContainsAny(p.Answer, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") {
+		msg := fmt.Sprintf("Answer contained text: %v\n", p)
+		glog.Info(msg)
+		return errors.New(msg)
+	}
+
 	c, err := common.ReadConfig("conf.json")
 	if err != nil {
 		glog.Fatal(err)
@@ -46,7 +53,7 @@ func ValidateProblem(p *Problem) error {
 	content := resp.Choices[0].Message.Content
 	if content != p.Answer {
 		msg := fmt.Sprintf("MISMATCH with OpenAI GPT4o validation: %s", content)
-		glog.Infof("%s", msg)
+		glog.Info(msg)
 		return errors.New(msg)
 	}
 	return nil

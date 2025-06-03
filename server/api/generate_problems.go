@@ -206,7 +206,7 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 
 			// Convert to an api.Problem
 			model = &Problem{}
-			model.Generator = "llm_0.0"
+			model.Generator = llm_generator.VERSION
 			model.ProblemTypeBitmap = uint64(FeaturesToProblemType(p.Features))
 			model.Expression = strings.TrimSpace(p.Expression)
 			model.Answer = p.Answer
