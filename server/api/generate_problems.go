@@ -87,7 +87,7 @@ func (a *Api) generateProblem(logPrefix string, c *gin.Context, settings *Settin
 	var err error
 	var p *Problem
 	for i := 0; i < retries; i++ {
-		p, err = a.generateProblems(logPrefix, c, settings, 1)
+		p, err = a.generateProblems(logPrefix, c, settings, 5)
 		if p != nil {
 			return p, nil
 		}
@@ -113,6 +113,7 @@ func (a *Api) generateProblemsBackground(logPrefix string, c *gin.Context, setti
 
 func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Settings, numProblems int) (*Problem, error) {
 	var model *Problem
+	var newProblem *Problem
 	if settings.ProblemTypeBitmap == 0 {
 		return nil, errors.New("settings.ProblemTypeBitmap is empty. Cannot generate problems.")
 	}
@@ -182,6 +183,7 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 				continue
 			}
 			newCount += 1
+			newProblem = model
 		}
 	} else {
 
@@ -244,14 +246,15 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 				continue
 			}
 			newCount += 1
+			newProblem = model
 		}
 	}
 
 	glog.Infof("%s generator numProblems requested: %d vs unique problems generated: %d and new problems generated: %d", logPrefix, numProblems, len(uniqueIds), newCount)
 
 	// Just return the last problem added
-	if model == nil {
+	if newProblem == nil {
 		return nil, errors.New("Failed to produce any valid new problem.")
 	}
-	return model, nil
+	return newProblem, nil
 }

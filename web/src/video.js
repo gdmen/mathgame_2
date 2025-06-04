@@ -31,6 +31,11 @@ const VideoView = ({ video, eventReporter, interval }) => {
     }
   };
 
+  // Remove the playlist parameter from the video url
+  var u = new URL(video.url);
+  u.searchParams.delete("list");
+  video.url = u.toString();
+
   return (
     <div id="video-container">
       <div id="video">
