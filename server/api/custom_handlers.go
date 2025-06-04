@@ -378,8 +378,10 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 		// Select a new problem
 		problem, err := a.selectProblem(logPrefix, c, settings, &([]uint32{0}))
 		if err != nil {
+			glog.Errorf("%s Error: %v", logPrefix, err)
 			return
 		}
+		glog.Infof("%s Problem: %v", logPrefix, problem)
 
 		// Write default new gamestate to database
 		default_gamestate := &Gamestate{
@@ -391,6 +393,7 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 		}
 		status, msg, err = a.gamestateManager.Create(default_gamestate)
 		if HandleMngrResp(logPrefix, c, status, msg, err, default_gamestate) != nil {
+			glog.Errorf("%s Error: %v", logPrefix, err)
 			return
 		}
 
@@ -422,6 +425,7 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 			Value:     strconv.FormatUint(uint64(problem.Id), 10),
 		})
 		if a.processEvents(logPrefix, c, events, false) != nil {
+			glog.Errorf("%s Error: %v", logPrefix, err)
 			return
 		}
 

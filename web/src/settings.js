@@ -197,6 +197,11 @@ const VideosSettingsView = ({ token, apiUrl, user, errCallback }) => {
 
   const handleAddVideoChange = (e) => {
     let url = e.target.value;
+    // Remove the playlist parameter from the video url
+    var u = new URL(url);
+    u.searchParams.delete("list");
+    url = u.toString();
+
     setVideoUrl(url);
     setVideoTitle(null);
     setVideoThumbnail(null);
