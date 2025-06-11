@@ -45,6 +45,13 @@ func (a *Api) processEvents(logPrefix string, c *gin.Context, events []*Event, w
 	return nil
 }
 
+func (a *Api) checkAnswer(logPrefix string, input string, correct string) bool {
+
+	msg := fmt.Sprintf("Incorrect answer: {%s}, expected: {%s}", input, correct)
+	glog.Infof("%s %s", logPrefix, msg)
+	return false
+}
+
 func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, writeCtx bool, user *User, gamestate *Gamestate, settings *Settings) error {
 
 	changed_gamestate := false
@@ -95,10 +102,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		if HandleMngrResp(logPrefix, c, status, msg, err, problem) != nil {
 			return err
 		}
-		if event.Value != problem.Answer {
-			msg := fmt.Sprintf("Incorrect answer: {%s}, expected: {%s}", event.Value, problem.Answer)
-			glog.Infof("%s %s", logPrefix, msg)
-		} else { // Answer was correct
+		if a.checkAnswer(event.Value, problem.Answer) {
 			events = append(events, &Event{
 				EventType: SOLVED_PROBLEM,
 				Value:     strconv.FormatUint(uint64(gamestate.ProblemId), 10),
