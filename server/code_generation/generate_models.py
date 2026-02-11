@@ -67,145 +67,115 @@ import (
     s += ''')
 '''
 
+    # Named template vars for readability
+    model_name = m["name"].capitalize()
+    table = m["table"]
+    table_def = ",\n\t".join(["%s %s" % (camel_to_snake(f["name"]), f["sql"]) for f in m["fields"]])
+    create_fields = ", ".join(create_sql_fields)
+    create_placeholders = ", ".join(["?"] * len(create_sql_fields))
+    key_snake = camel_to_snake(key_name)
+    user_id_cond = " AND user_id=?" if has_additional_user_fk else ""
+    get_key_cols = ", ".join(auto_incr_sql_fields)
+    get_key_table = m["name"]
+    get_key_where = " AND ".join([f + "=?" for f in create_sql_fields])
+    list_user_cond = " WHERE user_id=?" if has_user_fk else ""
+    update_set = ", ".join([f + "=?" for f in non_key_sql_fields])
+
     # const start
     s += "const ("
 
     # create table SQL
-    s += '''
-    Create{0}TableSQL = `
-    CREATE TABLE {1} (
-        {2}
+    s += f'''
+    Create{model_name}TableSQL = `
+    CREATE TABLE {table} (
+        {table_def}
     ) DEFAULT CHARSET=utf8mb4 ;`
-'''.format(
-        m["name"].capitalize(),
-        m["table"],
-        ",\n\t".join(["%s %s" % (camel_to_snake(f["name"]), f["sql"]) for f in m["fields"]])
-    )
+'''
 
     # create SQL
-    s += '''
-    create{0}SQL = `INSERT INTO {1} ({2}) VALUES ({3});`
-'''.format(
-        m["name"].capitalize(),
-        m["table"],
-        ", ".join(create_sql_fields),
-        ", ".join(["?"]*len(create_sql_fields))
-    )
+    s += f'''
+    create{model_name}SQL = `INSERT INTO {table} ({create_fields}) VALUES ({create_placeholders});`
+'''
 
     # get SQL
-    s += '''
-    get{0}SQL = `SELECT * FROM {1} WHERE {2}=?{3};`
-'''.format(
-        m["name"].capitalize(),
-        m["table"],
-        camel_to_snake(key_name),
-        " AND user_id=?" if has_additional_user_fk else ""
-    )
+    s += f'''
+    get{model_name}SQL = `SELECT * FROM {table} WHERE {key_snake}=?{user_id_cond};`
+'''
 
     # get key SQL
-    s += '''
-    get{0}KeySQL = `SELECT {1} FROM {2}s WHERE {3};`
-'''.format(
-        m["name"].capitalize(),
-        ", ".join(auto_incr_sql_fields),
-        m["name"],
-        " AND ".join([f+"=?" for f in create_sql_fields]),
-    )
+    s += f'''
+    get{model_name}KeySQL = `SELECT {get_key_cols} FROM {get_key_table}s WHERE {get_key_where};`
+'''
 
     # list SQL
-    s += '''
-    list{0}SQL = `SELECT * FROM {1}{2};`
-'''.format(
-        m["name"].capitalize(),
-        m["table"],
-        " WHERE user_id=?" if has_user_fk else ""
-    )
+    s += f'''
+    list{model_name}SQL = `SELECT * FROM {table}{list_user_cond};`
+'''
 
     # update SQL
-    s += '''
-    update{0}SQL = `UPDATE {1} SET {2} WHERE {3}=?{4};`
-'''.format(
-        m["name"].capitalize(),
-        m["table"],
-        ", ".join([f+"=?" for f in non_key_sql_fields]),
-        camel_to_snake(key_name),
-        " AND user_id=?" if has_additional_user_fk else ""
-    )
+    s += f'''
+    update{model_name}SQL = `UPDATE {table} SET {update_set} WHERE {key_snake}=?{user_id_cond};`
+'''
 
     # delete SQL
-    s += '''
-    delete{0}SQL = `DELETE FROM {1} WHERE {2}=?{3};`
-'''.format(
-        m["name"].capitalize(),
-        m["table"],
-        camel_to_snake(key_name),
-        " AND user_id=?" if has_additional_user_fk else ""
-    )
+    s += f'''
+    delete{model_name}SQL = `DELETE FROM {table} WHERE {key_snake}=?{user_id_cond};`
+'''
 
     # const end
     s += ")\n"
 
     # model struct
-    s += "type {0} struct {{".format(m["name"].capitalize())
+    s += f"type {model_name} struct {{"
     for f in m["fields"]:
-        fstr = '\n{0} {1} `json:"{2}" uri:"{2}"'
-        if f["name"] != key_name:
-            fstr += ' form:"{2}"'
-        fstr += "`"
-        s += fstr.format(f["name"], f["type"], camel_to_snake(f["name"]))
+        field_name = f["name"]
+        field_type = f["type"]
+        field_json = camel_to_snake(f["name"])
+        form_tag = f' form:"{field_json}"' if f["name"] != key_name else ""
+        s += f'\n{field_name} {field_type} `json:"{field_json}" uri:"{field_json}"{form_tag}`'
     s += "\n}"
 
     # model.String()
-    s += '''
-    func (model {0}) String() string {{
-        return fmt.Sprintf("{1}", {2})
+    fmt_args = ", ".join([n + ": %v" for n in struct_fields])
+    fmt_vals = ", ".join(["model." + n for n in struct_fields])
+    s += f'''
+    func (model {model_name}) String() string {{
+        return fmt.Sprintf("{fmt_args}", {fmt_vals})
     }}
-'''.format(
-        m["name"].capitalize(),
-        ", ".join([n + ": %v" for n in struct_fields]),
-        ", ".join(["model." + n for n in struct_fields])
-    )
+'''
 
     # manager struct
-    s += '''
-    type {0}Manager struct {{
+    s += f'''
+    type {model_name}Manager struct {{
         DB *sql.DB
     }}
-'''.format(
-        m["name"].capitalize()
-    )
+'''
 
     # manager.Create()
-    s += '''
-    func (m *{0}Manager) Create(model *{0}) (int, string, error) {{
+    create_exec_result = "result" if key_name in auto_incr_struct_fields else "_"
+    create_args = ", ".join(["model." + n for n in create_struct_fields])
+    entity_name = m["name"]
+    s += f'''
+    func (m *{model_name}Manager) Create(model *{model_name}) (int, string, error) {{
         status := http.StatusCreated
-        {1}, err := m.DB.Exec(create{0}SQL, {2})
+        {create_exec_result}, err := m.DB.Exec(create{model_name}SQL, {create_args})
         if err != nil {{
             if !strings.Contains(err.Error(), "Duplicate entry") {{
-                msg := "Couldn't add {3} to database"
+                msg := "Couldn't add {entity_name} to database"
                 return http.StatusInternalServerError, msg, err
             }}
-'''.format(
-        m["name"].capitalize(),
-        "result" if key_name in auto_incr_struct_fields else "_",
-        ", ".join(["model." + n for n in create_struct_fields]),
-        m["name"]
-    )
+'''
 
     if auto_incr_struct_fields:
-        s += '''
+        get_key_scan_args = ", ".join(["&model." + n for n in auto_incr_struct_fields])
+        s += f'''
             // Update model with the configured return field.
-            err = m.DB.QueryRow(get{0}KeySQL, {1}).Scan({2})
+            err = m.DB.QueryRow(get{model_name}KeySQL, {create_args}).Scan({get_key_scan_args})
             if err != nil {{
-                msg := "Couldn't add {3} to database"
+                msg := "Couldn't add {entity_name} to database"
                 return http.StatusInternalServerError, msg, err
             }}
-'''.format(
-        m["name"].capitalize(),
-        ", ".join(["model." + n for n in create_struct_fields]),
-        ", ".join(["&model." + n for n in auto_incr_struct_fields]),
-        m["name"]
-    )
+'''
 
     s += '''
             return http.StatusOK, "", nil
@@ -213,18 +183,14 @@ import (
     '''
 
     if key_name in auto_incr_struct_fields:
-        s += '''
+        s += f'''
         last_id, err := result.LastInsertId()
         if err != nil {{
-            msg := "Couldn't add {0} to database"
+            msg := "Couldn't add {entity_name} to database"
             return http.StatusInternalServerError, msg, err
         }}
-        model.{1} = {2}(last_id)
-'''.format(
-        m["name"],
-        key_name,
-        key_type
-    )
+        model.{key_name} = {key_type}(last_id)
+'''
 
     s += '''
         return status, "", nil
@@ -232,39 +198,35 @@ import (
 '''
 
     # manager.Get()
-    s += '''
-    func (m *{0}Manager) Get({1} {2}{5}) (*{0}, int, string, error) {{
-        model := &{0}{{}}
-        err := m.DB.QueryRow(get{0}SQL, {1}{6}).Scan({3})
+    get_scan_args = ", ".join(["&model." + n for n in struct_fields])
+    get_user_param = ", user_id uint32" if has_additional_user_fk else ""
+    get_user_arg = ", user_id" if has_additional_user_fk else ""
+    s += f'''
+    func (m *{model_name}Manager) Get({key_snake} {key_type}{get_user_param}) (*{model_name}, int, string, error) {{
+        model := &{model_name}{{}}
+        err := m.DB.QueryRow(get{model_name}SQL, {key_snake}{get_user_arg}).Scan({get_scan_args})
         if err == sql.ErrNoRows {{
-            msg := "Couldn't find a {4} with that {1}"
+            msg := "Couldn't find a {entity_name} with that {key_snake}"
             return nil, http.StatusNotFound, msg, err
         }} else if err != nil {{
-            msg := "Couldn't get {4} from database"
+            msg := "Couldn't get {entity_name} from database"
             return nil, http.StatusInternalServerError, msg, err
         }}
 	    return model, http.StatusOK, "", nil
     }}
-'''.format(
-        m["name"].capitalize(),
-        camel_to_snake(key_name),
-        key_type,
-        ", ".join(["&model." + n for n in struct_fields]),
-        m["name"],
-        ", user_id uint32" if has_additional_user_fk else "",
-        ", user_id" if has_additional_user_fk else ""
-    )
+'''
 
     # manager.List() and manager.CustomList(sql)
-    list_code = '''
+    list_scan_args = ", ".join(["&model." + n for n in struct_fields])
+    list_code = f'''
         defer rows.Close()
         if err != nil {{
-            msg := "Couldn't get {1} from database"
+            msg := "Couldn't get {table} from database"
             return nil, http.StatusInternalServerError, msg, err
         }}
         for rows.Next() {{
-            model := {0}{{}}
-            err = rows.Scan({2})
+            model := {model_name}{{}}
+            err = rows.Scan({list_scan_args})
             if err != nil {{
                 msg := "Couldn't scan row from database"
                 return nil, http.StatusInternalServerError, msg, err
@@ -278,27 +240,24 @@ import (
         }}
         return &models, http.StatusOK, "", nil
     }}
-'''.format(
-        m["name"].capitalize(),
-        m["table"],
-        ", ".join(["&model." + n for n in struct_fields])
-    )
+'''
 
     # manager.CustomIdList(sql)
-    list_id_code = '''
+    id_var = key_snake
+    list_id_code = f'''
         defer rows.Close()
         if err != nil {{
-            msg := "Couldn't get {1} from database"
+            msg := "Couldn't get {table} from database"
             return nil, http.StatusInternalServerError, msg, err
         }}
         for rows.Next() {{
-            var {2} {3}
-            err = rows.Scan(&{2})
+            var {id_var} {key_type}
+            err = rows.Scan(&{id_var})
             if err != nil {{
                 msg := "Couldn't scan row from database"
                 return nil, http.StatusInternalServerError, msg, err
             }}
-            ids = append(ids, {2})
+            ids = append(ids, {id_var})
         }}
         err = rows.Err()
         if err != nil {{
@@ -307,95 +266,77 @@ import (
         }}
         return &ids, http.StatusOK, "", nil
     }}
-'''.format(
-        m["name"].capitalize(),
-        m["table"],
-        camel_to_snake(key_name),
-        key_type
-    )
+'''
 
     # manager.List()
-    s += '''
-    func (m *{0}Manager) List({1}) (*[]{0}, int, string, error) {{
-        models := []{0}{{}}
-        rows, err := m.DB.Query(list{0}SQL{2})
-'''.format(
-        m["name"].capitalize(),
-        "user_id uint32" if has_user_fk else "",
-        ", user_id" if has_user_fk else ""
-    )
+    list_param = "user_id uint32" if has_user_fk else ""
+    list_arg = ", user_id" if has_user_fk else ""
+    s += f'''
+    func (m *{model_name}Manager) List({list_param}) (*[]{model_name}, int, string, error) {{
+        models := []{model_name}{{}}
+        rows, err := m.DB.Query(list{model_name}SQL{list_arg})
+'''
     s += list_code
 
     # manager.CustomList()
-    s += '''
-    func (m *{0}Manager) CustomList(sql string) (*[]{0}, int, string, error) {{
-        models := []{0}{{}}
-        sql = "SELECT * FROM {1} WHERE " + sql
+    s += f'''
+    func (m *{model_name}Manager) CustomList(sql string) (*[]{model_name}, int, string, error) {{
+        models := []{model_name}{{}}
+        sql = "SELECT * FROM {table} WHERE " + sql
         rows, err := m.DB.Query(sql)
-'''.format(
-        m["name"].capitalize(),
-        m["table"]
-    )
+'''
     s += list_code
 
     # manager.CustomIdList()
-    s += '''
-    func (m *{0}Manager) CustomIdList(sql string) (*[]{2}, int, string, error) {{
-        ids := []{2}{{}}
-        sql = "SELECT {1} FROM {3} WHERE " + sql
+    s += f'''
+    func (m *{model_name}Manager) CustomIdList(sql string) (*[]{key_type}, int, string, error) {{
+        ids := []{key_type}{{}}
+        sql = "SELECT {key_snake} FROM {table} WHERE " + sql
         rows, err := m.DB.Query(sql)
-'''.format(
-        m["name"].capitalize(),
-        camel_to_snake(key_name),
-        key_type,
-        m["table"]
-    )
+'''
     s += list_id_code
 
     # manager.CustomSql()
-    s += '''
-    func (m *{0}Manager) CustomSql(sql string) (int, string, error) {{
+    s += f'''
+    func (m *{model_name}Manager) CustomSql(sql string) (int, string, error) {{
         _, err := m.DB.Query(sql)
         if err != nil {{
-			msg := "Couldn't run sql for {0} in database"
+			msg := "Couldn't run sql for {model_name} in database"
 			return http.StatusBadRequest, msg, err
         }}
         return http.StatusOK, "", nil
     }}
-'''.format(
-        m["name"].capitalize())
+'''
 
     # manager.Update()
-    s += '''
-    func (m *{0}Manager) Update(model *{0}{4}) (int, string, error) {{
+    update_args = ", ".join(["model." + n for n in non_key_struct_fields + [key_name]])
+    update_user_param = ", user_id uint32" if has_additional_user_fk else ""
+    update_user_arg = ", user_id" if has_additional_user_fk else ""
+    s += f'''
+    func (m *{model_name}Manager) Update(model *{model_name}{update_user_param}) (int, string, error) {{
         // Check for 404s
-        _, status, msg, err := m.Get(model.{1}{5})
+        _, status, msg, err := m.Get(model.{key_name}{update_user_arg})
         if err != nil {{
             return status, msg, err
         }}
         // Update
-        _, err = m.DB.Exec(update{0}SQL, {2}{5})
+        _, err = m.DB.Exec(update{model_name}SQL, {update_args}{update_user_arg})
         if err != nil {{
-			msg := "Couldn't update {3} in database"
+			msg := "Couldn't update {entity_name} in database"
 			return http.StatusInternalServerError, msg, err
         }}
         return http.StatusOK, "", nil
     }}
-'''.format(
-        m["name"].capitalize(),
-        key_name,
-        ", ".join(["model." + n for n in non_key_struct_fields + [key_name]]),
-        m["name"],
-        ", user_id uint32" if has_additional_user_fk else "",
-        ", user_id" if has_additional_user_fk else ""
-    )
+'''
 
     # manager.Delete()
-    s += '''
-    func (m *{0}Manager) Delete({1} {2}{4}) (int, string, error) {{
-        result, err := m.DB.Exec(delete{0}SQL, {1}{5})
+    delete_user_param = ", user_id uint32" if has_additional_user_fk else ""
+    delete_user_arg = ", user_id" if has_additional_user_fk else ""
+    s += f'''
+    func (m *{model_name}Manager) Delete({key_snake} {key_type}{delete_user_param}) (int, string, error) {{
+        result, err := m.DB.Exec(delete{model_name}SQL, {key_snake}{delete_user_arg})
         if err != nil {{
-            msg := "Couldn't delete {3} in database"
+            msg := "Couldn't delete {entity_name} in database"
             return http.StatusInternalServerError, msg, err
         }}
         // Check for 404s
@@ -406,14 +347,7 @@ import (
         }}
         return http.StatusNoContent, "", nil
     }}
-'''.format(
-        m["name"].capitalize(),
-        camel_to_snake(key_name),
-        key_type,
-        m["name"],
-        ", user_id uint32" if has_additional_user_fk else "",
-        ", user_id" if has_additional_user_fk else ""
-    )
+'''
 
     return s
 
