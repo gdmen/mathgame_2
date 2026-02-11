@@ -1,11 +1,16 @@
 import katex from "katex";
 import React, { useCallback, useEffect, useState } from "react";
+import PinInput from "react-pin-input";
 
 import "katex/dist/katex.min.css";
 
 import { ProblemView, PreprocessExpression } from "./problem.js";
 import { VideoView } from "./video.js";
 import { ClearSessionPin } from "./pin.js";
+
+import "./play.scss";
+
+const REPORT_EXPLANATION_MAX_LENGTH = 500;
 
 const conf = require("./conf");
 
@@ -89,6 +94,11 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
   const [problem, setProblem] = useState(null);
   const [latex, setLatex] = useState(null);
   const [video, setVideo] = useState(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportPin, setReportPin] = useState("");
+  const [reportExplanation, setReportExplanation] = useState("");
+  const [reportError, setReportError] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
 
   ClearSessionPin();
 
@@ -130,15 +140,24 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
         );
       } catch (e) {
         console.log(e.message);
-        // handle rendering error
-        postEvent("bad_problem_system", gamestate.problem_id).then(() => {
-          window.location.pathname = "play";
+        const value = JSON.stringify({
+          problem_id: gamestate.problem_id,
+          explanation: e.message || "LaTeX rendering failed",
+        });
+        postEvent("bad_problem_system", value).then((json) => {
+          if (json && json.gamestate) {
+            setGamestate(json.gamestate);
+            setProblem(json.problem);
+            setVideo(json.video);
+          } else {
+            window.location.pathname = "play";
+          }
         });
       }
     };
 
     renderLatex();
-  }, [gamestate, problem]);
+  }, [gamestate, problem, postEvent]);
 
   const eventReporter = new EventReporterSingleton(
     async (event_type, value) => {
@@ -183,13 +202,100 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
       });
       return null;
     } else {
+      const handleReportSubmit = () => {
+        setReportError("");
+        if (!user.pin || user.pin.length < 4) {
+          setReportError("Set a PIN in settings first.");
+          return;
+        }
+        if (reportPin.length !== 4 || reportPin !== user.pin) {
+          setReportError("Incorrect PIN");
+          return;
+        }
+        setReportSubmitting(true);
+        const value = JSON.stringify({
+          problem_id: gamestate.problem_id,
+          explanation: reportExplanation.trim().slice(0, REPORT_EXPLANATION_MAX_LENGTH) || "",
+        });
+        postEvent("bad_problem_user", value)
+          .then((json) => {
+            if (json && json.gamestate) {
+              setGamestate(json.gamestate);
+              setProblem(json.problem);
+              setVideo(json.video);
+            }
+            setShowReportModal(false);
+            setReportPin("");
+            setReportExplanation("");
+            setReportError("");
+          })
+          .finally(() => setReportSubmitting(false));
+      };
+
       return (
-        <ProblemView
-          gamestate={gamestate}
-          latex={latex}
-          eventReporter={eventReporter}
-          interval={interval}
-        />
+        <>
+          <ProblemView
+            gamestate={gamestate}
+            latex={latex}
+            eventReporter={eventReporter}
+            interval={interval}
+          />
+          <button
+            type="button"
+            className="report-problem-link"
+            onClick={() => {
+              setShowReportModal(true);
+              setReportError("");
+              setReportPin("");
+              setReportExplanation("");
+            }}
+          >
+            Report problem
+          </button>
+          {showReportModal && (
+            <div className="report-modal-overlay" onClick={() => !reportSubmitting && setShowReportModal(false)}>
+              <div className="report-modal" onClick={(e) => e.stopPropagation()}>
+                <h4>Report problem</h4>
+                <p className="report-modal-copy">
+                  Report if this problem is unsuitable or doesn&apos;t accept the correct answer. Your PIN is required.
+                </p>
+                <div className="report-modal-pin">
+                  <label htmlFor="report-pin">PIN</label>
+                  <PinInput
+                    id="report-pin"
+                    length={4}
+                    type="numeric"
+                    inputMode="number"
+                    value={reportPin}
+                    onChange={(value) => setReportPin(value)}
+                    inputStyle={{ borderRadius: "0.25em" }}
+                  />
+                </div>
+                <div className="report-modal-explanation">
+                  <label htmlFor="report-explanation">Why are you reporting this problem? (optional)</label>
+                  <textarea
+                    id="report-explanation"
+                    value={reportExplanation}
+                    onChange={(e) => setReportExplanation(e.target.value.slice(0, REPORT_EXPLANATION_MAX_LENGTH))}
+                    maxLength={REPORT_EXPLANATION_MAX_LENGTH}
+                    rows={3}
+                    placeholder="e.g. Wrong answer was marked correct"
+                  />
+                  <span className="report-char-count">{reportExplanation.length}/{REPORT_EXPLANATION_MAX_LENGTH}</span>
+                </div>
+                {reportError && <p className="report-modal-error">{reportError}</p>}
+                <div className="report-modal-actions">
+                  <button type="button" onClick={handleReportSubmit} disabled={reportSubmitting}>
+                    {reportSubmitting ? "Submitting…" : "Submit"}
+                  </button>
+                  <button type="button" onClick={() => !reportSubmitting && setShowReportModal(false)} disabled={reportSubmitting}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       );
     }
   }
