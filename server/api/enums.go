@@ -20,6 +20,19 @@ const (
 	// -end- EventTypes
 )
 
+// recordOnlyEventTypes are events that only need to be persisted; they do not
+// mutate gamestate or settings. Use the simple processRecordOnlyEvents path.
+var recordOnlyEventTypes = map[string]bool{
+	LOGGED_IN:                  true,
+	WORKING_ON_PROBLEM:         true,
+	WATCHING_VIDEO:             true,
+	SET_TARGET_WORK_PERCENTAGE: true,
+}
+
+func isRecordOnlyEvent(eventType string) bool {
+	return recordOnlyEventTypes[eventType]
+}
+
 type ProblemType uint64
 
 const (

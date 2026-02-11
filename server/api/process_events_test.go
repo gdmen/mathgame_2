@@ -239,3 +239,45 @@ func TestProcessEvents_SetTargetWorkPercentage_Accepted(t *testing.T) {
 		t.Errorf("SET_TARGET_WORK_PERCENTAGE: expected %d, got %d body %s", http.StatusOK, resp.Code, resp.Body.Bytes())
 	}
 }
+
+func TestProcessEvents_RecordOnlyEvent_ThroughCreateEvent_UsesFullPath(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("Couldn't read config: %v", err)
+	}
+	ResetTestApi(c)
+	r := TestApi.GetRouter()
+	user := createTestUser(t, r, "auth0|record-create", "record@test.com", "recorduser")
+	for i := 0; i < 2; i++ {
+		v := &Video{UserId: user.Id, Title: "V", URL: fmt.Sprintf("https://ex.co/r%d", i)}
+		resp := httptest.NewRecorder()
+		body, _ := json.Marshal(v)
+		req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/videos?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
+		r.ServeHTTP(resp, req)
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("create video: %d", resp.Code)
+		}
+	}
+	_ = reportEvent(t, r, user, SELECTED_PROBLEM, "")
+
+	// Post a record-only event through the create event endpoint (writeCtx=true)
+	// This should use the full path even though it's a record-only event, because writeCtx=true
+	resp := httptest.NewRecorder()
+	event := Event{EventType: WORKING_ON_PROBLEM, Value: "45"}
+	body, _ := json.Marshal(event)
+	req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/events?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
+	r.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Errorf("record-only event via create endpoint: expected %d, got %d body %s", http.StatusOK, resp.Code, resp.Body.Bytes())
+	}
+
+	// Verify event was persisted and response includes play data (indicating full path was used)
+	body, _ = ioutil.ReadAll(resp.Body)
+	var playData PlayData
+	if err := json.Unmarshal(body, &playData); err != nil {
+		t.Fatalf("unmarshal play data: %v", err)
+	}
+	if playData.Gamestate == nil {
+		t.Errorf("expected play data response (full path), got nil gamestate")
+	}
+}

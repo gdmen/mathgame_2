@@ -17,8 +17,39 @@ const (
 	maxTarget = 20
 )
 
-// Do stuff based on the event and write an updated Gamestate / any other side effects
+// processRecordOnlyEvents persists events that do not mutate gamestate or settings.
+// Use this for LOGGED_IN, WORKING_ON_PROBLEM, WATCHING_VIDEO, SET_TARGET_WORK_PERCENTAGE.
+func (a *Api) processRecordOnlyEvents(logPrefix string, c *gin.Context, events []*Event) error {
+	user := GetUserFromContext(c)
+	for _, event := range events {
+		event.UserId = user.Id
+		event.Timestamp = time.Now()
+		status, msg, err := a.eventManager.Create(event)
+		if HandleMngrResp(logPrefix, c, status, msg, err, event) != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// processEvents dispatches to a simple path for record-only events, or the full
+// gamestate path when any event mutates gamestate/settings.
 func (a *Api) processEvents(logPrefix string, c *gin.Context, events []*Event, writeCtx bool) error {
+	if len(events) == 0 {
+		return nil
+	}
+	allRecordOnly := true
+	for _, e := range events {
+		if !isRecordOnlyEvent(e.EventType) {
+			allRecordOnly = false
+			break
+		}
+	}
+	// Use simple path only when all events are record-only AND we don't need play data
+	if allRecordOnly && !writeCtx {
+		return a.processRecordOnlyEvents(logPrefix, c, events)
+	}
+
 	// Get User
 	user := GetUserFromContext(c)
 
