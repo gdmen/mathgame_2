@@ -1,0 +1,102 @@
+@import "styles.scss";
+
+.report-problem-link {
+  background: none;
+  border: none;
+  color: $color-one-contrast;
+  cursor: pointer;
+  display: block;
+  font-size: 0.9em;
+  margin: 0.5em auto 1em;
+  text-decoration: underline;
+}
+
+.report-modal-overlay {
+  background: rgba(0, 0, 0, 0.4);
+  bottom: 0;
+  left: 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 1000;
+}
+
+.report-modal {
+  background: $background-color;
+  border-radius: 0.5em;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  left: 50%;
+  max-width: 90%;
+  padding: 1.5em;
+  position: fixed;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 24em;
+  z-index: 1001;
+
+  h4 {
+    margin-top: 0;
+  }
+
+  .report-modal-copy {
+    font-size: 0.95em;
+    margin: 0.5em 0 1em;
+  }
+
+  .report-modal-pin {
+    margin-bottom: 1em;
+
+    label {
+      display: block;
+      margin-bottom: 0.25em;
+    }
+  }
+
+  .report-modal-explanation {
+    margin-bottom: 1em;
+
+    label {
+      display: block;
+      margin-bottom: 0.25em;
+    }
+
+    textarea {
+      border: 1px solid #ccc;
+      border-radius: 0.25em;
+      box-sizing: border-box;
+      font-family: inherit;
+      padding: 0.5em;
+      width: 100%;
+    }
+
+    .report-char-count {
+      display: block;
+      font-size: 0.85em;
+      color: $color-inactive;
+      margin-top: 0.25em;
+    }
+  }
+
+  .report-modal-error {
+    color: $color-error;
+    font-size: 0.95em;
+    margin: 0.5em 0;
+  }
+
+  .report-modal-actions {
+    display: flex;
+    gap: 0.75em;
+    justify-content: flex-end;
+    margin-top: 1em;
+
+    button {
+      cursor: pointer;
+      padding: 0.4em 0.8em;
+
+      &:disabled {
+        cursor: not-allowed;
+        opacity: 0.7;
+      }
+    }
+  }
+}
