@@ -25,65 +25,74 @@ def get_handler_string(m: dict) -> str:
             key_name = f["name"]
         if f["name"] == "UserId":
             has_user_fk = True
-    has_additional_user_fk =  has_user_fk and key_name != "UserId"
-    s = '''
-func (a *Api) create{0}(c *gin.Context) {{
+    has_additional_user_fk = has_user_fk and key_name != "UserId"
+
+    model_name = m["name"].capitalize()
+    manager_name = m["name"]
+    get_user_line = "user := GetUserFromContext(c)" if has_additional_user_fk else ""
+    user_id_arg = ", user.Id" if has_additional_user_fk else ""
+    get_user_for_list = "user := GetUserFromContext(c)" if has_user_fk else ""
+    list_arg = "user.Id" if has_user_fk else ""
+    set_user_id_line = "model.UserId = GetUserFromContext(c).Id" if has_user_fk else ""
+
+    s = f'''
+func (a *Api) create{model_name}(c *gin.Context) {{
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Parse input
-	model := &{0}{{}}
+	model := &{model_name}{{}}
 	if BindModelFromForm(logPrefix, c, model) != nil {{
 		return
 	}}
 
-    {7}
+    {set_user_id_line}
 
 	// Write to database
-	status, msg, err := a.{1}Manager.Create(model)
+	status, msg, err := a.{manager_name}Manager.Create(model)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {{
 		return
 	}}
 }}
 
-func (a *Api) get{0}(c *gin.Context) {{
+func (a *Api) get{model_name}(c *gin.Context) {{
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Parse input
-	model := &{0}{{}}
+	model := &{model_name}{{}}
 	if BindModelFromURI(logPrefix, c, model) != nil {{
 		return
 	}}
 
-    {3}
+    {get_user_line}
 
 	// Read from database
-	model, status, msg, err := a.{1}Manager.Get(model.{2}{4})
+	model, status, msg, err := a.{manager_name}Manager.Get(model.{key_name}{user_id_arg})
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {{
 		return
 	}}
 }}
 
-func (a *Api) list{0}(c *gin.Context) {{
+func (a *Api) list{model_name}(c *gin.Context) {{
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
-    {5}
+    {get_user_for_list}
 
 	// Read from database
-	models, status, msg, err := a.{1}Manager.List({6})
+	models, status, msg, err := a.{manager_name}Manager.List({list_arg})
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {{
 		return
 	}}
 }}
 
-func (a *Api) update{0}(c *gin.Context) {{
+func (a *Api) update{model_name}(c *gin.Context) {{
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Parse input
-	model := &{0}{{}}
+	model := &{model_name}{{}}
 	if BindModelFromForm(logPrefix, c, model) != nil {{
 		return
 	}}
@@ -91,45 +100,35 @@ func (a *Api) update{0}(c *gin.Context) {{
 		return
 	}}
 
-    {3}
-    {7}
+    {get_user_line}
+    {set_user_id_line}
 
 	// Write to database
-	status, msg, err := a.{1}Manager.Update(model{4})
+	status, msg, err := a.{manager_name}Manager.Update(model{user_id_arg})
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {{
 		return
 	}}
 }}
 
-func (a *Api) delete{0}(c *gin.Context) {{
+func (a *Api) delete{model_name}(c *gin.Context) {{
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
 	// Parse input
-	model := &{0}{{}}
+	model := &{model_name}{{}}
 	if BindModelFromURI(logPrefix, c, model) != nil {{
 		return
 	}}
 
-    {3}
+    {get_user_line}
 
 	// Write to database
-	status, msg, err := a.{1}Manager.Delete(model.{2}{4})
+	status, msg, err := a.{manager_name}Manager.Delete(model.{key_name}{user_id_arg})
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {{
 		return
 	}}
 }}
-'''.format(
-        m["name"].capitalize(),
-        m["name"],
-        key_name,
-        "user := GetUserFromContext(c)" if has_additional_user_fk else "",
-        ", user.Id" if has_additional_user_fk else "",
-        "user := GetUserFromContext(c)" if has_user_fk else "",
-        "user.Id" if has_user_fk else "",
-        "model.UserId = GetUserFromContext(c).Id" if has_user_fk else ""
-    )
-
+'''
     return s
 
 def main():
