@@ -1,10 +1,10 @@
 # installation
-- install node.js
-- install go
-- install go-swagger
+- install Node.js
+- install Go 1.24.2 (see go.mod)
+- install go-swagger (optional; only needed for `make build-docs` / `make dev-docs`)
 
 # config
-- Fill out conf.json_ and remove the trailing underscore
+- Copy `conf.json_` to `conf.json` and fill in MySQL user/pass and any Auth0 or OpenAI keys you need
 
 # install mysql
 
@@ -17,13 +17,20 @@
 
 > CREATE DATABASE mathgame;
 
+# build (required before first run of dev-api)
+> make
+
 # refresh after not developing for a long time
-> make clean  
+> make clean
 > make
 
 # development
+Run from repo root. API reads conf.json from current directory.
 > make dev-api
 > make dev-web
+
+# test
+> make test
 
 # production
 > see ./deploy/README.md
