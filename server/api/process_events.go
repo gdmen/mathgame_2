@@ -126,7 +126,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		if HandleMngrResp(logPrefix, c, status, msg, err, problem) != nil {
 			return err
 		}
-		if event.Value != problem.Answer {
+		if !AnswersEquivalent(event.Value, problem.Answer) {
 			msg := fmt.Sprintf("Incorrect answer: {%s}, expected: {%s}", event.Value, problem.Answer)
 			glog.Infof("%s %s", logPrefix, msg)
 		} else { // Answer was correct
