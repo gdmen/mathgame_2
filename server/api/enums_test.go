@@ -35,3 +35,44 @@ func TestGetProblemTypePermutations(t *testing.T) {
 		}
 	}
 }
+
+func TestProblemTypeToFeaturesRoundTrip(t *testing.T) {
+	names := []string{"addition", "subtraction", "multiplication", "division", "fractions", "negatives", "word"}
+	for _, name := range names {
+		pt := FeaturesToProblemType([]string{name})
+		features := ProblemTypeToFeatures(pt)
+		if len(features) != 1 || features[0] != name {
+			t.Errorf("roundtrip %q: got features %v", name, features)
+		}
+	}
+	// Multiple features
+	pt := FeaturesToProblemType([]string{"addition", "subtraction"})
+	features := ProblemTypeToFeatures(pt)
+	sort.Strings(features)
+	if !reflect.DeepEqual(features, []string{"addition", "subtraction"}) {
+		t.Errorf("multi roundtrip: got %v", features)
+	}
+	pt2 := FeaturesToProblemType(features)
+	if pt != pt2 {
+		t.Errorf("roundtrip pt mismatch: %d vs %d", pt, pt2)
+	}
+}
+
+func TestEventTypeConstants(t *testing.T) {
+	eventTypes := []string{
+		LOGGED_IN, SELECTED_PROBLEM, WORKING_ON_PROBLEM, ANSWERED_PROBLEM, SOLVED_PROBLEM,
+		ERROR_PLAYING_VIDEO, WATCHING_VIDEO, DONE_WATCHING_VIDEO,
+		SET_TARGET_DIFFICULTY, SET_TARGET_WORK_PERCENTAGE, SET_PROBLEM_TYPE_BITMAP,
+		SET_GAMESTATE_TARGET, BAD_PROBLEM_SYSTEM, BAD_PROBLEM_USER,
+	}
+	seen := make(map[string]bool)
+	for _, et := range eventTypes {
+		if et == "" {
+			t.Errorf("event type constant is empty")
+		}
+		if seen[et] {
+			t.Errorf("duplicate event type %q", et)
+		}
+		seen[et] = true
+	}
+}

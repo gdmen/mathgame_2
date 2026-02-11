@@ -1,13 +1,19 @@
 package api // import "garydmenezes.com/mathgame/server/api"
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
 
 	"garydmenezes.com/mathgame/server/common"
@@ -69,4 +75,30 @@ func insertTestData(c *common.Config, tableName string) {
 		fmt.Printf("Couldn't populate %s in db: %v", tableName, err)
 		os.Exit(1)
 	}
+}
+
+// createTestUser creates a user via the API and returns it. Used by tests that need a valid user in the DB.
+func createTestUser(t *testing.T, r *gin.Engine, auth0Id, email, username string) *User {
+	t.Helper()
+	u := &User{
+		Auth0Id:  auth0Id,
+		Email:    email,
+		Username: username,
+	}
+	resp := httptest.NewRecorder()
+	body, _ := json.Marshal(u)
+	req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/users?test_auth0_id=%s", u.Auth0Id), bytes.NewBuffer(body))
+	r.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("createTestUser: expected status %d, got %d body %s", http.StatusOK, resp.Code, resp.Body.Bytes())
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("createTestUser: %v", err)
+	}
+	err = json.Unmarshal(body, u)
+	if err != nil {
+		t.Fatalf("createTestUser: %v", err)
+	}
+	return u
 }
