@@ -210,6 +210,94 @@ func TestProcessEvents_AnsweredProblem_CorrectAnswer_IncrementsSolved(t *testing
 	}
 }
 
+func TestProcessEvents_AnsweredProblem_EquivalentAnswer_Accepted(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("Couldn't read config: %v", err)
+	}
+	ResetTestApi(c)
+	r := TestApi.GetRouter()
+	user := createTestUser(t, r, "auth0|equiv-answer", "equiv@test.com", "equivuser")
+	for i := 0; i < 2; i++ {
+		v := &Video{UserId: user.Id, Title: "V", URL: fmt.Sprintf("https://ex.co/e%d", i)}
+		resp := httptest.NewRecorder()
+		body, _ := json.Marshal(v)
+		req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/videos?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
+		r.ServeHTTP(resp, req)
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("create video: %d", resp.Code)
+		}
+	}
+	_ = reportEvent(t, r, user, SELECTED_PROBLEM, "")
+	gs, _, _, err := TestApi.gamestateManager.Get(user.Id)
+	if err != nil || gs == nil {
+		t.Fatalf("get gamestate: %v", err)
+	}
+	// Create a problem with answer "1/2"; user will submit equivalent "0.5" or "1 1/2"
+	prob := &Problem{
+		Id:                999999001,
+		ProblemTypeBitmap: 1,
+		Expression:        "1/2",
+		Answer:            "1/2",
+		Explanation:       "half",
+		Difficulty:        3,
+		Disabled:          false,
+		Generator:         "test",
+	}
+	if _, _, err := TestApi.problemManager.Create(prob); err != nil {
+		t.Fatalf("create problem: %v", err)
+	}
+	gs.ProblemId = prob.Id
+	if _, _, err := TestApi.gamestateManager.Update(gs); err != nil {
+		t.Fatalf("update gamestate: %v", err)
+	}
+	beforeSolved := gs.Solved
+
+	// Submit equivalent answers; each should be accepted (1/2 == 0.5 == .5 == 2/4 == 1 1/2 is 3/2, so skip 1 1/2 for same problem)
+	for _, equiv := range []string{"0.5", ".5", "2/4"} {
+		gs, _, _, err = TestApi.gamestateManager.Get(user.Id)
+		if err != nil {
+			t.Fatalf("get gamestate: %v", err)
+		}
+		gs.ProblemId = prob.Id
+		if _, _, err := TestApi.gamestateManager.Update(gs); err != nil {
+			t.Fatalf("update gamestate: %v", err)
+		}
+		beforeSolved = gs.Solved
+		gs = reportEvent(t, r, user, ANSWERED_PROBLEM, equiv)
+		if gs.Solved != beforeSolved+1 {
+			t.Errorf("equivalent answer %q should be accepted: before=%d after=%d", equiv, beforeSolved, gs.Solved)
+		}
+	}
+	// 1 1/2 is 3/2, not 1/2; test mixed number with a problem whose answer is 3/2
+	prob2 := &Problem{
+		Id:                999999002,
+		ProblemTypeBitmap: 1,
+		Expression:        "3/2",
+		Answer:            "3/2",
+		Explanation:       "one and a half",
+		Difficulty:        3,
+		Disabled:          false,
+		Generator:         "test",
+	}
+	if _, _, err := TestApi.problemManager.Create(prob2); err != nil {
+		t.Fatalf("create problem2: %v", err)
+	}
+	gs, _, _, err = TestApi.gamestateManager.Get(user.Id)
+	if err != nil {
+		t.Fatalf("get gamestate: %v", err)
+	}
+	gs.ProblemId = prob2.Id
+	if _, _, err := TestApi.gamestateManager.Update(gs); err != nil {
+		t.Fatalf("update gamestate: %v", err)
+	}
+	beforeSolved = gs.Solved
+	gs = reportEvent(t, r, user, ANSWERED_PROBLEM, "1 1/2")
+	if gs.Solved != beforeSolved+1 {
+		t.Errorf("equivalent answer %q should be accepted for 3/2: before=%d after=%d", "1 1/2", beforeSolved, gs.Solved)
+	}
+}
+
 func TestProcessEvents_SetTargetWorkPercentage_Accepted(t *testing.T) {
 	c, err := common.ReadConfig("../../test_conf.json")
 	if err != nil {
