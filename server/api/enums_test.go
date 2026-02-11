@@ -76,3 +76,34 @@ func TestEventTypeConstants(t *testing.T) {
 		seen[et] = true
 	}
 }
+
+func TestIsRecordOnlyEvent(t *testing.T) {
+	tests := []struct {
+		eventType string
+		want      bool
+	}{
+		{LOGGED_IN, true},
+		{WORKING_ON_PROBLEM, true},
+		{WATCHING_VIDEO, true},
+		{SET_TARGET_WORK_PERCENTAGE, true},
+		{SELECTED_PROBLEM, false},
+		{ANSWERED_PROBLEM, false},
+		{SOLVED_PROBLEM, false},
+		{ERROR_PLAYING_VIDEO, false},
+		{DONE_WATCHING_VIDEO, false},
+		{SET_TARGET_DIFFICULTY, false},
+		{SET_PROBLEM_TYPE_BITMAP, false},
+		{SET_GAMESTATE_TARGET, false},
+		{BAD_PROBLEM_SYSTEM, false},
+		{BAD_PROBLEM_USER, false},
+		{"invalid_event_type", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.eventType, func(t *testing.T) {
+			if got := isRecordOnlyEvent(tt.eventType); got != tt.want {
+				t.Errorf("isRecordOnlyEvent(%q) = %v, want %v", tt.eventType, got, tt.want)
+			}
+		})
+	}
+}
