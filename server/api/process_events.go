@@ -141,7 +141,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		}
 	} else if event.EventType == ERROR_PLAYING_VIDEO {
 		// Get the current video
-		video, status, msg, err := a.videoManager.Get(gamestate.VideoId, user.Id)
+		video, status, msg, err := a.videoManager.Get(gamestate.VideoId)
 		if HandleMngrResp(logPrefix, c, status, msg, err, video) != nil {
 			return err
 		}
@@ -149,7 +149,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		glog.Infof("%s Disabling video: %v", logPrefix, video)
 		video.Disabled = true
 		// Save the disabled video
-		status, msg, err = a.videoManager.Update(video, user.Id)
+		status, msg, err = a.videoManager.Update(video)
 		if HandleMngrResp(logPrefix, c, status, msg, err, video) != nil {
 			return err
 		}

@@ -27,8 +27,8 @@ func TestProblemBasic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
 	}
-	ResetTestApi(c)
-	r := TestApi.GetRouter()
+	api, r, cleanup := setupTestAPI(t, c)
+	defer cleanup()
 
 	test_model := &Problem{
 		Id:         1305619059,
@@ -38,7 +38,7 @@ func TestProblemBasic(t *testing.T) {
 	}
 
 	// Backend Create
-	TestApi.problemManager.Create(test_model)
+	api.problemManager.Create(test_model)
 
 	// Get
 	resp := httptest.NewRecorder()

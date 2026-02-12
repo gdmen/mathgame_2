@@ -1,0 +1,1 @@
+ALTER TABLE playlists ADD COLUMN title VARCHAR(512) NOT NULL DEFAULT '' AFTER you_tube_id;

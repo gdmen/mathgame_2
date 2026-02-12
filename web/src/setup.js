@@ -1,6 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
-import { ProblemTypesSettingsView, VideosSettingsView } from "./settings.js";
+import {
+  ProblemTypesSettingsView,
+  PlaylistsSettingsView,
+  VideosSettingsView,
+} from "./settings.js";
 import { GetSessionPin, PinView } from "./pin.js";
 import "./settings.scss";
 import "./setup.scss";
@@ -45,6 +49,7 @@ const ProblemTypesTabView = ({
 
 const VideosTabView = ({ token, apiUrl, user, advanceSetup }) => {
   const [error, setError] = useState(true);
+  const [videosRefreshKey, setVideosRefreshKey] = useState(0);
 
   const errCallback = (e) => {
     setError(e);
@@ -57,11 +62,18 @@ const VideosTabView = ({ token, apiUrl, user, advanceSetup }) => {
 
   return (
     <>
+      <PlaylistsSettingsView
+        token={token}
+        apiUrl={apiUrl}
+        user={user}
+        onPlaylistsChange={() => setVideosRefreshKey((k) => k + 1)}
+      />
       <VideosSettingsView
         token={token}
         apiUrl={apiUrl}
         user={user}
         errCallback={errCallback}
+        refreshKey={videosRefreshKey}
       />
       <button
         className={error ? "submit error" : "submit"}
@@ -128,19 +140,29 @@ const PinTabView = ({ token, apiUrl, user, advanceSetup }) => {
   );
 };
 
-const StartPlayingTabView = () => {
+const StartPlayingTabView = ({ numEnabledVideos, refreshPageLoadData }) => {
+  useEffect(() => {
+    if (refreshPageLoadData) refreshPageLoadData();
+  }, [refreshPageLoadData]);
+  const hasEnoughVideos = numEnabledVideos != null && numEnabledVideos >= 3;
   return (
     <>
       <h2>You're all set!</h2>
       <div className="setup-form">
+        {!hasEnoughVideos && (
+          <p className="settings-hint">
+            Add at least 3 videos for this user in the Add Videos step to play.
+          </p>
+        )}
         <h3>
           Mikey's Math Game will start <strong>easy</strong> and get harder to
           match <strong>your child's</strong> math level!
         </h3>
         <button
           id="start-playing-button"
+          disabled={!hasEnoughVideos}
           onClick={function (e) {
-            window.location.href = "play";
+            if (hasEnoughVideos) window.location.href = "play";
           }}
         >
           Start Playing!
@@ -150,7 +172,14 @@ const StartPlayingTabView = () => {
   );
 };
 
-const SetupView = ({ token, apiUrl, user, settings }) => {
+const SetupView = ({
+  token,
+  apiUrl,
+  user,
+  settings,
+  numEnabledVideos,
+  refreshPageLoadData,
+}) => {
   const [activeTab, setActiveTab] = useState(null);
 
   const allTabs = [
@@ -228,7 +257,10 @@ const SetupView = ({ token, apiUrl, user, settings }) => {
       )}
       {activeTab === "Start Playing!" && (
         <div className="tab-content">
-          <StartPlayingTabView />
+          <StartPlayingTabView
+            numEnabledVideos={numEnabledVideos}
+            refreshPageLoadData={refreshPageLoadData}
+          />
         </div>
       )}
     </div>

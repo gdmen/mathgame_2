@@ -5,23 +5,28 @@
       "table": "users",
       "fields": [
         {
-          "name": "Auth0Id", "type": "string",
+          "name": "Auth0Id",
+          "type": "string",
           "sql": "VARCHAR(225) NOT NULL PRIMARY KEY"
         },
         {
-          "name": "Id", "type": "uint32",
+          "name": "Id",
+          "type": "uint32",
           "sql": "BIGINT UNSIGNED AUTO_INCREMENT UNIQUE"
         },
         {
-          "name": "Email", "type": "string",
+          "name": "Email",
+          "type": "string",
           "sql": "VARCHAR(320) NOT NULL"
         },
         {
-          "name": "Username", "type": "string",
+          "name": "Username",
+          "type": "string",
           "sql": "VARCHAR(128) NOT NULL"
         },
         {
-          "name": "Pin", "type": "string",
+          "name": "Pin",
+          "type": "string",
           "sql": "VARCHAR(4) NOT NULL DEFAULT ''"
         }
       ]
@@ -31,36 +36,75 @@
       "table": "problems",
       "fields": [
         {
-          "name": "Id", "type": "uint32",
+          "name": "Id",
+          "type": "uint32",
           "sql": "BIGINT UNSIGNED PRIMARY KEY UNIQUE"
         },
         {
-          "name": "ProblemTypeBitmap", "type": "uint64",
+          "name": "ProblemTypeBitmap",
+          "type": "uint64",
           "sql": "BIGINT UNSIGNED NOT NULL"
         },
         {
-          "name": "Expression", "type": "string",
+          "name": "Expression",
+          "type": "string",
           "sql": "TEXT NOT NULL"
         },
         {
-          "name": "Answer", "type": "string",
+          "name": "Answer",
+          "type": "string",
           "sql": "TEXT NOT NULL"
         },
         {
-          "name": "Explanation", "type": "string",
+          "name": "Explanation",
+          "type": "string",
           "sql": "TEXT"
         },
         {
-          "name": "Difficulty", "type": "float64",
+          "name": "Difficulty",
+          "type": "float64",
           "sql": "FLOAT NOT NULL"
         },
         {
-          "name": "Disabled", "type": "bool",
+          "name": "Disabled",
+          "type": "bool",
           "sql": "TINYINT NOT NULL DEFAULT 0"
         },
         {
-          "name": "Generator", "type": "string",
+          "name": "Generator",
+          "type": "string",
           "sql": "VARCHAR(64) NOT NULL"
+        }
+      ]
+    },
+    {
+      "name": "playlist",
+      "table": "playlists",
+      "fields": [
+        {
+          "name": "Id",
+          "type": "uint32",
+          "sql": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY"
+        },
+        {
+          "name": "YouTubeId",
+          "type": "string",
+          "sql": "VARCHAR(64) NOT NULL UNIQUE"
+        },
+        {
+          "name": "Title",
+          "type": "string",
+          "sql": "VARCHAR(512) NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "ThumbnailURL",
+          "type": "string",
+          "sql": "VARCHAR(1024) NOT NULL"
+        },
+        {
+          "name": "Etag",
+          "type": "string",
+          "sql": "VARCHAR(128) NOT NULL"
         }
       ]
     },
@@ -69,31 +113,33 @@
       "table": "videos",
       "fields": [
         {
-          "name": "Id", "type": "uint32",
+          "name": "Id",
+          "type": "uint32",
           "sql": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY"
         },
         {
-          "name": "UserId", "type": "uint32",
-          "sql": "BIGINT UNSIGNED NOT NULL"
-        },
-        {
-          "name": "Title", "type": "string",
+          "name": "Title",
+          "type": "string",
           "sql": "VARCHAR(128) NOT NULL"
         },
         {
-          "name": "URL", "type": "string",
+          "name": "URL",
+          "type": "string",
           "sql": "VARCHAR(256) NOT NULL"
         },
         {
-          "name": "ThumbnailURL", "type": "string",
+          "name": "ThumbnailURL",
+          "type": "string",
           "sql": "VARCHAR(256) NOT NULL"
         },
         {
-          "name": "Disabled", "type": "bool",
-          "sql": "TINYINT NOT NULL DEFAULT 0"
+          "name": "YouTubeId",
+          "type": "string",
+          "sql": "VARCHAR(32) NULL UNIQUE"
         },
         {
-          "name": "Deleted", "type": "bool",
+          "name": "Disabled",
+          "type": "bool",
           "sql": "TINYINT NOT NULL DEFAULT 0"
         }
       ]
@@ -103,19 +149,23 @@
       "table": "settings",
       "fields": [
         {
-          "name": "UserId", "type": "uint32",
+          "name": "UserId",
+          "type": "uint32",
           "sql": "BIGINT UNSIGNED PRIMARY KEY"
         },
         {
-          "name": "ProblemTypeBitmap", "type": "uint64",
+          "name": "ProblemTypeBitmap",
+          "type": "uint64",
           "sql": "BIGINT UNSIGNED NOT NULL"
         },
         {
-          "name": "TargetDifficulty", "type": "float64",
+          "name": "TargetDifficulty",
+          "type": "float64",
           "sql": "DOUBLE NOT NULL"
         },
         {
-          "name": "TargetWorkPercentage", "type": "uint8",
+          "name": "TargetWorkPercentage",
+          "type": "uint8",
           "sql": "INT(3) NOT NULL"
         }
       ]
@@ -125,23 +175,28 @@
       "table": "gamestates",
       "fields": [
         {
-          "name": "UserId", "type": "uint32",
+          "name": "UserId",
+          "type": "uint32",
           "sql": "BIGINT UNSIGNED PRIMARY KEY"
         },
         {
-          "name": "ProblemId", "type": "uint32",
+          "name": "ProblemId",
+          "type": "uint32",
           "sql": "BIGINT UNSIGNED NOT NULL"
         },
         {
-          "name": "VideoId", "type": "uint32",
+          "name": "VideoId",
+          "type": "uint32",
           "sql": "BIGINT UNSIGNED NOT NULL"
         },
         {
-          "name": "Solved", "type": "uint32",
+          "name": "Solved",
+          "type": "uint32",
           "sql": "INT(5) NOT NULL"
         },
         {
-          "name": "Target", "type": "uint32",
+          "name": "Target",
+          "type": "uint32",
           "sql": "INT(5) NOT NULL"
         }
       ]
@@ -151,23 +206,28 @@
       "table": "events",
       "fields": [
         {
-          "name": "Id", "type": "uint32",
+          "name": "Id",
+          "type": "uint32",
           "sql": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY"
         },
         {
-          "name": "Timestamp", "type": "time.Time",
+          "name": "Timestamp",
+          "type": "time.Time",
           "sql": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
         },
         {
-          "name": "UserId", "type": "uint32",
+          "name": "UserId",
+          "type": "uint32",
           "sql": "BIGINT UNSIGNED NOT NULL"
         },
         {
-          "name": "EventType", "type": "string",
+          "name": "EventType",
+          "type": "string",
           "sql": "VARCHAR(32) NOT NULL"
         },
         {
-          "name": "Value", "type": "string",
+          "name": "Value",
+          "type": "string",
           "sql": "TEXT NOT NULL"
         }
       ]

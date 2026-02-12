@@ -28,6 +28,9 @@ func ValidateProblem(p *Problem) error {
 	if err != nil {
 		glog.Fatal(err)
 	}
+	if err := c.Validate(); err != nil {
+		glog.Fatal(err)
+	}
 
 	prompt := fmt.Sprintf(PROMPT_VALIDATION, p.Expression)
 	glog.Infof("OpenAI validation prompt = expected answer: %s = %s\n", prompt, p.Answer)

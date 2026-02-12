@@ -15,6 +15,33 @@ import (
 	"garydmenezes.com/mathgame/server/common/auth0"
 )
 
+const (
+	CreatePlaylistVideoTableSQL = `
+CREATE TABLE playlist_video (
+    playlist_id BIGINT UNSIGNED NOT NULL,
+    video_id BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY (playlist_id, video_id),
+    FOREIGN KEY (playlist_id) REFERENCES playlists(id),
+    FOREIGN KEY (video_id) REFERENCES videos(id)
+) DEFAULT CHARSET=utf8mb4 ;`
+	CreateUserPlaylistTableSQL = `
+CREATE TABLE user_playlist (
+    user_id BIGINT UNSIGNED NOT NULL,
+    playlist_id BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY (user_id, playlist_id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (playlist_id) REFERENCES playlists(id)
+) DEFAULT CHARSET=utf8mb4 ;`
+	CreateUserHasVideoTableSQL = `
+CREATE TABLE user_has_video (
+    user_id BIGINT UNSIGNED NOT NULL,
+    video_id BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY (user_id, video_id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (video_id) REFERENCES videos(id)
+) DEFAULT CHARSET=utf8mb4 ;`
+)
+
 var CREATE_TABLES_SQL = []string{
 	CreateUserTableSQL,
 	CreateVideoTableSQL,
@@ -22,10 +49,15 @@ var CREATE_TABLES_SQL = []string{
 	CreateSettingsTableSQL,
 	CreateGamestateTableSQL,
 	CreateEventTableSQL,
+	CreatePlaylistTableSQL,
+	CreatePlaylistVideoTableSQL,
+	CreateUserPlaylistTableSQL,
+	CreateUserHasVideoTableSQL,
 }
 
 type Api struct {
 	DB               *sql.DB
+	YouTubeAPIKey    string
 	isTest           bool
 	userManager      *UserManager
 	videoManager     *VideoManager
@@ -33,9 +65,10 @@ type Api struct {
 	settingsManager  *SettingsManager
 	gamestateManager *GamestateManager
 	eventManager     *EventManager
+	playlistManager  *PlaylistManager
 }
 
-func NewApi(db *sql.DB) (*Api, error) {
+func NewApi(db *sql.DB, cfg *common.Config) (*Api, error) {
 	for _, sql := range CREATE_TABLES_SQL {
 		_, err := db.Exec(sql)
 		if err != nil {
@@ -48,12 +81,16 @@ func NewApi(db *sql.DB) (*Api, error) {
 		}
 	}
 	a := &Api{DB: db}
+	if cfg != nil {
+		a.YouTubeAPIKey = cfg.YouTubeAPIKey
+	}
 	a.userManager = &UserManager{DB: db}
 	a.videoManager = &VideoManager{DB: db}
 	a.problemManager = &ProblemManager{DB: db}
 	a.settingsManager = &SettingsManager{DB: db}
 	a.gamestateManager = &GamestateManager{DB: db}
 	a.eventManager = &EventManager{DB: db}
+	a.playlistManager = &PlaylistManager{DB: db}
 	return a, nil
 }
 
@@ -129,13 +166,21 @@ func (a *Api) GetRouter() *gin.Engine {
 		}
 		video := v1.Group("/videos")
 		{
-			video.POST("", userMiddleware, a.createVideo)
-			video.POST("/", userMiddleware, a.createVideo)
+			video.POST("", userMiddleware, a.customCreateVideo)
+			video.POST("/", userMiddleware, a.customCreateVideo)
 			video.POST("/:id", userMiddleware, a.updateVideo)
 			video.DELETE("/:id", userMiddleware, a.customDeleteVideo)
 			video.GET("/:id", userMiddleware, a.getVideo)
 			video.GET("", userMiddleware, a.customListVideo)
 			video.GET("/", userMiddleware, a.customListVideo)
+		}
+		playlists := v1.Group("/playlists")
+		{
+			playlists.GET("", userMiddleware, a.customListPlaylists)
+			playlists.GET("/", userMiddleware, a.customListPlaylists)
+			playlists.POST("", userMiddleware, a.customAddPlaylist)
+			playlists.POST("/", userMiddleware, a.customAddPlaylist)
+			playlists.DELETE("/:playlist_id", userMiddleware, a.customRemovePlaylist)
 		}
 		problem := v1.Group("/problems")
 		{

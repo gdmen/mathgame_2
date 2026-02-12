@@ -85,8 +85,8 @@ func TestFlowBasic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
 	}
-	ResetTestApi(c)
-	r := TestApi.GetRouter()
+	_, r, cleanup := setupTestAPI(t, c)
+	defer cleanup()
 
 	u := createTestUser(t, r, "auth0id|test|1", "test_1@email.com", "test_1")
 	t.Run("CreateUser", func(t *testing.T) {
@@ -97,11 +97,12 @@ func TestFlowBasic(t *testing.T) {
 
 	t.Run("AddVideos", func(t *testing.T) {
 		for i := 0; i < 2; i++ {
+			ytID := fmt.Sprintf("rm_3bfAEpII%d", i)
 			v := &Video{
-				UserId:       u.Id,
 				Title:        "Sesame Street: We're The A Team -A Song",
-				URL:          fmt.Sprintf("https://www.youtube.com/watch?v=rm_3bfAEpII%v", i),
+				URL:          fmt.Sprintf("https://www.youtube.com/watch?v=%s", ytID),
 				ThumbnailURL: "https://i.ytimg.com/vi/rm_3bfAEpII/hqdefault.jpg",
+				YouTubeId:    ytID,
 			}
 			resp := httptest.NewRecorder()
 			body, _ := json.Marshal(v)

@@ -47,6 +47,7 @@ dev-docs: check-swagger
 	$(SWAGGER) serve -F=swagger swagger.yaml
 
 clean:
+	-$(GOCMD) run ./cmd/clean_test_dbs -config test_conf.json
 	$(RM) ./swagger.yaml
 	$(RM) ./bin/*
 	$(RM) ./server/api/*.generated.go

@@ -89,6 +89,105 @@ $add-video-bg: linear-gradient(
         height: 0.5em;
       }
     }
+    .settings-hint {
+      color: gray;
+      font-size: 0.9em;
+      margin-bottom: $base-space;
+    }
+    .playlist-error {
+      color: $color-error;
+      margin-bottom: $base-space;
+    }
+    #playlists-settings {
+      #playlist-inputs {
+        background: $add-video-bg;
+        display: flex;
+        justify-content: center;
+        padding: $base-space;
+        input {
+          border: 0.25em solid $color-one;
+          min-width: 20em;
+          padding: 0.25em 0.5em;
+        }
+        button {
+          border-radius: 0.25em;
+          margin-left: 1em;
+          padding: 0.25em 0.5em;
+        }
+      }
+      ul#playlist-list,
+      ul#curated-playlist-list {
+        list-style-type: none;
+        padding: 0;
+        .playlist-list-header {
+          border-bottom: 1px solid lightgray;
+          display: flex;
+          align-items: center;
+          height: 2em;
+          margin-bottom: 0.25em;
+        }
+        .playlist-item {
+          align-items: center;
+          display: flex;
+          height: 3em;
+          margin-bottom: 0.25em;
+          padding: 0;
+          .playlist-thumbnail {
+            aspect-ratio: 16 / 9;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-size: 100% auto;
+            flex: 0 0 4em;
+            height: 2.25em;
+          }
+          .playlist-title {
+            color: inherit;
+            flex: 1 1 auto;
+            margin-left: 0.5em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-decoration: none;
+            white-space: nowrap;
+            &:hover {
+              text-decoration: underline;
+            }
+          }
+          .playlist-remove {
+            color: $color-error;
+            cursor: pointer;
+            font-size: 1.5em;
+            padding: 0 0.5em;
+            &:hover {
+              opacity: 0.8;
+            }
+          }
+          .add-curated {
+            margin-left: 0.5em;
+            padding: 0.25em 0.5em;
+          }
+        }
+      }
+      .curated-section {
+        margin-top: 1.5 * $base-space;
+        ul#recommended-playlist-list {
+          list-style-type: none;
+          padding: 0;
+        }
+        .recommended-playlist-item {
+          align-items: center;
+          display: flex;
+          margin-bottom: 0.5em;
+          .recommended-link {
+            color: $color-one;
+            margin-right: 0.5em;
+          }
+          .add-recommended {
+            margin-left: 0.5em;
+            padding: 0.25em 0.5em;
+          }
+        }
+      }
+    }
     #video-inputs {
       background: $add-video-bg;
       display: flex;

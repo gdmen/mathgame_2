@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 
 import { ProblemTypes } from "./enums.js";
 import { RequirePin } from "./pin.js";
@@ -89,6 +89,188 @@ const ProblemTypesSettingsView = ({
   );
 };
 
+// Add public YouTube playlist links to show as "Recommended playlists" (UI only).
+const RECOMMENDED_PLAYLISTS = [];
+
+const PlaylistsSettingsView = ({ token, apiUrl, user, onPlaylistsChange }) => {
+  const [myPlaylists, setMyPlaylists] = useState([]);
+  const [playlistInput, setPlaylistInput] = useState("");
+  const [playlistError, setPlaylistError] = useState(null);
+  const [addingPlaylist, setAddingPlaylist] = useState(false);
+
+  const authHeaders = () => ({
+    Accept: "application/json",
+    "Content-Type": "application/json",
+    Authorization: "Bearer " + token,
+  });
+
+  const fetchMyPlaylists = useCallback(async () => {
+    if (token == null || apiUrl == null || user == null) return;
+    try {
+      const req = await fetch(apiUrl + "/playlists", {
+        method: "GET",
+        headers: authHeaders(),
+      });
+      if (req.ok) {
+        const json = await req.json();
+        setMyPlaylists(Array.isArray(json) ? json : []);
+      }
+    } catch (e) {
+      console.log(e.message);
+    }
+  }, [token, apiUrl, user]);
+
+  useEffect(() => {
+    fetchMyPlaylists();
+  }, [fetchMyPlaylists]);
+
+  const handleAddPlaylistByUrl = async (e) => {
+    setPlaylistError(null);
+    const urlOrId = playlistInput.trim();
+    if (!urlOrId) return;
+    setAddingPlaylist(true);
+    try {
+      const body = urlOrId.startsWith("http")
+        ? { playlist_url: urlOrId }
+        : { youtube_playlist_id: urlOrId };
+      const req = await fetch(apiUrl + "/playlists", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(body),
+      });
+      const data = req.ok ? await req.json().catch(() => ({})) : null;
+      if (req.ok) {
+        setPlaylistInput("");
+        fetchMyPlaylists();
+        if (onPlaylistsChange) onPlaylistsChange();
+      } else {
+        setPlaylistError(
+          (data && (data.message || data.error)) ||
+            "Playlist must be public or check the URL."
+        );
+      }
+    } catch (e) {
+      setPlaylistError("Could not add playlist. Try again.");
+    } finally {
+      setAddingPlaylist(false);
+    }
+  };
+
+  const handleRemovePlaylist = async (playlistId) => {
+    try {
+      const req = await fetch(apiUrl + "/playlists/" + playlistId, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      if (req.ok) {
+        fetchMyPlaylists();
+        if (onPlaylistsChange) onPlaylistsChange();
+      }
+    } catch (e) {
+      console.log(e.message);
+    }
+  };
+
+  return (
+    <>
+      <div className="settings-form" id="playlists-settings">
+        <h4>Your playlists</h4>
+        <p className="settings-hint">
+          Add YouTube playlists; reward videos will be chosen from the union of
+          all your playlists.
+        </p>
+        {playlistError && (
+          <p className="error playlist-error">{playlistError}</p>
+        )}
+        <div id="playlist-inputs">
+          <input
+            type="text"
+            placeholder="YouTube playlist URL or ID (e.g. PLxxx)"
+            value={playlistInput}
+            onChange={(e) => {
+              setPlaylistInput(e.target.value);
+              setPlaylistError(null);
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleAddPlaylistByUrl}
+            disabled={addingPlaylist}
+            aria-busy={addingPlaylist}
+          >
+            {addingPlaylist ? "Adding…" : "Add playlist"}
+          </button>
+        </div>
+        <ul id="playlist-list">
+          <li className="playlist-list-header">
+            <span className="playlist-thumbnail"> </span>
+            <span className="playlist-title">PLAYLIST</span>
+          </li>
+          {myPlaylists.map((p) => (
+            <li key={p.id} className="playlist-item">
+              <span
+                className="playlist-thumbnail"
+                style={{
+                  backgroundImage: p.thumbnailurl
+                    ? `url(${p.thumbnailurl})`
+                    : "none",
+                }}
+              />
+              <a
+                href={
+                  "https://www.youtube.com/playlist?list=" +
+                  (p.you_tube_id || "")
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="playlist-title"
+              >
+                {p.title || p.you_tube_id || "Playlist " + p.id}
+              </a>
+              <span
+                className="playlist-remove"
+                onClick={() => handleRemovePlaylist(p.id)}
+              >
+                x
+              </span>
+            </li>
+          ))}
+        </ul>
+        {RECOMMENDED_PLAYLISTS.length > 0 && (
+          <div className="curated-section">
+            <h4>Recommended playlists</h4>
+            <p className="settings-hint">
+              Public YouTube playlists you can add. Paste the URL above and
+              click Add playlist, or open the link to view on YouTube.
+            </p>
+            <ul id="recommended-playlist-list">
+              {RECOMMENDED_PLAYLISTS.map((p, i) => (
+                <li key={i} className="recommended-playlist-item">
+                  <a
+                    href={p.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="recommended-link"
+                  >
+                    {p.label}
+                  </a>
+                  <button
+                    type="button"
+                    className="add-recommended"
+                    onClick={() => setPlaylistInput(p.url)}
+                  >
+                    Use this URL
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </>
+  );
+};
+
 const TargetWorkPercentageSettingsView = ({
   token,
   apiUrl,
@@ -127,250 +309,96 @@ const TargetWorkPercentageSettingsView = ({
   );
 };
 
-const VideosSettingsView = ({ token, apiUrl, user, errCallback }) => {
-  const [error, setError] = useState(true);
-  const [addError, setAddError] = useState(true);
-  const [videos, setVideos] = useState(new Map());
-  const [videoUrl, setVideoUrl] = useState("");
-  const [videoTitle, setVideoTitle] = useState("");
-  const [videoThumbnail, setVideoThumbnail] = useState("");
+function videoPlayUrl(video) {
+  if (video.url) return video.url;
+  if (video.you_tube_id)
+    return "https://www.youtube.com/watch?v=" + video.you_tube_id;
+  return "#";
+}
 
-  const getEnabledVideoCount = (videos) => {
-    return new Map([...videos].filter(([k, v]) => !v.disabled)).size;
-  };
+const VideosSettingsView = ({
+  token,
+  apiUrl,
+  user,
+  errCallback,
+  refreshKey,
+}) => {
+  const [error, setError] = useState(true);
+  const [videos, setVideos] = useState([]);
+
+  const getEnabledVideoCount = (list) => list.filter((v) => !v.disabled).length;
 
   useEffect(() => {
     const getVideos = async () => {
       try {
-        if (token == null || apiUrl == null || user == null) {
-          return;
-        }
-        const reqParams = {
+        if (token == null || apiUrl == null || user == null) return;
+        const req = await fetch(apiUrl + "/videos", {
           method: "GET",
           headers: {
             Accept: "application/json",
             "Content-Type": "application/json",
             Authorization: "Bearer " + token,
           },
-        };
-        const req = await fetch(apiUrl + "/videos", reqParams);
-        const json = await req.json();
-
-        let newVideos = new Map();
-        for (var i in json) {
-          let url = json[i].url;
-          newVideos.set(url, json[i]);
+        });
+        if (req.ok) {
+          const json = await req.json();
+          const list = Array.isArray(json) ? json : [];
+          setVideos(list);
+          const numEnabled = getEnabledVideoCount(list);
+          setError(numEnabled < 3);
+          if (errCallback) errCallback(numEnabled < 3);
         }
-        setVideos(newVideos);
-        var numEnabled = getEnabledVideoCount(newVideos);
-        setError(numEnabled < 3);
-        errCallback(numEnabled < 3);
       } catch (e) {
         console.log(e.message);
       }
     };
-
     getVideos();
-  }, [token, apiUrl, user, errCallback]);
-
-  const fetchYouTubeMetadata = async function (url, okFcn, errFcn) {
-    try {
-      const reqParams = {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-      };
-      const req = await fetch(
-        "https://www.youtube.com/oembed?format=json&url=" +
-          encodeURIComponent(url),
-        reqParams
-      );
-      const json = await req.json();
-      okFcn(json);
-    } catch (e) {
-      console.log(e.message);
-      errFcn(e);
-    }
-  };
-
-  const handleAddVideoChange = (e) => {
-    let url = e.target.value;
-    // Remove the playlist parameter from the video url
-    var u = new URL(url);
-    u.searchParams.delete("list");
-    url = u.toString();
-
-    setVideoUrl(url);
-    setVideoTitle(null);
-    setVideoThumbnail(null);
-    let okFcn = function (json) {
-      setVideoTitle(json.title);
-      setVideoThumbnail(json.thumbnail_url);
-      setAddError(videos.has(url));
-    };
-    let errFcn = function (e) {
-      setAddError(true);
-    };
-    fetchYouTubeMetadata(url, okFcn, errFcn);
-  };
-
-  const postVideo = async function (video) {
-    try {
-      const reqParams = {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + token,
-        },
-        body: JSON.stringify(video),
-      };
-      const req = await fetch(apiUrl + "/videos/", reqParams);
-      if (req.ok) {
-        const json = await req.json();
-        var newVideos = new Map(videos.set(json.url, json));
-        setVideos(newVideos);
-        var numEnabled = getEnabledVideoCount(newVideos);
-        setError(numEnabled < 3);
-        errCallback(numEnabled < 3);
-        setAddError(false);
-        if (video.url === videoUrl) {
-          // If the video we just added is currently in the add video UI, clear out that UI
-          setVideoUrl("");
-          setVideoTitle(null);
-          setVideoThumbnail(null);
-          setAddError(true);
-        }
-      }
-    } catch (e) {
-      console.log(e.message);
-    }
-  };
-
-  const handleAddVideoClick = (e) => {
-    postVideo({
-      user_id: user.id,
-      title: videoTitle,
-      url: videoUrl,
-      thumbnailurl: videoThumbnail,
-    });
-  };
-
-  const deleteVideo = async function (video) {
-    try {
-      const reqParams = {
-        method: "DELETE",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + token,
-        },
-      };
-      const req = await fetch(apiUrl + "/videos/" + video.id, reqParams);
-      if (req.ok) {
-        videos.delete(video.url);
-        if (video.url === videoUrl) {
-          // If we're deleting the video currently in the add video UI
-          setAddError(false);
-        }
-        setVideos(new Map(videos));
-        var numEnabled = getEnabledVideoCount(videos);
-        setError(numEnabled < 3);
-        errCallback(numEnabled < 3);
-      }
-    } catch (e) {
-      console.log(e.message);
-    }
-  };
-
-  const handleDeleteVideoClick = (e) => {
-    deleteVideo(videos.get(e.target.getAttribute("data-video-url")));
-  };
+  }, [token, apiUrl, user, errCallback, refreshKey]);
 
   return (
     <>
       <div className="settings-form">
         <h4>
-          Add <span className={error ? "error" : ""}>at least three</span>{" "}
-          <a
-            href="http://www.youtube.com"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            YouTube
-          </a>{" "}
-          videos that your child will love!
+          Videos from your playlists{" "}
+          <span className={error ? "error" : ""}>(at least three)</span>
         </h4>
-        <div id="video-inputs">
-          <input
-            type="text"
-            placeholder="paste a YouTube link here"
-            className={addError && videoUrl ? "error" : ""}
-            value={videoUrl}
-            onChange={handleAddVideoChange}
-          />
-          <button
-            className={addError ? "error" : ""}
-            onClick={handleAddVideoClick}
-          >
-            add
-          </button>
-        </div>
+        <p className="settings-hint">
+          These are the reward videos (union of the playlists you added above).
+          To add or remove videos, manage the playlists on YouTube or remove a
+          playlist above.
+        </p>
         <ul id="video-list">
-          <li id="new-video">
-            <span className="video-number"></span>
-            <span
-              className="video-thumbnail"
-              style={{
-                backgroundImage: `url(${videoThumbnail})`,
-              }}
-            ></span>
-            <span className="video-title">{videoTitle}</span>
-          </li>
           <li id="video-list-header">
             <span className="video-number">#</span>
             <span className="video-title">TITLE</span>
           </li>
-          {[...videos.keys()].map(function (key, i) {
-            var id = i + 1;
-            var video = videos.get(key);
-            return (
-              <li key={id} className={`${video.disabled ? "disabled" : ""}`}>
-                <span className="video-number">{id}</span>
-                <span
-                  className="video-thumbnail"
-                  style={{
-                    backgroundImage: `url(${video.thumbnailurl})`,
-                  }}
+          {videos.map((video, i) => (
+            <li key={video.id} className={video.disabled ? "disabled" : ""}>
+              <span className="video-number">{i + 1}</span>
+              <span
+                className="video-thumbnail"
+                style={{
+                  backgroundImage: video.thumbnailurl
+                    ? `url(${video.thumbnailurl})`
+                    : "none",
+                }}
+              >
+                <a
+                  className="video-play"
+                  href={videoPlayUrl(video)}
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
-                  <a
-                    className="video-play"
-                    href={video.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {video.disabled ? (
-                      <span>unavailable</span>
-                    ) : (
-                      <span>&#9654;</span>
-                    )}
-                  </a>
-                </span>
-                <span className="video-title">{video.title}</span>
-                <span
-                  className={`video-delete ${
-                    !video.disabled && videos.size <= 3 ? "disabled" : ""
-                  }`}
-                  data-video-url={video.url}
-                  onClick={handleDeleteVideoClick}
-                >
-                  x
-                </span>
-              </li>
-            );
-          })}
+                  {video.disabled ? (
+                    <span>unavailable</span>
+                  ) : (
+                    <span>&#9654;</span>
+                  )}
+                </a>
+              </span>
+              <span className="video-title">{video.title}</span>
+            </li>
+          ))}
         </ul>
       </div>
     </>
@@ -378,6 +406,7 @@ const VideosSettingsView = ({ token, apiUrl, user, errCallback }) => {
 };
 
 const SettingsView = ({ token, apiUrl, user, settings }) => {
+  const [videosRefreshKey, setVideosRefreshKey] = useState(0);
   if (!RequirePin(user.id)) {
     return <div className="content-loading"></div>;
   }
@@ -404,15 +433,30 @@ const SettingsView = ({ token, apiUrl, user, settings }) => {
       </div>
 
       <div className="tab-content">
+        <PlaylistsSettingsView
+          token={token}
+          apiUrl={apiUrl}
+          user={user}
+          onPlaylistsChange={() => setVideosRefreshKey((k) => k + 1)}
+        />
+      </div>
+
+      <div className="tab-content">
         <VideosSettingsView
           token={token}
           apiUrl={apiUrl}
           user={user}
           errCallback={(e) => null}
+          refreshKey={videosRefreshKey}
         />
       </div>
     </div>
   );
 };
 
-export { ProblemTypesSettingsView, VideosSettingsView, SettingsView };
+export {
+  ProblemTypesSettingsView,
+  PlaylistsSettingsView,
+  VideosSettingsView,
+  SettingsView,
+};
