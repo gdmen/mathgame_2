@@ -33,6 +33,10 @@ func main() {
 	}
 	defer db.Close()
 
+	if err := api.RunMigrations(db); err != nil {
+		glog.Fatalf("migrations: %v", err)
+	}
+
 	api, err := api.NewApi(db)
 	if err != nil {
 		glog.Fatal(err)
