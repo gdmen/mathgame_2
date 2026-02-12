@@ -2,10 +2,12 @@
 package api // import "garydmenezes.com/mathgame/server/api"
 
 import (
+	"database/sql"
 	"fmt"
 	"math"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -20,18 +22,29 @@ const (
 )
 
 func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32, exclusions map[uint32]bool) (uint32, error) {
-	// Get videos belonging to this user
-	videos, status, msg, err := a.videoManager.CustomList(fmt.Sprintf("user_id=%d AND disabled=0 AND deleted=0;", userId))
-	if HandleMngrResp(logPrefix, c, status, msg, err, videos) != nil {
+	rows, err := a.DB.Query(`
+		SELECT uhv.video_id FROM user_has_video uhv
+		INNER JOIN videos v ON v.id = uhv.video_id AND v.disabled = 0
+		WHERE uhv.user_id = ?`, userId)
+	if err != nil {
+		glog.Errorf("%s selectVideo user_has_video: %v", logPrefix, err)
 		return 0, err
 	}
-
+	defer rows.Close()
 	var videoIds []uint32
-	for _, v := range *videos {
-		if _, ok := exclusions[v.Id]; ok {
+	for rows.Next() {
+		var id uint32
+		if err := rows.Scan(&id); err != nil {
+			glog.Errorf("%s selectVideo scan: %v", logPrefix, err)
+			return 0, err
+		}
+		if _, ok := exclusions[id]; ok {
 			continue
 		}
-		videoIds = append(videoIds, v.Id)
+		videoIds = append(videoIds, id)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, err
 	}
 
 	// If there are no videos at all in the database, do nothing
@@ -166,8 +179,8 @@ func (a *Api) customGetPageLoadData(c *gin.Context) {
 		return
 	}
 
-	// Get a count of enabled videos for this user
-	sql := fmt.Sprintf("SELECT count(*) FROM videos WHERE user_id=%d AND disabled=0 AND deleted=0;", user.Id)
+	// Get a count of enabled videos for this user (from user_has_video / playlists)
+	sql := fmt.Sprintf("SELECT COUNT(*) FROM user_has_video uhv INNER JOIN videos v ON v.id = uhv.video_id AND v.disabled = 0 WHERE uhv.user_id = %d;", user.Id)
 	value, status, msg, err := a.CustomValueQuery(sql)
 	if HandleMngrResp(logPrefix, c, status, msg, err, value) != nil {
 		return
@@ -182,6 +195,15 @@ func (a *Api) customGetPageLoadData(c *gin.Context) {
 	HandleMngrRespWriteCtx(logPrefix, c, http.StatusOK, "", nil, data)
 }
 
+func (a *Api) countEnabledVideosForUser(userId uint32) (int, error) {
+	var n int
+	err := a.DB.QueryRow(`
+		SELECT COUNT(*) FROM user_has_video uhv
+		INNER JOIN videos v ON v.id = uhv.video_id AND v.disabled = 0
+		WHERE uhv.user_id = ?`, userId).Scan(&n)
+	return n, err
+}
+
 // Get all user info that the client uses on the play page
 func (a *Api) customGetPlayData(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
@@ -190,6 +212,18 @@ func (a *Api) customGetPlayData(c *gin.Context) {
 	// Parse input
 	gamestate := &Gamestate{}
 	if BindModelFromURI(logPrefix, c, gamestate) != nil {
+		return
+	}
+
+	// Require at least 3 videos to play
+	count, err := a.countEnabledVideosForUser(gamestate.UserId)
+	if err != nil {
+		glog.Errorf("%s countEnabledVideosForUser: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("Could not check video count"))
+		return
+	}
+	if count < 3 {
+		c.JSON(http.StatusForbidden, common.GetError("Add at least 3 videos via playlists in Settings to play."))
 		return
 	}
 
@@ -232,9 +266,17 @@ func (a *Api) helpGetPlayData(logPrefix string, c *gin.Context, gamestate *Games
 		return
 	}
 
-	// Get Video
-	video, status, msg, err := a.videoManager.Get(gamestate.VideoId, gamestate.UserId)
-	if HandleMngrResp(logPrefix, c, status, msg, err, video) != nil {
+	// Get Video (by id only; videos table no longer has user_id)
+	video := &Video{}
+	err = a.DB.QueryRow("SELECT id, title, url, thumbnailurl, you_tube_id, disabled FROM videos WHERE id=?", gamestate.VideoId).
+		Scan(&video.Id, &video.Title, &video.URL, &video.ThumbnailURL, &video.YouTubeId, &video.Disabled)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, common.GetError("Video not found"))
+			return
+		}
+		glog.Errorf("%s get video: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("Could not get video"))
 		return
 	}
 
@@ -285,48 +327,76 @@ func (a *Api) customListEvent(c *gin.Context) {
 	}
 }
 
-// If the current reward video is deleted, we need to replace it
+// Remove a video from the current user's allowed list only. We never delete or
+// soft-delete video rows, so event and gamestate references remain valid.
 func (a *Api) customDeleteVideo(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
-	// Parse input
 	model := &Video{}
 	if BindModelFromURI(logPrefix, c, model) != nil {
 		return
 	}
 
-	// Get User
 	user := GetUserFromContext(c)
 
-	// Get Gamestate
+	result, err := a.DB.Exec("DELETE FROM user_has_video WHERE user_id=? AND video_id=?", user.Id, model.Id)
+	if err != nil {
+		glog.Errorf("%s remove from user_has_video: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("Could not remove video"))
+		return
+	}
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		c.JSON(http.StatusNotFound, common.GetError("Video not in your list"))
+		return
+	}
+
 	gamestate, status, msg, err := a.gamestateManager.Get(user.Id)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, gamestate) != nil {
 		return
 	}
-	glog.Infof("%s Gamestate: %v", logPrefix, gamestate)
-
 	if gamestate.VideoId == model.Id {
-		// Set a new reward video
 		videoId, err := a.selectVideo(logPrefix, c, user.Id, map[uint32]bool{gamestate.VideoId: true})
 		if err != nil {
 			return
 		}
 		gamestate.VideoId = videoId
-		// Write the updated gamestate
-		glog.Infof("%s Gamestate: %v", logPrefix, gamestate)
 		status, msg, err = a.gamestateManager.Update(gamestate)
 		if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, gamestate) != nil {
 			return
 		}
 	}
 
-	// Write video to database
-	sql := fmt.Sprintf("UPDATE videos SET deleted=1 WHERE id=%d AND user_id=%d;", model.Id, user.Id)
-	status, msg, err = a.videoManager.CustomSql(sql)
-	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {
+	c.Status(http.StatusNoContent)
+}
+
+func (a *Api) customCreateVideo(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+	user := GetUserFromContext(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, common.GetError("unauthorized"))
 		return
 	}
+	model := &Video{}
+	if BindModelFromForm(logPrefix, c, model) != nil {
+		return
+	}
+	status, msg, err := a.videoManager.Create(model)
+	if err != nil {
+		if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+			return
+		}
+		return
+	}
+	_, err = a.DB.Exec("INSERT IGNORE INTO user_has_video (user_id, video_id) VALUES (?, ?)", user.Id, model.Id)
+	if err != nil {
+		glog.Errorf("%s insert user_has_video: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("Could not add video to your list"))
+		return
+	}
+	HandleMngrRespWriteCtx(logPrefix, c, status, "", nil, model)
 }
 
 func (a *Api) customListVideo(c *gin.Context) {
@@ -335,12 +405,31 @@ func (a *Api) customListVideo(c *gin.Context) {
 
 	user := GetUserFromContext(c)
 
-	// Read from database
-	sql := fmt.Sprintf("user_id=%d AND deleted=0;", user.Id)
-	models, status, msg, err := a.videoManager.CustomList(sql)
-	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {
+	rows, err := a.DB.Query(`
+		SELECT v.id, v.title, v.url, v.thumbnailurl, v.you_tube_id, v.disabled
+		FROM videos v
+		INNER JOIN user_has_video uhv ON uhv.video_id = v.id
+		WHERE uhv.user_id = ?`, user.Id)
+	if err != nil {
+		glog.Errorf("%s list videos: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("Could not list videos"))
 		return
 	}
+	defer rows.Close()
+	var models []Video
+	for rows.Next() {
+		var v Video
+		if err := rows.Scan(&v.Id, &v.Title, &v.URL, &v.ThumbnailURL, &v.YouTubeId, &v.Disabled); err != nil {
+			glog.Errorf("%s scan video: %v", logPrefix, err)
+			c.JSON(http.StatusInternalServerError, common.GetError("Could not list videos"))
+			return
+		}
+		models = append(models, v)
+	}
+	if models == nil {
+		models = []Video{}
+	}
+	c.JSON(http.StatusOK, models)
 }
 
 func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
@@ -457,4 +546,166 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 	if a.processEvents(logPrefix, c, []*Event{event}, false) != nil {
 		return
 	}
+}
+
+func (a *Api) refreshUserHasVideo(userId uint32) error {
+	_, err := a.DB.Exec("DELETE FROM user_has_video WHERE user_id=?", userId)
+	if err != nil {
+		return err
+	}
+	_, err = a.DB.Exec(`
+		INSERT INTO user_has_video (user_id, video_id)
+		SELECT DISTINCT up.user_id, pv.video_id
+		FROM user_playlist up
+		INNER JOIN playlist_video pv ON up.playlist_id = pv.playlist_id
+		WHERE up.user_id = ?`,
+		userId)
+	return err
+}
+
+func (a *Api) customListPlaylists(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	user := GetUserFromContext(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, common.GetError("unauthorized"))
+		return
+	}
+	rows, err := a.DB.Query(`
+		SELECT p.id, p.you_tube_id, p.title, p.thumbnailurl, p.etag
+		FROM playlists p
+		INNER JOIN user_playlist up ON p.id = up.playlist_id
+		WHERE up.user_id = ?`,
+		user.Id)
+	if err != nil {
+		glog.Errorf("%s list my playlists: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("Could not list playlists"))
+		return
+	}
+	defer rows.Close()
+	var list []Playlist
+	for rows.Next() {
+		var p Playlist
+		err := rows.Scan(&p.Id, &p.YouTubeId, &p.Title, &p.ThumbnailURL, &p.Etag)
+		if err != nil {
+			glog.Errorf("%s scan playlist: %v", logPrefix, err)
+			c.JSON(http.StatusInternalServerError, common.GetError("Could not list playlists"))
+			return
+		}
+		list = append(list, p)
+	}
+	if err = rows.Err(); err != nil {
+		glog.Errorf("%s rows.Err: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("Could not list playlists"))
+		return
+	}
+	if list == nil {
+		list = []Playlist{}
+	}
+	c.JSON(http.StatusOK, list)
+}
+
+func extractPlaylistIDFromURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if strings.HasPrefix(raw, "http") {
+		u, err := url.Parse(raw)
+		if err != nil {
+			return ""
+		}
+		return u.Query().Get("list")
+	}
+	return raw
+}
+
+func (a *Api) customAddPlaylist(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	user := GetUserFromContext(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, common.GetError("unauthorized"))
+		return
+	}
+	var body struct {
+		PlaylistID        *uint32 `json:"playlist_id"`
+		YouTubePlaylistID *string `json:"youtube_playlist_id"`
+		PlaylistURL       *string `json:"playlist_url"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, common.GetError("Invalid request body"))
+		return
+	}
+	var playlistID uint32
+	if body.PlaylistID != nil {
+		_, status, msg, err := a.playlistManager.Get(*body.PlaylistID)
+		if err != nil {
+			glog.Errorf("%s get playlist: %v", logPrefix, err)
+			c.JSON(status, common.GetError(msg))
+			return
+		}
+		playlistID = *body.PlaylistID
+	} else {
+		var ytID string
+		if body.YouTubePlaylistID != nil && *body.YouTubePlaylistID != "" {
+			ytID = strings.TrimSpace(*body.YouTubePlaylistID)
+		} else if body.PlaylistURL != nil {
+			ytID = extractPlaylistIDFromURL(*body.PlaylistURL)
+		}
+		if ytID == "" {
+			c.JSON(http.StatusBadRequest, common.GetError("Provide playlist_id, youtube_playlist_id, or playlist_url"))
+			return
+		}
+		syncedID, err := a.syncPlaylistFromYouTube(ytID)
+		if err != nil {
+			glog.Errorf("%s syncPlaylistFromYouTube %s: %v", logPrefix, ytID, err)
+			c.JSON(http.StatusBadRequest, common.GetError("Could not fetch playlist from YouTube: "+err.Error()))
+			return
+		}
+		playlistID = syncedID
+	}
+	_, err := a.DB.Exec("INSERT IGNORE INTO user_playlist (user_id, playlist_id) VALUES (?, ?)", user.Id, playlistID)
+	if err != nil {
+		glog.Errorf("%s add user_playlist: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("Could not add playlist"))
+		return
+	}
+	if err := a.refreshUserHasVideo(user.Id); err != nil {
+		glog.Errorf("%s refreshUserHasVideo: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("Could not update video list"))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"id": playlistID})
+}
+
+func (a *Api) customRemovePlaylist(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	user := GetUserFromContext(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, common.GetError("unauthorized"))
+		return
+	}
+	var uri struct {
+		PlaylistID uint32 `uri:"playlist_id" binding:"required"`
+	}
+	if err := c.ShouldBindUri(&uri); err != nil {
+		c.JSON(http.StatusBadRequest, common.GetError("Invalid playlist_id"))
+		return
+	}
+	result, err := a.DB.Exec("DELETE FROM user_playlist WHERE user_id=? AND playlist_id=?", user.Id, uri.PlaylistID)
+	if err != nil {
+		glog.Errorf("%s remove user_playlist: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("Could not remove playlist"))
+		return
+	}
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		c.JSON(http.StatusNotFound, common.GetError("Playlist not in your list"))
+		return
+	}
+	if err := a.refreshUserHasVideo(user.Id); err != nil {
+		glog.Errorf("%s refreshUserHasVideo: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("Could not update video list"))
+		return
+	}
+	c.Status(http.StatusNoContent)
 }

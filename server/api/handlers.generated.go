@@ -172,6 +172,88 @@ func (a *Api) deleteProblem(c *gin.Context) {
 	}
 }
 
+func (a *Api) createPlaylist(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Playlist{}
+	if BindModelFromForm(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Write to database
+	status, msg, err := a.playlistManager.Create(model)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
+}
+
+func (a *Api) getPlaylist(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Playlist{}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Read from database
+	model, status, msg, err := a.playlistManager.Get(model.Id)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
+}
+
+func (a *Api) listPlaylist(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Read from database
+	models, status, msg, err := a.playlistManager.List()
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {
+		return
+	}
+}
+
+func (a *Api) updatePlaylist(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Playlist{}
+	if BindModelFromForm(logPrefix, c, model) != nil {
+		return
+	}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Write to database
+	status, msg, err := a.playlistManager.Update(model)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
+}
+
+func (a *Api) deletePlaylist(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &Playlist{}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
+	// Write to database
+	status, msg, err := a.playlistManager.Delete(model.Id)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {
+		return
+	}
+}
+
 func (a *Api) createVideo(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
@@ -181,8 +263,6 @@ func (a *Api) createVideo(c *gin.Context) {
 	if BindModelFromForm(logPrefix, c, model) != nil {
 		return
 	}
-
-	model.UserId = GetUserFromContext(c).Id
 
 	// Write to database
 	status, msg, err := a.videoManager.Create(model)
@@ -201,10 +281,8 @@ func (a *Api) getVideo(c *gin.Context) {
 		return
 	}
 
-	user := GetUserFromContext(c)
-
 	// Read from database
-	model, status, msg, err := a.videoManager.Get(model.Id, user.Id)
+	model, status, msg, err := a.videoManager.Get(model.Id)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
@@ -214,10 +292,8 @@ func (a *Api) listVideo(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
-	user := GetUserFromContext(c)
-
 	// Read from database
-	models, status, msg, err := a.videoManager.List(user.Id)
+	models, status, msg, err := a.videoManager.List()
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, models) != nil {
 		return
 	}
@@ -236,11 +312,8 @@ func (a *Api) updateVideo(c *gin.Context) {
 		return
 	}
 
-	user := GetUserFromContext(c)
-	model.UserId = GetUserFromContext(c).Id
-
 	// Write to database
-	status, msg, err := a.videoManager.Update(model, user.Id)
+	status, msg, err := a.videoManager.Update(model)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
 		return
 	}
@@ -256,10 +329,8 @@ func (a *Api) deleteVideo(c *gin.Context) {
 		return
 	}
 
-	user := GetUserFromContext(c)
-
 	// Write to database
-	status, msg, err := a.videoManager.Delete(model.Id, user.Id)
+	status, msg, err := a.videoManager.Delete(model.Id)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, nil) != nil {
 		return
 	}

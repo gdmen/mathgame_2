@@ -48,6 +48,9 @@ func EnsureValidToken() func(next http.Handler) http.Handler {
 	if err != nil {
 		log.Fatalf("Failed to read config: %v", err)
 	}
+	if err := c.Validate(); err != nil {
+		log.Fatalf("Invalid config: %v", err)
+	}
 
 	issuerURL, err := url.Parse("https://" + c.Auth0Domain + "/")
 	if err != nil {

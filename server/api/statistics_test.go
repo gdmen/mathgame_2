@@ -16,12 +16,12 @@ func TestStatistics_ReturnsTotals(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
 	}
-	ResetTestApi(c)
-	r := TestApi.GetRouter()
+	api, r, cleanup := setupTestAPI(t, c)
+	defer cleanup()
 	user := createTestUser(t, r, "auth0|statistics-totals", "statistics@test.com", "statisticsuser")
 
 	// Insert events: 2 solved, 2 min work (120000 ms), 1 min video (60000 ms)
-	_, err = TestApi.DB.Exec(
+	_, err = api.DB.Exec(
 		"INSERT INTO events (user_id, event_type, value) VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?), (?, ?, ?)",
 		user.Id, SOLVED_PROBLEM, "1",
 		user.Id, SOLVED_PROBLEM, "1",
@@ -65,8 +65,8 @@ func TestStatistics_EmptyUser_ReturnsZeros(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
 	}
-	ResetTestApi(c)
-	r := TestApi.GetRouter()
+	_, r, cleanup := setupTestAPI(t, c)
+	defer cleanup()
 	user := createTestUser(t, r, "auth0|statistics-empty", "empty@test.com", "emptyuser")
 
 	resp := httptest.NewRecorder()
@@ -97,8 +97,8 @@ func TestStatistics_ForbiddenWhenWrongUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
 	}
-	ResetTestApi(c)
-	r := TestApi.GetRouter()
+	_, r, cleanup := setupTestAPI(t, c)
+	defer cleanup()
 	userA := createTestUser(t, r, "auth0|statistics-a", "a@test.com", "usera")
 	userB := createTestUser(t, r, "auth0|statistics-b", "b@test.com", "userb")
 
@@ -117,12 +117,12 @@ func TestStatistics_MsToMinutes_RoundsDown(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
 	}
-	ResetTestApi(c)
-	r := TestApi.GetRouter()
+	api, r, cleanup := setupTestAPI(t, c)
+	defer cleanup()
 	user := createTestUser(t, r, "auth0|statistics-ms", "ms@test.com", "msuser")
 
 	// 90000 ms = 1.5 min -> DIV 60000 = 1 minute
-	_, err = TestApi.DB.Exec(
+	_, err = api.DB.Exec(
 		"INSERT INTO events (user_id, event_type, value) VALUES (?, ?, ?), (?, ?, ?)",
 		user.Id, WORKING_ON_PROBLEM, "90000",
 		user.Id, WATCHING_VIDEO, "60000",
