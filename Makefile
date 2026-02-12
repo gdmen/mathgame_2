@@ -14,7 +14,7 @@ GOPATH=$(HOME)/go
 SWAGGER=$(GOPATH)/bin/swagger
 RM=rm -rf
 
-all: build-api build-web build-cmds
+all: build-api build-cmds build-web
 
 dev-api:
 	$(GOBIN)/apiserver -v 3 --logtostderr 1
@@ -30,6 +30,7 @@ build-api:
 
 build-cmds: build-api
 	$(GOBUILD) -o ./bin/compress_events ./cmd/compress_events/
+	$(GOBUILD) -o ./bin/check_disabled_videos ./cmd/check_disabled_videos/
 
 test: build-api test-api
 
@@ -50,6 +51,7 @@ dev-docs: check-swagger
 	$(SWAGGER) serve -F=swagger swagger.yaml
 
 clean:
+	-$(GOCMD) run ./cmd/clean_test_dbs -config test_conf.json
 	$(RM) ./swagger.yaml
 	$(RM) ./bin/*
 	$(RM) ./server/api/*.generated.go

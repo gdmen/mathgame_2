@@ -52,6 +52,9 @@ func GenerateProblem(opts *Options) ([]Problem, error) {
 	if err != nil {
 		glog.Fatal(err)
 	}
+	if err := c.Validate(); err != nil {
+		glog.Fatal(err)
+	}
 
 	sort.Strings(opts.Features)
 	featuresJson, err := json.Marshal(opts.Features)

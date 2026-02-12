@@ -35,8 +35,5 @@ Run from repo root. API reads conf.json from current directory.
 # production
 > see ./deploy/README.md
 
-# insert some test videos
-mysql -u root -proot mathgame < deploy/videos.sql
-
 # drop and recreate db
 mysql -u root -proot mathgame < deploy/drop.sql

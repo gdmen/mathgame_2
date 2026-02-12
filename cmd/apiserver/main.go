@@ -26,6 +26,9 @@ func main() {
 	if err != nil {
 		glog.Fatal(err)
 	}
+	if err := c.Validate(); err != nil {
+		glog.Fatal(err)
+	}
 	connectStr := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=true&time_zone=UTC", c.MySQLUser, c.MySQLPass, c.MySQLHost, c.MySQLPort, c.MySQLDatabase)
 	db, err := sql.Open("mysql", connectStr)
 	if err != nil {
@@ -37,7 +40,7 @@ func main() {
 		glog.Fatalf("migrations: %v", err)
 	}
 
-	api, err := api.NewApi(db)
+	api, err := api.NewApi(db, c)
 	if err != nil {
 		glog.Fatal(err)
 	}

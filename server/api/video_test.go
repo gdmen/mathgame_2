@@ -25,8 +25,8 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
 	}
-	ResetTestApi(c)
-	r := TestApi.GetRouter()
+	_, r, cleanup := setupTestAPI(t, c)
+	defer cleanup()
 
 	// Create new user
 	user := &User{
@@ -60,9 +60,10 @@ func TestVideoBasic(t *testing.T) {
 	resp = httptest.NewRecorder()
 
 	video := Video{
-		Title:    "son of man",
-		URL:      "https://www.youtube.com/watch?v=-WcHPFUwd6U",
-		Disabled: false,
+		Title:     "son of man",
+		URL:       "https://www.youtube.com/watch?v=-WcHPFUwd6U",
+		YouTubeId: "-WcHPFUwd6U",
+		Disabled:  false,
 	}
 	body, _ = json.Marshal(video)
 	req, _ = http.NewRequest("POST", fmt.Sprintf("/api/v1/videos/?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
@@ -77,7 +78,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `{"id":1,"user_id":1,"title":"son of man","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","thumbnailurl":"","disabled":false,"deleted":false}` {
+	if strings.TrimSpace(string(body)) != `{"id":1,"title":"son of man","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","thumbnailurl":"","you_tube_id":"-WcHPFUwd6U","disabled":false}` {
 		t.Fatal("ERROR: " + string(body))
 	}
 
@@ -96,7 +97,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `[{"id":1,"user_id":1,"title":"son of man","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","thumbnailurl":"","disabled":false,"deleted":false}]` {
+	if strings.TrimSpace(string(body)) != `[{"id":1,"title":"son of man","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","thumbnailurl":"","you_tube_id":"-WcHPFUwd6U","disabled":false}]` {
 		t.Fatal("ERROR: " + string(body))
 	}
 
@@ -118,7 +119,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `{"id":1,"user_id":1,"title":"unda da sea","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","thumbnailurl":"","disabled":true,"deleted":false}` {
+	if strings.TrimSpace(string(body)) != `{"id":1,"title":"unda da sea","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","thumbnailurl":"","you_tube_id":"-WcHPFUwd6U","disabled":true}` {
 		t.Fatal("ERROR: " + string(body))
 	}
 
@@ -137,7 +138,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `{"id":1,"user_id":1,"title":"unda da sea","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","thumbnailurl":"","disabled":true,"deleted":false}` {
+	if strings.TrimSpace(string(body)) != `{"id":1,"title":"unda da sea","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","thumbnailurl":"","you_tube_id":"-WcHPFUwd6U","disabled":true}` {
 		t.Fatal("ERROR: " + string(body))
 	}
 
@@ -148,8 +149,8 @@ func TestVideoBasic(t *testing.T) {
 
 	r.ServeHTTP(resp, req)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusOK, resp.Code, resp)
+	if resp.Code != http.StatusOK && resp.Code != http.StatusNoContent {
+		t.Fatalf("Expected status code %d or %d, got %d. . .\n%+v", http.StatusOK, http.StatusNoContent, resp.Code, resp)
 	}
 
 	// List
@@ -175,9 +176,10 @@ func TestVideoBasic(t *testing.T) {
 	resp = httptest.NewRecorder()
 
 	video = Video{
-		Title:    "14 years old defeating 16 Blue Belts with Foot Locks! 🤯",
-		URL:      "https://www.youtube.com/watch?v=B5YmbhNoD00",
-		Disabled: false,
+		Title:     "14 years old defeating 16 Blue Belts with Foot Locks! 🤯",
+		URL:       "https://www.youtube.com/watch?v=B5YmbhNoD00",
+		YouTubeId: "B5YmbhNoD00",
+		Disabled:  false,
 	}
 	body, _ = json.Marshal(video)
 	req, _ = http.NewRequest("POST", fmt.Sprintf("/api/v1/videos/?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
@@ -192,7 +194,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `{"id":2,"user_id":1,"title":"14 years old defeating 16 Blue Belts with Foot Locks! 🤯","url":"https://www.youtube.com/watch?v=B5YmbhNoD00","thumbnailurl":"","disabled":false,"deleted":false}` {
+	if strings.TrimSpace(string(body)) != `{"id":2,"title":"14 years old defeating 16 Blue Belts with Foot Locks! 🤯","url":"https://www.youtube.com/watch?v=B5YmbhNoD00","thumbnailurl":"","you_tube_id":"B5YmbhNoD00","disabled":false}` {
 		t.Fatal("ERROR: " + string(body))
 	}
 

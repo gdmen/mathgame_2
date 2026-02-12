@@ -27,9 +27,19 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 // RunMigrations creates the schema_migrations table if needed, then runs any
 // migration file in server/api/migrations/ that is not yet recorded. Files are
 // run in numeric order by base name (1.sql, 2.sql, ..., 10.sql, 11.sql, ...).
-// If schema_migrations is empty, versions 1-14 are seeded as already applied
+// If schema_migrations is empty, versions 1-14 are skipped as already applied
 // (all environments had those run manually before this system existed).
 func RunMigrations(db *sql.DB) error {
+	return runMigrations(db, true)
+}
+
+// RunMigrationsForTest runs all migrations from 1 upward with no skipping. Use for
+// test databases so the full schema (including events, etc.) is created.
+func RunMigrationsForTest(db *sql.DB) error {
+	return runMigrations(db, false)
+}
+
+func runMigrations(db *sql.DB, skipOneThroughFourteen bool) error {
 	if _, err := db.Exec(createSchemaMigrationsTable); err != nil {
 		return fmt.Errorf("creating schema_migrations table: %w", err)
 	}
@@ -39,15 +49,15 @@ func RunMigrations(db *sql.DB) error {
 		return err
 	}
 
-	if len(applied) == 0 {
+	if skipOneThroughFourteen && len(applied) == 0 {
 		for v := 1; v <= 14; v++ {
 			version := strconv.Itoa(v)
 			if _, err := db.Exec("INSERT INTO schema_migrations (version) VALUES (?)", version); err != nil {
-				return fmt.Errorf("seeding migration %s: %w", version, err)
+				return fmt.Errorf("skipping migration %s: %w", version, err)
 			}
 			applied[version] = true
 		}
-		glog.Info("seeded schema_migrations with versions 1-14 (already applied in all environments)")
+		glog.Info("skipped schema_migrations with versions 1-14 (already applied in all environments)")
 	}
 
 	entries, err := migrationsFS.ReadDir("migrations")

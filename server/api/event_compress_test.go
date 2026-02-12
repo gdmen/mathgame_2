@@ -133,12 +133,12 @@ func TestRunCompress_Integration_ProgressUnchanged(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
 	}
-	ResetTestApi(c)
-	r := TestApi.GetRouter()
+	api, r, cleanup := setupTestAPI(t, c)
+	defer cleanup()
 	user := createTestUser(t, r, "auth0|compress-progress", "compress@test.com", "compressuser")
 
 	// Insert 3x watching_video 5000 ms each (total 15000 ms = 0.25 min, but progress rounds; we'll assert row count and same total)
-	_, err = TestApi.DB.Exec(
+	_, err = api.DB.Exec(
 		"INSERT INTO events (user_id, event_type, value) VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?)",
 		user.Id, WATCHING_VIDEO, "5000",
 		user.Id, WATCHING_VIDEO, "5000",
@@ -150,12 +150,12 @@ func TestRunCompress_Integration_ProgressUnchanged(t *testing.T) {
 
 	// Get progress before compress (total_video_minutes: 15000/60000 = 0)
 	var count int
-	err = TestApi.DB.QueryRow("SELECT COUNT(*) FROM events WHERE user_id = ? AND event_type = ?", user.Id, WATCHING_VIDEO).Scan(&count)
+	err = api.DB.QueryRow("SELECT COUNT(*) FROM events WHERE user_id = ? AND event_type = ?", user.Id, WATCHING_VIDEO).Scan(&count)
 	if err != nil || count != 3 {
 		t.Fatalf("before: want 3 rows; got count=%d err=%v", count, err)
 	}
 
-	numUpdates, numDeletes, err := RunCompress(TestApi.DB)
+	numUpdates, numDeletes, err := RunCompress(api.DB)
 	if err != nil {
 		t.Fatalf("RunCompress: %v", err)
 	}
@@ -163,13 +163,13 @@ func TestRunCompress_Integration_ProgressUnchanged(t *testing.T) {
 		t.Errorf("RunCompress: want 1 update, 2 deletes; got %d, %d", numUpdates, numDeletes)
 	}
 
-	err = TestApi.DB.QueryRow("SELECT COUNT(*) FROM events WHERE user_id = ? AND event_type = ?", user.Id, WATCHING_VIDEO).Scan(&count)
+	err = api.DB.QueryRow("SELECT COUNT(*) FROM events WHERE user_id = ? AND event_type = ?", user.Id, WATCHING_VIDEO).Scan(&count)
 	if err != nil || count != 1 {
 		t.Fatalf("after: want 1 row; got count=%d err=%v", count, err)
 	}
 
 	var value string
-	err = TestApi.DB.QueryRow("SELECT value FROM events WHERE user_id = ? AND event_type = ?", user.Id, WATCHING_VIDEO).Scan(&value)
+	err = api.DB.QueryRow("SELECT value FROM events WHERE user_id = ? AND event_type = ?", user.Id, WATCHING_VIDEO).Scan(&value)
 	if err != nil || value != "15000" {
 		t.Errorf("merged value: want 15000; got %q err=%v", value, err)
 	}

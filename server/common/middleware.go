@@ -41,8 +41,10 @@ func TestAuth0IdMiddleware() gin.HandlerFunc {
 		logPrefix := GetLogPrefix(c)
 		c.Set(Auth0IdKey, nil)
 		model := &TestAuth0{}
-		err := c.Bind(model)
-		if err != nil {
+		// Prefer query param so test_auth0_id in URL works for POST requests with JSON body.
+		if id := c.Query("test_auth0_id"); id != "" {
+			model.Auth0Id = id
+		} else if err := c.Bind(model); err != nil {
 			glog.Errorf("%s error: %s", logPrefix, err)
 			panic(err)
 		}
