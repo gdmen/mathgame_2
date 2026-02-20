@@ -1,0 +1,113 @@
+.progress-page {
+  padding: 1rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.progress-header {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.progress-error {
+  color: #c00;
+}
+
+.progress-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.progress-summary-item {
+  display: flex;
+  flex-direction: column;
+  min-width: 6rem;
+  padding: 0.75rem 1rem;
+  background: #f5f5f5;
+  border-radius: 0.25rem;
+}
+
+.progress-summary-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.progress-summary-label {
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.progress-by-month {
+  margin-bottom: 2rem;
+
+  h2 {
+    font-size: 1.125rem;
+    margin-bottom: 0.5rem;
+  }
+}
+
+.progress-by-month-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+
+  th,
+  td {
+    padding: 0.35rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+  }
+
+  th {
+    font-weight: 600;
+    color: #444;
+  }
+}
+
+.progress-hardest {
+  margin-bottom: 2rem;
+
+  h2 {
+    font-size: 1.125rem;
+    margin-bottom: 0.25rem;
+  }
+}
+
+.progress-hardest-caption {
+  font-size: 0.875rem;
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+
+.progress-hardest-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+
+  th,
+  td {
+    padding: 0.35rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+  }
+
+  th {
+    font-weight: 600;
+    color: #444;
+  }
+
+  .progress-hardest-problem {
+    max-width: 280px;
+  }
+
+  .progress-hardest-expression {
+    font-family: inherit;
+  }
+
+  .progress-hardest-answer {
+    color: #666;
+    font-size: 0.8125rem;
+  }
+}
