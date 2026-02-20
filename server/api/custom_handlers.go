@@ -205,7 +205,25 @@ func (a *Api) customGetPlayData(c *gin.Context) {
 func (a *Api) helpGetPlayData(logPrefix string, c *gin.Context, gamestate *Gamestate) {
 	// Get Problem
 	problem, status, msg, err := a.problemManager.Get(gamestate.ProblemId)
-	if HandleMngrResp(logPrefix, c, status, msg, err, problem) != nil {
+	if err != nil || status == http.StatusNotFound || gamestate.ProblemId == 0 {
+		// Problem missing or invalid (e.g. id 0); select a new problem and persist it
+		glog.Infof("%s problem not found or invalid (id=%d), selecting new problem", logPrefix, gamestate.ProblemId)
+		settings, status, msg, err := a.settingsManager.Get(gamestate.UserId)
+		if HandleMngrResp(logPrefix, c, status, msg, err, settings) != nil {
+			return
+		}
+		problem, err = a.selectProblem(logPrefix, c, settings, &[]uint32{})
+		if err != nil {
+			glog.Errorf("%s selectProblem: %v", logPrefix, err)
+			c.JSON(http.StatusInternalServerError, common.GetError("Could not select problem"))
+			return
+		}
+		gamestate.ProblemId = problem.Id
+		status, msg, err = a.gamestateManager.Update(gamestate)
+		if HandleMngrResp(logPrefix, c, status, msg, err, gamestate) != nil {
+			return
+		}
+	} else if HandleMngrResp(logPrefix, c, status, msg, err, problem) != nil {
 		return
 	}
 

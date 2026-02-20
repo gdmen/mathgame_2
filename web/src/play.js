@@ -117,7 +117,24 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
           },
         };
         var req = await fetch(apiUrl + "/play/" + user.id, reqParams);
-        const json = await req.json();
+        const text = await req.text();
+        if (!req.ok) {
+          if (req.status === 403) {
+            window.location.pathname = "/";
+          }
+          return;
+        }
+        if (!text || text.trim() === "") {
+          console.log("Play API returned empty body");
+          return;
+        }
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch (parseErr) {
+          console.log("Play API invalid JSON: " + parseErr.message);
+          return;
+        }
         setGamestate(json["gamestate"]);
         setProblem(json["problem"]);
         setVideo(json["video"]);
@@ -162,7 +179,7 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
   const eventReporter = new EventReporterSingleton(
     async (event_type, value) => {
       let json = await postEvent(event_type, value);
-      if (event_type == "answered_problem") {
+      if (event_type == "answered_problem" && json && json.gamestate) {
         setGamestate(json["gamestate"]);
         setProblem(json["problem"]);
         setVideo(json["video"]);
@@ -178,10 +195,13 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
 
   if (gamestate.solved >= gamestate.target) {
     if (conf.debug_quickplay) {
-      postEvent("watching_video", 5000).then(() => {
-        postEvent("done_watching_video", gamestate.video_id).then(() => {
-          window.location.pathname = "play";
-        });
+      postEvent("watching_video", 5000).then((json) => {
+        if (json == null) return;
+        postEvent("done_watching_video", gamestate.video_id).then(
+          (doneJson) => {
+            if (doneJson != null) window.location.pathname = "play";
+          }
+        );
       });
       return null;
     } else {
@@ -195,9 +215,10 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
     }
   } else {
     if (conf.debug_quickplay) {
-      postEvent("working_on_problem", 1000).then(() => {
-        postEvent("answered_problem", problem.answer).then(() => {
-          window.location.pathname = "play";
+      postEvent("working_on_problem", 1000).then((json) => {
+        if (json == null) return;
+        postEvent("answered_problem", problem.answer).then((answeredJson) => {
+          if (answeredJson != null) window.location.pathname = "play";
         });
       });
       return null;
@@ -215,7 +236,9 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
         setReportSubmitting(true);
         const value = JSON.stringify({
           problem_id: gamestate.problem_id,
-          explanation: reportExplanation.trim().slice(0, REPORT_EXPLANATION_MAX_LENGTH) || "",
+          explanation:
+            reportExplanation.trim().slice(0, REPORT_EXPLANATION_MAX_LENGTH) ||
+            "",
         });
         postEvent("bad_problem_user", value)
           .then((json) => {
@@ -253,11 +276,18 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
             Report problem
           </button>
           {showReportModal && (
-            <div className="report-modal-overlay" onClick={() => !reportSubmitting && setShowReportModal(false)}>
-              <div className="report-modal" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="report-modal-overlay"
+              onClick={() => !reportSubmitting && setShowReportModal(false)}
+            >
+              <div
+                className="report-modal"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <h4>Report problem</h4>
                 <p className="report-modal-copy">
-                  Report if this problem is unsuitable or doesn&apos;t accept the correct answer. Your PIN is required.
+                  Report if this problem is unsuitable or doesn&apos;t accept
+                  the correct answer. Your PIN is required.
                 </p>
                 <div className="report-modal-pin">
                   <label htmlFor="report-pin">PIN</label>
@@ -272,23 +302,43 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
                   />
                 </div>
                 <div className="report-modal-explanation">
-                  <label htmlFor="report-explanation">Why are you reporting this problem? (optional)</label>
+                  <label htmlFor="report-explanation">
+                    Why are you reporting this problem? (optional)
+                  </label>
                   <textarea
                     id="report-explanation"
                     value={reportExplanation}
-                    onChange={(e) => setReportExplanation(e.target.value.slice(0, REPORT_EXPLANATION_MAX_LENGTH))}
+                    onChange={(e) =>
+                      setReportExplanation(
+                        e.target.value.slice(0, REPORT_EXPLANATION_MAX_LENGTH)
+                      )
+                    }
                     maxLength={REPORT_EXPLANATION_MAX_LENGTH}
                     rows={3}
                     placeholder="e.g. Wrong answer was marked correct"
                   />
-                  <span className="report-char-count">{reportExplanation.length}/{REPORT_EXPLANATION_MAX_LENGTH}</span>
+                  <span className="report-char-count">
+                    {reportExplanation.length}/{REPORT_EXPLANATION_MAX_LENGTH}
+                  </span>
                 </div>
-                {reportError && <p className="report-modal-error">{reportError}</p>}
+                {reportError && (
+                  <p className="report-modal-error">{reportError}</p>
+                )}
                 <div className="report-modal-actions">
-                  <button type="button" onClick={handleReportSubmit} disabled={reportSubmitting}>
+                  <button
+                    type="button"
+                    onClick={handleReportSubmit}
+                    disabled={reportSubmitting}
+                  >
                     {reportSubmitting ? "Submitting…" : "Submit"}
                   </button>
-                  <button type="button" onClick={() => !reportSubmitting && setShowReportModal(false)} disabled={reportSubmitting}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      !reportSubmitting && setShowReportModal(false)
+                    }
+                    disabled={reportSubmitting}
+                  >
                     Cancel
                   </button>
                 </div>

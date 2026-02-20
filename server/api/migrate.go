@@ -1,7 +1,8 @@
 // Package api runs database migrations on startup.
 // If you have already run some migrations by hand, insert their version numbers
 // into schema_migrations so they are not re-run, e.g.:
-//   INSERT INTO schema_migrations (version) VALUES ('1'), ('2'), ('3');
+//
+//	INSERT INTO schema_migrations (version) VALUES ('1'), ('2'), ('3');
 package api
 
 import (

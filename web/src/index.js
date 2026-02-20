@@ -123,10 +123,20 @@ const AppView = () => {
         };
         console.log("reporting " + event_type + ":" + String(value));
         const req = await fetch(ApiUrl + "/events", reqParams);
-        const json = await req.json();
-        return json;
+        const text = await req.text();
+        if (!text || text.trim() === "") {
+          console.log("Events API returned empty body");
+          return null;
+        }
+        try {
+          return JSON.parse(text);
+        } catch (parseErr) {
+          console.log("Events API invalid JSON: " + parseErr.message);
+          return null;
+        }
       } catch (e) {
         console.log(e.message);
+        return null;
       }
     };
   }, [token]);
