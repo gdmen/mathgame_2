@@ -111,6 +111,7 @@ func (a *Api) GetRouter() *gin.Engine {
 	{
 		v1.GET("/pageload/:auth0_id", userMiddleware, a.customGetPageLoadData)
 		v1.GET("/play/:user_id", userMiddleware, a.customGetPlayData)
+		v1.GET("/progress/:user_id", userMiddleware, a.getProgress)
 		user := v1.Group("/users")
 		{
 			user.POST("", userMiddlewareLenient, a.customCreateOrUpdateUser)

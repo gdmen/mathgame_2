@@ -12,6 +12,7 @@ import { SetupView } from "./setup.js";
 import { PinView, ClearSessionPin } from "./pin.js";
 import { SettingsView } from "./settings.js";
 import { PlayView } from "./play.js";
+import { ProgressView } from "./progress.js";
 import { CompanionView } from "./companion.js";
 
 import "./index.scss";
@@ -84,6 +85,11 @@ const MainView = ({
                 user={user}
                 settings={settings}
               />
+            )}
+          </Route>
+          <Route exact path="/progress">
+            {!isLoading && isAuthenticated && (
+              <ProgressView token={token} apiUrl={apiUrl} user={user} />
             )}
           </Route>
           <Route exact path="/companion/:student_id">
@@ -210,6 +216,13 @@ const AppView = () => {
         <ul className="menu">
           <li>{user ? user.username : ""}</li>
           <li>
+            {isAuthenticated ? (
+              <button onClick={() => (window.location.pathname = "progress")}>
+                Progress
+              </button>
+            ) : (
+              <></>
+            )}
             {isAuthenticated ? (
               <button onClick={() => (window.location.pathname = "settings")}>
                 Adults
