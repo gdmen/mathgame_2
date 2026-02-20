@@ -46,6 +46,14 @@ build-docs: check-swagger
 dev-docs: check-swagger
 	$(SWAGGER) serve -F=swagger swagger.yaml
 
+check-disabled-videos:
+	$(GOBUILD) -o ./bin/check_disabled_videos ./cmd/check_disabled_videos/
+	./bin/check_disabled_videos -config conf.json
+
+fix-disabled-videos:
+	$(GOBUILD) -o ./bin/check_disabled_videos ./cmd/check_disabled_videos/
+	./bin/check_disabled_videos -config conf.json --enable
+
 clean:
 	$(RM) ./swagger.yaml
 	$(RM) ./bin/*
