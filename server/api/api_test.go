@@ -63,6 +63,10 @@ func ResetTestApi(c *common.Config) {
 		fmt.Printf("Couldn't init Api: %v", err)
 		os.Exit(1)
 	}
+	if err := RunMigrations(db); err != nil {
+		fmt.Printf("Couldn't run migrations: %v", err)
+		os.Exit(1)
+	}
 	TestApi.isTest = true
 }
 
