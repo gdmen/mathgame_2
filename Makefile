@@ -14,7 +14,7 @@ GOPATH=$(HOME)/go
 SWAGGER=$(GOPATH)/bin/swagger
 RM=rm -rf
 
-all: build-api build-web
+all: build-api build-web build-cmds
 
 dev-api:
 	$(GOBIN)/apiserver -v 3 --logtostderr 1
@@ -27,6 +27,9 @@ build-api:
 	python3 server/code_generation/generate_handlers.py -c server/api/models.json -o server/api
 	$(GOFMT) -s .
 	$(GOBUILD) -o ./bin/apiserver ./cmd/apiserver/main.go
+
+build-cmds: build-api
+	$(GOBUILD) -o ./bin/compress_events ./cmd/compress_events/
 
 test: build-api test-api
 
