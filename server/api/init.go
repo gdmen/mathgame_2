@@ -88,7 +88,7 @@ func (a *Api) GetRouter() *gin.Engine {
 	// TODO: limit allowed origins
 	config.AllowAllOrigins = true
 	config.AllowHeaders = append(config.AllowHeaders, "Authorization")
-	config.AllowMethods = []string{"GET", "POST", "DELETE"}
+	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
 	router.Use(cors.New(config))
 
 	// Use our request id middleware

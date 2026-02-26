@@ -217,13 +217,6 @@ const AppView = () => {
           <li>{user ? user.username : ""}</li>
           <li>
             {isAuthenticated ? (
-              <button onClick={() => (window.location.pathname = "progress")}>
-                Progress
-              </button>
-            ) : (
-              <></>
-            )}
-            {isAuthenticated ? (
               <button onClick={() => (window.location.pathname = "settings")}>
                 Adults
               </button>
