@@ -4,6 +4,7 @@ package api
 import (
 	"database/sql"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 )
@@ -65,8 +66,9 @@ func parseInt64(s string) (int64, bool) {
 
 const (
 	selectEventsOrderedSQL = `SELECT id, timestamp, user_id, event_type, value FROM events ORDER BY user_id, id`
-	compressUpdateEventSQL = `UPDATE events SET timestamp=?, user_id=?, event_type=?, value=? WHERE id=? AND user_id=?`
-	compressDeleteEventSQL = `DELETE FROM events WHERE id=? AND user_id=?`
+	// maxChunkSize limits rows per batched UPDATE/DELETE to stay under MySQL's limit of 65,535 placeholders per prepared statement.
+	// UPDATE uses 3 placeholders per row (id, value, id), so max = 65535/3 = 21845.
+	maxChunkSize = 21845
 )
 
 // PlanCompress reads all events and returns planned updates and deletes (no write). Used for dry-run.
@@ -110,19 +112,49 @@ func RunCompress(db *sql.DB) (numUpdates, numDeletes int, err error) {
 		}
 	}()
 
-	for _, e := range updates {
-		_, err = tx.Exec(compressUpdateEventSQL, e.Timestamp, e.UserId, e.EventType, e.Value, e.Id, e.UserId)
+	numUpdates = len(updates)
+	for off := 0; off < len(updates); off += maxChunkSize {
+		end := off + maxChunkSize
+		if end > len(updates) {
+			end = len(updates)
+		}
+		chunk := updates[off:end]
+		caseParts := make([]string, len(chunk))
+		inPlaceholders := make([]string, len(chunk))
+		args := make([]interface{}, 0, len(chunk)*3)
+		for i, e := range chunk {
+			caseParts[i] = "WHEN ? THEN ?"
+			inPlaceholders[i] = "?"
+			args = append(args, e.Id, e.Value)
+		}
+		for _, e := range chunk {
+			args = append(args, e.Id)
+		}
+		_, err = tx.Exec(
+			"UPDATE events SET value = CASE id "+strings.Join(caseParts, " ")+" END WHERE id IN ("+strings.Join(inPlaceholders, ",")+")",
+			args...,
+		)
 		if err != nil {
 			return 0, 0, err
 		}
-		numUpdates++
 	}
-	for _, e := range toDelete {
-		_, err = tx.Exec(compressDeleteEventSQL, e.Id, e.UserId)
+	numDeletes = len(toDelete)
+	for off := 0; off < len(toDelete); off += maxChunkSize {
+		end := off + maxChunkSize
+		if end > len(toDelete) {
+			end = len(toDelete)
+		}
+		chunk := toDelete[off:end]
+		placeholders := make([]string, len(chunk))
+		args := make([]interface{}, len(chunk))
+		for i, e := range chunk {
+			placeholders[i] = "?"
+			args[i] = e.Id
+		}
+		_, err = tx.Exec("DELETE FROM events WHERE id IN ("+strings.Join(placeholders, ",")+")", args...)
 		if err != nil {
 			return 0, 0, err
 		}
-		numDeletes++
 	}
 
 	if err = tx.Commit(); err != nil {
