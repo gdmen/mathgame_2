@@ -152,46 +152,6 @@ const ProgressView = ({ token, apiUrl, user }) => {
           </table>
         </section>
       )}
-
-      {Array.isArray(data.hardest_problems) &&
-        data.hardest_problems.length > 0 && (
-          <section className="progress-hardest">
-            <h2>20 hardest problems</h2>
-            <p className="progress-hardest-caption">
-              By average time to solve (same problem may appear multiple times)
-            </p>
-            <table className="progress-hardest-table">
-              <thead>
-                <tr>
-                  <th>Problem</th>
-                  <th>Avg time to solve</th>
-                  <th>Avg attempts per solve</th>
-                  <th>Times seen</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.hardest_problems.map((p, i) => (
-                  <tr key={p.problem_id}>
-                    <td className="progress-hardest-problem">
-                      <span className="progress-hardest-expression">
-                        {p.expression || "—"}
-                      </span>
-                      {p.answer != null && p.answer !== "" && (
-                        <span className="progress-hardest-answer">
-                          {" "}
-                          = {p.answer}
-                        </span>
-                      )}
-                    </td>
-                    <td>{formatMs(p.avg_time_to_solve_ms)}</td>
-                    <td>{Number(p.avg_attempts_per_solve).toFixed(1)}</td>
-                    <td>{p.times_seen}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        )}
     </div>
   );
 };

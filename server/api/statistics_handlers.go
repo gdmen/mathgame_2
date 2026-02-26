@@ -4,7 +4,6 @@ package api
 import (
 	"database/sql"
 	"net/http"
-	"sort"
 	"strconv"
 	"time"
 
@@ -16,11 +15,10 @@ import (
 
 // StatisticsResponse is the JSON response for GET /api/v1/statistics/:user_id
 type StatisticsResponse struct {
-	TotalProblemsSolved int64            `json:"total_problems_solved"`
-	TotalWorkMinutes    int64            `json:"total_work_minutes"`
-	TotalVideoMinutes   int64            `json:"total_video_minutes"`
-	StatsByMonth        []MonthStats     `json:"stats_by_month"`
-	HardestProblems     []HardestProblem `json:"hardest_problems"`
+	TotalProblemsSolved int64        `json:"total_problems_solved"`
+	TotalWorkMinutes    int64        `json:"total_work_minutes"`
+	TotalVideoMinutes   int64        `json:"total_video_minutes"`
+	StatsByMonth        []MonthStats `json:"stats_by_month"`
 }
 
 // MonthStats holds the same top-level stats for a single month (YYYY-MM).
@@ -29,16 +27,6 @@ type MonthStats struct {
 	TotalProblemsSolved int64  `json:"total_problems_solved"`
 	TotalWorkMinutes    int64  `json:"total_work_minutes"`
 	TotalVideoMinutes   int64  `json:"total_video_minutes"`
-}
-
-// HardestProblem is one of the top 20 problems by average time to solve.
-type HardestProblem struct {
-	ProblemId           uint32  `json:"problem_id"`
-	Expression          string  `json:"expression"`
-	Answer              string  `json:"answer"`
-	AvgTimeToSolveMs    int64   `json:"avg_time_to_solve_ms"`
-	AvgAttemptsPerSolve float64 `json:"avg_attempts_per_solve"`
-	TimesSeen           int     `json:"times_seen"`
 }
 
 func (a *Api) getStatistics(c *gin.Context) {
@@ -205,26 +193,6 @@ func (a *Api) fullProgressBackfill(logPrefix string, userID uint32) error {
 		return err
 	}
 
-	allEvents, err := a.fetchProgressEventsAfter(userID, 0)
-	if err != nil {
-		return err
-	}
-	segments := buildSegmentsFromProgressEvents(allEvents)
-	for _, s := range segments {
-		_, err = a.DB.Exec(`
-			INSERT INTO statistics_hardest_aggregates (user_id, problem_id, total_time_ms, total_attempts, solve_count)
-			VALUES (?, ?, ?, ?, 1)
-			ON DUPLICATE KEY UPDATE
-				total_time_ms = total_time_ms + VALUES(total_time_ms),
-				total_attempts = total_attempts + VALUES(total_attempts),
-				solve_count = solve_count + 1`,
-			userID, s.problemID, s.timeMs, s.attempts,
-		)
-		if err != nil {
-			return err
-		}
-	}
-
 	var maxID uint64
 	err = a.DB.QueryRow(`SELECT COALESCE(MAX(id), 0) FROM events WHERE user_id = ?`, userID).Scan(&maxID)
 	if err != nil {
@@ -236,55 +204,6 @@ func (a *Api) fullProgressBackfill(logPrefix string, userID uint32) error {
 		userID, maxID,
 	)
 	return err
-}
-
-func buildSegmentsFromProgressEvents(events []progressEventRow) []struct {
-	problemID uint32
-	timeMs    int64
-	attempts  int
-} {
-	var segments []struct {
-		problemID uint32
-		timeMs    int64
-		attempts  int
-	}
-	var inSegment bool
-	var segTimeMs int64
-	var segAttempts int
-	for _, e := range events {
-		switch e.eventType {
-		case SELECTED_PROBLEM:
-			inSegment = true
-			segTimeMs = 0
-			segAttempts = 0
-		case WORKING_ON_PROBLEM:
-			if inSegment {
-				v, _ := strconv.ParseInt(e.value, 10, 64)
-				if v > 0 {
-					segTimeMs += v
-				}
-			}
-		case ANSWERED_PROBLEM:
-			if inSegment {
-				segAttempts++
-			}
-		case SOLVED_PROBLEM:
-			if inSegment {
-				pid, err := strconv.ParseUint(e.value, 10, 32)
-				if err == nil {
-					segments = append(segments, struct {
-						problemID uint32
-						timeMs    int64
-						attempts  int
-					}{
-						uint32(pid), segTimeMs, segAttempts + 1,
-					})
-				}
-			}
-			inSegment = false
-		}
-	}
-	return segments
 }
 
 func (a *Api) mergeProgressEventsIntoCache(logPrefix string, userID uint32, events []progressEventRow) (uint64, error) {
@@ -365,22 +284,6 @@ func (a *Api) mergeProgressEventsIntoCache(logPrefix string, userID uint32, even
 		}
 	}
 
-	segments := buildSegmentsFromProgressEvents(events)
-	for _, s := range segments {
-		_, err = a.DB.Exec(`
-			INSERT INTO statistics_hardest_aggregates (user_id, problem_id, total_time_ms, total_attempts, solve_count)
-			VALUES (?, ?, ?, ?, 1)
-			ON DUPLICATE KEY UPDATE
-				total_time_ms = total_time_ms + VALUES(total_time_ms),
-				total_attempts = total_attempts + VALUES(total_attempts),
-				solve_count = solve_count + 1`,
-			userID, s.problemID, s.timeMs, s.attempts,
-		)
-		if err != nil {
-			return 0, err
-		}
-	}
-
 	var maxID uint64
 	for _, e := range events {
 		if e.id > maxID {
@@ -405,7 +308,7 @@ func (a *Api) readStatisticsFromCache(logPrefix string, userID uint32) (Statisti
 		FROM statistics_totals WHERE user_id = ?`, userID,
 	).Scan(&resp.TotalProblemsSolved, &resp.TotalWorkMinutes, &resp.TotalVideoMinutes)
 	if err == sql.ErrNoRows {
-		return StatisticsResponse{StatsByMonth: []MonthStats{}, HardestProblems: []HardestProblem{}}, nil
+		return StatisticsResponse{StatsByMonth: []MonthStats{}}, nil
 	}
 	if err != nil {
 		return resp, err
@@ -429,86 +332,7 @@ func (a *Api) readStatisticsFromCache(logPrefix string, userID uint32) (Statisti
 	if err := rows.Err(); err != nil {
 		return resp, err
 	}
-
-	aggRows, err := a.DB.Query(`
-		SELECT problem_id, total_time_ms, total_attempts, solve_count
-		FROM statistics_hardest_aggregates WHERE user_id = ?
-		ORDER BY total_time_ms / GREATEST(solve_count, 1) DESC
-		LIMIT 20`, userID,
-	)
-	if err != nil {
-		return resp, err
-	}
-	defer aggRows.Close()
-	var hardest []HardestProblem
-	var problemIDs []uint32
-	for aggRows.Next() {
-		var pid uint32
-		var totalTimeMs int64
-		var totalAttempts int
-		var solveCount int
-		if err := aggRows.Scan(&pid, &totalTimeMs, &totalAttempts, &solveCount); err != nil {
-			return resp, err
-		}
-		problemIDs = append(problemIDs, pid)
-		avgTime := int64(0)
-		if solveCount > 0 {
-			avgTime = totalTimeMs / int64(solveCount)
-		}
-		avgAttempts := 0.0
-		if solveCount > 0 {
-			avgAttempts = float64(totalAttempts) / float64(solveCount)
-		}
-		hardest = append(hardest, HardestProblem{
-			ProblemId:           pid,
-			AvgTimeToSolveMs:    avgTime,
-			AvgAttemptsPerSolve: avgAttempts,
-			TimesSeen:           solveCount,
-		})
-	}
-	if err := aggRows.Err(); err != nil {
-		return resp, err
-	}
-	resp.HardestProblems = hardest
-
-	details := a.batchLoadProblemDetails(problemIDs)
-	for i := range resp.HardestProblems {
-		if d, ok := details[resp.HardestProblems[i].ProblemId]; ok {
-			resp.HardestProblems[i].Expression = d.expression
-			resp.HardestProblems[i].Answer = d.answer
-		}
-	}
 	return resp, nil
-}
-
-func (a *Api) batchLoadProblemDetails(ids []uint32) map[uint32]struct{ expression, answer string } {
-	out := make(map[uint32]struct{ expression, answer string })
-	if len(ids) == 0 {
-		return out
-	}
-	placeholders := ""
-	args := make([]interface{}, 0, len(ids))
-	for i, id := range ids {
-		if i > 0 {
-			placeholders += ","
-		}
-		placeholders += "?"
-		args = append(args, id)
-	}
-	rows, err := a.DB.Query(`SELECT id, expression, answer FROM problems WHERE id IN (`+placeholders+`)`, args...)
-	if err != nil {
-		return out
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var id uint32
-		var expr, ans string
-		if err := rows.Scan(&id, &expr, &ans); err != nil {
-			continue
-		}
-		out[id] = struct{ expression, answer string }{expr, ans}
-	}
-	return out
 }
 
 // computeStatsByMonth returns totals grouped by month (YYYY-MM), ordered by month descending.
@@ -541,106 +365,4 @@ func (a *Api) computeStatsByMonth(logPrefix string, userID uint32) ([]MonthStats
 		result = append(result, m)
 	}
 	return result, rows.Err()
-}
-
-// computeHardestProblems returns up to 20 problems with highest avg time to solve (ms). Each solve session is SELECTED_PROBLEM .. WORKING_ON_PROBLEM / ANSWERED_PROBLEM .. SOLVED_PROBLEM.
-func (a *Api) computeHardestProblems(logPrefix string, userID uint32) []HardestProblem {
-	rows, err := a.DB.Query(
-		`SELECT event_type, value FROM events WHERE user_id = ? AND event_type IN (?, ?, ?, ?) ORDER BY id`,
-		userID, SELECTED_PROBLEM, WORKING_ON_PROBLEM, ANSWERED_PROBLEM, SOLVED_PROBLEM,
-	)
-	if err != nil {
-		glog.Errorf("%s hardest problems query: %v", logPrefix, err)
-		return nil
-	}
-	defer rows.Close()
-
-	var segments []struct {
-		problemID uint32
-		timeMs    int64
-		attempts  int
-	}
-
-	var inSegment bool
-	var segTimeMs int64
-	var segAttempts int
-
-	for rows.Next() {
-		var eventType, value string
-		if err := rows.Scan(&eventType, &value); err != nil {
-			glog.Errorf("%s scan event: %v", logPrefix, err)
-			return nil
-		}
-		switch eventType {
-		case SELECTED_PROBLEM:
-			inSegment = true
-			segTimeMs = 0
-			segAttempts = 0
-		case WORKING_ON_PROBLEM:
-			if inSegment {
-				v, _ := strconv.ParseInt(value, 10, 64)
-				if v > 0 {
-					segTimeMs += v
-				}
-			}
-		case ANSWERED_PROBLEM:
-			if inSegment {
-				segAttempts++
-			}
-		case SOLVED_PROBLEM:
-			if inSegment {
-				pid, err := strconv.ParseUint(value, 10, 32)
-				if err == nil {
-					segments = append(segments, struct {
-						problemID uint32
-						timeMs    int64
-						attempts  int
-					}{uint32(pid), segTimeMs, segAttempts + 1})
-				}
-			}
-			inSegment = false
-		}
-	}
-	if err := rows.Err(); err != nil {
-		glog.Errorf("%s hardest problems rows: %v", logPrefix, err)
-		return nil
-	}
-
-	// Aggregate by problem_id: sum time, sum attempts, count
-	type agg struct {
-		totalTimeMs   int64
-		totalAttempts int
-		count         int
-	}
-	byProblem := make(map[uint32]*agg)
-	for _, s := range segments {
-		if byProblem[s.problemID] == nil {
-			byProblem[s.problemID] = &agg{}
-		}
-		byProblem[s.problemID].totalTimeMs += s.timeMs
-		byProblem[s.problemID].totalAttempts += s.attempts
-		byProblem[s.problemID].count++
-	}
-
-	var result []HardestProblem
-	for pid, ag := range byProblem {
-		if ag.count == 0 {
-			continue
-		}
-		avgTime := ag.totalTimeMs / int64(ag.count)
-		avgAttempts := float64(ag.totalAttempts) / float64(ag.count)
-		result = append(result, HardestProblem{
-			ProblemId:           pid,
-			AvgTimeToSolveMs:    avgTime,
-			AvgAttemptsPerSolve: avgAttempts,
-			TimesSeen:           ag.count,
-		})
-	}
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].AvgTimeToSolveMs > result[j].AvgTimeToSolveMs
-	})
-	if len(result) > 20 {
-		result = result[:20]
-	}
-	return result
 }
