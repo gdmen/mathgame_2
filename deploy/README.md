@@ -24,23 +24,35 @@ cd mathgame_2
 make
 sudo cp deploy/mathgame-api.service /etc/systemd/system
 sudo cp deploy/mathgame-web.service /etc/systemd/system
+sudo cp deploy/mathgame-compress-events.service /etc/systemd/system
+sudo cp deploy/mathgame-check-disabled-videos.service /etc/systemd/system
+sudo cp deploy/mathgame-compress-events.timer /etc/systemd/system
+sudo cp deploy/mathgame-check-disabled-videos.timer /etc/systemd/system
 
 sudo systemctl daemon-reload
 sudo systemctl enable mathgame-api
 sudo systemctl enable mathgame-web
+sudo systemctl enable --now mathgame-compress-events.timer
+sudo systemctl enable --now mathgame-check-disabled-videos.timer
 sudo service mathgame-api start
 sudo service mathgame-web start
 
 # Updates
 cd mathgame_2
-git fetch --all
+git fetch origin master
 git reset --hard origin/master
 make
 sudo cp deploy/mathgame-api.service /etc/systemd/system
 sudo cp deploy/mathgame-web.service /etc/systemd/system
+sudo cp deploy/mathgame-compress-events.service /etc/systemd/system
+sudo cp deploy/mathgame-check-disabled-videos.service /etc/systemd/system
+sudo cp deploy/mathgame-compress-events.timer /etc/systemd/system
+sudo cp deploy/mathgame-check-disabled-videos.timer /etc/systemd/system
 sudo systemctl daemon-reload
 sudo service mathgame-api restart
 sudo service mathgame-web restart
+sudo systemctl restart mathgame-compress-events.timer
+sudo systemctl restart mathgame-check-disabled-videos.timer
 ! MANUALLY RUN NEW MIGRATIONS FROM server/api/migrations !
 
 # Refresh let's encrypt cert
@@ -48,5 +60,7 @@ sudo certbot renew
 sudo service mathgame-web restart
 
 # Production logs
-journalctl -u mathgame-api -b
-journalctl -u mathgame-web -b
+journalctl -u mathgame-api -b -f
+journalctl -u mathgame-web -b -f
+journalctl -u mathgame-compress-events -b -f
+journalctl -u mathgame-check-disabled-videos -b -f
