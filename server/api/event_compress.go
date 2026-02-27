@@ -65,39 +65,69 @@ func parseInt64(s string) (int64, bool) {
 }
 
 const (
-	selectEventsOrderedSQL = `SELECT id, timestamp, user_id, event_type, value FROM events ORDER BY user_id, id`
+	selectEventsAfterIDSQL = `SELECT id, timestamp, user_id, event_type, value FROM events WHERE id > ? ORDER BY user_id, id`
+	compressMetaGetSQL     = `SELECT last_event_id FROM compress_events_meta WHERE dummy = 1`
+	compressMetaSetSQL     = `INSERT INTO compress_events_meta (dummy, last_event_id) VALUES (1, ?) ON DUPLICATE KEY UPDATE last_event_id = VALUES(last_event_id)`
 	// maxChunkSize limits rows per batched UPDATE/DELETE to stay under MySQL's limit of 65,535 placeholders per prepared statement.
 	// UPDATE uses 3 placeholders per row (id, value, id), so max = 65535/3 = 21845.
 	maxChunkSize = 21845
 )
 
-// PlanCompress reads all events and returns planned updates and deletes (no write). Used for dry-run.
-func PlanCompress(db *sql.DB) (updates []Event, toDelete []Event, err error) {
-	rows, err := db.Query(selectEventsOrderedSQL)
+func getLastCompressEventID(db *sql.DB) (uint64, error) {
+	var id uint64
+	err := db.QueryRow(compressMetaGetSQL).Scan(&id)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return id, err
+}
+
+func setLastCompressEventID(tx *sql.Tx, id uint64) error {
+	_, err := tx.Exec(compressMetaSetSQL, id)
+	return err
+}
+
+// planCompressFrom reads events with id > afterID, runs CompressEvents, and returns the event batch, planned updates, and deletes.
+func planCompressFrom(db *sql.DB, afterID uint64) (events []Event, updates []Event, toDelete []Event, err error) {
+	rows, err := db.Query(selectEventsAfterIDSQL, afterID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	defer rows.Close()
 
-	var events []Event
+	var batch []Event
 	for rows.Next() {
 		var e Event
 		if err := rows.Scan(&e.Id, &e.Timestamp, &e.UserId, &e.EventType, &e.Value); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
-		events = append(events, e)
+		batch = append(batch, e)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	updates, toDelete = CompressEvents(events)
-	return updates, toDelete, nil
+	updates, toDelete = CompressEvents(batch)
+	return batch, updates, toDelete, nil
 }
 
-// RunCompress reads all events, compresses runs of summable types (update first row, delete rest), and applies changes in one transaction.
+// PlanCompress reads events after the last checkpoint, returns planned updates and deletes (no write). Used for dry-run.
+func PlanCompress(db *sql.DB) (updates []Event, toDelete []Event, err error) {
+	afterID, err := getLastCompressEventID(db)
+	if err != nil {
+		return nil, nil, err
+	}
+	_, updates, toDelete, err = planCompressFrom(db, afterID)
+	return updates, toDelete, err
+}
+
+// RunCompress reads events after the last checkpoint, compresses runs of summable types, applies changes, and advances the checkpoint in one transaction.
 func RunCompress(db *sql.DB) (numUpdates, numDeletes int, err error) {
-	updates, toDelete, err := PlanCompress(db)
+	afterID, err := getLastCompressEventID(db)
+	if err != nil {
+		return 0, 0, err
+	}
+	events, updates, toDelete, err := planCompressFrom(db, afterID)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -153,6 +183,18 @@ func RunCompress(db *sql.DB) (numUpdates, numDeletes int, err error) {
 		}
 		_, err = tx.Exec("DELETE FROM events WHERE id IN ("+strings.Join(placeholders, ",")+")", args...)
 		if err != nil {
+			return 0, 0, err
+		}
+	}
+
+	var maxEventID uint64
+	for _, e := range events {
+		if uint64(e.Id) > maxEventID {
+			maxEventID = uint64(e.Id)
+		}
+	}
+	if maxEventID > 0 {
+		if err = setLastCompressEventID(tx, maxEventID); err != nil {
 			return 0, 0, err
 		}
 	}
