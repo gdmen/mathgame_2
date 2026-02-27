@@ -1,0 +1,12 @@
+[Unit]
+Description=Mathgame check_disabled_videos job
+After=network-online.target
+Wants=network-online.target systemd-networkd-wait-online.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/ubuntu/mathgame_2
+ExecStart=/usr/bin/flock -n /var/lock/mathgame-check-disabled-videos.lock /home/ubuntu/mathgame_2/bin/check_disabled_videos -config /home/ubuntu/mathgame_2/conf.json --enable
+
+[Install]
+WantedBy=multi-user.target

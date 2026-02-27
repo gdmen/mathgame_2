@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for mathgame compress_events job
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+Unit=mathgame-compress-events.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=Mathgame compress_events job
+After=network-online.target
+Wants=network-online.target systemd-networkd-wait-online.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/ubuntu/mathgame_2
+ExecStart=/usr/bin/flock -n /var/lock/mathgame-compress-events.lock /home/ubuntu/mathgame_2/bin/compress_events -config /home/ubuntu/mathgame_2/conf.json
+
+[Install]
+WantedBy=multi-user.target

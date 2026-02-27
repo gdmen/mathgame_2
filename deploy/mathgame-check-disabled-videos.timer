@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for mathgame check_disabled_videos job
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+Unit=mathgame-check-disabled-videos.service
+
+[Install]
+WantedBy=timers.target
