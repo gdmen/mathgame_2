@@ -152,3 +152,48 @@ func TestStatistics_MsToMinutes_RoundsDown(t *testing.T) {
 		t.Errorf("total_video_minutes: want 1, got %d", pr.TotalVideoMinutes)
 	}
 }
+
+func TestUpdateStatisticsForUser_BackfillsCacheAndMeta(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("Couldn't read config: %v", err)
+	}
+	api, r, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+	user := createTestUser(t, r, "auth0|update-stats", "updatestats@test.com", "updatestatsuser")
+
+	_, err = api.DB.Exec(
+		"INSERT INTO events (user_id, event_type, value) VALUES (?, ?, ?), (?, ?, ?)",
+		user.Id, SOLVED_PROBLEM, "1",
+		user.Id, WORKING_ON_PROBLEM, "60000",
+	)
+	if err != nil {
+		t.Fatalf("insert events: %v", err)
+	}
+
+	logPrefix := "[test]"
+	if err := api.UpdateStatisticsForUser(logPrefix, user.Id); err != nil {
+		t.Fatalf("UpdateStatisticsForUser: %v", err)
+	}
+
+	var totalSolved, totalWork, totalVideo int64
+	err = api.DB.QueryRow(
+		"SELECT total_problems_solved, total_work_minutes, total_video_minutes FROM statistics_totals WHERE user_id = ?",
+		user.Id,
+	).Scan(&totalSolved, &totalWork, &totalVideo)
+	if err != nil {
+		t.Fatalf("read statistics_totals: %v", err)
+	}
+	if totalSolved != 1 || totalWork != 1 || totalVideo != 0 {
+		t.Errorf("statistics_totals: want solved=1 work=1 video=0, got solved=%d work=%d video=%d", totalSolved, totalWork, totalVideo)
+	}
+
+	var lastEventID uint64
+	err = api.DB.QueryRow("SELECT last_event_id FROM statistics_cache_meta WHERE user_id = ?", user.Id).Scan(&lastEventID)
+	if err != nil {
+		t.Fatalf("read statistics_cache_meta: %v", err)
+	}
+	if lastEventID == 0 {
+		t.Error("statistics_cache_meta.last_event_id should be set")
+	}
+}

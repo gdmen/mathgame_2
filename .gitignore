@@ -6,6 +6,7 @@ swagger.yaml
 
 # conf files
 conf.json
+prod_conf.json
 
 # Project binaries
 bin/

@@ -1,0 +1,12 @@
+[Unit]
+Description=Mathgame update_statistics_cache job
+After=network-online.target
+Wants=network-online.target systemd-networkd-wait-online.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/ubuntu/mathgame_2
+ExecStart=/home/ubuntu/mathgame_2/bin/update_statistics_cache -config /home/ubuntu/mathgame_2/conf.json
+
+[Install]
+WantedBy=multi-user.target

@@ -29,6 +29,29 @@ type MonthStats struct {
 	TotalVideoMinutes   int64  `json:"total_video_minutes"`
 }
 
+// UpdateStatisticsForUser updates the statistics cache (statistics_totals, statistics_monthly,
+// statistics_cache_meta) for the given user using last_event_id when present for incremental
+// updates, or full backfill when no meta exists. Safe to call from API handlers or job commands.
+func (a *Api) UpdateStatisticsForUser(logPrefix string, userID uint32) error {
+	lastEventID, metaExists, err := a.getProgressLastEventID(userID)
+	if err != nil {
+		return err
+	}
+	if !metaExists {
+		return a.fullProgressBackfill(logPrefix, userID)
+	}
+	newEvents, err := a.fetchProgressEventsAfter(userID, lastEventID)
+	if err != nil {
+		return err
+	}
+	if len(newEvents) > 0 {
+		if _, err := a.mergeProgressEventsIntoCache(logPrefix, userID, newEvents); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (a *Api) getStatistics(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
@@ -46,33 +69,10 @@ func (a *Api) getStatistics(c *gin.Context) {
 		return
 	}
 
-	lastEventID, metaExists, err := a.getProgressLastEventID(user.Id)
-	if err != nil {
-		glog.Errorf("%s get last_event_id: %v", logPrefix, err)
+	if err := a.UpdateStatisticsForUser(logPrefix, user.Id); err != nil {
+		glog.Errorf("%s update statistics: %v", logPrefix, err)
 		c.JSON(http.StatusInternalServerError, common.GetError("Could not get statistics"))
 		return
-	}
-
-	if !metaExists {
-		if err := a.fullProgressBackfill(logPrefix, user.Id); err != nil {
-			glog.Errorf("%s full backfill: %v", logPrefix, err)
-			c.JSON(http.StatusInternalServerError, common.GetError("Could not get statistics"))
-			return
-		}
-	} else {
-		newEvents, err := a.fetchProgressEventsAfter(user.Id, lastEventID)
-		if err != nil {
-			glog.Errorf("%s fetch new events: %v", logPrefix, err)
-			c.JSON(http.StatusInternalServerError, common.GetError("Could not get statistics"))
-			return
-		}
-		if len(newEvents) > 0 {
-			if _, err := a.mergeProgressEventsIntoCache(logPrefix, user.Id, newEvents); err != nil {
-				glog.Errorf("%s merge events into cache: %v", logPrefix, err)
-				c.JSON(http.StatusInternalServerError, common.GetError("Could not get statistics"))
-				return
-			}
-		}
 	}
 
 	resp, err := a.readStatisticsFromCache(logPrefix, user.Id)

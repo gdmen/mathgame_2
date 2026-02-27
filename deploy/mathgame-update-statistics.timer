@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for mathgame update_statistics_cache job
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+Unit=mathgame-update-statistics.service
+
+[Install]
+WantedBy=timers.target

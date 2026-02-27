@@ -31,6 +31,7 @@ build-api:
 build-cmds: build-api
 	$(GOBUILD) -o ./bin/compress_events ./cmd/compress_events/
 	$(GOBUILD) -o ./bin/check_disabled_videos ./cmd/check_disabled_videos/
+	$(GOBUILD) -o ./bin/update_statistics_cache ./cmd/update_statistics_cache/
 
 test: build-api test-api
 
