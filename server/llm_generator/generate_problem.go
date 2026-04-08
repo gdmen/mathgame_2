@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	VERSION         = "llm_0.1"
+	VERSION         = "llm_0.2"
 	OPENAI_URL      = "https://api.openai.com/v1/completions"
 	PROMPT_QUESTION = `
 Generate math questions in the format of this example:
@@ -74,13 +74,18 @@ func GenerateProblem(opts *Options) ([]Problem, error) {
 	prompt := PROMPT_QUESTION + "\n" + fmt.Sprintf(PROMPT_QUANTITY,
 		opts.NumProblems, ptype, featuresJson, opts.TargetDifficulty,
 	)
-	glog.Infof("OpenAI GPT4oMini question prompt: %s\n", prompt)
+	// Add grade-level curriculum context if available
+	gradeCtx := GradeContext(opts.GradeLevel)
+	if gradeCtx != "" {
+		prompt += gradeCtx
+	}
+	glog.Infof("OpenAI question prompt: %s\n", prompt)
 
 	client := openai.NewClient(c.OpenAiApiKey)
 	resp, err := client.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
-			Model: openai.GPT4oMini,
+			Model: openai.GPT5Nano,
 			Messages: []openai.ChatCompletionMessage{
 				{
 					Role:    openai.ChatMessageRoleUser,

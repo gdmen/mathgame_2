@@ -1,0 +1,92 @@
+{
+  "grades": {
+    "1": {
+      "label": "1st Grade",
+      "strands": ["1.OA", "1.NBT"],
+      "operations": ["addition", "subtraction"],
+      "description": "Add and subtract within 20. Understand place value for tens and ones.",
+      "examples": [
+        {"expression": "7 + 5", "answer": "12", "difficulty": 4},
+        {"expression": "14 - 6", "answer": "8", "difficulty": 4},
+        {"expression": "9 + 8", "answer": "17", "difficulty": 5}
+      ]
+    },
+    "2": {
+      "label": "2nd Grade",
+      "strands": ["2.OA", "2.NBT"],
+      "operations": ["addition", "subtraction"],
+      "description": "Add and subtract within 100. Understand place value to 1000. Foundations for multiplication.",
+      "examples": [
+        {"expression": "45 + 27", "answer": "72", "difficulty": 6},
+        {"expression": "83 - 36", "answer": "47", "difficulty": 6},
+        {"expression": "54 + 39", "answer": "93", "difficulty": 7}
+      ]
+    },
+    "3": {
+      "label": "3rd Grade",
+      "strands": ["3.OA", "3.NF", "3.NBT"],
+      "operations": ["addition", "subtraction", "multiplication", "division", "fractions"],
+      "description": "Multiply and divide within 100. Understand fractions as numbers. Add and subtract within 1000.",
+      "examples": [
+        {"expression": "7 * 8", "answer": "56", "difficulty": 8},
+        {"expression": "42 / 6", "answer": "7", "difficulty": 8},
+        {"expression": "\\text{What fraction of the circle is shaded if 2 out of 4 parts are shaded?}", "answer": "1/2", "difficulty": 8}
+      ]
+    },
+    "4": {
+      "label": "4th Grade",
+      "strands": ["4.OA", "4.NF", "4.NBT"],
+      "operations": ["addition", "subtraction", "multiplication", "division", "fractions"],
+      "description": "Multi-digit arithmetic. Equivalent fractions, add/subtract fractions with like denominators. Factors and multiples.",
+      "examples": [
+        {"expression": "342 * 7", "answer": "2394", "difficulty": 10},
+        {"expression": "3/8 + 2/8", "answer": "5/8", "difficulty": 10},
+        {"expression": "\\text{A box has 24 crayons. If you share them equally among 6 friends, how many does each friend get?}", "answer": "4", "difficulty": 9}
+      ]
+    },
+    "5": {
+      "label": "5th Grade",
+      "strands": ["5.OA", "5.NF", "5.NBT"],
+      "operations": ["addition", "subtraction", "multiplication", "division", "fractions", "negatives"],
+      "description": "Decimals through thousandths. Add/subtract fractions with unlike denominators. Multiply/divide fractions. Order of operations.",
+      "examples": [
+        {"expression": "2/3 + 3/4", "answer": "17/12", "difficulty": 12},
+        {"expression": "3.45 * 2.1", "answer": "7.245", "difficulty": 12},
+        {"expression": "2 + 3 * 4", "answer": "14", "difficulty": 11}
+      ]
+    },
+    "6": {
+      "label": "6th Grade",
+      "strands": ["6.RP", "6.NS", "6.EE"],
+      "operations": ["addition", "subtraction", "multiplication", "division", "fractions", "negatives"],
+      "description": "Ratios and proportions. Divide fractions by fractions. Negative numbers. Expressions and equations.",
+      "examples": [
+        {"expression": "2/3 / 4/5", "answer": "5/6", "difficulty": 14},
+        {"expression": "-3 + 7", "answer": "4", "difficulty": 13},
+        {"expression": "\\text{If 3 apples cost \\$2.25, how much do 7 apples cost?}", "answer": "5.25", "difficulty": 14}
+      ]
+    },
+    "7": {
+      "label": "7th Grade",
+      "strands": ["7.RP", "7.NS", "7.EE"],
+      "operations": ["addition", "subtraction", "multiplication", "division", "fractions", "negatives", "word"],
+      "description": "Proportional relationships. Operations with rational numbers. Linear expressions and equations.",
+      "examples": [
+        {"expression": "-4 * (-3) + 2", "answer": "14", "difficulty": 15},
+        {"expression": "\\text{A shirt is 20\\% off its original price of \\$35. What is the sale price?}", "answer": "28", "difficulty": 15},
+        {"expression": "3/4 * (-2/3)", "answer": "-1/2", "difficulty": 16}
+      ]
+    },
+    "8": {
+      "label": "8th Grade",
+      "strands": ["8.NS", "8.EE", "8.F"],
+      "operations": ["addition", "subtraction", "multiplication", "division", "fractions", "negatives", "word"],
+      "description": "Irrational numbers. Integer exponents. Linear equations and functions. Systems of equations.",
+      "examples": [
+        {"expression": "2^3 * 2^4", "answer": "128", "difficulty": 17},
+        {"expression": "\\text{Solve for x: 3x + 7 = 22}", "answer": "5", "difficulty": 17},
+        {"expression": "\\text{A line passes through (0, 3) and (2, 7). What is its slope?}", "answer": "2", "difficulty": 18}
+      ]
+    }
+  }
+}
