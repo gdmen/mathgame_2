@@ -168,7 +168,7 @@ func insertPlaylistWithVideos(t *testing.T, api *Api, youTubeID string, videoIDs
 	return uint32(pid)
 }
 
-func TestPlay_RequiresThreeVideos(t *testing.T) {
+func TestPlay_RequiresAtLeastOneVideo(t *testing.T) {
 	c, err := common.ReadConfig("../../test_conf.json")
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
@@ -177,24 +177,23 @@ func TestPlay_RequiresThreeVideos(t *testing.T) {
 	defer cleanup()
 	user := createTestUser(t, r, "auth0id|playtest", "play@test.com", "playtest")
 
-	t.Run("ForbiddenWhenFewerThanThree", func(t *testing.T) {
-		insertVideosAndUserHasVideo(t, api, user.Id, 2)
+	t.Run("ForbiddenWhenNoVideos", func(t *testing.T) {
 		resp := httptest.NewRecorder()
 		req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/play/%d?test_auth0_id=%s", user.Id, user.Auth0Id), nil)
 		r.ServeHTTP(resp, req)
 		if resp.Code != http.StatusForbidden {
-			t.Errorf("expected 403 when user has 2 videos, got %d: %s", resp.Code, resp.Body.Bytes())
+			t.Errorf("expected 403 when user has 0 videos, got %d: %s", resp.Code, resp.Body.Bytes())
 		}
 	})
 
-	t.Run("SuccessWhenThreeOrMore", func(t *testing.T) {
+	t.Run("SuccessWhenOneOrMore", func(t *testing.T) {
 		user2 := createTestUser(t, r, "auth0id|playtest2", "play2@test.com", "playtest2")
-		insertVideosAndUserHasVideo(t, api, user2.Id, 3)
+		insertVideosAndUserHasVideo(t, api, user2.Id, 1)
 		resp := httptest.NewRecorder()
 		req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/play/%d?test_auth0_id=%s", user2.Id, user2.Auth0Id), nil)
 		r.ServeHTTP(resp, req)
 		if resp.Code != http.StatusOK {
-			t.Errorf("expected 200 when user has 3 videos, got %d: %s", resp.Code, resp.Body.Bytes())
+			t.Errorf("expected 200 when user has 1 video, got %d: %s", resp.Code, resp.Body.Bytes())
 		}
 		body, _ := ioutil.ReadAll(resp.Body)
 		var pd struct {
