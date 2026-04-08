@@ -138,7 +138,8 @@ func (a *Api) runHeuristicGenerator(logPrefix string, c *gin.Context, settings *
 		model := &Problem{}
 		model.Generator = "heuristic_0.0"
 		var err error
-		model.Expression, model.Answer, model.Difficulty, err = heuristic_generator.GenerateProblem(generatorOpts)
+		var heuristicDiff float64
+		model.Expression, model.Answer, heuristicDiff, err = heuristic_generator.GenerateProblem(generatorOpts)
 		if err != nil {
 			if _, ok := err.(*heuristic_generator.OptionsError); ok {
 				glog.Errorf("%s Failed options validation: %v", logPrefix, err)
@@ -147,6 +148,9 @@ func (a *Api) runHeuristicGenerator(logPrefix string, c *gin.Context, settings *
 			glog.Errorf("%s Couldn't generate problem: %v", logPrefix, err)
 			continue
 		}
+		// Pin difficulty to requested target (heuristic scale differs from LLM scale)
+		model.Difficulty = settings.TargetDifficulty
+		glog.Infof("%s heuristic problem: pinned difficulty=%g (heuristic raw=%g)", logPrefix, model.Difficulty, heuristicDiff)
 		h := fnv.New32a()
 		h.Write([]byte(model.Expression))
 		model.Id = h.Sum32()
@@ -219,7 +223,9 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 				model.Expression = strings.TrimSpace(p.Expression)
 				model.Answer = p.Answer
 				model.Explanation = p.Explanation
-				model.Difficulty = p.Difficulty
+				// Pin difficulty to requested target (LLM self-reported difficulty varies)
+				model.Difficulty = settings.TargetDifficulty
+				glog.Infof("%s LLM problem: pinned difficulty=%g (LLM raw=%g)", logPrefix, model.Difficulty, p.Difficulty)
 
 				// Use expression hash as model.Id
 				h := fnv.New32a()
