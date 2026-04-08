@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"slices"
 	"sort"
 	"strings"
@@ -78,6 +79,14 @@ func GenerateProblem(opts *Options) ([]Problem, error) {
 	gradeCtx := GradeContext(opts.GradeLevel)
 	if gradeCtx != "" {
 		prompt += gradeCtx
+	}
+	// Add topic-specific variety hint
+	for _, feature := range opts.Features {
+		hint := TopicPromptHint(feature, rand.Intn)
+		if hint != "" {
+			prompt += hint
+			break // One hint per generation batch is enough
+		}
 	}
 	glog.Infof("OpenAI question prompt: %s\n", prompt)
 
