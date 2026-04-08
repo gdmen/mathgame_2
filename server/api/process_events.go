@@ -106,20 +106,58 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	if event.EventType == LOGGED_IN {
 		// no-op
 	} else if event.EventType == SET_TARGET_DIFFICULTY {
-		// TODO: validate
+		val, parseErr := strconv.ParseFloat(event.Value, 64)
+		if parseErr != nil || val < 3 || val > 50 {
+			msg := fmt.Sprintf("Invalid target_difficulty: %s (must be 3-50)", event.Value)
+			glog.Errorf("%s %s", logPrefix, msg)
+			c.JSON(http.StatusBadRequest, msg)
+			return errors.New(msg)
+		}
 		select_new_problem = true
 	} else if event.EventType == SET_TARGET_WORK_PERCENTAGE {
-		// TODO: validate
+		val, parseErr := strconv.ParseUint(event.Value, 10, 8)
+		if parseErr != nil || val < 1 || val > 100 {
+			msg := fmt.Sprintf("Invalid target_work_percentage: %s (must be 1-100)", event.Value)
+			glog.Errorf("%s %s", logPrefix, msg)
+			c.JSON(http.StatusBadRequest, msg)
+			return errors.New(msg)
+		}
 	} else if event.EventType == SET_PROBLEM_TYPE_BITMAP {
-		// TODO: validate
+		val, parseErr := strconv.ParseUint(event.Value, 10, 64)
+		if parseErr != nil || val == 0 || val > 255 {
+			msg := fmt.Sprintf("Invalid problem_type_bitmap: %s (must be 1-255)", event.Value)
+			glog.Errorf("%s %s", logPrefix, msg)
+			c.JSON(http.StatusBadRequest, msg)
+			return errors.New(msg)
+		}
 		select_new_problem = true
 		a.generateProblemsBackground(logPrefix, c, settings)
 	} else if event.EventType == SET_GAMESTATE_TARGET {
-		// TODO: validate
+		val, parseErr := strconv.ParseUint(event.Value, 10, 32)
+		if parseErr != nil || val < 5 || val > 20 {
+			msg := fmt.Sprintf("Invalid gamestate_target: %s (must be 5-20)", event.Value)
+			glog.Errorf("%s %s", logPrefix, msg)
+			c.JSON(http.StatusBadRequest, msg)
+			return errors.New(msg)
+		}
 	} else if event.EventType == SELECTED_PROBLEM {
-		// TODO: validate problemID
+		if event.Value != "" {
+			val, parseErr := strconv.ParseUint(event.Value, 10, 32)
+			if parseErr != nil || val == 0 {
+				msg := fmt.Sprintf("Invalid problem_id: %s", event.Value)
+				glog.Errorf("%s %s", logPrefix, msg)
+				c.JSON(http.StatusBadRequest, msg)
+				return errors.New(msg)
+			}
+		}
 	} else if event.EventType == WORKING_ON_PROBLEM {
-		// TODO: validate duration
+		val, parseErr := strconv.ParseInt(event.Value, 10, 64)
+		if parseErr != nil || val < 0 || val > 3600000 {
+			msg := fmt.Sprintf("Invalid working_on_problem duration: %s (must be 0-3600000ms)", event.Value)
+			glog.Errorf("%s %s", logPrefix, msg)
+			c.JSON(http.StatusBadRequest, msg)
+			return errors.New(msg)
+		}
 	} else if event.EventType == ANSWERED_PROBLEM {
 		// Get Problem
 		problem, status, msg, err := a.problemManager.Get(gamestate.ProblemId)
