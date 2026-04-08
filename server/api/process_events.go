@@ -129,11 +129,15 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		if !AnswersEquivalent(event.Value, problem.Answer) {
 			msg := fmt.Sprintf("Incorrect answer: {%s}, expected: {%s}", event.Value, problem.Answer)
 			glog.Infof("%s %s", logPrefix, msg)
+			// Track incorrect attempt per topic
+			a.recordTopicAttempt(logPrefix, user.Id, problem.ProblemTypeBitmap, false, settings.TargetDifficulty)
 		} else { // Answer was correct
 			events = append(events, &Event{
 				EventType: SOLVED_PROBLEM,
 				Value:     strconv.FormatUint(uint64(gamestate.ProblemId), 10),
 			})
+			// Track correct attempt per topic
+			a.recordTopicAttempt(logPrefix, user.Id, problem.ProblemTypeBitmap, true, settings.TargetDifficulty)
 			// Update counts
 			gamestate.Solved += 1
 			// Select a new problem
@@ -229,6 +233,14 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			}
 		}
 		glog.Infof("%s modified difficulty & num problems: %v, %v", logPrefix, settings.TargetDifficulty, gamestate.Target)
+
+		// Adjust per-topic difficulties based on accuracy
+		topicStats, tsErr := a.getTopicStats(user.Id)
+		if tsErr != nil {
+			glog.Errorf("%s getTopicStats: %v", logPrefix, tsErr)
+		} else {
+			a.adjustTopicDifficulty(logPrefix, user.Id, topicStats)
+		}
 
 		// Reset solved progress
 		gamestate.Solved = 0

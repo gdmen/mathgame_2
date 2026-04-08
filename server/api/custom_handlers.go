@@ -482,6 +482,10 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 			return
 		}
 		glog.Infof("%s Settings: %v", logPrefix, settings)
+		// Initialize per-topic stats
+		if err := a.initTopicStats(user.Id, settings.ProblemTypeBitmap, settings.TargetDifficulty); err != nil {
+			glog.Errorf("%s initTopicStats: %v", logPrefix, err)
+		}
 		// Select a new problem
 		problem, err := a.selectProblem(logPrefix, c, settings, &([]uint32{0}))
 		if err != nil {
