@@ -215,15 +215,15 @@ func (a *Api) customGetPlayData(c *gin.Context) {
 		return
 	}
 
-	// Require at least 3 videos to play
+	// Require at least 1 video to play
 	count, err := a.countEnabledVideosForUser(gamestate.UserId)
 	if err != nil {
 		glog.Errorf("%s countEnabledVideosForUser: %v", logPrefix, err)
 		c.JSON(http.StatusInternalServerError, common.GetError("Could not check video count"))
 		return
 	}
-	if count < 3 {
-		c.JSON(http.StatusForbidden, common.GetError("Add at least 3 videos via playlists in Settings to play."))
+	if count < 1 {
+		c.JSON(http.StatusForbidden, common.GetError("Add at least 1 YouTube playlist in Settings to play."))
 		return
 	}
 
