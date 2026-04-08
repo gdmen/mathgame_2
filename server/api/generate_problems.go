@@ -315,9 +315,21 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 				// Validate problem (includes grade alignment check if grade is set)
 				err = llm_generator.ValidateProblemWithGrade(&p, settings.GradeLevel)
 				if err != nil {
-					//glog.Infof("%s problem validation failed: (%d: %s)", logPrefix, err)
+					glog.Infof("%s problem validation failed: %v", logPrefix, err)
 					model = nil
 					continue
+				}
+
+				// Difficulty calibration: reject if LLM's self-reported difficulty
+				// diverges too far from what we requested (> 100% off)
+				if settings.TargetDifficulty > 0 && p.Difficulty > 0 {
+					ratio := p.Difficulty / settings.TargetDifficulty
+					if ratio < 0.5 || ratio > 2.0 {
+						glog.Infof("%s difficulty calibration reject: requested=%.1f, LLM reported=%.1f (ratio=%.2f)",
+							logPrefix, settings.TargetDifficulty, p.Difficulty, ratio)
+						model = nil
+						continue
+					}
 				}
 
 				// Write to database
