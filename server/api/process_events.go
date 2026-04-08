@@ -131,6 +131,8 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			glog.Infof("%s %s", logPrefix, msg)
 			// Track incorrect attempt per topic
 			a.recordTopicAttempt(logPrefix, user.Id, problem.ProblemTypeBitmap, false, settings.TargetDifficulty)
+			// Add to spaced repetition review queue
+			a.addToReviewQueue(logPrefix, user.Id, gamestate.ProblemId)
 		} else { // Answer was correct
 			events = append(events, &Event{
 				EventType: SOLVED_PROBLEM,
@@ -138,6 +140,8 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			})
 			// Track correct attempt per topic
 			a.recordTopicAttempt(logPrefix, user.Id, problem.ProblemTypeBitmap, true, settings.TargetDifficulty)
+			// Advance spaced repetition if this was a review problem
+			a.advanceReviewQueue(logPrefix, user.Id, gamestate.ProblemId)
 			// Update counts
 			gamestate.Solved += 1
 			// Select a new problem

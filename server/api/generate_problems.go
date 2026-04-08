@@ -60,6 +60,17 @@ func (a *Api) getSatisfyingProblemIds(logPrefix string, c *gin.Context, settings
 }
 
 func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings, prevIds *[]uint32) (*Problem, error) {
+	// Check spaced repetition review queue first
+	dueReviewID := a.getDueReviewProblem(logPrefix, settings.UserId)
+	if dueReviewID != 0 {
+		p, status, msg, err := a.problemManager.Get(dueReviewID)
+		if err == nil && status == http.StatusOK && !p.Disabled {
+			glog.Infof("%s serving spaced rep review problem=%d", logPrefix, dueReviewID)
+			return p, nil
+		}
+		glog.Infof("%s spaced rep problem=%d unavailable: %s %v", logPrefix, dueReviewID, msg, err)
+	}
+
 	// Try topic-weighted selection first
 	topicStats, tsErr := a.getTopicStats(settings.UserId)
 	if tsErr != nil {
