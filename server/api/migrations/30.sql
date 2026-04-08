@@ -1,0 +1,8 @@
+SET @sql = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'settings' AND COLUMN_NAME = 'grade_level') = 0,
+  'ALTER TABLE settings ADD COLUMN grade_level INT NOT NULL DEFAULT 0 AFTER target_work_percentage',
+  'SELECT 1'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

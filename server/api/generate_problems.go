@@ -265,6 +265,7 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 			Features:         ProblemTypeToFeatures(inputProblemType),
 			TargetDifficulty: settings.TargetDifficulty,
 			NumProblems:      numProblems, // we still return just one problem, but this lets us reduce the number of OpenAI calls we need to make
+			GradeLevel:       settings.GradeLevel,
 		}
 
 		var err error
@@ -311,8 +312,8 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 				}
 				uniqueIds[model.Id] = true
 
-				// Validate problem
-				err = llm_generator.ValidateProblem(&p)
+				// Validate problem (includes grade alignment check if grade is set)
+				err = llm_generator.ValidateProblemWithGrade(&p, settings.GradeLevel)
 				if err != nil {
 					//glog.Infof("%s problem validation failed: (%d: %s)", logPrefix, err)
 					model = nil

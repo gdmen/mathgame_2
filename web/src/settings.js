@@ -271,6 +271,45 @@ const PlaylistsSettingsView = ({ token, apiUrl, user, onPlaylistsChange }) => {
   );
 };
 
+const GRADE_OPTIONS = [
+  { value: 0, label: "Not set" },
+  { value: 1, label: "1st Grade" },
+  { value: 2, label: "2nd Grade" },
+  { value: 3, label: "3rd Grade" },
+  { value: 4, label: "4th Grade" },
+  { value: 5, label: "5th Grade" },
+  { value: 6, label: "6th Grade" },
+  { value: 7, label: "7th Grade" },
+  { value: 8, label: "8th Grade" },
+];
+
+const GradeLevelSettingsView = ({ token, apiUrl, user, settings }) => {
+  const [gradeLevel, setGradeLevel] = useState(settings.grade_level || 0);
+
+  const handleChange = (e) => {
+    const val = parseInt(e.target.value);
+    setGradeLevel(val);
+    settings.grade_level = val;
+    postSettings(token, apiUrl, settings);
+  };
+
+  return (
+    <div id="grade-level-settings" className="settings-form">
+      <h4>Grade Level</h4>
+      <p className="settings-hint">
+        Problems will be aligned to this grade's math curriculum.
+      </p>
+      <select value={gradeLevel} onChange={handleChange}>
+        {GRADE_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+};
+
 const TargetWorkPercentageSettingsView = ({
   token,
   apiUrl,
@@ -413,6 +452,15 @@ const SettingsView = ({ token, apiUrl, user, settings }) => {
   return (
     <div id="settings" className="settings">
       <h2>Settings</h2>
+      <div className="tab-content">
+        <GradeLevelSettingsView
+          token={token}
+          apiUrl={apiUrl}
+          user={user}
+          settings={settings}
+        />
+      </div>
+
       <div className="tab-content">
         <ProblemTypesSettingsView
           token={token}

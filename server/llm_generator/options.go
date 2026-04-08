@@ -5,4 +5,5 @@ type Options struct {
 	Features         []string `json:"features" form:"features"`
 	TargetDifficulty float64  `json:"target_difficulty" form:"target_difficulty"`
 	NumProblems      int      `json:"num_problems" form:"num_problems"`
+	GradeLevel       int      `json:"grade_level" form:"grade_level"`
 }

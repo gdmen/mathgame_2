@@ -167,6 +167,11 @@
           "name": "TargetWorkPercentage",
           "type": "uint8",
           "sql": "INT(3) NOT NULL"
+        },
+        {
+          "name": "GradeLevel",
+          "type": "int",
+          "sql": "INT NOT NULL DEFAULT 0"
         }
       ]
     },
