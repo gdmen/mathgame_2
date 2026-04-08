@@ -60,6 +60,40 @@ func (a *Api) getSatisfyingProblemIds(logPrefix string, c *gin.Context, settings
 }
 
 func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings, prevIds *[]uint32) (*Problem, error) {
+	// Try topic-weighted selection first
+	topicStats, tsErr := a.getTopicStats(settings.UserId)
+	if tsErr != nil {
+		glog.Errorf("%s getTopicStats: %v (falling back to default selection)", logPrefix, tsErr)
+		topicStats = nil
+	}
+
+	if topicStats != nil && len(topicStats) > 0 {
+		targetTopic, topicDiff := chooseWeightedTopic(topicStats, settings.ProblemTypeBitmap, settings.TargetDifficulty, rand.Intn)
+		if targetTopic != 0 {
+			glog.Infof("%s topic-weighted selection: topic=%d difficulty=%.2f", logPrefix, targetTopic, topicDiff)
+			// Build a topic-specific settings to query with the topic's difficulty
+			topicSettings := *settings
+			topicSettings.TargetDifficulty = topicDiff
+			// Only include permutations that contain the target topic
+			topicSettings.ProblemTypeBitmap = settings.ProblemTypeBitmap // keep all enabled, filter below
+			pids, err := a.getSatisfyingProblemIdsForTopic(logPrefix, c, &topicSettings, prevIds, targetTopic)
+			if err == nil && len(*pids) > 0 {
+				pid := (*pids)[rand.Intn(len(*pids))]
+				p, status, msg, err := a.problemManager.Get(pid)
+				if err == nil && status == http.StatusOK {
+					return p, nil
+				}
+				glog.Infof("%s topic-weighted fetch failed (id=%d): %s : %v", logPrefix, pid, msg, err)
+			}
+			// Topic-specific pool too small, trigger background generation
+			if err == nil && len(*pids) < minSelectionPool {
+				glog.Infof("%s topic pool small (%d), generating more", logPrefix, len(*pids))
+				a.generateProblemsBackground(logPrefix, c, &topicSettings)
+			}
+		}
+	}
+
+	// Fall back to default (non-topic-weighted) selection
 	pids, err := a.getSatisfyingProblemIds(logPrefix, c, settings, prevIds)
 	if err != nil {
 		return nil, err
@@ -80,6 +114,41 @@ func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings
 		}
 	}
 	return a.generateProblem(logPrefix, c, settings)
+}
+
+// getSatisfyingProblemIdsForTopic is like getSatisfyingProblemIds but only returns
+// problems whose bitmap contains the target topic.
+func (a *Api) getSatisfyingProblemIdsForTopic(logPrefix string, c *gin.Context, settings *Settings, prevIds *[]uint32, targetTopic uint64) (*[]uint32, error) {
+	permutations := GetProblemTypePermutations(ProblemType(settings.ProblemTypeBitmap))
+	// Filter to permutations containing the target topic
+	filtered := []ProblemType{}
+	for _, pt := range permutations {
+		if (uint64(pt) & targetTopic) != 0 {
+			filtered = append(filtered, pt)
+		}
+	}
+	if len(filtered) == 0 {
+		empty := []uint32{}
+		return &empty, nil
+	}
+
+	diffLowerBound := settings.TargetDifficulty * (1 - problemSelectionEpsilon)
+	diffUpperBound := settings.TargetDifficulty * (1 + problemSelectionEpsilon)
+	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0;",
+		strings.Replace(strings.Trim(fmt.Sprint(filtered), "[]"), " ", ",", -1),
+		diffLowerBound,
+		diffUpperBound,
+	)
+	if len(*prevIds) > 0 {
+		idFilter := fmt.Sprintf("id NOT IN (%s) AND ", strings.Replace(strings.Trim(fmt.Sprint(*prevIds), "[]"), " ", ",", -1))
+		sql = idFilter + sql
+	}
+	glog.Infof("getSatisfyingProblemIdsForTopic sql: select id from problems where %s\n", sql)
+	problemIds, status, msg, err := a.problemManager.CustomIdList(sql)
+	if HandleMngrResp(logPrefix, c, status, msg, err, problemIds) != nil {
+		return nil, err
+	}
+	return problemIds, nil
 }
 
 func (a *Api) generateProblem(logPrefix string, c *gin.Context, settings *Settings) (*Problem, error) {
