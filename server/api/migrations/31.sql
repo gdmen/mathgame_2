@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS review_queue (
+    user_id BIGINT UNSIGNED NOT NULL,
+    problem_id BIGINT UNSIGNED NOT NULL,
+    next_review_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    interval_days INT UNSIGNED NOT NULL DEFAULT 1,
+    PRIMARY KEY (user_id, problem_id)
+) DEFAULT CHARSET=utf8mb4;
