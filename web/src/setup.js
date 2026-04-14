@@ -17,9 +17,32 @@ const GRADE_DEFAULTS = {
   3: ["addition", "subtraction", "multiplication", "division"],
   4: ["addition", "subtraction", "multiplication", "division", "fractions"],
   5: ["addition", "subtraction", "multiplication", "division", "fractions"],
-  6: ["addition", "subtraction", "multiplication", "division", "fractions", "negatives"],
-  7: ["addition", "subtraction", "multiplication", "division", "fractions", "negatives", "word"],
-  8: ["addition", "subtraction", "multiplication", "division", "fractions", "negatives", "word"],
+  6: [
+    "addition",
+    "subtraction",
+    "multiplication",
+    "division",
+    "fractions",
+    "negatives",
+  ],
+  7: [
+    "addition",
+    "subtraction",
+    "multiplication",
+    "division",
+    "fractions",
+    "negatives",
+    "word",
+  ],
+  8: [
+    "addition",
+    "subtraction",
+    "multiplication",
+    "division",
+    "fractions",
+    "negatives",
+    "word",
+  ],
 };
 
 const GRADE_OPTIONS = [
@@ -80,16 +103,32 @@ const GradeLevelTabView = ({ token, apiUrl, user, settings, advanceSetup }) => {
     <>
       <h2>Hi there! What grade is your child in?</h2>
       <div className="settings-form">
-        <div id="grade-buttons" style={{ display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "center", margin: "16px 0" }}>
+        <div
+          id="grade-buttons"
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "8px",
+            justifyContent: "center",
+            margin: "16px 0",
+          }}
+        >
           {GRADE_OPTIONS.map((opt) => (
             <button
               key={opt.value}
-              className={gradeLevel === opt.value ? "grade-button active" : "grade-button"}
+              className={
+                gradeLevel === opt.value
+                  ? "grade-button active"
+                  : "grade-button"
+              }
               onClick={() => handleGradeSelect(opt.value)}
               style={{
                 padding: "12px 20px",
                 fontSize: "16px",
-                border: gradeLevel === opt.value ? "2px solid #4CAF50" : "2px solid #ddd",
+                border:
+                  gradeLevel === opt.value
+                    ? "2px solid #4CAF50"
+                    : "2px solid #ddd",
                 borderRadius: "8px",
                 background: gradeLevel === opt.value ? "#E8F5E9" : "#fff",
                 cursor: "pointer",
@@ -101,7 +140,9 @@ const GradeLevelTabView = ({ token, apiUrl, user, settings, advanceSetup }) => {
         </div>
         {gradeLevel > 0 && (
           <p className="settings-hint" style={{ textAlign: "center" }}>
-            Problems will be aligned to {GRADE_OPTIONS.find(o => o.value === gradeLevel)?.label} math curriculum.
+            Problems will be aligned to{" "}
+            {GRADE_OPTIONS.find((o) => o.value === gradeLevel)?.label} math
+            curriculum.
           </p>
         )}
       </div>
