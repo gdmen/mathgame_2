@@ -29,14 +29,14 @@ func CompressEvents(events []Event) (updates []Event, toDelete []Event) {
 			continue
 		}
 		runStart := i
-		sum, ok := parseInt64(e.Value)
+		sum, ok := parseEventDurationMs(e.Value)
 		if !ok {
 			i++
 			continue
 		}
 		j := i + 1
 		for j < len(events) && events[j].UserId == e.UserId && events[j].EventType == e.EventType {
-			v, ok := parseInt64(events[j].Value)
+			v, ok := parseEventDurationMs(events[j].Value)
 			if !ok {
 				break
 			}
@@ -59,9 +59,19 @@ func CompressEvents(events []Event) (updates []Event, toDelete []Event) {
 	return updates, toDelete
 }
 
-func parseInt64(s string) (int64, bool) {
-	n, err := strconv.ParseInt(s, 10, 64)
-	return n, err == nil
+// parseEventDurationMs parses an event row's value as a millisecond duration.
+// Tolerates decimal strings (e.g. watching_video posts durations as floats like
+// "505.9579275207507") by falling back to ParseFloat and truncating toward zero.
+// Returns (0, false) only when the string cannot be parsed at all.
+func parseEventDurationMs(s string) (int64, bool) {
+	if n, err := strconv.ParseInt(s, 10, 64); err == nil {
+		return n, true
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, false
+	}
+	return int64(f), true
 }
 
 const (

@@ -105,6 +105,28 @@ func TestCompressEvents_TwoRunsSameType(t *testing.T) {
 	}
 }
 
+func TestCompressEvents_DecimalValuesCompress(t *testing.T) {
+	// watching_video events are posted as floating-point millisecond strings
+	// (e.g. "505.9579275207507") because the frontend computes the delta with
+	// floating-point math. Compression must tolerate these.
+	events := []Event{
+		{Id: 1, UserId: 1, EventType: WATCHING_VIDEO, Value: "505.9579275207507", Timestamp: ts(1)},
+		{Id: 2, UserId: 1, EventType: WATCHING_VIDEO, Value: "500.5", Timestamp: ts(2)},
+		{Id: 3, UserId: 1, EventType: WATCHING_VIDEO, Value: "499.1", Timestamp: ts(3)},
+	}
+	updates, toDelete := CompressEvents(events)
+	if len(updates) != 1 {
+		t.Fatalf("updates: want 1, got %d", len(updates))
+	}
+	// int64(505.95...) + int64(500.5) + int64(499.1) = 505 + 500 + 499 = 1504
+	if updates[0].Id != 1 || updates[0].Value != "1504" {
+		t.Errorf("merged: want id=1 value=1504; got id=%d value=%q", updates[0].Id, updates[0].Value)
+	}
+	if len(toDelete) != 2 || toDelete[0].Id != 2 || toDelete[1].Id != 3 {
+		t.Errorf("toDelete ids: want [2,3]; got %+v", toDelete)
+	}
+}
+
 func TestCompressEvents_NonNumericValueSkipsRun(t *testing.T) {
 	events := []Event{
 		{Id: 1, UserId: 1, EventType: WATCHING_VIDEO, Value: "5000", Timestamp: ts(1)},
