@@ -14,14 +14,6 @@ const (
 	negativeDiffMultiplier = 1.5
 )
 
-func getMaxAllowedNumberDiff(opts *Options) float64 {
-	diff := getNumberDiff(maxAllowedNumber)
-	if opts.Negatives {
-		diff *= negativeDiffMultiplier
-	}
-	return diff
-}
-
 func getNumberDiff(n float64) float64 {
 	diff := math.Abs(math.Log(n) / math.Log(numberDiffMagnitude))
 	if diff == 0 || math.IsInf(diff, 0) || math.IsNaN(diff) {
