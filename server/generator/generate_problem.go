@@ -81,10 +81,6 @@ type Options struct {
 	TargetDifficulty float64  `json:"target_difficulty" form:"target_difficulty"`
 }
 
-func (opts Options) String() string {
-	return fmt.Sprintf("Operations: %s", opts.Operations)
-}
-
 func validateOptions(opts *Options) error {
 	for _, o := range opts.Operations {
 		if !isSupportedOperation(o) {
