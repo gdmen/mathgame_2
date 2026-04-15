@@ -337,35 +337,3 @@ func (a *Api) readStatisticsFromCache(logPrefix string, userID uint32) (Statisti
 	}
 	return resp, nil
 }
-
-// computeStatsByMonth returns totals grouped by month (YYYY-MM), ordered by month descending.
-func (a *Api) computeStatsByMonth(logPrefix string, userID uint32) ([]MonthStats, error) {
-	const msPerMinute = 60000
-	rows, err := a.DB.Query(`
-		SELECT
-			DATE_FORMAT(timestamp, '%Y-%m') AS month,
-			COUNT(CASE WHEN event_type = ? THEN 1 END),
-			(GREATEST(COALESCE(SUM(CASE WHEN event_type = ? THEN CAST(value AS SIGNED) END), 0), 0)) DIV ?,
-			(GREATEST(COALESCE(SUM(CASE WHEN event_type = ? THEN CAST(value AS SIGNED) END), 0), 0)) DIV ?
-		FROM events
-		WHERE user_id = ? AND event_type IN (?, ?, ?)
-		GROUP BY DATE_FORMAT(timestamp, '%Y-%m')
-		ORDER BY month DESC`,
-		SOLVED_PROBLEM, WORKING_ON_PROBLEM, msPerMinute, WATCHING_VIDEO, msPerMinute,
-		userID, SOLVED_PROBLEM, WORKING_ON_PROBLEM, WATCHING_VIDEO,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var result []MonthStats
-	for rows.Next() {
-		var m MonthStats
-		if err := rows.Scan(&m.Month, &m.TotalProblemsSolved, &m.TotalWorkMinutes, &m.TotalVideoMinutes); err != nil {
-			return nil, err
-		}
-		result = append(result, m)
-	}
-	return result, rows.Err()
-}

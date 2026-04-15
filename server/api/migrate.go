@@ -33,12 +33,6 @@ func RunMigrations(db *sql.DB) error {
 	return runMigrations(db, true)
 }
 
-// RunMigrationsForTest runs all migrations from 1 upward with no skipping. Use for
-// test databases so the full schema (including events, etc.) is created.
-func RunMigrationsForTest(db *sql.DB) error {
-	return runMigrations(db, false)
-}
-
 func runMigrations(db *sql.DB, skipOneThroughFourteen bool) error {
 	if _, err := db.Exec(createSchemaMigrationsTable); err != nil {
 		return fmt.Errorf("creating schema_migrations table: %w", err)
