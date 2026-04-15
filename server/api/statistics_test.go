@@ -197,3 +197,127 @@ func TestUpdateStatisticsForUser_BackfillsCacheAndMeta(t *testing.T) {
 		t.Error("statistics_cache_meta.last_event_id should be set")
 	}
 }
+
+// Regression: watching_video events are posted by the frontend with decimal
+// millisecond values (e.g. "505.9579275207507"). Before the fix, the incremental
+// merge path used strconv.ParseInt which fails on decimals and silently returned 0,
+// so every post-cache video event contributed 0 min to both totals and monthly.
+func TestUpdateStatisticsForUser_IncrementalHandlesDecimalWatchingVideo(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("Couldn't read config: %v", err)
+	}
+	api, r, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+	user := createTestUser(t, r, "auth0|stats-decimal", "decimal@test.com", "decimaluser")
+
+	// First call: no events yet, triggers fullProgressBackfill and establishes cache_meta.
+	if err := api.UpdateStatisticsForUser("[test]", user.Id); err != nil {
+		t.Fatalf("initial UpdateStatisticsForUser: %v", err)
+	}
+
+	// Now insert decimal-valued watching_video events. 120 events * ~506 ms ≈ 60720 ms ≈ 1 min.
+	tx, err := api.DB.Begin()
+	if err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+	stmt, err := tx.Prepare("INSERT INTO events (user_id, event_type, value) VALUES (?, ?, ?)")
+	if err != nil {
+		t.Fatalf("prepare: %v", err)
+	}
+	for i := 0; i < 120; i++ {
+		if _, err := stmt.Exec(user.Id, WATCHING_VIDEO, "505.9579275207507"); err != nil {
+			t.Fatalf("insert: %v", err)
+		}
+	}
+	_ = stmt.Close()
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+
+	// Second call: takes the incremental path.
+	if err := api.UpdateStatisticsForUser("[test]", user.Id); err != nil {
+		t.Fatalf("incremental UpdateStatisticsForUser: %v", err)
+	}
+
+	var totalVideo int64
+	err = api.DB.QueryRow(
+		"SELECT total_video_minutes FROM statistics_totals WHERE user_id = ?",
+		user.Id,
+	).Scan(&totalVideo)
+	if err != nil {
+		t.Fatalf("read statistics_totals: %v", err)
+	}
+	// int64(505.9579...) = 505; 505 * 120 = 60600 ms = 1 minute (floor).
+	if totalVideo != 1 {
+		t.Errorf("total_video_minutes: want 1, got %d", totalVideo)
+	}
+
+	var monthVideo int64
+	err = api.DB.QueryRow(
+		"SELECT total_video_minutes FROM statistics_monthly WHERE user_id = ? ORDER BY month DESC LIMIT 1",
+		user.Id,
+	).Scan(&monthVideo)
+	if err != nil {
+		t.Fatalf("read statistics_monthly: %v", err)
+	}
+	if monthVideo != 1 {
+		t.Errorf("monthly total_video_minutes: want 1, got %d", monthVideo)
+	}
+}
+
+// Regression: the monthly branch of mergeProgressEventsIntoCache used to divide
+// per-event (d.workMin += v / 60000), which rounded every sub-minute event to 0 and
+// made monthly stats dramatically under-count when event granularity is small
+// (the frontend posts working_on_problem events every 500 ms).
+func TestUpdateStatisticsForUser_IncrementalMonthlySumsThenDivides(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("Couldn't read config: %v", err)
+	}
+	api, r, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+	user := createTestUser(t, r, "auth0|stats-sub-min", "submin@test.com", "subminuser")
+
+	// First call: establish cache_meta with no events, so the next call is incremental.
+	if err := api.UpdateStatisticsForUser("[test]", user.Id); err != nil {
+		t.Fatalf("initial UpdateStatisticsForUser: %v", err)
+	}
+
+	// 180 events * 500 ms = 90000 ms = 1 minute (with leftover 30000 ms).
+	tx, err := api.DB.Begin()
+	if err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+	stmt, err := tx.Prepare("INSERT INTO events (user_id, event_type, value) VALUES (?, ?, ?)")
+	if err != nil {
+		t.Fatalf("prepare: %v", err)
+	}
+	for i := 0; i < 180; i++ {
+		if _, err := stmt.Exec(user.Id, WORKING_ON_PROBLEM, "500"); err != nil {
+			t.Fatalf("insert: %v", err)
+		}
+	}
+	_ = stmt.Close()
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+
+	if err := api.UpdateStatisticsForUser("[test]", user.Id); err != nil {
+		t.Fatalf("incremental UpdateStatisticsForUser: %v", err)
+	}
+
+	var monthWork int64
+	err = api.DB.QueryRow(
+		"SELECT total_work_minutes FROM statistics_monthly WHERE user_id = ? ORDER BY month DESC LIMIT 1",
+		user.Id,
+	).Scan(&monthWork)
+	if err != nil {
+		t.Fatalf("read statistics_monthly: %v", err)
+	}
+	// 180 * 500 = 90000 ms. Pre-fix: per-event 500/60000 = 0 each -> 0 min.
+	// Post-fix: sum first, 90000/60000 = 1 min.
+	if monthWork != 1 {
+		t.Errorf("monthly total_work_minutes: want 1, got %d", monthWork)
+	}
+}

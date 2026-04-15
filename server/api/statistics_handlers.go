@@ -4,7 +4,6 @@ package api
 import (
 	"database/sql"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -213,22 +212,24 @@ func (a *Api) mergeProgressEventsIntoCache(logPrefix string, userID uint32, even
 	const msPerMinute = 60000
 	var totalDelta int64
 	var workDelta, videoDelta int64
+	// Accumulate per-month totals in milliseconds and divide once at the end, to
+	// match how fullProgressBackfill computes it.
 	monthDeltas := make(map[string]struct {
-		solved   int64
-		workMin  int64
-		videoMin int64
+		solved  int64
+		workMs  int64
+		videoMs int64
 	})
 	for _, e := range events {
 		switch e.eventType {
 		case SOLVED_PROBLEM:
 			totalDelta++
 		case WORKING_ON_PROBLEM:
-			v, _ := strconv.ParseInt(e.value, 10, 64)
+			v, _ := parseEventDurationMs(e.value)
 			if v > 0 {
 				workDelta += v
 			}
 		case WATCHING_VIDEO:
-			v, _ := strconv.ParseInt(e.value, 10, 64)
+			v, _ := parseEventDurationMs(e.value)
 			if v > 0 {
 				videoDelta += v
 			}
@@ -240,14 +241,14 @@ func (a *Api) mergeProgressEventsIntoCache(logPrefix string, userID uint32, even
 			case SOLVED_PROBLEM:
 				d.solved++
 			case WORKING_ON_PROBLEM:
-				v, _ := strconv.ParseInt(e.value, 10, 64)
+				v, _ := parseEventDurationMs(e.value)
 				if v > 0 {
-					d.workMin += v / msPerMinute
+					d.workMs += v
 				}
 			case WATCHING_VIDEO:
-				v, _ := strconv.ParseInt(e.value, 10, 64)
+				v, _ := parseEventDurationMs(e.value)
 				if v > 0 {
-					d.videoMin += v / msPerMinute
+					d.videoMs += v
 				}
 			}
 			monthDeltas[month] = d
@@ -270,6 +271,8 @@ func (a *Api) mergeProgressEventsIntoCache(logPrefix string, userID uint32, even
 	}
 
 	for month, d := range monthDeltas {
+		workMin := d.workMs / msPerMinute
+		videoMin := d.videoMs / msPerMinute
 		_, err = a.DB.Exec(`
 			INSERT INTO statistics_monthly (user_id, month, total_problems_solved, total_work_minutes, total_video_minutes)
 			VALUES (?, ?, ?, ?, ?)
@@ -277,7 +280,7 @@ func (a *Api) mergeProgressEventsIntoCache(logPrefix string, userID uint32, even
 				total_problems_solved = total_problems_solved + VALUES(total_problems_solved),
 				total_work_minutes = total_work_minutes + VALUES(total_work_minutes),
 				total_video_minutes = total_video_minutes + VALUES(total_video_minutes)`,
-			userID, month, d.solved, d.workMin, d.videoMin,
+			userID, month, d.solved, workMin, videoMin,
 		)
 		if err != nil {
 			return 0, err
