@@ -42,10 +42,13 @@ func (a *Api) getSatisfyingProblemIds(logPrefix string, c *gin.Context, settings
 
 	diffLowerBound := settings.TargetDifficulty * (1 - problemSelectionEpsilon)
 	diffUpperBound := settings.TargetDifficulty * (1 + problemSelectionEpsilon)
-	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0;",
+	// Grade filter: grade_level > 0 always-excludes backfilled/ungraded problems (grade=0).
+	// grade_level = settings.GradeLevel ensures cross-grade pool isolation.
+	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0 AND grade_level > 0 AND grade_level = %d;",
 		strings.Replace(strings.Trim(fmt.Sprint(permutations), "[]"), " ", ",", -1),
 		diffLowerBound,
 		diffUpperBound,
+		settings.GradeLevel,
 	)
 	if len(*prevIds) > 0 {
 		idFilter := fmt.Sprintf("id NOT IN (%s) AND ", strings.Replace(strings.Trim(fmt.Sprint(*prevIds), "[]"), " ", ",", -1))
@@ -145,10 +148,12 @@ func (a *Api) getSatisfyingProblemIdsForTopic(logPrefix string, c *gin.Context, 
 
 	diffLowerBound := settings.TargetDifficulty * (1 - problemSelectionEpsilon)
 	diffUpperBound := settings.TargetDifficulty * (1 + problemSelectionEpsilon)
-	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0;",
+	// Grade filter: always-exclude backfilled/ungraded (grade=0); match settings.GradeLevel.
+	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0 AND grade_level > 0 AND grade_level = %d;",
 		strings.Replace(strings.Trim(fmt.Sprint(filtered), "[]"), " ", ",", -1),
 		diffLowerBound,
 		diffUpperBound,
+		settings.GradeLevel,
 	)
 	if len(*prevIds) > 0 {
 		idFilter := fmt.Sprintf("id NOT IN (%s) AND ", strings.Replace(strings.Trim(fmt.Sprint(*prevIds), "[]"), " ", ",", -1))
@@ -230,7 +235,8 @@ func (a *Api) runHeuristicGenerator(logPrefix string, c *gin.Context, settings *
 		}
 		// Pin difficulty to requested target (heuristic scale differs from LLM scale)
 		model.Difficulty = settings.TargetDifficulty
-		glog.Infof("%s heuristic problem: pinned difficulty=%g (heuristic raw=%g)", logPrefix, model.Difficulty, heuristicDiff)
+		model.GradeLevel = settings.GradeLevel
+		glog.Infof("%s heuristic problem: pinned difficulty=%g grade=%d (heuristic raw=%g)", logPrefix, model.Difficulty, model.GradeLevel, heuristicDiff)
 		h := fnv.New32a()
 		h.Write([]byte(model.Expression))
 		model.Id = h.Sum32()
@@ -306,7 +312,8 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 				model.Explanation = p.Explanation
 				// Pin difficulty to requested target (LLM self-reported difficulty varies)
 				model.Difficulty = settings.TargetDifficulty
-				glog.Infof("%s LLM problem: pinned difficulty=%g (LLM raw=%g)", logPrefix, model.Difficulty, p.Difficulty)
+				model.GradeLevel = settings.GradeLevel
+				glog.Infof("%s LLM problem: pinned difficulty=%g grade=%d (LLM raw=%g)", logPrefix, model.Difficulty, model.GradeLevel, p.Difficulty)
 
 				// Use expression hash as model.Id
 				h := fnv.New32a()
