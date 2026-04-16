@@ -217,7 +217,35 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		var diffIncrease float64 = 0.05
 		var minDiff float64 = 3
 		var minProbs uint32 = 5
+		// Maximum difficulty cap, grade-aware when set. Prevents runaway growth.
+		// The LLM interprets difficulty as "age in years" - grade 5 kid is ~10-11,
+		// so cap at (gradeLevel * 2 + 4). Default ceiling of 20 when grade unset.
+		var maxDiff float64 = 20
+		if settings.GradeLevel > 0 {
+			maxDiff = float64(settings.GradeLevel)*2 + 4
+		}
 		// End difficulty adjustment limits
+
+		// Defensive: clamp any previously-runaway difficulty back into range.
+		// If TargetDifficulty was set to a wildly high value (from the unbounded
+		// adjuster bug), reset it to maxDiff immediately so even if later processing
+		// fails, the user gets grade-appropriate problems on their next session.
+		if settings.TargetDifficulty > maxDiff {
+			glog.Infof("%s TargetDifficulty %.2f exceeds cap %.2f, clamping down",
+				logPrefix, settings.TargetDifficulty, maxDiff)
+			settings.TargetDifficulty = maxDiff
+			if _, dbErr := a.DB.Exec(
+				`UPDATE settings SET target_difficulty = ? WHERE user_id = ?`,
+				maxDiff, user.Id,
+			); dbErr != nil {
+				glog.Errorf("%s failed to persist difficulty clamp: %v", logPrefix, dbErr)
+			}
+			// Also log as an event for audit trail
+			events = append(events, &Event{
+				EventType: SET_TARGET_DIFFICULTY,
+				Value:     strconv.FormatFloat(maxDiff, 'E', -1, 64),
+			})
+		}
 
 		if gamestate.Solved < gamestate.Target {
 			msg := fmt.Sprintf("Done watching video, but there's an inconsistency in problems solved: %v < %v", gamestate.Solved, gamestate.Target)
@@ -255,9 +283,17 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			// Make it more difficult
 			if gamestate.Target < uint32(maxTarget) {
 				changeGamestateTarget(gamestate.Target + 1)
+			} else if settings.TargetDifficulty >= maxDiff {
+				// Already at difficulty cap - don't bump further, just reset problem target
+				glog.Infof("%s difficulty %.2f already at cap %.2f; not increasing further", logPrefix, settings.TargetDifficulty, maxDiff)
+				changeGamestateTarget(uint32(math.Max(float64(minProbs), math.Ceil(float64(gamestate.Target)/2))))
 			} else {
 				changeGamestateTarget(uint32(math.Max(float64(minProbs), math.Ceil(float64(gamestate.Target)/2))))
-				changeTargetDifficulty(settings.TargetDifficulty + math.Max(1, diffIncrease*settings.TargetDifficulty))
+				newDiff := settings.TargetDifficulty + math.Max(1, diffIncrease*settings.TargetDifficulty)
+				if newDiff > maxDiff {
+					newDiff = maxDiff
+				}
+				changeTargetDifficulty(newDiff)
 			}
 		} else if targetWorkPercentage < workPercentage {
 			// Make it easier
