@@ -196,9 +196,11 @@ func (a *Api) generateProblemsBackground(logPrefix string, c *gin.Context, setti
 
 }
 
-// runHeuristicGenerator generates problems using the heuristic generator (addition/subtraction only).
-// problemType must be a subset of ADDITION|SUBTRACTION. Returns the last new problem created,
-// the count of new problems, and the set of unique IDs.
+// runHeuristicGenerator generates problems using the heuristic generator.
+// Supports ADDITION, SUBTRACTION, MULTIPLICATION, DIVISION, FRACTIONS, NEGATIVES.
+// WORD problems should be generated via the LLM generator instead.
+// Returns the last new problem created, the count of new problems, and the set
+// of unique IDs.
 func (a *Api) runHeuristicGenerator(logPrefix string, c *gin.Context, settings *Settings, numProblems int, problemType ProblemType) (*Problem, int, map[uint32]bool) {
 	uniqueIds := map[uint32]bool{}
 	newCount := 0
@@ -210,18 +212,25 @@ func (a *Api) runHeuristicGenerator(logPrefix string, c *gin.Context, settings *
 	if (SUBTRACTION & problemType) > 0 {
 		operations = append(operations, "-")
 	}
+	if (MULTIPLICATION & problemType) > 0 {
+		operations = append(operations, "*")
+	}
+	if (DIVISION & problemType) > 0 {
+		operations = append(operations, "/")
+	}
 	if len(operations) == 0 {
 		return nil, 0, uniqueIds
 	}
 	generatorOpts := &heuristic_generator.Options{
 		Operations:       operations,
-		Fractions:        false,
-		Negatives:        false,
+		Fractions:        (FRACTIONS & problemType) > 0,
+		Negatives:        (NEGATIVES & problemType) > 0,
 		TargetDifficulty: settings.TargetDifficulty,
+		GradeLevel:       settings.GradeLevel,
 	}
 	for i := 0; i < numProblems; i++ {
 		model := &Problem{}
-		model.Generator = "heuristic_0.0"
+		model.Generator = heuristic_generator.VERSION
 		var err error
 		var heuristicDiff float64
 		model.Expression, model.Answer, heuristicDiff, err = heuristic_generator.GenerateProblem(generatorOpts)
@@ -236,7 +245,7 @@ func (a *Api) runHeuristicGenerator(logPrefix string, c *gin.Context, settings *
 		// Pin difficulty to requested target (heuristic scale differs from LLM scale)
 		model.Difficulty = settings.TargetDifficulty
 		model.GradeLevel = settings.GradeLevel
-		glog.Infof("%s heuristic problem: pinned difficulty=%g grade=%d (heuristic raw=%g)", logPrefix, model.Difficulty, model.GradeLevel, heuristicDiff)
+		glog.Infof("%s heuristic problem: %s = %s (grade=%d pinned_diff=%g raw=%g)", logPrefix, model.Expression, model.Answer, model.GradeLevel, model.Difficulty, heuristicDiff)
 		h := fnv.New32a()
 		h.Write([]byte(model.Expression))
 		model.Id = h.Sum32()
@@ -245,13 +254,7 @@ func (a *Api) runHeuristicGenerator(logPrefix string, c *gin.Context, settings *
 			continue
 		}
 		uniqueIds[model.Id] = true
-		model.ProblemTypeBitmap = 0
-		if strings.Contains(model.Expression, "+") {
-			model.ProblemTypeBitmap += uint64(ADDITION)
-		}
-		if strings.Contains(model.Expression, "-") {
-			model.ProblemTypeBitmap += uint64(SUBTRACTION)
-		}
+		model.ProblemTypeBitmap = detectProblemTypeBitmap(model.Expression)
 		status, msg, err := a.problemManager.Create(model)
 		if HandleMngrResp(logPrefix, c, status, msg, err, model) != nil {
 			glog.Infof("%s could not create problem: (%d: %s)", logPrefix, status, err)
@@ -263,6 +266,43 @@ func (a *Api) runHeuristicGenerator(logPrefix string, c *gin.Context, settings *
 	return newProblem, newCount, uniqueIds
 }
 
+// detectProblemTypeBitmap inspects a generated expression and returns the
+// bitmap of problem types it contains. Used to tag heuristic-generated
+// problems so they're selected correctly by type filter.
+//
+// Heuristic generator formatting conventions:
+//   - Binary operators are surrounded by spaces: "42 / 6", "3 + 5"
+//   - Fractions have no surrounding spaces on their slash: "1/2 + 3/4"
+//   - Negative numbers appear as "-N" or with a leading minus in expressions.
+func detectProblemTypeBitmap(expr string) uint64 {
+	var bitmap uint64 = 0
+	// Subtraction has a space-dash-space pattern; a bare leading "-" is a
+	// negative number, not a subtraction operator.
+	if strings.Contains(expr, " - ") {
+		bitmap |= uint64(SUBTRACTION)
+	}
+	if strings.Contains(expr, " + ") {
+		bitmap |= uint64(ADDITION)
+	}
+	if strings.Contains(expr, " * ") {
+		bitmap |= uint64(MULTIPLICATION)
+	}
+	if strings.Contains(expr, " / ") {
+		bitmap |= uint64(DIVISION)
+	}
+	// Fractions: a "/" without surrounding spaces (e.g., "1/2").
+	// Easy test: any "/" that isn't part of " / ".
+	if strings.Count(expr, "/") > strings.Count(expr, " / ") {
+		bitmap |= uint64(FRACTIONS)
+	}
+	// Negatives: presence of a unary minus (leading "-" or "-" after operator/space).
+	// Cheap heuristic: "-" at start, or " -" appearing where no subtraction operator follows.
+	if strings.HasPrefix(expr, "-") {
+		bitmap |= uint64(NEGATIVES)
+	}
+	return bitmap
+}
+
 func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Settings, numProblems int) (*Problem, error) {
 	var model *Problem
 	var newProblem *Problem
@@ -272,8 +312,11 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 	uniqueIds := map[uint32]bool{}
 	newCount := 0
 	inputProblemType := ProblemType(settings.ProblemTypeBitmap)
-	// If difficulty is low and only using basic operations, use the heuristic generator.
-	if settings.TargetDifficulty <= 5 && inputProblemType <= (ADDITION+SUBTRACTION) {
+	// Use the heuristic generator unless the user has enabled WORD problems.
+	// Heuristic_1.0 supports all 4 basic operations, fractions, and negatives
+	// and is grade-aware via settings.GradeLevel. Word problems still go to
+	// the LLM because they need natural language and contextual variety.
+	if (inputProblemType & WORD) == 0 {
 		newProblem, newCount, uniqueIds = a.runHeuristicGenerator(logPrefix, c, settings, numProblems, inputProblemType)
 	} else {
 
@@ -289,10 +332,12 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 		var generatorProblems []llm_generator.Problem
 		generatorProblems, err = llm_generator.GenerateProblem(generatorOpts)
 		if err != nil {
-			// Fall back to heuristic when OpenAI fails, as long as addition or subtraction is an option.
-			heuristicType := inputProblemType & (ADDITION + SUBTRACTION)
+			// Fall back to heuristic when OpenAI fails. Strip WORD since the
+			// heuristic doesn't produce word problems, and fall back on the
+			// remaining arithmetic types.
+			heuristicType := inputProblemType &^ WORD
 			if heuristicType != 0 {
-				glog.Infof("%s OpenAI failed (%v), falling back to heuristic generator (addition/subtraction)", logPrefix, err)
+				glog.Infof("%s OpenAI failed (%v), falling back to heuristic generator", logPrefix, err)
 				newProblem, newCount, uniqueIds = a.runHeuristicGenerator(logPrefix, c, settings, numProblems, heuristicType)
 			} else {
 				msg := "Couldn't generate problems"

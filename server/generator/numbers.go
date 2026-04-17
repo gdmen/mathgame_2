@@ -1,59 +1,51 @@
-// Package generator contains a math problem generator
 package generator // import "garydmenezes.com/mathgame/server/generator"
 
 import (
-	"math"
-	"math/big"
 	"math/rand"
-	//"github.com/golang/glog"
 )
 
-const (
-	maxAllowedNumber       = 100000.0
-	numberDiffMagnitude    = 3.0
-	negativeDiffMultiplier = 1.5
-)
-
-func getNumberDiff(n float64) float64 {
-	diff := math.Abs(math.Log(n) / math.Log(numberDiffMagnitude))
-	if diff == 0 || math.IsInf(diff, 0) || math.IsNaN(diff) {
-		diff = 0.5
+// randIntRange returns a random int in [min, max] inclusive.
+// Both min and max are included.
+func randIntRange(min, max int) int {
+	if max < min {
+		return min
 	}
-	return diff
+	return rand.Intn(max-min+1) + min
 }
 
-func generateNumber(maxDiff float64, opts *Options) (*big.Rat, float64) {
-	//logPrefix := "[generateNumber]"
-	//glog.Infof("%s fcn start", logPrefix)
-	//glog.Infof("%s maxDiff: %d\n", logPrefix, maxDiff)
-	// Difficulty is exponentially related to number size
-	var denom int64
-	denom = 1
-	isNeg := false
-	if opts.Negatives {
-		isNeg = rand.Intn(2) == 0
-		if isNeg {
-			// Reduce random number diff to account for negative difficulty
-			maxDiff /= negativeDiffMultiplier
+// randNonZeroInRange returns a random non-zero int in [min, max] inclusive.
+// Useful for denominators and divisors.
+func randNonZeroInRange(min, max int) int {
+	for i := 0; i < 10; i++ {
+		n := randIntRange(min, max)
+		if n != 0 {
+			return n
 		}
 	}
-	if opts.Fractions {
-		// Generate non-zero denominator and expand numerator range
-		//denom = rand.Int63n(int64(max))
+	if min <= 0 && max >= 1 {
+		return 1
 	}
+	return min
+}
 
-	max := math.Pow(numberDiffMagnitude, maxDiff)
-	max = math.Min(max, maxAllowedNumber)
-	// an input of 0 breaks rand.Int63n, so make it at least 1:
-	max = math.Max(max, 1)
-
-	num := big.NewRat(rand.Int63n(int64(max)), denom)
-	numF, _ := num.Float64()
-	diff := getNumberDiff(numF)
-
-	if isNeg {
-		diff *= negativeDiffMultiplier
-		num = num.Neg(num)
+// gcd returns the greatest common divisor of a and b.
+func gcd(a, b int) int {
+	if a < 0 {
+		a = -a
 	}
-	return num, diff
+	if b < 0 {
+		b = -b
+	}
+	for b != 0 {
+		a, b = b, a%b
+	}
+	if a == 0 {
+		return 1
+	}
+	return a
+}
+
+// lcm returns the least common multiple of a and b.
+func lcm(a, b int) int {
+	return a * b / gcd(a, b)
 }

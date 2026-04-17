@@ -1,91 +1,91 @@
-// Package generator contains a math problem generator
 package generator // import "garydmenezes.com/mathgame/server/generator"
 
 import (
 	"fmt"
 )
 
+// Op represents an arithmetic operator.
+type Op string
+
 const (
-	addDiffMultiplier = 1.0
-	subDiffMultiplier = 1.2
-	mulDiffMultiplier = 2
+	OpAdd Op = "+"
+	OpSub Op = "-"
+	OpMul Op = "*"
+	OpDiv Op = "/"
 )
 
-type Operation struct {
-	getInputDiff GetInputDiff
-	do           Operate
-	String       func() string
-}
-
-type GetInputDiff func(maxDiff float64) (maxInputDiff float64)
-
-type Operate func(a *Problem, b *Problem, opts *Options) (prob *Problem)
-
-func addInputDiff(maxDiff float64) float64 {
-	return maxDiff / addDiffMultiplier
-}
-
-func add(a *Problem, b *Problem, opts *Options) *Problem {
-	prob := &Problem{}
-	prob.Expr = fmt.Sprintf("%s+%s", a.Expr, b.Expr)
-	a_v, b_v := a.GetAns(), b.GetAns()
-	prob.SetAns(a_v.Add(a_v, b_v))
-	prob.Diff = (a.Diff + b.Diff) * addDiffMultiplier
-	return prob
-}
-
-func subInputDiff(maxDiff float64) float64 {
-	return maxDiff / subDiffMultiplier
-}
-
-func sub(a *Problem, b *Problem, opts *Options) *Problem {
-	prob := &Problem{}
-	if !opts.Negatives {
-		a, b = SortProblems(a, b)
+// opsFromStrings converts legacy string-based operations list to Op values.
+// Also accepts "mul" and "div" aliases.
+func opsFromStrings(ss []string) []Op {
+	var out []Op
+	for _, s := range ss {
+		switch s {
+		case "+", "add", "addition":
+			out = append(out, OpAdd)
+		case "-", "sub", "subtraction":
+			out = append(out, OpSub)
+		case "*", "x", "mul", "multiplication":
+			out = append(out, OpMul)
+		case "/", "div", "division":
+			out = append(out, OpDiv)
+		}
 	}
-	expr_fmt := "%s-(%s)"
-	if b.isNumber {
-		expr_fmt = "%s-%s"
+	return out
+}
+
+// pickOp picks a random operation from ops. Returns OpAdd if ops is empty.
+func pickOp(ops []Op, rng randFunc) Op {
+	if len(ops) == 0 {
+		return OpAdd
 	}
-	prob.Expr = fmt.Sprintf(expr_fmt, a.Expr, b.Expr)
-	a_v, b_v := a.GetAns(), b.GetAns()
-	prob.SetAns(a_v.Sub(a_v, b_v))
-	prob.Diff = (a.Diff + b.Diff) * subDiffMultiplier
-	return prob
+	return ops[rng(len(ops))]
 }
 
-func mulInputDiff(maxDiff float64) float64 {
-	return maxDiff / mulDiffMultiplier
+// opSymbol returns the display symbol for the operator.
+// Multiplication renders as × (multiplication sign) rather than * for readability.
+// Division renders as ÷ rather than /.
+// Addition and subtraction are themselves.
+func opSymbol(op Op) string {
+	switch op {
+	case OpMul:
+		return "*"
+	case OpDiv:
+		return "/"
+	default:
+		return string(op)
+	}
 }
 
-func mul(a *Problem, b *Problem, opts *Options) *Problem {
-	prob := &Problem{}
-	prob.Expr = fmt.Sprintf("(%s)*(%s)", a.Expr, b.Expr)
-	a_v, b_v := a.GetAns(), b.GetAns()
-	prob.SetAns(a_v.Mul(a_v, b_v))
-	prob.Diff = (a.Diff * b.Diff) * mulDiffMultiplier
-	return prob
+// compute performs the operation on two ints and returns the result.
+// Callers are responsible for ensuring division is clean (no remainder).
+func compute(a int, op Op, b int) int {
+	switch op {
+	case OpAdd:
+		return a + b
+	case OpSub:
+		return a - b
+	case OpMul:
+		return a * b
+	case OpDiv:
+		if b == 0 {
+			return 0
+		}
+		return a / b
+	}
+	return 0
 }
 
-var operations = map[string]Operation{
-	"+": {
-		getInputDiff: addInputDiff,
-		do:           add,
-		String:       func() string { return "add" },
-	},
-	"-": {
-		getInputDiff: subInputDiff,
-		do:           sub,
-		String:       func() string { return "sub" },
-	},
-	"*": {
-		getInputDiff: mulInputDiff,
-		do:           mul,
-		String:       func() string { return "mul" },
-	},
+// formatBinary formats a binary expression with clean spacing: "a op b".
+// No parens around operands unless needed for precedence (handled by caller).
+func formatBinary(a int, op Op, b int) string {
+	return fmt.Sprintf("%d %s %d", a, opSymbol(op), b)
 }
 
-func isSupportedOperation(o string) bool {
-	_, ok := operations[o]
-	return ok
+// formatBinaryStrs is like formatBinary but accepts string operands for
+// multi-term chains where operands may themselves be expressions or fractions.
+func formatBinaryStrs(a string, op Op, b string) string {
+	return fmt.Sprintf("%s %s %s", a, opSymbol(op), b)
 }
+
+// randFunc is the random integer source, abstracted for testability.
+type randFunc func(n int) int
