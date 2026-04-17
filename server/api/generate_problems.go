@@ -129,6 +129,21 @@ func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings
 			return p, nil
 		}
 	}
+
+	// Fast fallback: rather than blocking the request on an LLM call, try the
+	// deterministic heuristic generator when it can satisfy the user's settings.
+	// The LLM is still being invoked in the background via generateProblemsBackground
+	// above to backfill the DB with richer problems.
+	inputProblemType := ProblemType(settings.ProblemTypeBitmap)
+	heuristicType := inputProblemType &^ WORD
+	if inputProblemType&WORD == 0 && heuristicType&(ADDITION|SUBTRACTION|MULTIPLICATION|DIVISION) != 0 {
+		glog.Infof("%s no satisfying problems in DB; trying heuristic fallback before blocking LLM", logPrefix)
+		p, _, _ := a.runHeuristicGenerator(logPrefix, c, settings, 3, heuristicType)
+		if p != nil {
+			return p, nil
+		}
+	}
+
 	return a.generateProblem(logPrefix, c, settings)
 }
 
