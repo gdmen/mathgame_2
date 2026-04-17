@@ -1,20 +1,15 @@
-// Package generator contains a math problem generator
 package generator // import "garydmenezes.com/mathgame/server/generator"
 
 import (
 	"fmt"
-	"github.com/golang/glog"
-	"math"
-	"math/big"
 	"math/rand"
-	"regexp"
 )
 
-const (
-	startingDifficultyRatio = 1 / 3.0
-	targetDelta             = 0.25
-)
+// VERSION is the generator version string stamped on created problems.
+// See docs/generator_versions.md for version history.
+const VERSION = "heuristic_1.0"
 
+// OptionsError is returned when options don't allow valid problem generation.
 type OptionsError struct {
 	s string
 }
@@ -23,135 +18,136 @@ func (e *OptionsError) Error() string {
 	return e.s
 }
 
-type Problem struct {
-	Expr     string
-	ans      *big.Rat
-	isNumber bool
-	Diff     float64
-}
-
-func (p *Problem) String() string {
-	desc := "Problem"
-	if p.isNumber {
-		desc = "Number"
-	}
-	return fmt.Sprintf("%s[%f] {%s = %s}", desc, p.Diff, p.ExprString(), p.AnsString())
-}
-
-func (p *Problem) ExprString() string {
-	re := regexp.MustCompile(`\s+`)
-	p.Expr = re.ReplaceAllString(p.Expr, "")
-	return p.Expr
-}
-
-func (p *Problem) AnsString() string {
-	if p.ans == nil {
-		return ""
-	}
-	return p.ans.RatString()
-}
-
-func (p *Problem) GetAns() *big.Rat {
-	if p.ans == nil {
-		return nil
-	}
-	r := big.NewRat(0, 1)
-	return r.Set(p.ans)
-}
-
-func (p *Problem) SetAns(a *big.Rat) {
-	if p.ans == nil {
-		p.ans = big.NewRat(0, 1)
-	}
-	p.ans.Set(a)
-}
-
-// Return <bigger>, <smaller>
-func SortProblems(a *Problem, b *Problem) (*Problem, *Problem) {
-	if b.GetAns().Cmp(a.GetAns()) > 0 {
-		return b, a
-	}
-	return a, b
-}
-
+// Options configures problem generation. Backwards compatible with
+// heuristic_0.0 signatures; GradeLevel added for grade-aware generation.
 type Options struct {
 	Operations       []string `json:"operations" form:"operations"`
 	Fractions        bool     `json:"fractions" form:"fractions"`
 	Negatives        bool     `json:"negatives" form:"negatives"`
 	TargetDifficulty float64  `json:"target_difficulty" form:"target_difficulty"`
+	GradeLevel       int      `json:"grade_level" form:"grade_level"`
+}
+
+// templateChoice picks a template probabilistically based on grade config.
+// Returns the chosen template along with a short label for logging.
+func pickTemplate(cfg GradeConfig, ops []Op, rng randFunc) (Template, string) {
+	type entry struct {
+		name   string
+		weight int
+		tmpl   Template
+	}
+	entries := []entry{
+		{"basic", 10, tBasic},
+	}
+	if cfg.AllowMissing {
+		entries = append(entries, entry{"missing", 3, tMissing})
+	}
+	if cfg.AllowMultiOp {
+		entries = append(entries, entry{"multiop", 4, tMultiOp})
+	}
+	if cfg.AllowFrac {
+		entries = append(entries, entry{"frac_same", 3, tFractionSameDenom})
+		if cfg.MaxFracDenom >= 3 {
+			entries = append(entries, entry{"frac_diff", 2, tFractionDiffDenom})
+		}
+	}
+
+	total := 0
+	for _, e := range entries {
+		total += e.weight
+	}
+	r := rng(total)
+	cum := 0
+	for _, e := range entries {
+		cum += e.weight
+		if r < cum {
+			return e.tmpl, e.name
+		}
+	}
+	return entries[0].tmpl, entries[0].name
+}
+
+// GenerateProblem produces a grade-appropriate math problem.
+//
+// Returns (expression, answer, difficulty, error). The difficulty return
+// value is kept for backward compatibility with heuristic_0.0 callers but
+// is always the requested TargetDifficulty (callers pin stored difficulty
+// anyway via settings.TargetDifficulty).
+//
+// If the grade + operations combination can't produce a valid problem after
+// several attempts, returns a best-effort simple addition problem.
+func GenerateProblem(opts *Options) (string, string, float64, error) {
+	if err := validateOptions(opts); err != nil {
+		return "", "", 0, err
+	}
+
+	cfg := getGradeConfig(opts.GradeLevel)
+	ops := opsFromStrings(opts.Operations)
+	if len(ops) == 0 {
+		return "", "", 0, &OptionsError{s: "no valid operations"}
+	}
+	// Apply option-level toggles on top of grade config.
+	cfg = applyOptionOverrides(cfg, opts)
+
+	rng := rand.Intn
+
+	// Try up to 5 times to get a valid problem from a weighted template choice.
+	// If all fail, fall back to a basic binary problem.
+	for attempt := 0; attempt < 5; attempt++ {
+		tmpl, _ := pickTemplate(cfg, ops, rng)
+		expr, ans, ok := tmpl(cfg, ops, rng)
+		if ok && expr != "" && ans != "" {
+			return expr, ans, opts.TargetDifficulty, nil
+		}
+	}
+	// Last-resort fallback: basic add with small numbers.
+	a := randIntRange(cfg.MinAddSub, max(cfg.MinAddSub+1, cfg.MaxAddSub))
+	b := randIntRange(cfg.MinAddSub, max(cfg.MinAddSub+1, cfg.MaxAddSub))
+	return formatBinary(a, OpAdd, b), fmt.Sprintf("%d", a+b), opts.TargetDifficulty, nil
+}
+
+// applyOptionOverrides lets old callers force-enable fractions/negatives
+// even if the grade config wouldn't have them. Grade config still sets the
+// ranges; these just flip the allow flags.
+func applyOptionOverrides(cfg GradeConfig, opts *Options) GradeConfig {
+	if opts.Fractions {
+		cfg.AllowFrac = true
+		if cfg.MaxFracDenom < 4 {
+			cfg.MaxFracDenom = 8
+		}
+	}
+	if opts.Negatives {
+		cfg.AllowNeg = true
+	}
+	return cfg
 }
 
 func validateOptions(opts *Options) error {
-	for _, o := range opts.Operations {
-		if !isSupportedOperation(o) {
-			return &OptionsError{s: fmt.Sprintf("'%s' is not a supported operation", o)}
+	if opts == nil {
+		return &OptionsError{s: "nil options"}
+	}
+	if len(opts.Operations) == 0 {
+		return &OptionsError{s: "no operations specified"}
+	}
+	for _, s := range opts.Operations {
+		switch s {
+		case "+", "-", "*", "/",
+			"add", "sub", "mul", "div",
+			"addition", "subtraction", "multiplication", "division",
+			"x":
+			// valid
+		default:
+			return &OptionsError{s: fmt.Sprintf("'%s' is not a supported operation", s)}
 		}
 	}
 	return nil
 }
 
-func generateNumberProblem(maxDifficulty float64, opts *Options) *Problem {
-	num, diff := generateNumber(maxDifficulty, opts)
-	p := &Problem{
-		isNumber: true,
-		Diff:     diff,
-	}
-	p.SetAns(num)
-	p.Expr = p.AnsString()
-	return p
-}
-
-func GenerateProblem(opts *Options) (string, string, float64, error) {
-	err := validateOptions(opts)
-	if err != nil {
-		return "", "", 0, err
-	}
-
-	// Cap difficulty at 50
-	opts.TargetDifficulty = min(opts.TargetDifficulty, 50)
-
-	prev := generateNumberProblem(opts.TargetDifficulty*startingDifficultyRatio, opts)
-
-	iter := 1
-	curr := doStep(prev, iter, opts)
-	for prev.Expr != curr.Expr {
-		prev = curr
-		iter += 1
-		curr = doStep(prev, iter, opts)
-	}
-
-	return curr.ExprString(), curr.AnsString(), curr.Diff, nil
-}
-
-func doStep(a *Problem, iteration int, opts *Options) *Problem {
-	logPrefix := "[doStep]"
-	glog.Infof("%s fcn start", logPrefix)
-	remainDiff := opts.TargetDifficulty - a.Diff
-	glog.Infof("%s iteration: %d\n", logPrefix, iteration)
-	glog.Infof("%s remainDiff: %f\n", logPrefix, remainDiff)
-	glog.Infof("%s min reasonable: %f\n", logPrefix, getNumberDiff(opts.TargetDifficulty/math.Log(float64(iteration))))
-	if iteration > 1 && remainDiff <= getNumberDiff(opts.TargetDifficulty/math.Log(float64(iteration))) {
-		glog.Infof("%s returning_a: %s\n", logPrefix, a)
+// max returns the larger of two ints. Local helper to avoid pulling math.Max
+// on floats when both args are ints.
+func max(a, b int) int {
+	if a > b {
 		return a
 	}
-	possOps := []Operation{}
-	for _, v := range opts.Operations {
-		possOps = append(possOps, operations[v])
-	}
-	for len(possOps) > 0 {
-		i := rand.Intn(len(possOps))
-		randOp := possOps[i]
-		maxBDiff := randOp.getInputDiff(remainDiff)
-		b := generateNumberProblem(maxBDiff, opts)
-		n := randOp.do(a, b, opts)
-		glog.Infof("%s randOp %s: %s\n", logPrefix, randOp.String(), n)
-		if n.Diff-opts.TargetDifficulty <= targetDelta {
-			return n
-		}
-		// Remove randOp
-		possOps[i] = possOps[len(possOps)-1]
-		possOps = possOps[:len(possOps)-1]
-	}
-	glog.Infof("%s returning_z: %s\n", logPrefix, a)
-	return a
+	return b
 }
