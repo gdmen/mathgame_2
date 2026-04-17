@@ -316,15 +316,12 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 	uniqueIds := map[uint32]bool{}
 	newCount := 0
 	inputProblemType := ProblemType(settings.ProblemTypeBitmap)
-	// Use the heuristic generator unless the user has enabled WORD problems.
-	// Heuristic_1.0 supports all 4 basic operations, fractions, and negatives
-	// and is grade-aware via settings.GradeLevel. Word problems still go to
-	// the LLM because they need natural language and contextual variety.
-	if (inputProblemType & WORD) == 0 {
-		newProblem, newCount, uniqueIds = a.runHeuristicGenerator(logPrefix, c, settings, numProblems, inputProblemType)
-	} else {
-
-		// Otherwise use the GPT generator.
+	// Try the LLM generator first. It produces richer content (word problems,
+	// varied phrasings, curriculum-aligned context) and should be the primary
+	// source for every problem type it can handle. The heuristic generator is
+	// a deterministic, offline fallback for when OpenAI is unreachable or
+	// returns no valid problems.
+	{
 		generatorOpts := &llm_generator.Options{
 			Features:         ProblemTypeToFeatures(inputProblemType),
 			TargetDifficulty: settings.TargetDifficulty,
