@@ -31,10 +31,10 @@ func ValidateProblemWithGrade(p *Problem, gradeLevel int) error {
 
 	c, err := common.ReadConfig("conf.json")
 	if err != nil {
-		glog.Fatal(err)
+		return fmt.Errorf("read config: %w", err)
 	}
 	if err := c.Validate(); err != nil {
-		glog.Fatal(err)
+		return fmt.Errorf("validate config: %w", err)
 	}
 
 	var prompt string

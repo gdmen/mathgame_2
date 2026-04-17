@@ -51,10 +51,12 @@ func GenerateProblem(opts *Options) ([]Problem, error) {
 
 	c, err := common.ReadConfig("conf.json")
 	if err != nil {
-		glog.Fatal(err)
+		// Return an error rather than fataling - the caller (generate_problems.go)
+		// is expected to fall back to the heuristic generator when we fail.
+		return []Problem{}, fmt.Errorf("read config: %w", err)
 	}
 	if err := c.Validate(); err != nil {
-		glog.Fatal(err)
+		return []Problem{}, fmt.Errorf("validate config: %w", err)
 	}
 
 	sort.Strings(opts.Features)
