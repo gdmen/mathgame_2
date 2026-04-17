@@ -42,12 +42,12 @@ func (a *Api) getSatisfyingProblemIds(logPrefix string, c *gin.Context, settings
 
 	diffLowerBound := settings.TargetDifficulty * (1 - problemSelectionEpsilon)
 	diffUpperBound := settings.TargetDifficulty * (1 + problemSelectionEpsilon)
-	// Selection filters on universal difficulty only. grade_level is still
-	// saved on each problem for provenance and LLM prompt context, but it
-	// isn't used as a pool filter. The adaptive loop's target_difficulty is
-	// the full identity now, and the grade setting in settings drives the
-	// target range via the runtime cap.
-	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0;",
+	// Universal difficulty allows cross-grade pool sharing: a grade 5 user
+	// whose target drifts to 5 can draw from problems generated for other
+	// grades as long as the computed difficulty matches. BUT grade_level=0
+	// is the sentinel for backfilled/ungraded legacy rows that should never
+	// be served; keep the always-exclude on that.
+	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0 AND grade_level > 0;",
 		strings.Replace(strings.Trim(fmt.Sprint(permutations), "[]"), " ", ",", -1),
 		diffLowerBound,
 		diffUpperBound,
@@ -165,8 +165,9 @@ func (a *Api) getSatisfyingProblemIdsForTopic(logPrefix string, c *gin.Context, 
 
 	diffLowerBound := settings.TargetDifficulty * (1 - problemSelectionEpsilon)
 	diffUpperBound := settings.TargetDifficulty * (1 + problemSelectionEpsilon)
-	// See note in getSatisfyingProblemIds: universal difficulty replaces grade filter.
-	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0;",
+	// See note in getSatisfyingProblemIds: cross-grade sharing is OK, but
+	// grade_level=0 is always excluded as the legacy-row sentinel.
+	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0 AND grade_level > 0;",
 		strings.Replace(strings.Trim(fmt.Sprint(filtered), "[]"), " ", ",", -1),
 		diffLowerBound,
 		diffUpperBound,
