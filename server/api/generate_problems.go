@@ -42,13 +42,15 @@ func (a *Api) getSatisfyingProblemIds(logPrefix string, c *gin.Context, settings
 
 	diffLowerBound := settings.TargetDifficulty * (1 - problemSelectionEpsilon)
 	diffUpperBound := settings.TargetDifficulty * (1 + problemSelectionEpsilon)
-	// Grade filter: grade_level > 0 always-excludes backfilled/ungraded problems (grade=0).
-	// grade_level = settings.GradeLevel ensures cross-grade pool isolation.
-	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0 AND grade_level > 0 AND grade_level = %d;",
+	// Selection filters on universal difficulty only. grade_level is still
+	// saved on each problem for provenance and LLM prompt context, but it
+	// isn't used as a pool filter. The adaptive loop's target_difficulty is
+	// the full identity now, and the grade setting in settings drives the
+	// target range via the runtime cap.
+	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0;",
 		strings.Replace(strings.Trim(fmt.Sprint(permutations), "[]"), " ", ",", -1),
 		diffLowerBound,
 		diffUpperBound,
-		settings.GradeLevel,
 	)
 	if len(*prevIds) > 0 {
 		idFilter := fmt.Sprintf("id NOT IN (%s) AND ", strings.Replace(strings.Trim(fmt.Sprint(*prevIds), "[]"), " ", ",", -1))
@@ -148,12 +150,11 @@ func (a *Api) getSatisfyingProblemIdsForTopic(logPrefix string, c *gin.Context, 
 
 	diffLowerBound := settings.TargetDifficulty * (1 - problemSelectionEpsilon)
 	diffUpperBound := settings.TargetDifficulty * (1 + problemSelectionEpsilon)
-	// Grade filter: always-exclude backfilled/ungraded (grade=0); match settings.GradeLevel.
-	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0 AND grade_level > 0 AND grade_level = %d;",
+	// See note in getSatisfyingProblemIds: universal difficulty replaces grade filter.
+	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0;",
 		strings.Replace(strings.Trim(fmt.Sprint(filtered), "[]"), " ", ",", -1),
 		diffLowerBound,
 		diffUpperBound,
-		settings.GradeLevel,
 	)
 	if len(*prevIds) > 0 {
 		idFilter := fmt.Sprintf("id NOT IN (%s) AND ", strings.Replace(strings.Trim(fmt.Sprint(*prevIds), "[]"), " ", ",", -1))
@@ -242,10 +243,13 @@ func (a *Api) runHeuristicGenerator(logPrefix string, c *gin.Context, settings *
 			glog.Errorf("%s Couldn't generate problem: %v", logPrefix, err)
 			continue
 		}
-		// Pin difficulty to requested target (heuristic scale differs from LLM scale)
-		model.Difficulty = settings.TargetDifficulty
+		// Compute universal difficulty from the generated expression.
+		// Stored difficulty is a function of the problem itself, not the
+		// requester's target. This lets problems be shared across grades
+		// and users with different targets.
+		model.Difficulty = ComputeProblemDifficulty(model.Expression)
 		model.GradeLevel = settings.GradeLevel
-		glog.Infof("%s heuristic problem: %s = %s (grade=%d pinned_diff=%g raw=%g)", logPrefix, model.Expression, model.Answer, model.GradeLevel, model.Difficulty, heuristicDiff)
+		glog.Infof("%s heuristic problem: %s = %s (grade=%d computed_diff=%g raw=%g)", logPrefix, model.Expression, model.Answer, model.GradeLevel, model.Difficulty, heuristicDiff)
 		h := fnv.New32a()
 		h.Write([]byte(model.Expression))
 		model.Id = h.Sum32()
@@ -355,10 +359,11 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 				model.Expression = strings.TrimSpace(p.Expression)
 				model.Answer = p.Answer
 				model.Explanation = p.Explanation
-				// Pin difficulty to requested target (LLM self-reported difficulty varies)
-				model.Difficulty = settings.TargetDifficulty
+				// Compute universal difficulty from the expression itself.
+				// LLM's self-reported difficulty is logged for debugging only.
+				model.Difficulty = ComputeProblemDifficulty(model.Expression)
 				model.GradeLevel = settings.GradeLevel
-				glog.Infof("%s LLM problem: pinned difficulty=%g grade=%d (LLM raw=%g)", logPrefix, model.Difficulty, model.GradeLevel, p.Difficulty)
+				glog.Infof("%s LLM problem: %s computed_diff=%g grade=%d (LLM raw=%g)", logPrefix, model.Expression, model.Difficulty, model.GradeLevel, p.Difficulty)
 
 				// Use expression hash as model.Id
 				h := fnv.New32a()
