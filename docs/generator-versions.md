@@ -83,18 +83,62 @@ Changes vs `0.1`:
   difficulty diverges >100% from the requested target
 - Added GPT5/GPT5Nano model constants (go-openai v1.41.2)
 
+## Universal Difficulty Scale
+
+Every problem's `difficulty` column stores a universal score on a 1-20 scale
+computed from the expression itself via `api.ComputeProblemDifficulty(expr)`.
+See `server/api/difficulty.go` for the formula.
+
+The score is a log-compressed composite of:
+- **magnitude** — `log10` of the largest operand
+- **op_weight** — hardest operation present (1.0 add → 4.0 exponent)
+- **concept** — multipliers for fractions, negatives, variables, word problems
+- **structure** — chain length and missing-number bump
+
+Rough alignment with Common Core progression:
+
+| Scale | Typical content |
+|-------|-----------------|
+| 1-3   | Grade 1: counting, basic add within 20 |
+| 3-5   | Grade 2: add/sub within 100, missing addend |
+| 5-8   | Grade 3: multiplication facts, simple fractions |
+| 8-11  | Grade 4: multi-digit mul, fraction add/sub |
+| 11-14 | Grade 5: unlike-denom fractions, order of ops |
+| 14-16 | Grade 6-7: negatives, proportional reasoning |
+| 16-20 | Grade 8+: algebra, exponents |
+
+Selection filters problems with `difficulty BETWEEN target*0.7 AND target*1.3`
+on the universal scale. `grade_level` is still saved on each problem for
+provenance and LLM prompt context but is **not** used as a pool filter. A
+struggling grade 5 kid whose target drifts to 5 gets actual difficulty-5
+problems (from any generator, any grade) — no more contradictory "difficulty 3
+for a 5th grader" requests to the LLM.
+
+The `grade_level` setting in user settings drives the `maxDiff` cap for the
+adaptive loop (`grade*2+4`) so moving a user's grade up/down raises/lowers
+their difficulty range. It's the parent's explicit lever.
+
+To recompute legacy problem difficulties after deployment:
+
+```
+./bin/recompute_problem_difficulty -config=prod_conf.json
+# or --dry-run first
+```
+
 ## When a problem is served
 
 1. `generate_problems.go:selectProblem` first checks the spaced-repetition
    review queue for due problems.
 2. If no review is due, it runs a topic-weighted selection from the
-   existing problem pool (matching `grade_level` and `difficulty`).
+   existing problem pool (matching `difficulty` within ±30% of target).
 3. If the pool doesn't have enough matching problems, it triggers
    background generation.
 4. Generation routes to the **heuristic generator** when the enabled
    problem types don't include `WORD`, otherwise to the **LLM generator**.
 5. If the LLM fails, it falls back to the heuristic generator (stripping
    `WORD` from the bitmap).
+6. When a problem is created, its `difficulty` column is set to
+   `ComputeProblemDifficulty(expression)` — not the requester's target.
 
 ## Adding a new version
 
