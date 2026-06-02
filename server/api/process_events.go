@@ -15,6 +15,20 @@ import (
 
 const (
 	maxTarget = 20
+
+	// recentProblemHistorySize caps how far back we look when building the
+	// "don't repeat recently-shown problems" exclusion list. The last N
+	// SELECTED_PROBLEM events per user are excluded from selection.
+	//
+	// Tuning notes:
+	//  - Too small: kids see the same problems back-to-back within a session.
+	//  - Too large: excludes so many problems that the filtered pool becomes
+	//    empty, forcing heuristic fallbacks or regeneration.
+	//  - 20 was the original value; 50 handles a typical 20-problem session
+	//    plus breathing room without starving the pool (which runs ~100+).
+	//  - Spaced repetition (review_queue) handles intentional re-exposure
+	//    independently of this list.
+	recentProblemHistorySize = 50
 )
 
 // processRecordOnlyEvents persists events that do not mutate gamestate or settings.
@@ -131,7 +145,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			return errors.New(msg)
 		}
 		select_new_problem = true
-		a.generateProblemsBackground(logPrefix, c, settings)
+		a.generateProblemsBackground(logPrefix, settings)
 	} else if event.EventType == SET_GAMESTATE_TARGET {
 		val, parseErr := strconv.ParseUint(event.Value, 10, 32)
 		if parseErr != nil || val < 5 || val > 20 {
@@ -356,7 +370,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	// Select a new problem
 	if select_new_problem {
 		// Get the most recent problem ids
-		sql := fmt.Sprintf("user_id=%d AND event_type='%s' ORDER BY timestamp DESC LIMIT 20;", user.Id, SELECTED_PROBLEM)
+		sql := fmt.Sprintf("user_id=%d AND event_type='%s' ORDER BY timestamp DESC LIMIT %d;", user.Id, SELECTED_PROBLEM, recentProblemHistorySize)
 		glog.Infof("recent problem ids sql: select * from events where %s\n", sql)
 		prevProblems, _, msg, err := a.eventManager.CustomList(sql)
 		if err != nil {
