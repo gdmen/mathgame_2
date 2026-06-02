@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
@@ -21,7 +22,39 @@ const (
 	problemSelectionEpsilon = 0.3
 	// minimum number of problems we want to select from
 	minSelectionPool = 100
+	// defaultGradeLevel is used when settings.GradeLevel is 0 (legacy users
+	// or users who somehow skipped the grade-selection step in onboarding).
+	// Stops us from ever writing a grade_level=0 problem which the selection
+	// filter (grade_level > 0) would then permanently exclude.
+	defaultGradeLevel = 3
 )
+
+// effectiveGradeLevel returns the grade we should tag a newly-generated
+// problem with. Never zero: legacy users still on grade_level=0 get a
+// sensible fallback derived from their target_difficulty, or a hard
+// default if that isn't useful either.
+//
+// Derivation: the adaptive cap is grade*2+4, so invert: grade = (target-4)/2.
+// target=6  -> grade 1
+// target=10 -> grade 3
+// target=14 -> grade 5
+// target=20 -> grade 8
+func effectiveGradeLevel(settings *Settings) int {
+	if settings.GradeLevel > 0 {
+		return settings.GradeLevel
+	}
+	if settings.TargetDifficulty >= 6 {
+		g := int((settings.TargetDifficulty - 4) / 2)
+		if g < 1 {
+			g = 1
+		}
+		if g > 8 {
+			g = 8
+		}
+		return g
+	}
+	return defaultGradeLevel
+}
 
 // Get all problem ids that satisfy this ProblemTypeBitmap and have similar Difficulty
 func (a *Api) getSatisfyingProblemIds(logPrefix string, c *gin.Context, settings *Settings, prevIds *[]uint32) (*[]uint32, error) {
@@ -104,7 +137,7 @@ func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings
 			// Topic-specific pool too small, trigger background generation
 			if err == nil && len(*pids) < minSelectionPool {
 				glog.Infof("%s topic pool small (%d), generating more", logPrefix, len(*pids))
-				a.generateProblemsBackground(logPrefix, c, &topicSettings)
+				a.generateProblemsBackground(logPrefix, &topicSettings)
 			}
 		}
 	}
@@ -117,7 +150,7 @@ func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings
 
 	if len(*pids) < minSelectionPool {
 		glog.Infof("%s generating new problems because there are only %d problems", logPrefix, len(*pids))
-		a.generateProblemsBackground(logPrefix, c, settings)
+		a.generateProblemsBackground(logPrefix, settings)
 	}
 
 	if len(*pids) > 0 {
@@ -130,21 +163,25 @@ func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings
 		}
 	}
 
-	// Fast fallback: rather than blocking the request on an LLM call, try the
-	// deterministic heuristic generator when it can satisfy the user's settings.
-	// The LLM is still being invoked in the background via generateProblemsBackground
-	// above to backfill the DB with richer problems.
+	// Pool is empty. The LLM backfill was already kicked off above via
+	// generateProblemsBackground; we don't want the user waiting on an
+	// OpenAI request here. Serve a heuristic-generated problem synchronously
+	// so they see something immediately. The LLM backfill fills the pool for
+	// subsequent requests.
 	inputProblemType := ProblemType(settings.ProblemTypeBitmap)
 	heuristicType := inputProblemType &^ WORD
-	if inputProblemType&WORD == 0 && heuristicType&(ADDITION|SUBTRACTION|MULTIPLICATION|DIVISION) != 0 {
-		glog.Infof("%s no satisfying problems in DB; trying heuristic fallback before blocking LLM", logPrefix)
-		p, _, _ := a.runHeuristicGenerator(logPrefix, c, settings, 3, heuristicType)
+	if heuristicType != 0 {
+		glog.Infof("%s pool empty; serving heuristic problem while LLM backfills", logPrefix)
+		p, _, _ := a.runHeuristicGenerator(logPrefix, settings, 3, heuristicType)
 		if p != nil {
 			return p, nil
 		}
 	}
 
-	return a.generateProblem(logPrefix, c, settings)
+	// Last resort: the user's enabled types are WORD-only (or the heuristic
+	// couldn't produce one). Block on a synchronous LLM call.
+	glog.Infof("%s pool empty and no heuristic-eligible types; blocking on LLM", logPrefix)
+	return a.generateProblem(logPrefix, settings)
 }
 
 // getSatisfyingProblemIdsForTopic is like getSatisfyingProblemIds but only returns
@@ -184,12 +221,12 @@ func (a *Api) getSatisfyingProblemIdsForTopic(logPrefix string, c *gin.Context, 
 	return problemIds, nil
 }
 
-func (a *Api) generateProblem(logPrefix string, c *gin.Context, settings *Settings) (*Problem, error) {
+func (a *Api) generateProblem(logPrefix string, settings *Settings) (*Problem, error) {
 	retries := 5
 	var err error
 	var p *Problem
 	for i := 0; i < retries; i++ {
-		p, err = a.generateProblems(logPrefix, c, settings, 5)
+		p, err = a.generateProblems(logPrefix, settings, 5)
 		if p != nil {
 			return p, nil
 		}
@@ -197,20 +234,40 @@ func (a *Api) generateProblem(logPrefix string, c *gin.Context, settings *Settin
 	return nil, err
 }
 
-func (a *Api) generateProblemsBackground(logPrefix string, c *gin.Context, settings *Settings) error {
+// backgroundGenLocks dedups concurrent background problem generations per
+// user. Multiple rapid events (e.g., the 500ms working_on_problem ticker)
+// can trigger generateProblemsBackground many times over a single slow LLM
+// round-trip; without this guard, we stack up goroutines all trying to
+// insert similar problems and pounding the DB + OpenAI quota.
+//
+// Key: user_id (uint32). Value: *sync.Mutex. TryLock wins the right to run;
+// losers log and skip. The mutex is released in the goroutine's defer.
+var backgroundGenLocks sync.Map
+
+func (a *Api) generateProblemsBackground(logPrefix string, settings *Settings) error {
+	userID := settings.UserId
+	muAny, _ := backgroundGenLocks.LoadOrStore(userID, &sync.Mutex{})
+	mu := muAny.(*sync.Mutex)
+	if !mu.TryLock() {
+		glog.Infof("%s background generation already running for user=%d; skipping", logPrefix, userID)
+		return nil
+	}
+
+	// Detach from the request: make a local copy so the goroutine can't see
+	// mutations the main request might make to settings after returning.
+	settingsCopy := *settings
+
 	go func() {
+		defer mu.Unlock()
 		defer func() {
 			if r := recover(); r != nil {
-				glog.Infof("%s a.generateProblems failed: %s", logPrefix, r)
+				glog.Errorf("%s background generation panicked: %v", logPrefix, r)
 			}
 		}()
-
-		a.generateProblems(logPrefix, c, settings, 20)
+		a.generateProblems(logPrefix, &settingsCopy, 20)
 	}()
 
-	// job successfully 'enqueued'
 	return nil
-
 }
 
 // runHeuristicGenerator generates problems using the heuristic generator.
@@ -218,7 +275,12 @@ func (a *Api) generateProblemsBackground(logPrefix string, c *gin.Context, setti
 // WORD problems should be generated via the LLM generator instead.
 // Returns the last new problem created, the count of new problems, and the set
 // of unique IDs.
-func (a *Api) runHeuristicGenerator(logPrefix string, c *gin.Context, settings *Settings, numProblems int, problemType ProblemType) (*Problem, int, map[uint32]bool) {
+//
+// Does NOT take a gin.Context: this function may run in a background goroutine
+// after the originating request has returned. Writing to a stale/reused context
+// from a background path corrupts unrelated in-flight requests. Errors are
+// logged via glog; callers decide how to handle a nil return.
+func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numProblems int, problemType ProblemType) (*Problem, int, map[uint32]bool) {
 	uniqueIds := map[uint32]bool{}
 	newCount := 0
 	var newProblem *Problem
@@ -238,12 +300,16 @@ func (a *Api) runHeuristicGenerator(logPrefix string, c *gin.Context, settings *
 	if len(operations) == 0 {
 		return nil, 0, uniqueIds
 	}
+	// Never write a grade_level=0 row. Legacy users whose settings still
+	// have grade_level=0 get a derived grade from their target_difficulty
+	// so their problems are selectable going forward.
+	effectiveGrade := effectiveGradeLevel(settings)
 	generatorOpts := &heuristic_generator.Options{
 		Operations:       operations,
 		Fractions:        (FRACTIONS & problemType) > 0,
 		Negatives:        (NEGATIVES & problemType) > 0,
 		TargetDifficulty: settings.TargetDifficulty,
-		GradeLevel:       settings.GradeLevel,
+		GradeLevel:       effectiveGrade,
 	}
 	for i := 0; i < numProblems; i++ {
 		model := &Problem{}
@@ -264,7 +330,7 @@ func (a *Api) runHeuristicGenerator(logPrefix string, c *gin.Context, settings *
 		// requester's target. This lets problems be shared across grades
 		// and users with different targets.
 		model.Difficulty = ComputeProblemDifficulty(model.Expression)
-		model.GradeLevel = settings.GradeLevel
+		model.GradeLevel = effectiveGrade
 		glog.Infof("%s heuristic problem: %s = %s (grade=%d computed_diff=%g raw=%g)", logPrefix, model.Expression, model.Answer, model.GradeLevel, model.Difficulty, heuristicDiff)
 		h := fnv.New32a()
 		h.Write([]byte(model.Expression))
@@ -276,8 +342,8 @@ func (a *Api) runHeuristicGenerator(logPrefix string, c *gin.Context, settings *
 		uniqueIds[model.Id] = true
 		model.ProblemTypeBitmap = detectProblemTypeBitmap(model.Expression)
 		status, msg, err := a.problemManager.Create(model)
-		if HandleMngrResp(logPrefix, c, status, msg, err, model) != nil {
-			glog.Infof("%s could not create problem: (%d: %s)", logPrefix, status, err)
+		if err != nil {
+			glog.Errorf("%s could not create heuristic problem (%d: %s): %v", logPrefix, status, msg, err)
 			continue
 		}
 		newCount++
@@ -323,7 +389,13 @@ func detectProblemTypeBitmap(expr string) uint64 {
 	return bitmap
 }
 
-func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Settings, numProblems int) (*Problem, error) {
+// generateProblems is the core generation routine used by both the sync
+// request path and the background goroutine. It does NOT take a gin.Context:
+// in the background path we must not share a context with the originating
+// request (gin pools contexts and they get reused by later requests, so
+// writes to a stale context corrupt unrelated in-flight responses).
+// Errors are logged via glog; callers decide how to handle a nil return.
+func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems int) (*Problem, error) {
 	var model *Problem
 	var newProblem *Problem
 	if settings.ProblemTypeBitmap == 0 {
@@ -338,11 +410,14 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 	// a deterministic, offline fallback for when OpenAI is unreachable or
 	// returns no valid problems.
 	{
+		// Never tag a new problem with grade_level=0. Legacy users still on
+		// grade 0 get a derived grade so their problems are selectable.
+		effectiveGrade := effectiveGradeLevel(settings)
 		generatorOpts := &llm_generator.Options{
 			Features:         ProblemTypeToFeatures(inputProblemType),
 			TargetDifficulty: settings.TargetDifficulty,
 			NumProblems:      numProblems, // we still return just one problem, but this lets us reduce the number of OpenAI calls we need to make
-			GradeLevel:       settings.GradeLevel,
+			GradeLevel:       effectiveGrade,
 		}
 
 		var err error
@@ -355,7 +430,7 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 			heuristicType := inputProblemType &^ WORD
 			if heuristicType != 0 {
 				glog.Infof("%s OpenAI failed (%v), falling back to heuristic generator", logPrefix, err)
-				newProblem, newCount, uniqueIds = a.runHeuristicGenerator(logPrefix, c, settings, numProblems, heuristicType)
+				newProblem, newCount, uniqueIds = a.runHeuristicGenerator(logPrefix, settings, numProblems, heuristicType)
 			} else {
 				msg := "Couldn't generate problems"
 				glog.Errorf("%s %s: %v", logPrefix, msg, err)
@@ -375,7 +450,7 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 				// Compute universal difficulty from the expression itself.
 				// LLM's self-reported difficulty is logged for debugging only.
 				model.Difficulty = ComputeProblemDifficulty(model.Expression)
-				model.GradeLevel = settings.GradeLevel
+				model.GradeLevel = effectiveGrade
 				glog.Infof("%s LLM problem: %s computed_diff=%g grade=%d (LLM raw=%g)", logPrefix, model.Expression, model.Difficulty, model.GradeLevel, p.Difficulty)
 
 				// Use expression hash as model.Id
@@ -394,7 +469,7 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 				uniqueIds[model.Id] = true
 
 				// Validate problem (includes grade alignment check if grade is set)
-				err = llm_generator.ValidateProblemWithGrade(&p, settings.GradeLevel)
+				err = llm_generator.ValidateProblemWithGrade(&p, effectiveGrade)
 				if err != nil {
 					glog.Infof("%s problem validation failed: %v", logPrefix, err)
 					model = nil
@@ -415,8 +490,8 @@ func (a *Api) generateProblems(logPrefix string, c *gin.Context, settings *Setti
 
 				// Write to database
 				status, msg, err := a.problemManager.Create(model)
-				if HandleMngrResp(logPrefix, c, status, msg, err, model) != nil {
-					glog.Infof("%s could not create problem: (%d: %s)", logPrefix, status, err)
+				if err != nil {
+					glog.Errorf("%s could not create LLM problem (%d: %s): %v", logPrefix, status, msg, err)
 					model = nil
 					continue
 				}

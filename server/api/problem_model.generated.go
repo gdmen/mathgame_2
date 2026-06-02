@@ -19,14 +19,14 @@ const (
 	difficulty FLOAT NOT NULL,
 	disabled TINYINT NOT NULL DEFAULT 0,
 	generator VARCHAR(64) NOT NULL,
-	grade_level INT NOT NULL DEFAULT 0
+	grade_level INT NOT NULL
     ) DEFAULT CHARSET=utf8mb4 ;`
 
-	createProblemSQL = `INSERT INTO problems (id, problem_type_bitmap, expression, answer, explanation, difficulty, generator) VALUES (?, ?, ?, ?, ?, ?, ?);`
+	createProblemSQL = `INSERT INTO problems (id, problem_type_bitmap, expression, answer, explanation, difficulty, generator, grade_level) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`
 
 	getProblemSQL = `SELECT * FROM problems WHERE id=?;`
 
-	getProblemKeySQL = `SELECT  FROM problems WHERE id=? AND problem_type_bitmap=? AND expression=? AND answer=? AND explanation=? AND difficulty=? AND generator=?;`
+	getProblemKeySQL = `SELECT  FROM problems WHERE id=? AND problem_type_bitmap=? AND expression=? AND answer=? AND explanation=? AND difficulty=? AND generator=? AND grade_level=?;`
 
 	listProblemSQL = `SELECT * FROM problems;`
 
@@ -57,7 +57,7 @@ type ProblemManager struct {
 
 func (m *ProblemManager) Create(model *Problem) (int, string, error) {
 	status := http.StatusCreated
-	_, err := m.DB.Exec(createProblemSQL, model.Id, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Explanation, model.Difficulty, model.Generator)
+	_, err := m.DB.Exec(createProblemSQL, model.Id, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Explanation, model.Difficulty, model.Generator, model.GradeLevel)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Duplicate entry") {
 			msg := "Couldn't add problem to database"

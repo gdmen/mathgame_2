@@ -78,7 +78,7 @@
         {
           "name": "GradeLevel",
           "type": "int",
-          "sql": "INT NOT NULL DEFAULT 0"
+          "sql": "INT NOT NULL"
         }
       ]
     },
