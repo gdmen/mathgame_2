@@ -55,8 +55,9 @@ func ValidateProblemWithGrade(p *Problem, gradeLevel int) error {
 	glog.Infof("OpenAI validation prompt = expected answer: %s = %s\n", prompt, p.Answer)
 
 	client := openai.NewClient(c.OpenAiApiKey)
-	resp, err := client.CreateChatCompletion(
+	resp, err := chatCompletionWithRetry(
 		context.Background(),
+		client,
 		openai.ChatCompletionRequest{
 			Model: openai.GPT5,
 			Messages: []openai.ChatCompletionMessage{
@@ -69,7 +70,7 @@ func ValidateProblemWithGrade(p *Problem, gradeLevel int) error {
 	)
 
 	if err != nil {
-		glog.Infof("OpenAI error when validating: %v\n", err)
+		glog.Infof("OpenAI error when validating (after retries): %v\n", err)
 		return err
 	}
 	content := resp.Choices[0].Message.Content
