@@ -2,6 +2,7 @@
 package api // import "garydmenezes.com/mathgame/server/api"
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -12,6 +13,21 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
 )
+
+// parseBadProblemID returns the problem_id from a BAD_PROBLEM_* event's
+// JSON value, or 0 if the value is empty / not JSON / missing the field.
+func parseBadProblemID(rawValue string) uint32 {
+	if rawValue == "" {
+		return 0
+	}
+	var v struct {
+		ProblemID uint32 `json:"problem_id"`
+	}
+	if err := json.Unmarshal([]byte(rawValue), &v); err != nil {
+		return 0
+	}
+	return v.ProblemID
+}
 
 const (
 	maxTarget = 20
@@ -346,20 +362,25 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		gamestate.VideoId = videoId
 		changed_gamestate = true
 	} else if event.EventType == BAD_PROBLEM_SYSTEM || event.EventType == BAD_PROBLEM_USER {
-		// 1. set problem_id disabled
-		problem, status, msg, err := a.problemManager.Get(gamestate.ProblemId)
+		// Disable the reported problem, falling back to gamestate.ProblemId.
+		badID := parseBadProblemID(event.Value)
+		if badID == 0 {
+			badID = gamestate.ProblemId
+		}
+		problem, status, msg, err := a.problemManager.Get(badID)
 		if HandleMngrResp(logPrefix, c, status, msg, err, problem) != nil {
 			return err
 		}
 		glog.Infof("%s Disabling problem: %v", logPrefix, problem)
 		problem.Disabled = true
-		// Write to database
 		status, msg, err = a.problemManager.Update(problem)
 		if HandleMngrResp(logPrefix, c, status, msg, err, problem) != nil {
 			return err
 		}
-		// 2. select a new problem
-		select_new_problem = true
+		// Only re-select if the disabled problem is the current one.
+		if badID == gamestate.ProblemId {
+			select_new_problem = true
+		}
 	} else {
 		msg := fmt.Sprintf("Invalid EventType: %s", event.EventType)
 		glog.Errorf("%s %s", logPrefix, msg)
