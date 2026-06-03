@@ -377,3 +377,26 @@ func TestProcessEvents_RecordOnlyEvent_ThroughCreateEvent_UsesFullPath(t *testin
 		t.Errorf("expected play data response (full path), got nil gamestate")
 	}
 }
+
+func TestParseBadProblemID(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want uint32
+	}{
+		{"empty", "", 0},
+		{"not json", "abc", 0},
+		{"valid", `{"problem_id":1234,"explanation":"katex broke"}`, 1234},
+		{"missing field", `{"foo":"bar"}`, 0},
+		{"zero id", `{"problem_id":0}`, 0},
+		{"large id", `{"problem_id":4294967295}`, 4294967295},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseBadProblemID(tc.in)
+			if got != tc.want {
+				t.Errorf("parseBadProblemID(%q) = %d, want %d", tc.in, got, tc.want)
+			}
+		})
+	}
+}
