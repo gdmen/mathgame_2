@@ -127,7 +127,7 @@ func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings
 			topicSettings.ProblemTypeBitmap = settings.ProblemTypeBitmap // keep all enabled, filter below
 			pids, err := a.getSatisfyingProblemIdsForTopic(logPrefix, c, &topicSettings, prevIds, targetTopic)
 			if err == nil && len(*pids) > 0 {
-				pid := (*pids)[rand.Intn(len(*pids))]
+				pid := a.pickWithRecencyBias(logPrefix, settings.UserId, *pids)
 				p, status, msg, err := a.problemManager.Get(pid)
 				if err == nil && status == http.StatusOK {
 					return p, nil
@@ -154,7 +154,7 @@ func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings
 	}
 
 	if len(*pids) > 0 {
-		pid := (*pids)[rand.Intn(len(*pids))]
+		pid := a.pickWithRecencyBias(logPrefix, settings.UserId, *pids)
 		p, status, msg, err := a.problemManager.Get(pid)
 		if HandleMngrResp(logPrefix, c, status, msg, err, p) != nil {
 			glog.Infof("%s unexpected (recoverable) error fetching problem (id=%d): %s : %s", logPrefix, pid, msg, err)
