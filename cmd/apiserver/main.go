@@ -18,6 +18,10 @@ import (
 )
 
 func main() {
+	// Default glog to mirror INFO+ to stderr so app logs land alongside
+	// gin's request log. CLI flags can still override.
+	flag.Set("alsologtostderr", "true")
+	flag.Set("stderrthreshold", "INFO")
 	// call this for glog to work
 	flag.Parse()
 
