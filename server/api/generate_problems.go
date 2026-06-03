@@ -244,6 +244,11 @@ func (a *Api) generateProblem(logPrefix string, settings *Settings) (*Problem, e
 // losers log and skip. The mutex is released in the goroutine's defer.
 var backgroundGenLocks sync.Map
 
+// backgroundGenFn is swappable for tests.
+var backgroundGenFn = func(a *Api, logPrefix string, settings *Settings, numProblems int) {
+	a.generateProblems(logPrefix, settings, numProblems)
+}
+
 func (a *Api) generateProblemsBackground(logPrefix string, settings *Settings) error {
 	userID := settings.UserId
 	muAny, _ := backgroundGenLocks.LoadOrStore(userID, &sync.Mutex{})
@@ -264,7 +269,7 @@ func (a *Api) generateProblemsBackground(logPrefix string, settings *Settings) e
 				glog.Errorf("%s background generation panicked: %v", logPrefix, r)
 			}
 		}()
-		a.generateProblems(logPrefix, &settingsCopy, 20)
+		backgroundGenFn(a, logPrefix, &settingsCopy, 20)
 	}()
 
 	return nil
