@@ -68,6 +68,7 @@ func ValidateProblemWithGrade(p *Problem, gradeLevel int) error {
 			},
 		},
 	)
+	recordLLMCall(err)
 
 	if err != nil {
 		glog.Infof("OpenAI error when validating (after retries): %v\n", err)

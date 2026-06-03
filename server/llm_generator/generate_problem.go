@@ -106,6 +106,7 @@ func GenerateProblem(opts *Options) ([]Problem, error) {
 			},
 		},
 	)
+	recordLLMCall(err)
 
 	if err != nil {
 		glog.Errorf("OpenAI error after retries: %v\n", err)
