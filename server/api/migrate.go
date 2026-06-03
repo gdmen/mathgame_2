@@ -6,6 +6,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"fmt"
@@ -34,11 +35,33 @@ func RunMigrations(db *sql.DB) error {
 }
 
 func runMigrations(db *sql.DB, skipOneThroughFourteen bool) error {
-	if _, err := db.Exec(createSchemaMigrationsTable); err != nil {
+	ctx := context.Background()
+	// Pin to a single connection for the whole migration run so the SET SESSION
+	// timeouts below actually apply to every subsequent statement.
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquiring migration connection: %w", err)
+	}
+	defer conn.Close()
+
+	// Long ALTERs can outlast MySQL's default net_*_timeout. Raise the ceiling
+	// on this connection so a slow DDL statement doesn't lose the wire.
+	for _, stmt := range []string{
+		"SET SESSION net_read_timeout = 3600",
+		"SET SESSION net_write_timeout = 3600",
+		"SET SESSION wait_timeout = 86400",
+		"SET SESSION interactive_timeout = 86400",
+	} {
+		if _, err := conn.ExecContext(ctx, stmt); err != nil {
+			glog.Warningf("setting migration session timeout %q: %v (continuing)", stmt, err)
+		}
+	}
+
+	if _, err := conn.ExecContext(ctx, createSchemaMigrationsTable); err != nil {
 		return fmt.Errorf("creating schema_migrations table: %w", err)
 	}
 
-	applied, err := appliedVersions(db)
+	applied, err := appliedVersions(ctx, conn)
 	if err != nil {
 		return err
 	}
@@ -46,7 +69,7 @@ func runMigrations(db *sql.DB, skipOneThroughFourteen bool) error {
 	if skipOneThroughFourteen && len(applied) == 0 {
 		for v := 1; v <= 14; v++ {
 			version := strconv.Itoa(v)
-			if _, err := db.Exec("INSERT INTO schema_migrations (version) VALUES (?)", version); err != nil {
+			if _, err := conn.ExecContext(ctx, "INSERT INTO schema_migrations (version) VALUES (?)", version); err != nil {
 				return fmt.Errorf("skipping migration %s: %w", version, err)
 			}
 			applied[version] = true
@@ -87,10 +110,11 @@ func runMigrations(db *sql.DB, skipOneThroughFourteen bool) error {
 		if err != nil {
 			return fmt.Errorf("reading %s: %w", path, err)
 		}
-		if err := runOne(db, string(body)); err != nil {
+		glog.Infof("applying migration: %s", path)
+		if err := runOne(ctx, conn, string(body)); err != nil {
 			return fmt.Errorf("migration %s: %w", path, err)
 		}
-		if _, err := db.Exec("INSERT INTO schema_migrations (version) VALUES (?)", version); err != nil {
+		if _, err := conn.ExecContext(ctx, "INSERT INTO schema_migrations (version) VALUES (?)", version); err != nil {
 			return fmt.Errorf("recording migration %s: %w", version, err)
 		}
 		glog.Infof("migration applied: %s", path)
@@ -99,8 +123,8 @@ func runMigrations(db *sql.DB, skipOneThroughFourteen bool) error {
 	return nil
 }
 
-func appliedVersions(db *sql.DB) (map[string]bool, error) {
-	rows, err := db.Query("SELECT version FROM schema_migrations")
+func appliedVersions(ctx context.Context, conn *sql.Conn) (map[string]bool, error) {
+	rows, err := conn.QueryContext(ctx, "SELECT version FROM schema_migrations")
 	if err != nil {
 		return nil, fmt.Errorf("listing applied migrations: %w", err)
 	}
@@ -116,14 +140,14 @@ func appliedVersions(db *sql.DB) (map[string]bool, error) {
 	return m, rows.Err()
 }
 
-func runOne(db *sql.DB, body string) error {
+func runOne(ctx context.Context, conn *sql.Conn, body string) error {
 	body = strings.TrimSpace(body)
 	for _, stmt := range splitStatements(body) {
 		stmt = strings.TrimSpace(stmt)
 		if stmt == "" {
 			continue
 		}
-		if _, err := db.Exec(stmt); err != nil {
+		if _, err := conn.ExecContext(ctx, stmt); err != nil {
 			return fmt.Errorf("exec: %w", err)
 		}
 	}
