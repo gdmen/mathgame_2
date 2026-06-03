@@ -20,12 +20,12 @@ import (
 )
 
 func init() {
-	// Long ALTER TABLE migrations sit idle on the wire while the server works,
-	// and AWS/firewall NAT layers idle-timeout TCP connections in ~3 minutes.
-	// Override the driver's default dialer with a 30s TCP keepalive so the
-	// connection stays alive through long DDL.
+	// Long ALTER/CREATE INDEX migrations sit idle on the wire while the server
+	// works. The Go MySQL driver's default keepalive inherits Linux's 2-hour
+	// interval, way too long for any intermediate firewall/NAT idle timeout.
+	// 5s keepalive beats anything reasonable.
 	mysql.RegisterDialContext("tcp", func(ctx context.Context, addr string) (net.Conn, error) {
-		d := net.Dialer{KeepAlive: 30 * time.Second}
+		d := net.Dialer{KeepAlive: 5 * time.Second}
 		return d.DialContext(ctx, "tcp", addr)
 	})
 }
