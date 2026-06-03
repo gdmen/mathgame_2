@@ -1,14 +1,16 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"flag"
 	"fmt"
 	"math/rand"
+	"net"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 	"github.com/golang/glog"
 
 	_ "garydmenezes.com/mathgame/server/docs"
@@ -16,6 +18,17 @@ import (
 	"garydmenezes.com/mathgame/server/api"
 	"garydmenezes.com/mathgame/server/common"
 )
+
+func init() {
+	// Long ALTER TABLE migrations sit idle on the wire while the server works,
+	// and AWS/firewall NAT layers idle-timeout TCP connections in ~3 minutes.
+	// Override the driver's default dialer with a 30s TCP keepalive so the
+	// connection stays alive through long DDL.
+	mysql.RegisterDialContext("tcp", func(ctx context.Context, addr string) (net.Conn, error) {
+		d := net.Dialer{KeepAlive: 30 * time.Second}
+		return d.DialContext(ctx, "tcp", addr)
+	})
+}
 
 func main() {
 	// Default glog to mirror INFO+ to stderr so app logs land alongside
@@ -33,7 +46,9 @@ func main() {
 	if err := c.Validate(); err != nil {
 		glog.Fatal(err)
 	}
-	connectStr := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=true&time_zone=UTC", c.MySQLUser, c.MySQLPass, c.MySQLHost, c.MySQLPort, c.MySQLDatabase)
+	// readTimeout/writeTimeout=30m so the driver doesn't abort a long migration
+	// (ALTER TABLE on a large table can take tens of minutes).
+	connectStr := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=true&time_zone=UTC&readTimeout=30m&writeTimeout=30m", c.MySQLUser, c.MySQLPass, c.MySQLHost, c.MySQLPort, c.MySQLDatabase)
 	db, err := sql.Open("mysql", connectStr)
 	if err != nil {
 		glog.Fatal(err)
