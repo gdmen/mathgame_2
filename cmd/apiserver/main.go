@@ -25,7 +25,8 @@ func init() {
 	// Override the driver's default dialer with a 30s TCP keepalive so the
 	// connection stays alive through long DDL.
 	mysql.RegisterDialContext("tcp", func(ctx context.Context, addr string) (net.Conn, error) {
-		d := net.Dialer{KeepAlive: 30 * time.Second}
+		// Keep in sync with cmd/migrate/main.go.
+		d := net.Dialer{KeepAlive: 5 * time.Second}
 		return d.DialContext(ctx, "tcp", addr)
 	})
 }

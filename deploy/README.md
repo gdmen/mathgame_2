@@ -45,6 +45,13 @@ cd mathgame_2
 git fetch origin master
 git reset --hard origin/master
 make
+# If the release includes a slow migration (ALTER on a big table, CREATE INDEX
+# on events, etc.), apiserver startup might not be able to finish it inside
+# its connection window. Run it manually in tmux first; then start the API.
+# Safe to run anytime - already-applied migrations are skipped.
+tmux new -s migrate
+bin/migrate
+# wait for "All pending migrations applied successfully." then Ctrl-b d to detach
 sudo cp deploy/mathgame-api.service /etc/systemd/system
 sudo cp deploy/mathgame-web.service /etc/systemd/system
 sudo cp deploy/mathgame-compress-events.service /etc/systemd/system
