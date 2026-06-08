@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -96,9 +95,7 @@ func (a *Api) getDueReviewProblem(logPrefix string, settings *Settings) uint32 {
 	if len(permutations) == 0 {
 		return 0
 	}
-	// Same Sprintf+Replace interpolation pattern used by getSatisfyingProblemIds
-	// in generate_problems.go — keeps all three SQL sites consistent.
-	permsStr := strings.Replace(strings.Trim(fmt.Sprint(permutations), "[]"), " ", ",", -1)
+	permsStr := formatUintsForSQLIn(permutations)
 	diffUpperBound := settings.TargetDifficulty + problemSelectionEpsilon
 
 	// Earliest-due review problem for this user, gated by current settings.
