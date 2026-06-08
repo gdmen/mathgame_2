@@ -9,10 +9,12 @@ import (
 	"math"
 	"net/http"
 	"strconv"
-	"time"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
+
+	"garydmenezes.com/mathgame/server/common"
 )
 
 // parseBadProblemID returns the problem_id from a BAD_PROBLEM_* event's
@@ -41,13 +43,10 @@ const (
 // Use this for LOGGED_IN, WORKING_ON_PROBLEM, WATCHING_VIDEO, SET_TARGET_WORK_PERCENTAGE.
 func (a *Api) processRecordOnlyEvents(logPrefix string, c *gin.Context, events []*Event) error {
 	user := GetUserFromContext(c)
-	for _, event := range events {
-		event.UserId = user.Id
-		event.Timestamp = time.Now()
-		status, msg, err := a.eventManager.Create(event)
-		if HandleMngrResp(logPrefix, c, status, msg, err, event) != nil {
-			return err
-		}
+	if err := a.createEventsBatch(user.Id, events); err != nil {
+		glog.Errorf("%s createEventsBatch: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("Couldn't add events to database"))
+		return err
 	}
 	return nil
 }
@@ -73,18 +72,20 @@ func (a *Api) processEvents(logPrefix string, c *gin.Context, events []*Event, w
 	// Get User
 	user := GetUserFromContext(c)
 
-	// Get Gamestate
-	gamestate, status, msg, err := a.gamestateManager.Get(user.Id)
-	if HandleMngrResp(logPrefix, c, status, msg, err, gamestate) != nil {
+	// Get Gamestate + Settings in a single round-trip via JOIN. Both rows
+	// are keyed by user_id and we always need both in this code path.
+	gamestate, settings, err := a.loadGamestateAndSettings(user.Id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			glog.Errorf("%s gamestate or settings missing for user=%d", logPrefix, user.Id)
+			c.JSON(http.StatusNotFound, common.GetError("gamestate or settings not found"))
+			return err
+		}
+		glog.Errorf("%s loadGamestateAndSettings: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("could not load gamestate/settings"))
 		return err
 	}
 	glog.Infof("%s Gamestate: %v", logPrefix, gamestate)
-
-	// Get Settings
-	settings, status, msg, err := a.settingsManager.Get(user.Id)
-	if HandleMngrResp(logPrefix, c, status, msg, err, settings) != nil {
-		return err
-	}
 	glog.Infof("%s Settings: %v", logPrefix, settings)
 
 	for _, event := range events {
@@ -396,19 +397,18 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		changed_gamestate = true
 	}
 
-	// Write all events to database
+	// Write all events to database in a single multi-row INSERT.
+	if err := a.createEventsBatch(gamestate.UserId, events); err != nil {
+		glog.Errorf("%s createEventsBatch: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("Couldn't add events to database"))
+		return err
+	}
+	// After SELECTED_PROBLEM events land, upsert into the
+	// recently_shown_problems cache used by the selection funnel.
+	// Source-of-truth lives in events; this is a derived cache and a
+	// failure here is non-fatal (small drift self-corrects on the next
+	// SELECTED_PROBLEM for this user).
 	for _, e := range events {
-		e.UserId = gamestate.UserId
-		e.Timestamp = time.Now()
-		status, msg, err := a.eventManager.Create(e)
-		if HandleMngrResp(logPrefix, c, status, msg, err, e) != nil {
-			return err
-		}
-		// After a SELECTED_PROBLEM event lands, also upsert into the
-		// recently_shown_problems cache used by the selection funnel.
-		// events stays source-of-truth; this is a derived cache and a
-		// failure here is non-fatal (a small drift self-corrects on the
-		// next SELECTED_PROBLEM for this user).
 		if e.EventType == SELECTED_PROBLEM {
 			recordRecentlyShown(logPrefix, a.DB, e.UserId, e.Value)
 		}
@@ -510,4 +510,55 @@ func recordRecentlyShown(logPrefix string, db *sql.DB, userID uint32, problemVal
 		glog.Warningf("%s recordRecentlyShown upsert user=%d problem=%d: %v",
 			logPrefix, userID, problemID, err)
 	}
+}
+
+// loadGamestateAndSettings loads both the gamestate and settings row for a
+// user in a single round-trip. Both tables are keyed by user_id and the
+// full-path processEvents handler always needs both - combining the fetch
+// saves a round-trip per request.
+func (a *Api) loadGamestateAndSettings(userID uint32) (*Gamestate, *Settings, error) {
+	gs := &Gamestate{}
+	s := &Settings{}
+	// INNER JOIN: every user that has a gamestate also has a settings row
+	// (both are created together in customCreateOrUpdateUser). If either
+	// is missing, the row count is 0 and Scan returns sql.ErrNoRows.
+	err := a.DB.QueryRow(`
+		SELECT
+		  g.user_id, g.problem_id, g.video_id, g.solved, g.target,
+		  s.problem_type_bitmap, s.target_difficulty, s.target_work_percentage, s.grade_level
+		FROM gamestates g
+		JOIN settings s ON s.user_id = g.user_id
+		WHERE g.user_id = ?`,
+		userID,
+	).Scan(
+		&gs.UserId, &gs.ProblemId, &gs.VideoId, &gs.Solved, &gs.Target,
+		&s.ProblemTypeBitmap, &s.TargetDifficulty, &s.TargetWorkPercentage, &s.GradeLevel,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	// Settings.UserId isn't projected (JOIN deduplicates by g.user_id).
+	s.UserId = gs.UserId
+	return gs, s, nil
+}
+
+// createEventsBatch INSERTs N events in a single multi-row INSERT, saving
+// N-1 round-trips vs calling eventManager.Create per event. The events
+// table has timestamp DEFAULT CURRENT_TIMESTAMP, so we don't need to set
+// per-row timestamps. Callers don't use the auto-increment id returned by
+// Create, so dropping it is safe.
+func (a *Api) createEventsBatch(userID uint32, events []*Event) error {
+	if len(events) == 0 {
+		return nil
+	}
+	placeholders := make([]string, len(events))
+	args := make([]interface{}, 0, len(events)*3)
+	for i, e := range events {
+		e.UserId = userID
+		placeholders[i] = "(?, ?, ?)"
+		args = append(args, e.UserId, e.EventType, e.Value)
+	}
+	query := "INSERT INTO events (user_id, event_type, value) VALUES " + strings.Join(placeholders, ", ")
+	_, err := a.DB.Exec(query, args...)
+	return err
 }
