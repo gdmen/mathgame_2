@@ -6,10 +6,15 @@ import "./problem.scss";
 import { ProblemTypes } from "./enums.js";
 
 const PreprocessExpression = (expression) => {
-  function replacer(match, offset, string) {
-    return match.replace(/\s/g, " }\\text{");
-  }
-  return expression.replace(/\\text\{[^\}]+\}/g, replacer);
+  // Split each \text{...} block at internal whitespace into per-word
+  // \text{} blocks so word-wrap can happen between words.
+  expression = expression.replace(/\\text\{[^\}]+\}/g, (match) =>
+    match.replace(/\s/g, " }\\text{"),
+  );
+  // Wrap math-mode multi-digit numbers in \text{} so KaTeX renders them
+  // as a single atomic span instead of one <span class="mord"> per digit.
+  expression = expression.replace(/(?<![A-Za-z\\])(\d{2,})(?![A-Za-z])/g, "\\text{$1}");
+  return expression;
 };
 
 class AnswerTracker {
