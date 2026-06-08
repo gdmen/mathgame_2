@@ -280,6 +280,16 @@ var backgroundGenFn = func(a *Api, logPrefix string, settings *Settings, numProb
 	a.generateProblems(logPrefix, settings, numProblems)
 }
 
+// llmGenerateProblemFn and llmValidateProblemFn are seams for the LLM
+// problem-generation and validation calls. Production points them at
+// llm_generator.GenerateProblem / ValidateProblemWithGrade; tests
+// override them to return canned problems and validation outcomes
+// without hitting OpenAI.
+var (
+	llmGenerateProblemFn = llm_generator.GenerateProblem
+	llmValidateProblemFn = llm_generator.ValidateProblemWithGrade
+)
+
 func (a *Api) generateProblemsBackground(logPrefix string, settings *Settings) error {
 	userID := settings.UserId
 	muAny, _ := backgroundGenLocks.LoadOrStore(userID, &sync.Mutex{})
@@ -458,7 +468,7 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 
 		var err error
 		var generatorProblems []llm_generator.Problem
-		generatorProblems, err = llm_generator.GenerateProblem(generatorOpts)
+		generatorProblems, err = llmGenerateProblemFn(generatorOpts)
 		if err != nil {
 			// Fall back to heuristic when OpenAI fails. Strip WORD since the
 			// heuristic doesn't produce word problems, and fall back on the
@@ -505,7 +515,7 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 				uniqueIds[model.Id] = true
 
 				// Validate problem (includes grade alignment check if grade is set)
-				err = llm_generator.ValidateProblemWithGrade(&p, effectiveGrade)
+				err = llmValidateProblemFn(&p, effectiveGrade)
 				if err != nil {
 					glog.Infof("%s problem validation failed: %v", logPrefix, err)
 					model = nil
