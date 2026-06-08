@@ -47,24 +47,7 @@ sudo service mathgame-web start
 cd mathgame_2
 git fetch origin master
 git reset --hard origin/master
-make
-sudo cp deploy/mathgame-api.service /etc/systemd/system
-sudo cp deploy/mathgame-web.service /etc/systemd/system
-sudo cp deploy/mathgame-compress-events.service /etc/systemd/system
-sudo cp deploy/mathgame-check-disabled-videos.service /etc/systemd/system
-sudo cp deploy/mathgame-update-statistics.service /etc/systemd/system
-sudo cp deploy/mathgame-trim-recently-shown-problems.service /etc/systemd/system
-sudo cp deploy/mathgame-compress-events.timer /etc/systemd/system
-sudo cp deploy/mathgame-check-disabled-videos.timer /etc/systemd/system
-sudo cp deploy/mathgame-update-statistics.timer /etc/systemd/system
-sudo cp deploy/mathgame-trim-recently-shown-problems.timer /etc/systemd/system
-sudo systemctl daemon-reload
-sudo service mathgame-api restart
-sudo service mathgame-web restart
-sudo systemctl restart mathgame-compress-events.timer
-sudo systemctl restart mathgame-check-disabled-videos.timer
-sudo systemctl restart mathgame-update-statistics.timer
-sudo systemctl restart mathgame-trim-recently-shown-problems.timer
+./deploy/update.sh
 
 # Refresh let's encrypt cert
 sudo certbot renew
