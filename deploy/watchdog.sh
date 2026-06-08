@@ -28,7 +28,7 @@ CONF="${1:-/home/ubuntu/mathgame_2/conf.json}"
 STATE_DIR="${STATE_DIR:-/run}"
 
 WATCHES=(
-    "openai|5|OpenAI errors|OpenAI error after retries"
+    "openai|5|OpenAI errors|OpenAI error"
 )
 
 if [ ! -f "$CONF" ]; then
