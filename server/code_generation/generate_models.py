@@ -3,6 +3,7 @@
 import argparse
 import os
 import re
+import subprocess
 
 CAMEL_TO_SNAKE_RE = re.compile(r'(?<!^)(?=[A-Z][a-z])')
 
@@ -361,8 +362,10 @@ def main():
         import json
         c = json.loads(f.read())
     for m in c["models"]:
-        with open(os.path.join(args.output,  m["name"]+"_model.generated.go"), "w") as f:
+        path = os.path.join(args.output,  m["name"]+"_model.generated.go")
+        with open(path, "w") as f:
             f.write(get_model_string(m))
+        subprocess.run(["gofmt", "-w", "-s", path], check=True)
 
 if __name__ == "__main__":
     main()

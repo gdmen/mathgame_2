@@ -3,6 +3,7 @@
 import argparse
 import os
 import re
+import subprocess
 
 def get_comment_and_imports() -> str:
     s = '''// Package api contains api routes, handlers, and models
@@ -140,10 +141,12 @@ def main():
     with open(args.config, "r") as f:
         import json
         c = json.loads(f.read())
-    with open(os.path.join(args.output,  "handlers.generated.go"), "w") as f:
+    path = os.path.join(args.output,  "handlers.generated.go")
+    with open(path, "w") as f:
         f.write(get_comment_and_imports())
         for m in c["models"]:
             f.write(get_handler_string(m))
+    subprocess.run(["gofmt", "-w", "-s", path], check=True)
 
 if __name__ == "__main__":
     main()
