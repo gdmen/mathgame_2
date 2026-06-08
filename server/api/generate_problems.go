@@ -7,6 +7,7 @@ import (
 	"hash/fnv"
 	"math/rand"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -77,6 +78,15 @@ func effectiveGradeLevel(settings *Settings) int {
 	return defaultGradeLevel
 }
 
+// formatUintsForSQLIn formats a slice of unsigned integers as "1,2,3" for use in a SQL "IN (...)" clause.
+func formatUintsForSQLIn[T ~uint32 | ~uint64](vals []T) string {
+	parts := make([]string, len(vals))
+	for i, v := range vals {
+		parts[i] = strconv.FormatUint(uint64(v), 10)
+	}
+	return strings.Join(parts, ",")
+}
+
 // Get all problem ids that satisfy this ProblemTypeBitmap and have similar Difficulty
 func (a *Api) getSatisfyingProblemIds(logPrefix string, c *gin.Context, settings *Settings, prevIds *[]uint32) (*[]uint32, error) {
 	permutations := GetProblemTypePermutations(ProblemType(settings.ProblemTypeBitmap))
@@ -102,12 +112,12 @@ func (a *Api) getSatisfyingProblemIds(logPrefix string, c *gin.Context, settings
 	// is the sentinel for backfilled/ungraded legacy rows that should never
 	// be served; keep the always-exclude on that.
 	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0 AND grade_level > 0;",
-		strings.Replace(strings.Trim(fmt.Sprint(permutations), "[]"), " ", ",", -1),
+		formatUintsForSQLIn(permutations),
 		diffLowerBound,
 		diffUpperBound,
 	)
 	if len(*prevIds) > 0 {
-		idFilter := fmt.Sprintf("id NOT IN (%s) AND ", strings.Replace(strings.Trim(fmt.Sprint(*prevIds), "[]"), " ", ",", -1))
+		idFilter := fmt.Sprintf("id NOT IN (%s) AND ", formatUintsForSQLIn(*prevIds))
 		sql = idFilter + sql
 	}
 	glog.Infof("getSatisfyingProblemIds sql: select * from problems where %s\n", sql)
@@ -226,12 +236,12 @@ func (a *Api) getSatisfyingProblemIdsForTopic(logPrefix string, c *gin.Context, 
 	// See note in getSatisfyingProblemIds: cross-grade sharing is OK, but
 	// grade_level=0 is always excluded as the legacy-row sentinel.
 	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0 AND grade_level > 0;",
-		strings.Replace(strings.Trim(fmt.Sprint(filtered), "[]"), " ", ",", -1),
+		formatUintsForSQLIn(filtered),
 		diffLowerBound,
 		diffUpperBound,
 	)
 	if len(*prevIds) > 0 {
-		idFilter := fmt.Sprintf("id NOT IN (%s) AND ", strings.Replace(strings.Trim(fmt.Sprint(*prevIds), "[]"), " ", ",", -1))
+		idFilter := fmt.Sprintf("id NOT IN (%s) AND ", formatUintsForSQLIn(*prevIds))
 		sql = idFilter + sql
 	}
 	glog.Infof("getSatisfyingProblemIdsForTopic sql: select id from problems where %s\n", sql)
