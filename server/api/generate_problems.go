@@ -18,10 +18,31 @@ import (
 )
 
 const (
-	// difficulty comparison epsilon as a multiple
+	// recencyWindow is the base unit for recency-related selection sizes.
+	recencyWindow = 50
+
+	// recentProblemHistorySize is how many recent problems to hard-exclude.
+	// Used by process_events.go to build prevIds.
+	recentProblemHistorySize = recencyWindow
+
+	// minSelectionPool is the smallest healthy candidate-pool size; below
+	// this we trigger background generation (non-blocking) to refill.
+	minSelectionPool = 2 * recencyWindow
+
+	// recentlyShownProblemsTrimSize is the max rows per user retained in the
+	// recently_shown_problems table. The async trim job evicts anything
+	// older than this many shown_at-DESC entries; evicted problems become
+	// "never shown" to the recency-bias sort and re-enter the rotation.
+	recentlyShownProblemsTrimSize = 4 * recencyWindow
+
+	// lruTopFrac is the fraction of the recency-sorted pool we pick from
+	// uniformly at random. With minSelectionPool=100 and 0.20 → top 20.
+	lruTopFrac = 0.20
+
+	// problemSelectionEpsilon: candidate difficulty must be within this
+	// multiplicative window of the user's target_difficulty (so ±30%).
 	problemSelectionEpsilon = 0.3
-	// minimum number of problems we want to select from
-	minSelectionPool = 100
+
 	// defaultGradeLevel is used when settings.GradeLevel is 0 (legacy users
 	// or users who somehow skipped the grade-selection step in onboarding).
 	// Stops us from ever writing a grade_level=0 problem which the selection
@@ -99,7 +120,7 @@ func (a *Api) getSatisfyingProblemIds(logPrefix string, c *gin.Context, settings
 
 func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings, prevIds *[]uint32) (*Problem, error) {
 	// Check spaced repetition review queue first
-	dueReviewID := a.getDueReviewProblem(logPrefix, settings.UserId)
+	dueReviewID := a.getDueReviewProblem(logPrefix, settings)
 	if dueReviewID != 0 {
 		p, status, msg, err := a.problemManager.Get(dueReviewID)
 		if err == nil && status == http.StatusOK && !p.Disabled {
