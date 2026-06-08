@@ -1,0 +1,12 @@
+[Unit]
+Description=Mathgame OpenAI failure watchdog
+After=network-online.target
+Wants=network-online.target systemd-networkd-wait-online.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/ubuntu/mathgame_2
+ExecStart=/home/ubuntu/mathgame_2/deploy/openai-watchdog.sh /home/ubuntu/mathgame_2/conf.json
+
+[Install]
+WantedBy=multi-user.target
