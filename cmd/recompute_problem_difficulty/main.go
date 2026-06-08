@@ -77,24 +77,34 @@ func main() {
 	}
 	rows.Close()
 
+	// Print progress every progressStep rows so a multi-minute run isn't silent.
+	// Stderr keeps stdout clean for dry-run row diffs.
+	fmt.Fprintf(os.Stderr, "loaded %d rows; processing...\n", len(recs))
+	progressStep := len(recs) / 100
+	if progressStep < 1000 {
+		progressStep = 1000
+	}
 	for _, r := range recs {
 		total++
 		newDiff := api.ComputeProblemDifficulty(r.expr)
 		if fuzzyEqual(newDiff, r.oldDiff) {
 			unchanged++
-			continue
-		}
-		delta := newDiff - r.oldDiff
-		deltaSum += delta
-		if *dryRun {
-			fmt.Printf("id=%d expr=%q: %.2f -> %.2f (%+.2f)\n", r.id, r.expr, r.oldDiff, newDiff, delta)
 		} else {
-			if _, err := db.Exec(`UPDATE problems SET difficulty = ? WHERE id = ?`, newDiff, r.id); err != nil {
-				glog.Errorf("update id=%d: %v", r.id, err)
-				continue
+			delta := newDiff - r.oldDiff
+			deltaSum += delta
+			if *dryRun {
+				fmt.Printf("id=%d expr=%q: %.2f -> %.2f (%+.2f)\n", r.id, r.expr, r.oldDiff, newDiff, delta)
+			} else {
+				if _, err := db.Exec(`UPDATE problems SET difficulty = ? WHERE id = ?`, newDiff, r.id); err != nil {
+					glog.Errorf("update id=%d: %v", r.id, err)
+					continue
+				}
 			}
+			updated++
 		}
-		updated++
+		if total%progressStep == 0 || total == len(recs) {
+			fmt.Fprintf(os.Stderr, "  %d/%d (%.1f%%)\n", total, len(recs), 100*float64(total)/float64(len(recs)))
+		}
 	}
 
 	fmt.Printf("\nRecompute summary:\n")
