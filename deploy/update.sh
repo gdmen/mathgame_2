@@ -10,14 +10,14 @@ SERVICES=(
     mathgame-check-disabled-videos
     mathgame-update-statistics
     mathgame-trim-recently-shown-problems
-    mathgame-openai-watchdog
+    mathgame-watchdog
 )
 TIMERS=(
     mathgame-compress-events
     mathgame-check-disabled-videos
     mathgame-update-statistics
     mathgame-trim-recently-shown-problems
-    mathgame-openai-watchdog
+    mathgame-watchdog
 )
 
 # Rebuild from whatever is currently checked out.
