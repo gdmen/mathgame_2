@@ -280,13 +280,11 @@ var backgroundGenFn = func(a *Api, logPrefix string, settings *Settings, numProb
 	a.generateProblems(logPrefix, settings, numProblems)
 }
 
-/*
-llmGenerateProblemFn and llmValidateProblemFn are seams for the LLM
-problem-generation and validation calls. Production points them at
-llm_generator.GenerateProblem / ValidateProblemWithGrade; tests
-override them to return canned problems and validation outcomes
-without hitting OpenAI.
-*/
+// llmGenerateProblemFn and llmValidateProblemFn are seams for the LLM
+// problem-generation and validation calls. Production points them at
+// llm_generator.GenerateProblem / ValidateProblemWithGrade; tests
+// override them to return canned problems and validation outcomes
+// without hitting OpenAI.
 var (
 	llmGenerateProblemFn = llm_generator.GenerateProblem
 	llmValidateProblemFn = llm_generator.ValidateProblemWithGrade
