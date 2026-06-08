@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for mathgame trim_recently_shown_problems job
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+Unit=mathgame-trim-recently-shown-problems.service
+
+[Install]
+WantedBy=timers.target

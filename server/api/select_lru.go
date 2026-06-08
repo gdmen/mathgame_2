@@ -4,17 +4,14 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
 )
 
-// lruTopFrac is the fraction of recency-sorted candidates we pick uniformly from.
-const lruTopFrac = 0.20
-
 // pickWithRecencyBias picks a candidate id, biased toward least-recently-shown.
+// lruTopFrac, recentlyShownProblemsTrimSize, etc. live in generate_problems.go.
 func (a *Api) pickWithRecencyBias(logPrefix string, userID uint32, candidates []uint32) uint32 {
 	if len(candidates) == 0 {
 		return 0
@@ -51,21 +48,26 @@ func recencyLess(ids []uint32, lastShown map[uint32]time.Time) func(i, j int) bo
 	}
 }
 
-// lastShownAt returns the latest SELECTED_PROBLEM timestamp per id for the user.
+// lastShownAt returns the latest shown_at timestamp per id for the user from
+// recently_shown_problems. Ids not in the result are treated as "never shown"
+// by recencyLess, which is the right semantics: the cache is trimmed to
+// recentlyShownProblemsTrimSize per user, so anything evicted is functionally
+// forgotten and should re-enter the rotation.
 func (a *Api) lastShownAt(userID uint32, ids []uint32) (map[uint32]time.Time, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
 	placeholders := strings.Repeat("?,", len(ids))
 	placeholders = placeholders[:len(placeholders)-1]
+	// PK lookup on the bounded recently_shown_problems cache: one row per
+	// (user_id, problem_id), so this is at most len(ids) rows, indexed.
 	sql := fmt.Sprintf(
-		`SELECT value, MAX(timestamp) FROM events
-		 WHERE user_id=? AND event_type=? AND value IN (%s)
-		 GROUP BY value`, placeholders)
-	args := make([]interface{}, 0, 2+len(ids))
-	args = append(args, userID, SELECTED_PROBLEM)
+		`SELECT problem_id, shown_at FROM recently_shown_problems
+		 WHERE user_id=? AND problem_id IN (%s)`, placeholders)
+	args := make([]interface{}, 0, 1+len(ids))
+	args = append(args, userID)
 	for _, id := range ids {
-		args = append(args, strconv.FormatUint(uint64(id), 10))
+		args = append(args, id)
 	}
 	rows, err := a.DB.Query(sql, args...)
 	if err != nil {
@@ -74,16 +76,12 @@ func (a *Api) lastShownAt(userID uint32, ids []uint32) (map[uint32]time.Time, er
 	defer rows.Close()
 	out := make(map[uint32]time.Time, len(ids))
 	for rows.Next() {
-		var valStr string
+		var id uint32
 		var ts time.Time
-		if err := rows.Scan(&valStr, &ts); err != nil {
+		if err := rows.Scan(&id, &ts); err != nil {
 			return nil, err
 		}
-		id, perr := strconv.ParseUint(valStr, 10, 32)
-		if perr != nil {
-			continue
-		}
-		out[uint32(id)] = ts
+		out[id] = ts
 	}
 	return out, rows.Err()
 }

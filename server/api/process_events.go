@@ -2,6 +2,7 @@
 package api // import "garydmenezes.com/mathgame/server/api"
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,21 +32,10 @@ func parseBadProblemID(rawValue string) uint32 {
 
 const (
 	maxTarget = 20
-
-	// recentProblemHistorySize caps how far back we look when building the
-	// "don't repeat recently-shown problems" exclusion list. The last N
-	// SELECTED_PROBLEM events per user are excluded from selection.
-	//
-	// Tuning notes:
-	//  - Too small: kids see the same problems back-to-back within a session.
-	//  - Too large: excludes so many problems that the filtered pool becomes
-	//    empty, forcing heuristic fallbacks or regeneration.
-	//  - 20 was the original value; 50 handles a typical 20-problem session
-	//    plus breathing room without starving the pool (which runs ~100+).
-	//  - Spaced repetition (review_queue) handles intentional re-exposure
-	//    independently of this list.
-	recentProblemHistorySize = 50
 )
+
+// recentProblemHistorySize and the other recency-related sizes live in
+// generate_problems.go alongside the rest of the selection-funnel constants.
 
 // processRecordOnlyEvents persists events that do not mutate gamestate or settings.
 // Use this for LOGGED_IN, WORKING_ON_PROBLEM, WATCHING_VIDEO, SET_TARGET_WORK_PERCENTAGE.
@@ -390,23 +380,14 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 
 	// Select a new problem
 	if select_new_problem {
-		// Get the most recent problem ids
-		sql := fmt.Sprintf("user_id=%d AND event_type='%s' ORDER BY timestamp DESC LIMIT %d;", user.Id, SELECTED_PROBLEM, recentProblemHistorySize)
-		glog.Infof("recent problem ids sql: select * from events where %s\n", sql)
-		prevProblems, _, msg, err := a.eventManager.CustomList(sql)
-		if err != nil {
-			glog.Errorf("%s %s", logPrefix, msg)
-			c.JSON(http.StatusInternalServerError, msg)
-			return err
-		}
-		problemIds := []uint32{}
-		for _, p := range *prevProblems {
-			val, err := strconv.ParseUint(p.Value, 10, 32)
-			if err != nil {
-				continue
-			}
-			problemIds = append(problemIds, uint32(val))
-		}
+		// Hard-exclusion list: the recentProblemHistorySize most-recently-shown
+		// problem ids for this user, sourced from the bounded
+		// recently_shown_problems cache (PK lookup on the (user_id, shown_at)
+		// index, sub-millisecond). Fail-tolerant: if the lookup fails the
+		// user gets an empty exclusion list (may briefly see a repeat) but
+		// the request still serves a problem - matching the upsert path's
+		// best-effort posture.
+		problemIds := loadRecentProblemIds(logPrefix, a.DB, user.Id)
 		problem, err := a.selectProblem(logPrefix, c, settings, &problemIds)
 		if err != nil {
 			return err
@@ -422,6 +403,14 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		status, msg, err := a.eventManager.Create(e)
 		if HandleMngrResp(logPrefix, c, status, msg, err, e) != nil {
 			return err
+		}
+		// After a SELECTED_PROBLEM event lands, also upsert into the
+		// recently_shown_problems cache used by the selection funnel.
+		// events stays source-of-truth; this is a derived cache and a
+		// failure here is non-fatal (a small drift self-corrects on the
+		// next SELECTED_PROBLEM for this user).
+		if e.EventType == SELECTED_PROBLEM {
+			recordRecentlyShown(logPrefix, a.DB, e.UserId, e.Value)
 		}
 	}
 
@@ -462,4 +451,63 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	}
 
 	return nil
+}
+
+// loadRecentProblemIds returns the recentProblemHistorySize most-recently
+// shown problem ids for this user from the bounded recently_shown_problems
+// cache. Fail-tolerant: on any error, logs a warning and returns an empty
+// slice rather than failing the request - a recent-repeat is acceptable
+// when the alternative is denying the user a problem at all.
+func loadRecentProblemIds(logPrefix string, db *sql.DB, userID uint32) []uint32 {
+	out := []uint32{}
+	// PK-indexed lookup on (user_id, shown_at).
+	rows, err := db.Query(
+		`SELECT problem_id FROM recently_shown_problems
+		 WHERE user_id = ? ORDER BY shown_at DESC LIMIT ?`,
+		userID, recentProblemHistorySize,
+	)
+	if err != nil {
+		glog.Warningf("%s loadRecentProblemIds user=%d query: %v (continuing with empty exclusion list)", logPrefix, userID, err)
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id uint32
+		if err := rows.Scan(&id); err != nil {
+			glog.Warningf("%s loadRecentProblemIds user=%d scan: %v", logPrefix, userID, err)
+			return out
+		}
+		out = append(out, id)
+	}
+	if err := rows.Err(); err != nil {
+		glog.Warningf("%s loadRecentProblemIds user=%d iter: %v", logPrefix, userID, err)
+		return out
+	}
+	return out
+}
+
+// recordRecentlyShown upserts the (user_id, problem_id, shown_at) row in
+// the bounded recently_shown_problems cache. Source of truth lives in the
+// events table; this is a derived cache for the selection-funnel hot path.
+// Failures are logged but never propagated — small drift here self-corrects
+// on the next SELECTED_PROBLEM event for the same user.
+func recordRecentlyShown(logPrefix string, db *sql.DB, userID uint32, problemValue string) {
+	problemID, err := strconv.ParseUint(problemValue, 10, 32)
+	if err != nil || problemID == 0 {
+		glog.Warningf("%s recordRecentlyShown: skipping unparseable SELECTED_PROBLEM value %q", logPrefix, problemValue)
+		return
+	}
+	// PK is (user_id, problem_id) so re-shows update shown_at in place
+	// instead of piling up. The trim job caps each user at
+	// recentlyShownProblemsTrimSize rows.
+	_, err = db.Exec(
+		`INSERT INTO recently_shown_problems (user_id, problem_id, shown_at)
+		 VALUES (?, ?, NOW())
+		 ON DUPLICATE KEY UPDATE shown_at = NOW()`,
+		userID, uint32(problemID),
+	)
+	if err != nil {
+		glog.Warningf("%s recordRecentlyShown upsert user=%d problem=%d: %v",
+			logPrefix, userID, problemID, err)
+	}
 }
