@@ -11,6 +11,7 @@
   "auth0_audience": "",
   "openai_api_key": "",
   "youtube_api_key": "",
+  "ntfy_topic": "",
   "event_reporting_interval": 500,
   "debug_quickplay": false
 }

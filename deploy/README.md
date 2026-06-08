@@ -32,6 +32,11 @@ sudo cp deploy/mathgame-update-statistics.service /etc/systemd/system
 sudo cp deploy/mathgame-update-statistics.timer /etc/systemd/system
 sudo cp deploy/mathgame-trim-recently-shown-problems.service /etc/systemd/system
 sudo cp deploy/mathgame-trim-recently-shown-problems.timer /etc/systemd/system
+sudo cp deploy/mathgame-openai-watchdog.service /etc/systemd/system
+sudo cp deploy/mathgame-openai-watchdog.timer /etc/systemd/system
+
+# OpenAI failure watchdog: pick an unguessable ntfy.sh topic, subscribe to it
+# in the ntfy phone app, then set "ntfy_topic" in conf.json (gitignored).
 
 sudo systemctl daemon-reload
 sudo systemctl enable mathgame-api
@@ -40,6 +45,7 @@ sudo systemctl enable --now mathgame-compress-events.timer
 sudo systemctl enable --now mathgame-check-disabled-videos.timer
 sudo systemctl enable --now mathgame-update-statistics.timer
 sudo systemctl enable --now mathgame-trim-recently-shown-problems.timer
+sudo systemctl enable --now mathgame-openai-watchdog.timer
 sudo service mathgame-api start
 sudo service mathgame-web start
 
@@ -60,3 +66,4 @@ journalctl -u mathgame-compress-events -b -f
 journalctl -u mathgame-check-disabled-videos -b -f
 journalctl -u mathgame-trim-recently-shown-problems -b -f
 journalctl -u mathgame-update-statistics -b -f
+journalctl -u mathgame-openai-watchdog -b -f

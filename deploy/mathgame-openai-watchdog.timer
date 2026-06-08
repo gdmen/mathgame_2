@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for mathgame OpenAI failure watchdog
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=mathgame-openai-watchdog.service
+
+[Install]
+WantedBy=timers.target
