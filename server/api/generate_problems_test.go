@@ -106,10 +106,8 @@ func TestGenerateProblemsBackground_DedupIsPerUser(t *testing.T) {
 	}
 }
 
-/*
-llmTestProblem returns a canned LLM problem with sensible defaults for
-happy-path tests. Callers can mutate any field they care about.
-*/
+// llmTestProblem returns a canned LLM problem with sensible defaults for
+// happy-path tests. Callers can mutate any field they care about.
 func llmTestProblem() llm_generator.Problem {
 	return llm_generator.Problem{
 		Features:    []string{"addition"},
@@ -120,11 +118,9 @@ func llmTestProblem() llm_generator.Problem {
 	}
 }
 
-/*
-withCannedLLM swaps llmGenerateProblemFn + llmValidateProblemFn for the
-duration of the test. Validation defaults to accept (returns nil); pass
-validateErr to simulate a rejection.
-*/
+// withCannedLLM swaps llmGenerateProblemFn + llmValidateProblemFn for the
+// duration of the test. Validation defaults to accept (returns nil); pass
+// validateErr to simulate a rejection.
 func withCannedLLM(t *testing.T, problems []llm_generator.Problem, genErr error, validateErr error) {
 	t.Helper()
 	originalGen := llmGenerateProblemFn
@@ -144,11 +140,9 @@ func withCannedLLM(t *testing.T, problems []llm_generator.Problem, genErr error,
 	})
 }
 
-/*
-TestGenerateProblems_LLM_HappyPath: a valid LLM problem flows through to
-a DB row with the right fields. Locks in the wire shape so any drift
-(e.g. dropped field on insert) shows up here.
-*/
+// TestGenerateProblems_LLM_HappyPath: a valid LLM problem flows through to
+// a DB row with the right fields. Locks in the wire shape so any drift
+// (e.g. dropped field on insert) shows up here.
 func TestGenerateProblems_LLM_HappyPath(t *testing.T) {
 	c, err := common.ReadConfig("../../test_conf.json")
 	if err != nil {
@@ -197,11 +191,9 @@ func TestGenerateProblems_LLM_HappyPath(t *testing.T) {
 	}
 }
 
-/*
-TestGenerateProblems_LLM_IdCollisionSkipped: when the LLM returns a problem
-whose expression hashes to an already-occupied id, the loop must skip it
-(status != 404 from problemManager.Get) instead of overwriting.
-*/
+// TestGenerateProblems_LLM_IdCollisionSkipped: when the LLM returns a problem
+// whose expression hashes to an already-occupied id, the loop must skip it
+// (status != 404 from problemManager.Get) instead of overwriting.
 func TestGenerateProblems_LLM_IdCollisionSkipped(t *testing.T) {
 	c, err := common.ReadConfig("../../test_conf.json")
 	if err != nil {
@@ -213,10 +205,8 @@ func TestGenerateProblems_LLM_IdCollisionSkipped(t *testing.T) {
 	canned := llmTestProblem()
 	canned.Expression = "999 + 1"
 
-	/*
-		Pre-seed a row with the same fnv32a(expression) so the next attempt
-		collides and gets dropped.
-	*/
+	// Pre-seed a row with the same fnv32a(expression) so the next attempt
+	// collides and gets dropped.
 	h := fnv.New32a()
 	h.Write([]byte(canned.Expression))
 	existing := &Problem{
@@ -256,10 +246,8 @@ func TestGenerateProblems_LLM_IdCollisionSkipped(t *testing.T) {
 	}
 }
 
-/*
-TestGenerateProblems_LLM_ValidationReject: a problem that fails
-llmValidateProblemFn must not be persisted.
-*/
+// TestGenerateProblems_LLM_ValidationReject: a problem that fails
+// llmValidateProblemFn must not be persisted.
 func TestGenerateProblems_LLM_ValidationReject(t *testing.T) {
 	c, err := common.ReadConfig("../../test_conf.json")
 	if err != nil {
@@ -292,11 +280,9 @@ func TestGenerateProblems_LLM_ValidationReject(t *testing.T) {
 	}
 }
 
-/*
-TestGenerateProblems_LLM_CalibrationReject: a problem whose self-reported
-difficulty diverges too far from target (ratio < 0.5 or > 2.0) must be
-dropped.
-*/
+// TestGenerateProblems_LLM_CalibrationReject: a problem whose self-reported
+// difficulty diverges too far from target (ratio < 0.5 or > 2.0) must be
+// dropped.
 func TestGenerateProblems_LLM_CalibrationReject(t *testing.T) {
 	c, err := common.ReadConfig("../../test_conf.json")
 	if err != nil {
@@ -329,11 +315,9 @@ func TestGenerateProblems_LLM_CalibrationReject(t *testing.T) {
 	}
 }
 
-/*
-TestGenerateProblems_LLM_FallbackToHeuristic: when llmGenerateProblemFn
-returns an error, the path falls back to the heuristic generator (with
-WORD stripped) and produces a heuristic-generated problem instead.
-*/
+// TestGenerateProblems_LLM_FallbackToHeuristic: when llmGenerateProblemFn
+// returns an error, the path falls back to the heuristic generator (with
+// WORD stripped) and produces a heuristic-generated problem instead.
 func TestGenerateProblems_LLM_FallbackToHeuristic(t *testing.T) {
 	c, err := common.ReadConfig("../../test_conf.json")
 	if err != nil {
