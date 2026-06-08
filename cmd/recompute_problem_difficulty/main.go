@@ -45,7 +45,7 @@ func main() {
 	}
 	defer db.Close()
 
-	query := `SELECT id, expression, difficulty FROM problems ORDER BY id`
+	query := `SELECT id, expression, difficulty, difficulty_version FROM problems ORDER BY id`
 	if *limit > 0 {
 		query = fmt.Sprintf("%s LIMIT %d", query, *limit)
 	}
@@ -55,18 +55,19 @@ func main() {
 	}
 	defer rows.Close()
 
-	var updated, unchanged, total int
+	var updated, unchanged, skipped, total int
 	var deltaSum float64
 	// Collect rows first so we can close the query cursor before updating.
 	type rec struct {
 		id      uint32
 		expr    string
 		oldDiff float64
+		oldVer  string
 	}
 	var recs []rec
 	for rows.Next() {
 		var r rec
-		if err := rows.Scan(&r.id, &r.expr, &r.oldDiff); err != nil {
+		if err := rows.Scan(&r.id, &r.expr, &r.oldDiff, &r.oldVer); err != nil {
 			glog.Errorf("scan: %v", err)
 			continue
 		}
@@ -86,19 +87,24 @@ func main() {
 	}
 	for _, r := range recs {
 		total++
-		newDiff := api.ComputeProblemDifficulty(r.expr)
-		if fuzzyEqual(newDiff, r.oldDiff) {
+		action, newDiff, err := recomputeProblemRow(db, r.id, r.expr, r.oldDiff, r.oldVer, *dryRun)
+		if err != nil {
+			glog.Error(err)
+			continue
+		}
+		switch action {
+		case actionSkipped:
+			skipped++
+		case actionStamped:
+			if *dryRun {
+				fmt.Printf("id=%d expr=%q: value unchanged (%.2f), version %q -> %q\n", r.id, r.expr, r.oldDiff, r.oldVer, api.DifficultyVersion)
+			}
 			unchanged++
-		} else {
+		case actionUpdated:
 			delta := newDiff - r.oldDiff
 			deltaSum += delta
 			if *dryRun {
-				fmt.Printf("id=%d expr=%q: %.2f -> %.2f (%+.2f)\n", r.id, r.expr, r.oldDiff, newDiff, delta)
-			} else {
-				if _, err := db.Exec(`UPDATE problems SET difficulty = ? WHERE id = ?`, newDiff, r.id); err != nil {
-					glog.Errorf("update id=%d: %v", r.id, err)
-					continue
-				}
+				fmt.Printf("id=%d expr=%q: %.2f -> %.2f (%+.2f) ver=%q->%q\n", r.id, r.expr, r.oldDiff, newDiff, delta, r.oldVer, api.DifficultyVersion)
 			}
 			updated++
 		}
@@ -111,6 +117,7 @@ func main() {
 	fmt.Printf("  total:     %d\n", total)
 	fmt.Printf("  updated:   %d\n", updated)
 	fmt.Printf("  unchanged: %d\n", unchanged)
+	fmt.Printf("  skipped:   %d (already at version %s)\n", skipped, api.DifficultyVersion)
 	if updated > 0 {
 		fmt.Printf("  avg delta: %+.2f\n", deltaSum/float64(updated))
 	}
@@ -118,12 +125,4 @@ func main() {
 		fmt.Println("\n(dry run; no changes written)")
 	}
 	os.Exit(0)
-}
-
-func fuzzyEqual(a, b float64) bool {
-	delta := a - b
-	if delta < 0 {
-		delta = -delta
-	}
-	return delta < 0.01
 }

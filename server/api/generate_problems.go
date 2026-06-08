@@ -376,6 +376,7 @@ func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numPro
 		// requester's target. This lets problems be shared across grades
 		// and users with different targets.
 		model.Difficulty = ComputeProblemDifficulty(model.Expression)
+		model.DifficultyVersion = DifficultyVersion
 		model.GradeLevel = effectiveGrade
 		glog.Infof("%s heuristic problem: %s = %s (grade=%d computed_diff=%g raw=%g)", logPrefix, model.Expression, model.Answer, model.GradeLevel, model.Difficulty, heuristicDiff)
 		h := fnv.New32a()
@@ -496,6 +497,7 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 				// Compute universal difficulty from the expression itself.
 				// LLM's self-reported difficulty is logged for debugging only.
 				model.Difficulty = ComputeProblemDifficulty(model.Expression)
+				model.DifficultyVersion = DifficultyVersion
 				model.GradeLevel = effectiveGrade
 				glog.Infof("%s LLM problem: %s computed_diff=%g grade=%d (LLM raw=%g)", logPrefix, model.Expression, model.Difficulty, model.GradeLevel, p.Difficulty)
 

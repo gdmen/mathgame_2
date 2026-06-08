@@ -79,6 +79,12 @@
           "name": "GradeLevel",
           "type": "int",
           "sql": "INT NOT NULL"
+        },
+        {
+          "name": "DifficultyVersion",
+          "type": "string",
+          "_note": "DEFAULT intentionally absent here; migration 38 adds it with DEFAULT '' for backfill. Codegen skips DEFAULT-bearing fields in INSERT, so omitting DEFAULT here forces the generator paths to stamp the current api.DifficultyVersion on every new row.",
+          "sql": "VARCHAR(16) NOT NULL"
         }
       ]
     },

@@ -189,6 +189,9 @@ func TestGenerateProblems_LLM_HappyPath(t *testing.T) {
 	if persisted.GradeLevel != 3 {
 		t.Errorf("GradeLevel = %d, want 3", persisted.GradeLevel)
 	}
+	if persisted.DifficultyVersion != DifficultyVersion {
+		t.Errorf("DifficultyVersion = %q, want %q", persisted.DifficultyVersion, DifficultyVersion)
+	}
 }
 
 // TestGenerateProblems_LLM_IdCollisionSkipped: when the LLM returns a problem
@@ -344,5 +347,41 @@ func TestGenerateProblems_LLM_FallbackToHeuristic(t *testing.T) {
 	// Heuristic generator stamps its own version into Generator.
 	if problem.Generator == llm_generator.VERSION {
 		t.Errorf("fallback path produced an LLM-tagged problem; Generator = %q", problem.Generator)
+	}
+}
+
+// TestRunHeuristicGenerator_StampsDifficultyVersion guards against future
+// refactors silently dropping the version stamp in the heuristic insert
+// path. Asserts both the returned model and the persisted DB row carry
+// the current DifficultyVersion.
+func TestRunHeuristicGenerator_StampsDifficultyVersion(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("Couldn't read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+
+	settings := &Settings{
+		UserId:           1,
+		TargetDifficulty: 5,
+		GradeLevel:       3,
+	}
+	problem, count, _ := api.runHeuristicGenerator("[test-difficulty-version]", settings, 1, ADDITION)
+	if count == 0 || problem == nil {
+		t.Fatalf("expected one heuristic problem, got count=%d problem=%v", count, problem)
+	}
+	if problem.DifficultyVersion != DifficultyVersion {
+		t.Errorf("returned model: DifficultyVersion = %q, want %q", problem.DifficultyVersion, DifficultyVersion)
+	}
+
+	// Persisted row should also carry the stamp (catches a regression where
+	// the field is set on the in-memory struct but lost on the way to INSERT).
+	persisted, status, _, err := api.problemManager.Get(problem.Id)
+	if err != nil || status != 200 {
+		t.Fatalf("re-fetch problem id=%d: status=%d err=%v", problem.Id, status, err)
+	}
+	if persisted.DifficultyVersion != DifficultyVersion {
+		t.Errorf("persisted row: DifficultyVersion = %q, want %q", persisted.DifficultyVersion, DifficultyVersion)
 	}
 }

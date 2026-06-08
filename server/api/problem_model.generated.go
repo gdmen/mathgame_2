@@ -19,18 +19,19 @@ const (
 	difficulty FLOAT NOT NULL,
 	disabled TINYINT NOT NULL DEFAULT 0,
 	generator VARCHAR(64) NOT NULL,
-	grade_level INT NOT NULL
+	grade_level INT NOT NULL,
+	difficulty_version VARCHAR(16) NOT NULL
     ) DEFAULT CHARSET=utf8mb4 ;`
 
-	createProblemSQL = `INSERT INTO problems (id, problem_type_bitmap, expression, answer, explanation, difficulty, generator, grade_level) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`
+	createProblemSQL = `INSERT INTO problems (id, problem_type_bitmap, expression, answer, explanation, difficulty, generator, grade_level, difficulty_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`
 
 	getProblemSQL = `SELECT * FROM problems WHERE id=?;`
 
-	getProblemKeySQL = `SELECT  FROM problems WHERE id=? AND problem_type_bitmap=? AND expression=? AND answer=? AND explanation=? AND difficulty=? AND generator=? AND grade_level=?;`
+	getProblemKeySQL = `SELECT  FROM problems WHERE id=? AND problem_type_bitmap=? AND expression=? AND answer=? AND explanation=? AND difficulty=? AND generator=? AND grade_level=? AND difficulty_version=?;`
 
 	listProblemSQL = `SELECT * FROM problems;`
 
-	updateProblemSQL = `UPDATE problems SET problem_type_bitmap=?, expression=?, answer=?, explanation=?, difficulty=?, disabled=?, generator=?, grade_level=? WHERE id=?;`
+	updateProblemSQL = `UPDATE problems SET problem_type_bitmap=?, expression=?, answer=?, explanation=?, difficulty=?, disabled=?, generator=?, grade_level=?, difficulty_version=? WHERE id=?;`
 
 	deleteProblemSQL = `DELETE FROM problems WHERE id=?;`
 )
@@ -45,10 +46,11 @@ type Problem struct {
 	Disabled          bool    `json:"disabled" uri:"disabled" form:"disabled"`
 	Generator         string  `json:"generator" uri:"generator" form:"generator"`
 	GradeLevel        int     `json:"grade_level" uri:"grade_level" form:"grade_level"`
+	DifficultyVersion string  `json:"difficulty_version" uri:"difficulty_version" form:"difficulty_version"`
 }
 
 func (model Problem) String() string {
-	return fmt.Sprintf("Id: %v, ProblemTypeBitmap: %v, Expression: %v, Answer: %v, Explanation: %v, Difficulty: %v, Disabled: %v, Generator: %v, GradeLevel: %v", model.Id, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Explanation, model.Difficulty, model.Disabled, model.Generator, model.GradeLevel)
+	return fmt.Sprintf("Id: %v, ProblemTypeBitmap: %v, Expression: %v, Answer: %v, Explanation: %v, Difficulty: %v, Disabled: %v, Generator: %v, GradeLevel: %v, DifficultyVersion: %v", model.Id, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Explanation, model.Difficulty, model.Disabled, model.Generator, model.GradeLevel, model.DifficultyVersion)
 }
 
 type ProblemManager struct {
@@ -57,7 +59,7 @@ type ProblemManager struct {
 
 func (m *ProblemManager) Create(model *Problem) (int, string, error) {
 	status := http.StatusCreated
-	_, err := m.DB.Exec(createProblemSQL, model.Id, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Explanation, model.Difficulty, model.Generator, model.GradeLevel)
+	_, err := m.DB.Exec(createProblemSQL, model.Id, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Explanation, model.Difficulty, model.Generator, model.GradeLevel, model.DifficultyVersion)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Duplicate entry") {
 			msg := "Couldn't add problem to database"
@@ -72,7 +74,7 @@ func (m *ProblemManager) Create(model *Problem) (int, string, error) {
 
 func (m *ProblemManager) Get(id uint32) (*Problem, int, string, error) {
 	model := &Problem{}
-	err := m.DB.QueryRow(getProblemSQL, id).Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Explanation, &model.Difficulty, &model.Disabled, &model.Generator, &model.GradeLevel)
+	err := m.DB.QueryRow(getProblemSQL, id).Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Explanation, &model.Difficulty, &model.Disabled, &model.Generator, &model.GradeLevel, &model.DifficultyVersion)
 	if err == sql.ErrNoRows {
 		msg := "Couldn't find a problem with that id"
 		return nil, http.StatusNotFound, msg, err
@@ -94,7 +96,7 @@ func (m *ProblemManager) List() (*[]Problem, int, string, error) {
 	}
 	for rows.Next() {
 		model := Problem{}
-		err = rows.Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Explanation, &model.Difficulty, &model.Disabled, &model.Generator, &model.GradeLevel)
+		err = rows.Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Explanation, &model.Difficulty, &model.Disabled, &model.Generator, &model.GradeLevel, &model.DifficultyVersion)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -121,7 +123,7 @@ func (m *ProblemManager) CustomList(sql string) (*[]Problem, int, string, error)
 	}
 	for rows.Next() {
 		model := Problem{}
-		err = rows.Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Explanation, &model.Difficulty, &model.Disabled, &model.Generator, &model.GradeLevel)
+		err = rows.Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Explanation, &model.Difficulty, &model.Disabled, &model.Generator, &model.GradeLevel, &model.DifficultyVersion)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -179,7 +181,7 @@ func (m *ProblemManager) Update(model *Problem) (int, string, error) {
 		return status, msg, err
 	}
 	// Update
-	_, err = m.DB.Exec(updateProblemSQL, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Explanation, model.Difficulty, model.Disabled, model.Generator, model.GradeLevel, model.Id)
+	_, err = m.DB.Exec(updateProblemSQL, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Explanation, model.Difficulty, model.Disabled, model.Generator, model.GradeLevel, model.DifficultyVersion, model.Id)
 	if err != nil {
 		msg := "Couldn't update problem in database"
 		return http.StatusInternalServerError, msg, err
