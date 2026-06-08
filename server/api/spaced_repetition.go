@@ -80,7 +80,7 @@ func (a *Api) advanceReviewQueue(logPrefix string, userID uint32, problemID uint
 //   - problem_type_bitmap is one of the permutations of currently-enabled
 //     topics (so a previously-failed problem with a now-disabled topic bit
 //     stops surfacing as a review),
-//   - difficulty <= target_difficulty * (1 + problemSelectionEpsilon) — no
+//   - difficulty <= target_difficulty + problemSelectionEpsilon — no
 //     lower bound, since a now-easy review is still a meaningful retest,
 //   - grade_level > 0 (skip legacy backfill sentinel rows),
 //   - not disabled.
@@ -99,7 +99,7 @@ func (a *Api) getDueReviewProblem(logPrefix string, settings *Settings) uint32 {
 	// Same Sprintf+Replace interpolation pattern used by getSatisfyingProblemIds
 	// in generate_problems.go — keeps all three SQL sites consistent.
 	permsStr := strings.Replace(strings.Trim(fmt.Sprint(permutations), "[]"), " ", ",", -1)
-	diffUpperBound := settings.TargetDifficulty * (1 + problemSelectionEpsilon)
+	diffUpperBound := settings.TargetDifficulty + problemSelectionEpsilon
 
 	// Earliest-due review problem for this user, gated by current settings.
 	// JOINs review_queue (small, per-user) against the indexed problems

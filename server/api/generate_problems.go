@@ -40,8 +40,8 @@ const (
 	lruTopFrac = 0.20
 
 	// problemSelectionEpsilon: candidate difficulty must be within this
-	// multiplicative window of the user's target_difficulty (so ±30%).
-	problemSelectionEpsilon = 0.3
+	// additive window of the user's target_difficulty (target ± epsilon).
+	problemSelectionEpsilon = 1.5
 
 	// defaultGradeLevel is used when settings.GradeLevel is 0 (legacy users
 	// or users who somehow skipped the grade-selection step in onboarding).
@@ -94,8 +94,8 @@ func (a *Api) getSatisfyingProblemIds(logPrefix string, c *gin.Context, settings
 		return &([]uint32{}), nil
 	}
 
-	diffLowerBound := settings.TargetDifficulty * (1 - problemSelectionEpsilon)
-	diffUpperBound := settings.TargetDifficulty * (1 + problemSelectionEpsilon)
+	diffLowerBound := settings.TargetDifficulty - problemSelectionEpsilon
+	diffUpperBound := settings.TargetDifficulty + problemSelectionEpsilon
 	// Universal difficulty allows cross-grade pool sharing: a grade 5 user
 	// whose target drifts to 5 can draw from problems generated for other
 	// grades as long as the computed difficulty matches. BUT grade_level=0
@@ -221,8 +221,8 @@ func (a *Api) getSatisfyingProblemIdsForTopic(logPrefix string, c *gin.Context, 
 		return &empty, nil
 	}
 
-	diffLowerBound := settings.TargetDifficulty * (1 - problemSelectionEpsilon)
-	diffUpperBound := settings.TargetDifficulty * (1 + problemSelectionEpsilon)
+	diffLowerBound := settings.TargetDifficulty - problemSelectionEpsilon
+	diffUpperBound := settings.TargetDifficulty + problemSelectionEpsilon
 	// See note in getSatisfyingProblemIds: cross-grade sharing is OK, but
 	// grade_level=0 is always excluded as the legacy-row sentinel.
 	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0 AND grade_level > 0;",
