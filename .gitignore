@@ -18,5 +18,9 @@ bin/
 *.swo
 *.swp
 
+# Python bytecode (codegen scripts under server/code_generation/)
+__pycache__/
+*.pyc
+
 # Local DB dumps in the repo root (migrations live under server/)
 /*.sql
