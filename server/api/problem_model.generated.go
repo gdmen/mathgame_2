@@ -11,7 +11,7 @@ import (
 const (
 	CreateProblemTableSQL = `
     CREATE TABLE problems (
-        id BIGINT UNSIGNED PRIMARY KEY UNIQUE,
+        id BIGINT UNSIGNED PRIMARY KEY,
 	problem_type_bitmap BIGINT UNSIGNED NOT NULL,
 	expression TEXT NOT NULL,
 	answer TEXT NOT NULL,

@@ -38,7 +38,7 @@
         {
           "name": "Id",
           "type": "uint32",
-          "sql": "BIGINT UNSIGNED PRIMARY KEY UNIQUE"
+          "sql": "BIGINT UNSIGNED PRIMARY KEY"
         },
         {
           "name": "ProblemTypeBitmap",
