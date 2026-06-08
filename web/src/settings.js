@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { useAuth0 } from "@auth0/auth0-react";
+import PinInput from "react-pin-input";
 
 import { ProblemTypes } from "./enums.js";
-import { RequirePin } from "./pin.js";
+import { RequirePin, ClearSessionPin } from "./pin.js";
 import "./settings.scss";
 
 const postSettings = async function (token, apiUrl, model) {
@@ -444,6 +446,111 @@ const VideosSettingsView = ({
   );
 };
 
+const DeleteAccountView = ({ token, apiUrl, user }) => {
+  const { logout } = useAuth0();
+  const [showModal, setShowModal] = useState(false);
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const openModal = () => {
+    setPin("");
+    setError(null);
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    if (submitting) return;
+    setShowModal(false);
+  };
+
+  const handleDelete = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const req = await fetch(
+        apiUrl + "/users/" + encodeURIComponent(user.auth0_id),
+        {
+          method: "DELETE",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+          },
+          body: JSON.stringify({ pin }),
+        }
+      );
+      if (req.status === 204) {
+        // Account is gone; drop the adult PIN session and log out of Auth0.
+        ClearSessionPin();
+        logout({ returnTo: window.location.origin });
+        return;
+      }
+      if (req.status === 403) {
+        setError("Incorrect PIN. Please try again.");
+      } else {
+        setError("Couldn't delete your account. Please try again.");
+      }
+    } catch (e) {
+      console.log(e.message);
+      setError("Couldn't delete your account. Please try again.");
+    }
+    setSubmitting(false);
+  };
+
+  return (
+    <div id="delete-account-settings" className="settings-form">
+      <h4>Delete account</h4>
+      <p className="settings-hint">
+        Permanently delete this account and all of its data — settings,
+        playlists, videos, and progress. This can&rsquo;t be undone.
+      </p>
+      <button className="delete-account-button" onClick={openModal}>
+        Delete account
+      </button>
+
+      {showModal && (
+        <div className="delete-account-modal-overlay" onClick={closeModal}>
+          <div
+            className="delete-account-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h4>Delete account?</h4>
+            <p className="delete-account-modal-copy">
+              This permanently deletes the account and all of its data. Enter
+              your PIN to confirm.
+            </p>
+            <div className="delete-account-modal-pin">
+              <label htmlFor="delete-account-pin">PIN</label>
+              <PinInput
+                length={4}
+                type="numeric"
+                inputMode="number"
+                onChange={(value) => setPin(value)}
+                inputStyle={{ borderRadius: "0.25em" }}
+              />
+            </div>
+            {error && <p className="delete-account-modal-error">{error}</p>}
+            <div className="delete-account-modal-actions">
+              <button
+                type="button"
+                className="delete-account-confirm"
+                onClick={handleDelete}
+                disabled={submitting || pin.length < 4}
+              >
+                {submitting ? "Deleting…" : "Delete forever"}
+              </button>
+              <button type="button" onClick={closeModal} disabled={submitting}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const SettingsView = ({ token, apiUrl, user, settings }) => {
   const [videosRefreshKey, setVideosRefreshKey] = useState(0);
   if (!RequirePin(user.id)) {
@@ -497,6 +604,10 @@ const SettingsView = ({ token, apiUrl, user, settings }) => {
           errCallback={(e) => null}
           refreshKey={videosRefreshKey}
         />
+      </div>
+
+      <div className="tab-content">
+        <DeleteAccountView token={token} apiUrl={apiUrl} user={user} />
       </div>
     </div>
   );

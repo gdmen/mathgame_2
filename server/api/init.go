@@ -56,16 +56,19 @@ var CREATE_TABLES_SQL = []string{
 }
 
 type Api struct {
-	DB               *sql.DB
-	YouTubeAPIKey    string
-	isTest           bool
-	userManager      *UserManager
-	videoManager     *VideoManager
-	problemManager   *ProblemManager
-	settingsManager  *SettingsManager
-	gamestateManager *GamestateManager
-	eventManager     *EventManager
-	playlistManager  *PlaylistManager
+	DB                          *sql.DB
+	YouTubeAPIKey               string
+	auth0Domain                 string
+	auth0ManagementClientId     string
+	auth0ManagementClientSecret string
+	isTest                      bool
+	userManager                 *UserManager
+	videoManager                *VideoManager
+	problemManager              *ProblemManager
+	settingsManager             *SettingsManager
+	gamestateManager            *GamestateManager
+	eventManager                *EventManager
+	playlistManager             *PlaylistManager
 }
 
 func NewApi(db *sql.DB, cfg *common.Config) (*Api, error) {
@@ -83,6 +86,9 @@ func NewApi(db *sql.DB, cfg *common.Config) (*Api, error) {
 	a := &Api{DB: db}
 	if cfg != nil {
 		a.YouTubeAPIKey = cfg.YouTubeAPIKey
+		a.auth0Domain = cfg.Auth0Domain
+		a.auth0ManagementClientId = cfg.Auth0ManagementClientId
+		a.auth0ManagementClientSecret = cfg.Auth0ManagementClientSecret
 	}
 	a.userManager = &UserManager{DB: db}
 	a.videoManager = &VideoManager{DB: db}
@@ -155,6 +161,10 @@ func (a *Api) GetRouter() *gin.Engine {
 			user.POST("/", userMiddlewareLenient, a.customCreateOrUpdateUser)
 			user.POST("/:auth0_id", userMiddleware, a.updateUser)
 			user.GET("/:auth0_id", userMiddleware, a.getUser)
+			// Self-service account deletion (Adults section). PIN-gated;
+			// purges per-user state, anonymizes the users row, best-effort
+			// removes the Auth0 identity.
+			user.DELETE("/:auth0_id", userMiddleware, a.customDeleteAccount)
 		}
 		settings := v1.Group("/settings")
 		{
