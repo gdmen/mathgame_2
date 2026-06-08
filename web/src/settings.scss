@@ -188,6 +188,75 @@ $add-video-bg: linear-gradient(
         }
       }
     }
+    #delete-account-settings {
+      button.delete-account-button {
+        background-color: $color-error;
+        border-radius: 0.25em;
+        color: white;
+        padding: 0.5em 0.75em;
+      }
+      .delete-account-modal-overlay {
+        background: rgba(0, 0, 0, 0.4);
+        bottom: 0;
+        left: 0;
+        position: fixed;
+        right: 0;
+        top: 0;
+        z-index: 1000;
+      }
+      .delete-account-modal {
+        background: $background-color;
+        border-radius: $base-radius;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        left: 50%;
+        max-width: 90%;
+        padding: 1.5em;
+        position: fixed;
+        text-align: left;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 24em;
+        z-index: 1001;
+        h4 {
+          margin-top: 0;
+        }
+        .delete-account-modal-copy {
+          font-size: 0.95em;
+          margin: 0.5em 0 1em;
+        }
+        .delete-account-modal-pin {
+          margin-bottom: 1em;
+          label {
+            display: block;
+            margin-bottom: 0.25em;
+          }
+        }
+        .delete-account-modal-error {
+          color: $color-error;
+          font-size: 0.95em;
+          margin: 0.5em 0;
+        }
+        .delete-account-modal-actions {
+          display: flex;
+          gap: 0.75em;
+          justify-content: flex-end;
+          margin-top: 1em;
+          button {
+            background-color: lightgray;
+            color: $font-color;
+            padding: 0.4em 0.8em;
+            &.delete-account-confirm {
+              background-color: $color-error;
+              color: white;
+            }
+            &:disabled {
+              cursor: not-allowed;
+              opacity: 0.7;
+            }
+          }
+        }
+      }
+    }
     #video-inputs {
       background: $add-video-bg;
       display: flex;
