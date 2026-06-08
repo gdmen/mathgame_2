@@ -18,6 +18,14 @@ import (
 // Difficulty 14-16 ~ Grade 6-7 (negatives, proportional reasoning)
 // Difficulty 16-20 ~ Grade 8+  (algebra, exponents, systems)
 
+// DifficultyVersion is stamped on every problem row whose stored
+// difficulty was produced by the current code. Bump it whenever
+// ComputeProblemDifficulty's output semantics change (any constant tweak,
+// any new feature in parseProblemFeatures, any change to the compression
+// curve). 0.x while the scale is still in active calibration; 1.0 once
+// stable. Minor bumps for tuning, major bumps for structural rewrites.
+const DifficultyVersion = "0.1"
+
 // Patterns for feature extraction. Pre-compiled at package init for speed.
 var (
 	reNumber   = regexp.MustCompile(`-?\d+(?:\.\d+)?`)
