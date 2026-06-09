@@ -14,6 +14,7 @@ import { SettingsView } from "./settings.js";
 import { PlayView } from "./play.js";
 import { ProgressView } from "./progress.js";
 import { CompanionView } from "./companion.js";
+import { StyleGuideView } from "./style_guide.js";
 
 import "./index.scss";
 
@@ -40,6 +41,15 @@ const MainView = ({
   refreshPageLoadData,
   postEvent,
 }) => {
+  // Style guide is intentionally unlinked; render it before any auth or
+  // setup gate so a direct URL hit works even when logged out.
+  if (window.location.pathname === "/style-guide") {
+    return (
+      <main>
+        <StyleGuideView />
+      </main>
+    );
+  }
   if (isLoading || (isAuthenticated && settings == null)) {
     return <div className="content-loading"></div>;
   } else if (settings != null && (user.pin === "" || numEnabledVideos < 3)) {

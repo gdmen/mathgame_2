@@ -1,0 +1,207 @@
+@import "styles.scss";
+
+.sg-page {
+  margin: 0 auto;
+  max-width: $max-width;
+  padding: $base-space;
+
+  .sg-header {
+    margin-bottom: 2 * $base-space;
+
+    p {
+      max-width: 60ch;
+    }
+  }
+
+  .sg-section {
+    margin-bottom: 2 * $base-space;
+
+    h2 {
+      border-bottom: 1px solid $color-inactive;
+      padding-bottom: 0.25 * $base-space;
+    }
+
+    h3 {
+      margin-top: 1.5 * $base-space;
+    }
+  }
+
+  .sg-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: $base-space;
+  }
+
+  .sg-token-row {
+    align-items: center;
+    border: 1px solid $color-inactive;
+    border-radius: $base-radius;
+    display: flex;
+    gap: $base-space;
+    padding: 0.5 * $base-space;
+  }
+
+  .sg-swatch {
+    flex-shrink: 0;
+  }
+
+  .sg-token-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25 * $base-space;
+  }
+
+  .sg-token-name {
+    font-weight: 600;
+  }
+
+  .sg-token-value {
+    color: $color-inactive;
+  }
+
+  .sg-token-note {
+    color: $color-inactive;
+    font-size: 0.85em;
+  }
+
+  // Color swatch — fixed-size square with a subtle border so white-on-white
+  // doesn't disappear.
+  .sg-color-swatch {
+    border: 1px solid $color-inactive;
+    border-radius: $base-radius;
+    height: 3em;
+    width: 3em;
+  }
+
+  // Spacing swatch — colored block sized to the actual token value.
+  .sg-space-swatch {
+    background-color: $color-one;
+  }
+
+  // Shape swatch — solid block to show the corner radius.
+  .sg-shape-swatch {
+    background-color: $color-one;
+    height: 3em;
+    width: 3em;
+  }
+
+  .sg-type-scale {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5 * $base-space;
+  }
+
+  .sg-type-row {
+    align-items: baseline;
+    border-bottom: 1px dashed $color-inactive;
+    display: flex;
+    gap: $base-space;
+    justify-content: space-between;
+    padding: 0.5 * $base-space 0;
+
+    code {
+      color: $color-inactive;
+      flex-shrink: 0;
+    }
+  }
+
+  .sg-button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $base-space;
+  }
+
+  .sg-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75 * $base-space;
+    max-width: 400px;
+
+    label {
+      align-items: flex-start;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25 * $base-space;
+    }
+  }
+
+  .sg-footer {
+    border-top: 1px solid $color-inactive;
+    color: $color-inactive;
+    margin-top: 2 * $base-space;
+    padding-top: $base-space;
+  }
+
+  // Compound example block — a card framing one production component so
+  // each example is visually isolated from siblings.
+  .sg-compound {
+    border: 1px solid $color-inactive;
+    border-radius: $base-radius;
+    margin-top: $base-space;
+    overflow: hidden;
+  }
+
+  .sg-compound-meta {
+    background-color: whitesmoke;
+    border-bottom: 1px solid $color-inactive;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25 * $base-space;
+    padding: 0.5 * $base-space $base-space;
+  }
+
+  .sg-compound-name {
+    font-weight: 600;
+  }
+
+  .sg-compound-context {
+    color: $color-inactive;
+    font-size: 0.85em;
+  }
+
+  .sg-compound-frame {
+    padding: $base-space;
+  }
+
+  // Local utility: strip the default outer padding from production
+  // components that assume page-level wrappers so they sit cleanly in
+  // their compound frame.
+  .sg-no-padding {
+    padding: 0 !important;
+  }
+
+  // Breakpoints section has no real swatch shape — just a placeholder
+  // block so the row layout stays aligned with other token sections.
+  .sg-bp-swatch {
+    background-color: $color-two;
+    border-radius: $base-radius;
+    height: 1.5em;
+    width: 3em;
+  }
+
+  // PIN demo frame — match the production layout's centering.
+  .sg-pin-frame {
+    padding: 0.5 * $base-space 0;
+  }
+
+  // The hero example placeholder image — keeps layout intact without
+  // requiring a real image asset in the guide.
+  .sg-hero-placeholder {
+    background-color: $color-two;
+    border-radius: 20%;
+    min-height: 12em;
+  }
+
+  // Playlist thumbnail placeholder.
+  .sg-thumb-placeholder {
+    background-color: $color-two;
+  }
+
+  // Modal-open button — gets the production .submit look so the example
+  // doesn't visually rely on the bare button reset.
+  .sg-modal-open-btn {
+    background-color: $color-one-contrast;
+    color: white;
+    font-weight: 400;
+  }
+}
