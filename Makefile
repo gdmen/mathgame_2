@@ -14,6 +14,10 @@ GOPATH=$(HOME)/go
 SWAGGER=$(GOPATH)/bin/swagger
 RM=rm -rf
 
+# Backend config the web build reads. Override for the secret scan, which builds
+# against a canary config (see test-bundle-secrets) instead of real secrets.
+CONF ?= conf.json
+
 all: build-api build-cmds build-web
 
 dev-api:
@@ -72,11 +76,28 @@ clean:
 
 # Emit web/src/conf.json with ONLY the public fields the frontend reads.
 frontend-conf:
-	python3 web/gen_frontend_conf.py conf.json web/src/conf.json
+	python3 web/gen_frontend_conf.py $(CONF) web/src/conf.json
 
 build-web: frontend-conf
 	cd web && npm install --force && npm run build; cd -
 	cd web/src && npx prettier --write .; cd -
+
+# Fail if any secret value from $(CONF) (or a known secret pattern) made it into
+# the public web bundle. Run after build-web; safe to run pre-deploy.
+check-bundle-secrets:
+	python3 web/check_bundle_secrets.py $(CONF) web/build
+
+# Reproduce the CI bundle secret scan locally: build the web bundle against a
+# canary config (unique sentinel value per field, no real secrets) and fail if
+# any secret-field value leaks into web/build. Safe to run anywhere; does not
+# touch the real conf.json. This is exactly what the CI workflow runs.
+test-bundle-secrets:
+	python3 web/gen_canary_conf.py conf.json_ canary_conf.json
+	$(MAKE) build-web CONF=canary_conf.json
+	$(MAKE) check-bundle-secrets CONF=canary_conf.json
+
+# Full local parity with CI: Go tests + the web bundle secret scan.
+test-all: test test-bundle-secrets
 
 prod-web:
 	cd web && serve -s build -l 443 --ssl-cert "/etc/letsencrypt/live/mikeymath.org/fullchain.pem" --ssl-key "/etc/letsencrypt/live/mikeymath.org/privkey.pem"
