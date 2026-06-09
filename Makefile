@@ -19,7 +19,7 @@ all: build-api build-cmds build-web
 dev-api:
 	$(GOBIN)/apiserver -v 3 --logtostderr 1
 
-dev-web:
+dev-web: frontend-conf
 	cd web && npm start
 
 build-api:
@@ -70,10 +70,13 @@ clean:
 	$(GOMOD) tidy
 	$(RM) ./web/build/*
 
-build-web:
+# Emit web/src/conf.json with ONLY the public fields the frontend reads.
+frontend-conf:
+	python3 web/gen_frontend_conf.py conf.json web/src/conf.json
+
+build-web: frontend-conf
 	cd web && npm install --force && npm run build; cd -
 	cd web/src && npx prettier --write .; cd -
-	ln -s ../../conf.json web/src/conf.json
 
 prod-web:
 	cd web && serve -s build -l 443 --ssl-cert "/etc/letsencrypt/live/mikeymath.org/fullchain.pem" --ssl-key "/etc/letsencrypt/live/mikeymath.org/privkey.pem"
