@@ -142,7 +142,7 @@ func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings
 	}
 
 	if topicStats != nil && len(topicStats) > 0 {
-		targetTopic, topicDiff := chooseWeightedTopic(topicStats, settings.ProblemTypeBitmap, settings.TargetDifficulty, rand.Intn)
+		targetTopic, topicDiff := chooseWeightedTopic(topicStats, settings.ProblemTypeBitmap, settings.TargetDifficulty, rand.Intn, a.poolCountsByBit(logPrefix))
 		if targetTopic != 0 {
 			glog.Infof("%s topic-weighted selection: topic=%d difficulty=%.2f", logPrefix, targetTopic, topicDiff)
 			// Build a topic-specific settings to query with the topic's difficulty
