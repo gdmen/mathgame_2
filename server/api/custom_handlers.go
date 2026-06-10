@@ -126,6 +126,18 @@ func (a *Api) customUpdateSettings(c *gin.Context) {
 		return
 	}
 
+	// Clamp target_difficulty to the ceiling of the bitmap being saved
+	// BEFORE the write - this PUT persists the model first and only then
+	// runs event validation, so without the clamp an out-of-ceiling value
+	// would land in the DB and 400 after the fact. Computed against the NEW
+	// bitmap: the same PUT may shrink the envelope, lowering the ceiling.
+	// (See MaxDiffForBitmap for why the ceiling exists.)
+	if ceiling := MaxDiffForBitmap(model.ProblemTypeBitmap); model.TargetDifficulty > ceiling {
+		glog.Infof("%s clamping target_difficulty %.2f to bitmap ceiling %.2f",
+			logPrefix, model.TargetDifficulty, ceiling)
+		model.TargetDifficulty = ceiling
+	}
+
 	// Write to database
 	status, msg, err = a.settingsManager.Update(model)
 	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {

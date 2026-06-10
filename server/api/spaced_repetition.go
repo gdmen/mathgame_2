@@ -1,7 +1,6 @@
 package api
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/golang/glog"
@@ -76,47 +75,38 @@ func (a *Api) advanceReviewQueue(logPrefix string, userID uint32, problemID uint
 
 // getDueReviewProblem returns a problem ID from the review queue that is
 // due for review AND still matches the user's current settings:
-//   - problem_type_bitmap is one of the permutations of currently-enabled
-//     topics (so a previously-failed problem with a now-disabled topic bit
-//     stops surfacing as a review),
+//   - problem_type_bitmap is a subset of the currently-enabled topics (so a
+//     previously-failed problem with a now-disabled topic bit stops
+//     surfacing as a review),
 //   - difficulty <= target_difficulty + problemSelectionEpsilon — no
 //     lower bound, since a now-easy review is still a meaningful retest,
-//   - grade_level > 0 (skip legacy backfill sentinel rows),
 //   - not disabled.
-//
-// Unlike the Stage 1/2 pool selection, this does NOT apply the
-// WORD-only-when-WORD-enabled special case: spaced rep targets a specific
-// problem the user previously got wrong, regardless of WORD setting.
 //
 // Returns 0 if no due reviews match. Caller (selectProblem) then falls
 // through to the normal topic-weighted / default selection path.
 func (a *Api) getDueReviewProblem(logPrefix string, settings *Settings) uint32 {
-	permutations := GetProblemTypePermutations(ProblemType(settings.ProblemTypeBitmap))
-	if len(permutations) == 0 {
-		return 0
-	}
-	permsStr := formatUintsForSQLIn(permutations)
 	diffUpperBound := settings.TargetDifficulty + problemSelectionEpsilon
 
 	// Earliest-due review problem for this user, gated by current settings.
 	// JOINs review_queue (small, per-user) against the indexed problems
 	// table by primary key; the filters drop rows that no longer fit the
-	// user's current topic/difficulty/grade.
-	sql := fmt.Sprintf(`
+	// user's current topic/difficulty settings. The subset clause matches
+	// the Stage 1/2 selection SQL (see getSatisfyingProblemIds).
+	sql := `
 		SELECT rq.problem_id
 		FROM review_queue rq
 		JOIN problems p ON p.id = rq.problem_id
 		WHERE rq.user_id = ?
 		  AND rq.next_review_at <= NOW()
 		  AND p.disabled = 0
-		  AND p.grade_level > 0
-		  AND p.problem_type_bitmap IN (%s)
+		  AND (p.problem_type_bitmap & ~?) = 0
+		  AND p.problem_type_bitmap != 0
 		  AND p.difficulty <= ?
 		ORDER BY rq.next_review_at ASC
-		LIMIT 1`, permsStr)
+		LIMIT 1`
 
 	var problemID uint32
-	if err := a.DB.QueryRow(sql, settings.UserId, diffUpperBound).Scan(&problemID); err != nil {
+	if err := a.DB.QueryRow(sql, settings.UserId, settings.ProblemTypeBitmap, diffUpperBound).Scan(&problemID); err != nil {
 		// No matching due reviews; fall through to the rest of selectProblem.
 		return 0
 	}

@@ -87,32 +87,26 @@ func formatUintsForSQLIn[T ~uint32 | ~uint64](vals []T) string {
 	return strings.Join(parts, ",")
 }
 
-// Get all problem ids that satisfy this ProblemTypeBitmap and have similar Difficulty
+// Get all problem ids that satisfy this ProblemTypeBitmap and have similar
+// Difficulty. Bitwise-subset selection (#225): a problem matches iff every
+// bit it carries is enabled in the user's settings -
+// (problem_type_bitmap & ~enabled) = 0. This replaces the old permutation
+// enumeration (GetProblemTypePermutations + IN (...)), which was 2^n in the
+// popcount and capped what the bitmap could grow to.
+//
+// problem_type_bitmap != 0 is defense-in-depth: a zero bitmap is a subset of
+// everything, so an unstamped row would be served to every user. The
+// backfill census flags such rows for review; this clause keeps them out of
+// selection regardless.
+//
+// The old WORD special case (force word problems whenever WORD is enabled)
+// is gone: enabled means MAY, not MUST. Coverage balancing in
+// chooseWeightedTopic replaces the imbalance that wart papered over.
 func (a *Api) getSatisfyingProblemIds(logPrefix string, c *gin.Context, settings *Settings, prevIds *[]uint32) (*[]uint32, error) {
-	permutations := GetProblemTypePermutations(ProblemType(settings.ProblemTypeBitmap))
-	// Special case to guarantee word problems if they're turned on
-	if (ProblemType(settings.ProblemTypeBitmap) & WORD) != 0 {
-		res := []ProblemType{}
-		for _, pt := range permutations {
-			if (pt & WORD) != 0 {
-				res = append(res, pt)
-			}
-		}
-		permutations = res
-	}
-	if len(permutations) == 0 {
-		return &([]uint32{}), nil
-	}
-
 	diffLowerBound := settings.TargetDifficulty - problemSelectionEpsilon
 	diffUpperBound := settings.TargetDifficulty + problemSelectionEpsilon
-	// Universal difficulty allows cross-grade pool sharing: a grade 5 user
-	// whose target drifts to 5 can draw from problems generated for other
-	// grades as long as the computed difficulty matches. BUT grade_level=0
-	// is the sentinel for backfilled/ungraded legacy rows that should never
-	// be served; keep the always-exclude on that.
-	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0 AND grade_level > 0;",
-		formatUintsForSQLIn(permutations),
+	sql := fmt.Sprintf("(problem_type_bitmap & ~%d) = 0 AND problem_type_bitmap != 0 AND difficulty >= %g and difficulty <= %g AND disabled=0;",
+		settings.ProblemTypeBitmap,
 		diffLowerBound,
 		diffUpperBound,
 	)
@@ -215,28 +209,15 @@ func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings
 	return a.generateProblem(logPrefix, settings)
 }
 
-// getSatisfyingProblemIdsForTopic is like getSatisfyingProblemIds but only returns
-// problems whose bitmap contains the target topic.
+// getSatisfyingProblemIdsForTopic is like getSatisfyingProblemIds but only
+// returns problems whose bitmap contains the target topic: the same
+// bitwise-subset clause plus (problem_type_bitmap & targetTopic) != 0.
 func (a *Api) getSatisfyingProblemIdsForTopic(logPrefix string, c *gin.Context, settings *Settings, prevIds *[]uint32, targetTopic uint64) (*[]uint32, error) {
-	permutations := GetProblemTypePermutations(ProblemType(settings.ProblemTypeBitmap))
-	// Filter to permutations containing the target topic
-	filtered := []ProblemType{}
-	for _, pt := range permutations {
-		if (uint64(pt) & targetTopic) != 0 {
-			filtered = append(filtered, pt)
-		}
-	}
-	if len(filtered) == 0 {
-		empty := []uint32{}
-		return &empty, nil
-	}
-
 	diffLowerBound := settings.TargetDifficulty - problemSelectionEpsilon
 	diffUpperBound := settings.TargetDifficulty + problemSelectionEpsilon
-	// See note in getSatisfyingProblemIds: cross-grade sharing is OK, but
-	// grade_level=0 is always excluded as the legacy-row sentinel.
-	sql := fmt.Sprintf("problem_type_bitmap IN (%s) AND difficulty >= %g and difficulty <= %g AND disabled=0 AND grade_level > 0;",
-		formatUintsForSQLIn(filtered),
+	sql := fmt.Sprintf("(problem_type_bitmap & ~%d) = 0 AND problem_type_bitmap != 0 AND (problem_type_bitmap & %d) != 0 AND difficulty >= %g and difficulty <= %g AND disabled=0;",
+		settings.ProblemTypeBitmap,
+		targetTopic,
 		diffLowerBound,
 		diffUpperBound,
 	)
@@ -282,12 +263,11 @@ var backgroundGenFn = func(a *Api, logPrefix string, settings *Settings, numProb
 
 // llmGenerateProblemFn and llmValidateProblemFn are seams for the LLM
 // problem-generation and validation calls. Production points them at
-// llm_generator.GenerateProblem / ValidateProblemWithGrade; tests
-// override them to return canned problems and validation outcomes
-// without hitting OpenAI.
+// llm_generator.GenerateProblem / ValidateWordProblem; tests override them
+// to return canned problems and validation outcomes without hitting OpenAI.
 var (
 	llmGenerateProblemFn = llm_generator.GenerateProblem
-	llmValidateProblemFn = llm_generator.ValidateProblemWithGrade
+	llmValidateProblemFn = llm_generator.ValidateWordProblem
 )
 
 func (a *Api) generateProblemsBackground(logPrefix string, settings *Settings) error {
@@ -346,23 +326,33 @@ func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numPro
 	if len(operations) == 0 {
 		return nil, 0, uniqueIds
 	}
-	// Never write a grade_level=0 row. Legacy users whose settings still
-	// have grade_level=0 get a derived grade from their target_difficulty
-	// so their problems are selectable going forward.
-	effectiveGrade := effectiveGradeLevel(settings)
+	// Bit-driven generator config (#225): magnitude bits set the operand
+	// bound, MISSING_NUMBER/CHAINED_OPERATIONS gate the templates, and
+	// MISMATCHED_DENOMINATORS gates unlike-denominator fractions.
+	maxOperand := smallMaxOperand
+	if (MEDIUM_NUMBERS & problemType) > 0 {
+		maxOperand = mediumMaxOperand
+	}
+	if (LARGE_NUMBERS & problemType) > 0 {
+		maxOperand = LargeMaxOperand
+	}
 	generatorOpts := &heuristic_generator.Options{
 		Operations:       operations,
 		Fractions:        (FRACTIONS & problemType) > 0,
 		Negatives:        (NEGATIVES & problemType) > 0,
 		TargetDifficulty: settings.TargetDifficulty,
-		GradeLevel:       effectiveGrade,
+		MaxOperand:       maxOperand,
+		AllowMissing:     (MISSING_NUMBER & problemType) > 0,
+		AllowMultiOp:     (CHAINED_OPERATIONS & problemType) > 0,
+		MaxChainLen:      MaxChainLen,
+		SameDenomOnly:    (MISMATCHED_DENOMINATORS & problemType) == 0,
 	}
+	// grade_level still exists as a column until PR3; keep stamping a
+	// non-zero value so rollback to pre-#225 selection SQL stays possible.
+	effectiveGrade := effectiveGradeLevel(settings)
+	funnel := newGenerationFunnel(numProblems)
 	for i := 0; i < numProblems; i++ {
-		model := &Problem{}
-		model.Generator = heuristic_generator.VERSION
-		var err error
-		var heuristicDiff float64
-		model.Expression, model.Answer, heuristicDiff, err = heuristic_generator.GenerateProblem(generatorOpts)
+		expr, answer, _, err := heuristic_generator.GenerateProblem(generatorOpts)
 		if err != nil {
 			if _, ok := err.(*heuristic_generator.OptionsError); ok {
 				glog.Errorf("%s Failed options validation: %v", logPrefix, err)
@@ -371,69 +361,131 @@ func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numPro
 			glog.Errorf("%s Couldn't generate problem: %v", logPrefix, err)
 			continue
 		}
-		// Compute universal difficulty from the generated expression.
+		funnel.returned++
+
+		// Heuristic candidates pass the same admission pipeline as LLM
+		// candidates: the generator is trusted to be well-formed, but the
+		// pipeline is the single source of truth for stamping and envelope.
+		adm := AdmitExpression(expr)
+		if adm.RejectStage != "" {
+			funnel.reject(adm.RejectStage)
+			glog.Infof("%s heuristic reject [%s]: %s (%q)", logPrefix, adm.RejectStage, adm.RejectWhy, expr)
+			continue
+		}
+		if err := verifyAnswerSymbolic(adm.Tokens, answer); err != nil {
+			funnel.reject(rejectAnswer)
+			glog.Errorf("%s heuristic answer reject: %v (%q = %q)", logPrefix, err, expr, answer)
+			continue
+		}
+		// Envelope is the problemType param (the caller-masked request for
+		// THIS generation call, always a subset of the user's settings), not
+		// settings.ProblemTypeBitmap directly.
+		if v := envelopeViolation(adm.Bitmap, uint64(problemType)); v != "" {
+			funnel.reject(rejectEnvelope)
+			glog.Infof("%s heuristic envelope reject [%s]: %q", logPrefix, v, expr)
+			continue
+		}
+
+		model := &Problem{}
+		model.Generator = heuristic_generator.VERSION
+		model.Expression = adm.Expr
+		model.Answer = answer
+		model.ProblemTypeBitmap = adm.Bitmap
 		// Stored difficulty is a function of the problem itself, not the
-		// requester's target. This lets problems be shared across grades
-		// and users with different targets.
-		model.Difficulty = ComputeProblemDifficulty(model.Expression)
+		// requester's target - the pool is shared across users.
+		model.Difficulty = ComputeProblemDifficulty(adm.Expr)
 		model.DifficultyVersion = DifficultyVersion
 		model.GradeLevel = effectiveGrade
-		glog.Infof("%s heuristic problem: %s = %s (grade=%d computed_diff=%g raw=%g)", logPrefix, model.Expression, model.Answer, model.GradeLevel, model.Difficulty, heuristicDiff)
+		glog.Infof("%s heuristic problem: %s = %s (computed_diff=%g bitmap=%d)", logPrefix, model.Expression, model.Answer, model.Difficulty, model.ProblemTypeBitmap)
 		h := fnv.New32a()
 		h.Write([]byte(model.Expression))
 		model.Id = h.Sum32()
-		_, status, _, err := a.problemManager.Get(model.Id)
-		if status != http.StatusNotFound {
+		_, getStatus, _, _ := a.problemManager.Get(model.Id)
+		if getStatus != http.StatusNotFound {
+			funnel.reject(rejectCollision)
 			continue
 		}
 		uniqueIds[model.Id] = true
-		model.ProblemTypeBitmap = detectProblemTypeBitmap(model.Expression)
 		status, msg, err := a.problemManager.Create(model)
 		if err != nil {
+			funnel.reject(rejectCreate)
 			glog.Errorf("%s could not create heuristic problem (%d: %s): %v", logPrefix, status, msg, err)
 			continue
 		}
+		funnel.inserted++
 		newCount++
 		newProblem = model
 	}
+	glog.Infof("%s heuristic %s", logPrefix, funnel)
 	return newProblem, newCount, uniqueIds
 }
 
-// detectProblemTypeBitmap inspects a generated expression and returns the
-// bitmap of problem types it contains. Used to tag heuristic-generated
-// problems so they're selected correctly by type filter.
+// DetectProblemTypeBitmap inspects an expression and returns the bitmap of
+// problem types it contains, mapped from the same parsed features the
+// difficulty formula uses - bits, difficulty, and answers cannot disagree
+// about what an expression means.
 //
-// Heuristic generator formatting conventions:
-//   - Binary operators are surrounded by spaces: "42 / 6", "3 + 5"
-//   - Fractions have no surrounding spaces on their slash: "1/2 + 3/4"
-//   - Negative numbers appear as "-N" or with a leading minus in expressions.
-func detectProblemTypeBitmap(expr string) uint64 {
-	var bitmap uint64 = 0
-	// Subtraction has a space-dash-space pattern; a bare leading "-" is a
-	// negative number, not a subtraction operator.
-	if strings.Contains(expr, " - ") {
-		bitmap |= uint64(SUBTRACTION)
+// The prose rule applies: structural bits (operators, unknowns, PEMDAS,
+// SINGLE_VARIABLE) are token-level only; \text{...} contents never fire
+// them. WORD problems' topic bits come from the validator instead. The
+// magnitude bits are SHAPE bits and deliberately read prose numerals (a word
+// problem about 999 apples is a LARGE_NUMBERS problem - multi-digit operands
+// are visually intimidating to the audience regardless of framing), while
+// DECIMALS/PERCENTAGES bits are symbolic-only.
+//
+// Magnitude bits are brackets, not cumulative: 13-99 stamps MEDIUM_NUMBERS,
+// >= 100 stamps LARGE_NUMBERS alone ("1 + 999" is LARGE, not MEDIUM).
+func DetectProblemTypeBitmap(expr string) uint64 {
+	f := parseProblemFeatures(expr)
+	var b ProblemType
+	if f.hasAdd {
+		b |= ADDITION
 	}
-	if strings.Contains(expr, " + ") {
-		bitmap |= uint64(ADDITION)
+	if f.hasSub {
+		b |= SUBTRACTION
 	}
-	if strings.Contains(expr, " * ") {
-		bitmap |= uint64(MULTIPLICATION)
+	if f.hasMul {
+		b |= MULTIPLICATION
 	}
-	if strings.Contains(expr, " / ") {
-		bitmap |= uint64(DIVISION)
+	if f.hasDiv {
+		b |= DIVISION
 	}
-	// Fractions: a "/" without surrounding spaces (e.g., "1/2").
-	// Easy test: any "/" that isn't part of " / ".
-	if strings.Count(expr, "/") > strings.Count(expr, " / ") {
-		bitmap |= uint64(FRACTIONS)
+	if f.numFractions > 0 {
+		b |= FRACTIONS
 	}
-	// Negatives: presence of a unary minus (leading "-" or "-" after operator/space).
-	// Cheap heuristic: "-" at start, or " -" appearing where no subtraction operator follows.
-	if strings.HasPrefix(expr, "-") {
-		bitmap |= uint64(NEGATIVES)
+	if f.hasNegatives {
+		b |= NEGATIVES
 	}
-	return bitmap
+	if f.isWord {
+		b |= WORD
+	}
+	if f.maxMagnitude > mediumMaxOperand {
+		b |= LARGE_NUMBERS
+	} else if f.maxMagnitude > smallMaxOperand {
+		b |= MEDIUM_NUMBERS
+	}
+	if f.numOps >= 2 {
+		b |= CHAINED_OPERATIONS
+	}
+	if f.hasMissing {
+		b |= MISSING_NUMBER
+	}
+	if f.numFractions >= 2 && !f.sameDenom {
+		b |= MISMATCHED_DENOMINATORS
+	}
+	if f.hasDecimalsSymbolic {
+		b |= DECIMALS
+	}
+	if f.requiresPEMDAS {
+		b |= PEMDAS
+	}
+	if f.hasVariables {
+		b |= SINGLE_VARIABLE
+	}
+	if f.hasPercentSymbolic {
+		b |= PERCENTAGES
+	}
+	return uint64(b)
 }
 
 // generateProblems is the core generation routine used by both the sync
@@ -457,15 +509,16 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 	// a deterministic, offline fallback for when OpenAI is unreachable or
 	// returns no valid problems.
 	{
-		// Never tag a new problem with grade_level=0. Legacy users still on
-		// grade 0 get a derived grade so their problems are selectable.
-		effectiveGrade := effectiveGradeLevel(settings)
+		constraints := BuildBitConstraints(inputProblemType)
 		generatorOpts := &llm_generator.Options{
 			Features:         ProblemTypeToFeatures(inputProblemType),
 			TargetDifficulty: settings.TargetDifficulty,
 			NumProblems:      numProblems, // we still return just one problem, but this lets us reduce the number of OpenAI calls we need to make
-			GradeLevel:       effectiveGrade,
+			Constraints:      constraints,
 		}
+		// grade_level still exists as a column until PR3; keep stamping a
+		// non-zero value so rollback to pre-#225 selection SQL stays possible.
+		effectiveGrade := effectiveGradeLevel(settings)
 
 		var err error
 		var generatorProblems []llm_generator.Problem
@@ -484,22 +537,68 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 				return nil, err
 			}
 		} else {
+			funnel := newGenerationFunnel(numProblems)
+			funnel.returned = len(generatorProblems)
 			for _, p := range generatorProblems {
 				glog.Infof("%s generated problem: %v", logPrefix, p)
 
-				// Convert to an api.Problem
+				// Admission pipeline (#225): normalize -> lex -> rewrite ->
+				// detect -> unknown rules. The LLM's self-reported features
+				// are NOT trusted for stamping (#224 precedent).
+				adm := AdmitExpression(p.Expression)
+				if adm.RejectStage != "" {
+					funnel.reject(adm.RejectStage)
+					glog.Infof("%s LLM reject [%s]: %s (%q)", logPrefix, adm.RejectStage, adm.RejectWhy, p.Expression)
+					continue
+				}
+				bitmap := adm.Bitmap
+
+				// Local-first validation: symbolic problems are verified by
+				// the exact evaluator with zero LLM calls; WORD problems get
+				// one validator round-trip that checks the answer, judges
+				// envelope compliance against the same constraints the
+				// generator saw, and extracts topic features for stamping.
+				if bitmap&uint64(WORD) == 0 {
+					if err := verifyAnswerSymbolic(adm.Tokens, p.Answer); err != nil {
+						funnel.reject(rejectAnswer)
+						glog.Infof("%s LLM answer reject: %v (%q = %q)", logPrefix, err, adm.Expr, p.Answer)
+						continue
+					}
+				} else {
+					features, err := llmValidateProblemFn(&p, constraints, ValidatorFeatureNames)
+					if err != nil {
+						funnel.reject(rejectValidator)
+						glog.Infof("%s LLM validator reject: %v", logPrefix, err)
+						continue
+					}
+					// Validator-extracted topic bits stamp the WORD problem;
+					// parser-derived shape bits (magnitude, chained, word)
+					// are already in the bitmap.
+					bitmap |= uint64(FeaturesToProblemType(features))
+				}
+
+				// Envelope: every stamped bit must be enabled for this user.
+				if v := envelopeViolation(bitmap, settings.ProblemTypeBitmap); v != "" {
+					funnel.reject(rejectEnvelope)
+					glog.Infof("%s LLM envelope reject [%s]: %q", logPrefix, v, adm.Expr)
+					continue
+				}
+
+				// Convert to an api.Problem. The (possibly rewritten)
+				// canonical expression is what gets stored and hashed.
 				model = &Problem{}
 				model.Generator = llm_generator.VERSION
-				model.ProblemTypeBitmap = uint64(FeaturesToProblemType(p.Features))
-				model.Expression = strings.TrimSpace(p.Expression)
+				model.ProblemTypeBitmap = bitmap
+				model.Expression = adm.Expr
 				model.Answer = p.Answer
-				model.Explanation = p.Explanation
-				// Compute universal difficulty from the expression itself.
-				// LLM's self-reported difficulty is logged for debugging only.
-				model.Difficulty = ComputeProblemDifficulty(model.Expression)
+				// Keep the explanation consistent with a stage-1.5 rewrite:
+				// the kid must not see the letter the expression no longer has.
+				model.Explanation = RewriteLetterInProse(p.Explanation, adm.RewroteLetter)
+				// Computed difficulty only; LLM self-report is debug logging.
+				model.Difficulty = ComputeProblemDifficulty(adm.Expr)
 				model.DifficultyVersion = DifficultyVersion
 				model.GradeLevel = effectiveGrade
-				glog.Infof("%s LLM problem: %s computed_diff=%g grade=%d (LLM raw=%g)", logPrefix, model.Expression, model.Difficulty, model.GradeLevel, p.Difficulty)
+				glog.Infof("%s LLM problem: %s computed_diff=%g bitmap=%d (LLM raw=%g)", logPrefix, model.Expression, model.Difficulty, model.ProblemTypeBitmap, p.Difficulty)
 
 				// Use expression hash as model.Id
 				h := fnv.New32a()
@@ -510,42 +609,25 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 				_, status, _, err := a.problemManager.Get(model.Id)
 				// There is certainly no collision iff we receive a 404
 				if status != http.StatusNotFound {
-					//glog.Infof("%s could not verify uniqueness of problem: (%d: %v)", logPrefix, status, err)
+					funnel.reject(rejectCollision)
 					model = nil
 					continue
 				}
 				uniqueIds[model.Id] = true
 
-				// Validate problem (includes grade alignment check if grade is set)
-				err = llmValidateProblemFn(&p, effectiveGrade)
-				if err != nil {
-					glog.Infof("%s problem validation failed: %v", logPrefix, err)
-					model = nil
-					continue
-				}
-
-				// Difficulty calibration: reject if LLM's self-reported difficulty
-				// diverges too far from what we requested (> 100% off)
-				if settings.TargetDifficulty > 0 && p.Difficulty > 0 {
-					ratio := p.Difficulty / settings.TargetDifficulty
-					if ratio < 0.5 || ratio > 2.0 {
-						glog.Infof("%s difficulty calibration reject: requested=%.1f, LLM reported=%.1f (ratio=%.2f)",
-							logPrefix, settings.TargetDifficulty, p.Difficulty, ratio)
-						model = nil
-						continue
-					}
-				}
-
 				// Write to database
 				status, msg, err := a.problemManager.Create(model)
 				if err != nil {
+					funnel.reject(rejectCreate)
 					glog.Errorf("%s could not create LLM problem (%d: %s): %v", logPrefix, status, msg, err)
 					model = nil
 					continue
 				}
+				funnel.inserted++
 				newCount += 1
 				newProblem = model
 			}
+			glog.Infof("%s LLM %s", logPrefix, funnel)
 		}
 	}
 

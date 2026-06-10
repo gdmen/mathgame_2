@@ -1,4 +1,8 @@
 // Package llm_generator contains a math problem llm_generator
+//
+// Part of the problem-generation system - documented in docs/problem-generation.md
+// (lands with issue #225 PR3). Behavior changes here REQUIRE updating that doc
+// in the same PR.
 package llm_generator // import "garydmenezes.com/mathgame/server/llm_generator"
 
 import (
@@ -13,45 +17,52 @@ import (
 	"garydmenezes.com/mathgame/server/common"
 )
 
-const (
-	PROMPT_VALIDATION            = "Return the answers to fractional expressions as fractions, not decimals. Return only the numeric answer and no other text: %s"
-	PROMPT_VALIDATION_WITH_GRADE = "Given this math problem: %s\n1. Solve it. Return ONLY the numeric answer on line 1 (fractions as fractions, not decimals).\n2. Is this problem appropriate for %s (%s)? Answer YES or NO on line 2."
-)
+// The WORD-problem validator. Called for word problems ONLY - symbolic
+// problems are verified by the exact in-process evaluator (api package) with
+// zero LLM calls. The validator receives the SAME MAY/MUST NOT constraints
+// the generator was given, and answers three lines:
+//
+//	line 1: the numeric answer (authoritative for prose math)
+//	line 2: YES/NO - does the problem comply with ALL the constraints?
+//	line 3: comma-separated features actually present (closed name list)
+//
+// Line 3 stamps the WORD problem's topic bits, replacing generator
+// self-report (the same credibility problem #224 found for self-reported
+// difficulty).
+const PROMPT_VALIDATION_WORD = `Given this word problem: %s
+1. Solve it. Return ONLY the numeric answer on line 1 (fractions as fractions, not decimals; no LaTeX).
+2. The problem was generated under these constraints:
+%s
+Does the problem comply with ALL of them? Answer YES or NO on line 2.
+3. On line 3, list the features actually present in the problem, comma-separated, using only these names: %s.
+Return exactly three lines and nothing else.`
 
-func ValidateProblem(p *Problem) error {
-	return ValidateProblemWithGrade(p, 0)
-}
+// ErrEnvelopeMismatch marks a validator NO on the constraints line
+// (the replacement for the old GRADE_MISMATCH).
+var ErrEnvelopeMismatch = errors.New("ENVELOPE_MISMATCH")
 
-func ValidateProblemWithGrade(p *Problem, gradeLevel int) error {
+// ValidateWordProblem checks a word problem's answer and envelope compliance
+// in one LLM round-trip and extracts its observed features.
+//
+// featureNames is the closed list the validator may use on line 3 (the api
+// side owns it). Returns the observed features on success.
+func ValidateWordProblem(p *Problem, constraints string, featureNames []string) ([]string, error) {
 	if strings.ContainsAny(p.Answer, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") {
 		msg := fmt.Sprintf("Answer contained text: %v\n", p)
 		glog.Info(msg)
-		return errors.New(msg)
+		return nil, errors.New(msg)
 	}
 
 	c, err := common.ReadConfig("conf.json")
 	if err != nil {
-		return fmt.Errorf("read config: %w", err)
+		return nil, fmt.Errorf("read config: %w", err)
 	}
 	if err := c.Validate(); err != nil {
-		return fmt.Errorf("validate config: %w", err)
+		return nil, fmt.Errorf("validate config: %w", err)
 	}
 
-	var prompt string
-	useGradeValidation := false
-	if gradeLevel > 0 {
-		cur, loadErr := loadCurriculum()
-		if loadErr == nil {
-			key := fmt.Sprintf("%d", gradeLevel)
-			if grade, ok := cur.Grades[key]; ok {
-				prompt = fmt.Sprintf(PROMPT_VALIDATION_WITH_GRADE, p.Expression, grade.Label, grade.Description)
-				useGradeValidation = true
-			}
-		}
-	}
-	if !useGradeValidation {
-		prompt = fmt.Sprintf(PROMPT_VALIDATION, p.Expression)
-	}
+	prompt := fmt.Sprintf(PROMPT_VALIDATION_WORD,
+		p.Expression, constraints, strings.Join(featureNames, ", "))
 	glog.Infof("OpenAI validation prompt = expected answer: %s = %s\n", prompt, p.Answer)
 
 	client := openai.NewClient(c.OpenAiApiKey)
@@ -68,36 +79,38 @@ func ValidateProblemWithGrade(p *Problem, gradeLevel int) error {
 			},
 		},
 	)
-
 	if err != nil {
 		glog.Infof("OpenAI error when validating (after retries): %v\n", err)
-		return err
+		return nil, err
 	}
-	content := resp.Choices[0].Message.Content
 
-	if useGradeValidation {
-		// Parse two-line response: line 1 = answer, line 2 = YES/NO grade check
-		lines := strings.SplitN(strings.TrimSpace(content), "\n", 2)
-		answer := strings.TrimSpace(lines[0])
-		if answer != p.Answer {
-			msg := fmt.Sprintf("MISMATCH with OpenAI GPT4o validation: got %s, expected %s", answer, p.Answer)
-			glog.Info(msg)
-			return errors.New(msg)
-		}
-		if len(lines) > 1 {
-			gradeCheck := strings.TrimSpace(strings.ToUpper(lines[1]))
-			if strings.HasPrefix(gradeCheck, "NO") {
-				msg := fmt.Sprintf("GRADE_MISMATCH: problem not appropriate for grade %d: %s", gradeLevel, p.Expression)
-				glog.Info(msg)
-				return errors.New(msg)
+	lines := strings.Split(strings.TrimSpace(resp.Choices[0].Message.Content), "\n")
+	if len(lines) < 2 {
+		return nil, fmt.Errorf("validator returned %d lines, want 3: %q",
+			len(lines), resp.Choices[0].Message.Content)
+	}
+
+	answer := strings.TrimSpace(lines[0])
+	if answer != p.Answer {
+		msg := fmt.Sprintf("MISMATCH with validator: got %s, expected %s", answer, p.Answer)
+		glog.Info(msg)
+		return nil, errors.New(msg)
+	}
+
+	envelope := strings.TrimSpace(strings.ToUpper(lines[1]))
+	if !strings.HasPrefix(envelope, "YES") {
+		glog.Infof("%v: %s", ErrEnvelopeMismatch, p.Expression)
+		return nil, ErrEnvelopeMismatch
+	}
+
+	var features []string
+	if len(lines) >= 3 {
+		for _, f := range strings.Split(lines[2], ",") {
+			f = strings.ToLower(strings.TrimSpace(f))
+			if f != "" {
+				features = append(features, f)
 			}
 		}
-	} else {
-		if content != p.Answer {
-			msg := fmt.Sprintf("MISMATCH with OpenAI GPT4o validation: %s", content)
-			glog.Info(msg)
-			return errors.New(msg)
-		}
 	}
-	return nil
+	return features, nil
 }

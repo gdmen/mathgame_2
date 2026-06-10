@@ -19,13 +19,65 @@ func (e *OptionsError) Error() string {
 }
 
 // Options configures problem generation. Backwards compatible with
-// heuristic_0.0 signatures; GradeLevel added for grade-aware generation.
+// heuristic_0.0 signatures.
+//
+// Bit-driven configuration (#225): when MaxOperand > 0, the generator builds
+// its config from these explicit fields and ignores GradeLevel entirely. The
+// grade path remains only for legacy callers and is deleted with the
+// grade_level column (PR3).
 type Options struct {
 	Operations       []string `json:"operations" form:"operations"`
 	Fractions        bool     `json:"fractions" form:"fractions"`
 	Negatives        bool     `json:"negatives" form:"negatives"`
 	TargetDifficulty float64  `json:"target_difficulty" form:"target_difficulty"`
 	GradeLevel       int      `json:"grade_level" form:"grade_level"`
+
+	// MaxOperand bounds EVERY number that appears in the expression -
+	// operands, fraction numerators/denominators, and values embedded by
+	// missing-number templates (the sum in "? + 5 = 12"). 0 disables the
+	// bit-driven path.
+	MaxOperand int `json:"max_operand" form:"max_operand"`
+	// AllowMissing enables "? + b = c" templates (MISSING_NUMBER bit).
+	AllowMissing bool `json:"allow_missing" form:"allow_missing"`
+	// AllowMultiOp enables chains of 2+ operators (CHAINED_OPERATIONS bit),
+	// capped at MaxChainLen operators.
+	AllowMultiOp bool `json:"allow_multi_op" form:"allow_multi_op"`
+	MaxChainLen  int  `json:"max_chain_len" form:"max_chain_len"`
+	// SameDenomOnly restricts fraction problems to one shared denominator
+	// (MISMATCHED_DENOMINATORS bit disabled).
+	SameDenomOnly bool `json:"same_denom_only" form:"same_denom_only"`
+}
+
+// configFromBitOptions builds the generation config from explicit bit-driven
+// options - no grade involved. Every numeric range respects MaxOperand
+// because the insert pipeline stamps magnitude bits from every number in the
+// expression: a single out-of-range embedded value would push the problem
+// outside the user's envelope and waste the candidate.
+func configFromBitOptions(opts *Options) GradeConfig {
+	maxOp := opts.MaxOperand
+	capAt := func(c int) int {
+		if maxOp < c {
+			return maxOp
+		}
+		return c
+	}
+	chainLen := opts.MaxChainLen
+	if chainLen < 2 {
+		chainLen = 2
+	}
+	return GradeConfig{
+		Label:     "bitmap",
+		MinAddSub: 1, MaxAddSub: maxOp,
+		MinMul: 2, MaxMul: capAt(12),
+		MaxDiv: maxOp, MaxDivisor: capAt(12),
+		AllowFrac: opts.Fractions, MaxFracDenom: capAt(12),
+		AllowNeg:      opts.Negatives,
+		AllowMultiOp:  opts.AllowMultiOp,
+		AllowMissing:  opts.AllowMissing,
+		MaxChainLen:   chainLen,
+		SameDenomOnly: opts.SameDenomOnly,
+		MaxOperand:    maxOp,
+	}
 }
 
 // templateChoice picks a template probabilistically based on grade config.
@@ -47,7 +99,7 @@ func pickTemplate(cfg GradeConfig, ops []Op, rng randFunc) (Template, string) {
 	}
 	if cfg.AllowFrac {
 		entries = append(entries, entry{"frac_same", 3, tFractionSameDenom})
-		if cfg.MaxFracDenom >= 3 {
+		if cfg.MaxFracDenom >= 3 && !cfg.SameDenomOnly {
 			entries = append(entries, entry{"frac_diff", 2, tFractionDiffDenom})
 		}
 	}
@@ -81,29 +133,60 @@ func GenerateProblem(opts *Options) (string, string, float64, error) {
 		return "", "", 0, err
 	}
 
-	cfg := getGradeConfig(opts.GradeLevel)
+	var cfg GradeConfig
+	if opts.MaxOperand > 0 {
+		cfg = configFromBitOptions(opts)
+	} else {
+		cfg = getGradeConfig(opts.GradeLevel)
+		// Apply option-level toggles on top of grade config (legacy path).
+		cfg = applyOptionOverrides(cfg, opts)
+	}
 	ops := opsFromStrings(opts.Operations)
 	if len(ops) == 0 {
 		return "", "", 0, &OptionsError{s: "no valid operations"}
 	}
-	// Apply option-level toggles on top of grade config.
-	cfg = applyOptionOverrides(cfg, opts)
 
 	rng := rand.Intn
 
-	// Try up to 5 times to get a valid problem from a weighted template choice.
-	// If all fail, fall back to a basic binary problem.
-	for attempt := 0; attempt < 5; attempt++ {
+	// Try up to 8 times to get a valid problem from a weighted template
+	// choice. The magnitude guard rejects candidates where a template
+	// embedded a computed value above MaxOperand (e.g. the sum in
+	// "? + 9 = 21" for a MaxOperand of 12), since the insert pipeline would
+	// stamp an out-of-envelope magnitude bit on it.
+	for attempt := 0; attempt < 8; attempt++ {
 		tmpl, _ := pickTemplate(cfg, ops, rng)
 		expr, ans, ok := tmpl(cfg, ops, rng)
-		if ok && expr != "" && ans != "" {
+		if ok && expr != "" && ans != "" && withinMaxOperand(expr, cfg.MaxOperand) {
 			return expr, ans, opts.TargetDifficulty, nil
 		}
 	}
-	// Last-resort fallback: basic add with small numbers.
-	a := randIntRange(cfg.MinAddSub, max(cfg.MinAddSub+1, cfg.MaxAddSub))
-	b := randIntRange(cfg.MinAddSub, max(cfg.MinAddSub+1, cfg.MaxAddSub))
+	// Last-resort fallback: basic add with small numbers, halved so the
+	// magnitude guard can't reject it.
+	hi := max(cfg.MinAddSub+1, cfg.MaxAddSub/2)
+	a := randIntRange(cfg.MinAddSub, hi)
+	b := randIntRange(cfg.MinAddSub, hi)
 	return formatBinary(a, OpAdd, b), fmt.Sprintf("%d", a+b), opts.TargetDifficulty, nil
+}
+
+// withinMaxOperand reports whether every number appearing in the expression
+// is <= maxOperand. maxOperand 0 means unbounded (legacy grade path).
+func withinMaxOperand(expr string, maxOperand int) bool {
+	if maxOperand <= 0 {
+		return true
+	}
+	n := 0
+	for i := 0; i < len(expr); i++ {
+		c := expr[i]
+		if c >= '0' && c <= '9' {
+			n = n*10 + int(c-'0')
+			if n > maxOperand {
+				return false
+			}
+		} else {
+			n = 0
+		}
+	}
+	return true
 }
 
 // applyOptionOverrides lets old callers force-enable fractions/negatives

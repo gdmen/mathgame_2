@@ -7,32 +7,27 @@ import (
 	"testing"
 )
 
-func TestGetProblemTypePermutations(t *testing.T) {
-	cases := map[ProblemType][]ProblemType{
-		1:  {1},
-		2:  {2},
-		3:  {1, 2, 3},
-		4:  {4},
-		5:  {1, 4, 5},
-		6:  {2, 4, 6},
-		7:  {1, 2, 3, 4, 5, 6, 7},
-		8:  {8},
-		9:  {1, 8, 9},
-		10: {2, 8, 10},
-		11: {1, 2, 3, 8, 9, 10, 11},
-		12: {4, 8, 12},
-		13: {1, 4, 5, 8, 9, 12, 13},
-		14: {2, 4, 6, 8, 10, 12, 14},
-		15: {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+// TestProblemTypeBitInventory pins the bit layout: 16 bits, every bit named,
+// every name mapped back, masks consistent. (GetProblemTypePermutations was
+// deleted in #225 PR2 - selection is bitwise-subset SQL now.)
+func TestProblemTypeBitInventory(t *testing.T) {
+	if len(problemTypeNames) != 16 || len(problemTypeValues) != 16 {
+		t.Fatalf("bit inventory: %d names, %d values, want 16 each",
+			len(problemTypeNames), len(problemTypeValues))
 	}
-	for k, v := range cases {
-		res := GetProblemTypePermutations(k)
-		sort.Slice(res, func(i, j int) bool {
-			return res[i] < res[j]
-		})
-		if !reflect.DeepEqual(res, v) {
-			t.Errorf("ProblemTypePermutations(%d) = %v, want %v", k, res, v)
+	var all ProblemType
+	for pt, name := range problemTypeNames {
+		if problemTypeValues[name] != pt {
+			t.Errorf("name map mismatch: %s -> %d, want %d", name, problemTypeValues[name], pt)
 		}
+		all |= pt
+	}
+	if all != ALL_PROBLEM_TYPES {
+		t.Errorf("ALL_PROBLEM_TYPES = %d, OR of named bits = %d", ALL_PROBLEM_TYPES, all)
+	}
+	// WEIGHTED_TOPIC_MASK is exactly the non-magnitude bits.
+	if WEIGHTED_TOPIC_MASK != ALL_PROBLEM_TYPES&^(MEDIUM_NUMBERS|LARGE_NUMBERS) {
+		t.Errorf("WEIGHTED_TOPIC_MASK = %d, want all bits except magnitude", WEIGHTED_TOPIC_MASK)
 	}
 }
 

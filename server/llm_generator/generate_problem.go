@@ -36,13 +36,13 @@ or this example:
   "explanation": "\\text{The distance traveled is calculated by multiplying the speed by the time: }60\\text{ miles/hour }* 2\\text{ hours }= 120\\text{ miles.}",
   "difficulty": 15
 }
-where "question" is the math question in LaTeX math mode e.g. it might use \\text{} tags as shown, "answer" is the correct answer with no other text, "explanation" is the explanation for the correct answer in LaTeX math mode e.g. it might use \\text{} tags as shown, "features" are the allowed features that were actually used in this problem, and "difficulty" is an age in years - this problem should be the appropriate difficulty for people of that age. If NOT a word problem, do not use any LaTeX. For example, fractions should be returned as e.g. 1/2 in this case. If it IS a word problem, fractions can be returned as e.g. \frac{1}{2}.
+where "question" is the math question in LaTeX math mode e.g. it might use \\text{} tags as shown, "answer" is the correct answer with no other text, "explanation" is the explanation for the correct answer in LaTeX math mode e.g. it might use \\text{} tags as shown, and "features" are the allowed features that were actually used in this problem. In word problems, keep prose inside \\text{...} and write any symbolic math OUTSIDE the \\text{} blocks. If NOT a word problem, do not use any LaTeX. For example, fractions should be returned as e.g. 1/2 in this case. If it IS a word problem, fractions can be returned as e.g. \frac{1}{2}.
 Return the answers to fractional expressions as fractions, not decimals.
 The "answer" should NEVER be in LaTeX format. It should be purely numeric, possibly including mathematical symbols like / and -.
 Return these problems as a valid JSON list with no additional text.
 Do not wrap the JSON in markdown or any other JSON markers.
 `
-	PROMPT_QUANTITY = "Produce %d unique %sproblems in this format that may include these features %s and is the appropriate difficulty for a %g year old."
+	PROMPT_QUANTITY = "Produce %d unique %sproblems in this format."
 	MAX_QUANTITY    = 20
 )
 
@@ -60,27 +60,22 @@ func GenerateProblem(opts *Options) ([]Problem, error) {
 	}
 
 	sort.Strings(opts.Features)
-	featuresJson, err := json.Marshal(opts.Features)
-	if err != nil {
-		glog.Fatal(err)
-	}
 
-	// Request question(s)
+	// Request question(s). The May/MustNot constraint block (built by the
+	// api side from the user's settings bitmap) is the sole source of shape
+	// guidance - grade-curriculum context and the "age in years" difficulty
+	// framing are gone (#225).
 	var ptype string
 	ptype = "problems that are NOT word-"
 	for _, x := range opts.Features {
 		if x == "word" {
-			ptype = "word-"
+			ptype = ""
 			break
 		}
 	}
-	prompt := PROMPT_QUESTION + "\n" + fmt.Sprintf(PROMPT_QUANTITY,
-		opts.NumProblems, ptype, featuresJson, opts.TargetDifficulty,
-	)
-	// Add grade-level curriculum context if available
-	gradeCtx := GradeContext(opts.GradeLevel)
-	if gradeCtx != "" {
-		prompt += gradeCtx
+	prompt := PROMPT_QUESTION + "\n" + fmt.Sprintf(PROMPT_QUANTITY, opts.NumProblems, ptype)
+	if opts.Constraints != "" {
+		prompt += "\n" + opts.Constraints
 	}
 	// Add topic-specific variety hint
 	for _, feature := range opts.Features {

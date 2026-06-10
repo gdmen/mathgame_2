@@ -25,6 +25,10 @@ type GradeConfig struct {
 	AllowMultiOp bool // Multi-term expressions (a + b - c)
 	AllowMissing bool // Missing-number templates (? + b = c)
 	MaxChainLen  int  // Maximum chain length for multi-op
+
+	// Bit-driven fields (#225). Zero values preserve legacy grade behavior.
+	SameDenomOnly bool // All fractions in a problem share one denominator
+	MaxOperand    int  // Hard bound on every number in the expression (0 = unbounded)
 }
 
 // grades holds per-grade configuration. Grades 1-8 mirror the curriculum.json

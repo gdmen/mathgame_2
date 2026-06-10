@@ -56,11 +56,17 @@ func getOrDefaultTopicStat(stats map[uint64]*TopicStat, userID uint32, problemTy
 }
 
 // recordTopicAttempt increments attempts (and correct if isCorrect) for each
-// individual problem type bit set in the problem's bitmap.
+// individual problem type bit set in the problem's bitmap. Gated by
+// WEIGHTED_TOPIC_MASK: magnitude bits never get stats rows - magnitude IS
+// difficulty, so per-topic accuracy tracking for it is meaningless (see the
+// mask comment in enums.go).
 func (a *Api) recordTopicAttempt(logPrefix string, userID uint32, problemTypeBitmap uint64, isCorrect bool, baseDifficulty float64) {
 	for i := 0; i < 64; i++ {
 		pt := uint64(1 << i)
 		if (problemTypeBitmap & pt) == 0 {
+			continue
+		}
+		if pt&uint64(WEIGHTED_TOPIC_MASK) == 0 {
 			continue
 		}
 		correctDelta := 0
@@ -154,6 +160,12 @@ func chooseWeightedTopic(stats map[uint64]*TopicStat, enabledBitmap uint64, base
 		if (enabledBitmap & pt) == 0 {
 			continue
 		}
+		// Magnitude bits are not practice topics: "weak at LARGE_NUMBERS ->
+		// serve large numbers, easier" fights itself. Size progression is
+		// target_difficulty's job (see WEIGHTED_TOPIC_MASK in enums.go).
+		if pt&uint64(WEIGHTED_TOPIC_MASK) == 0 {
+			continue
+		}
 		diff := baseDifficulty
 		weight := 1
 		if ts, ok := stats[pt]; ok {
@@ -192,6 +204,12 @@ func (a *Api) initTopicStats(userID uint32, enabledBitmap uint64, baseDifficulty
 	for i := 0; i < 64; i++ {
 		pt := uint64(1 << i)
 		if (enabledBitmap & pt) == 0 {
+			continue
+		}
+		// Never seed magnitude-bit rows: getEffectiveDifficulty consults
+		// seeded rows, and a magnitude "topic difficulty" is meaningless
+		// (see WEIGHTED_TOPIC_MASK in enums.go).
+		if pt&uint64(WEIGHTED_TOPIC_MASK) == 0 {
 			continue
 		}
 		_, err := a.DB.Exec(`

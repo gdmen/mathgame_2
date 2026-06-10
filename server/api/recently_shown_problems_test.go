@@ -132,9 +132,10 @@ func TestRecentlyShownProblems_FailTolerantWrite(t *testing.T) {
 	// Read path: SET_TARGET_DIFFICULTY triggers select_new_problem which
 	// reads recently_shown_problems via loadRecentProblemIds. With the
 	// table dropped, the helper should warn and return an empty exclusion
-	// list, and the request should still 200.
+	// list, and the request should still 200. Value 4 stays under the
+	// bitmap-derived ceiling (test user default is ADDITION-only -> ~4.8).
 	resp = httptest.NewRecorder()
-	body, _ = json.Marshal(&Event{EventType: SET_TARGET_DIFFICULTY, Value: "10"})
+	body, _ = json.Marshal(&Event{EventType: SET_TARGET_DIFFICULTY, Value: "4"})
 	req, _ = http.NewRequest("POST", fmt.Sprintf("/api/v1/events?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
 	r.ServeHTTP(resp, req)
 	if resp.Code != http.StatusOK {
