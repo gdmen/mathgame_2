@@ -139,30 +139,3 @@ func FeaturesToProblemType(features []string) ProblemType {
 	}
 	return pt
 }
-
-// Convert a ProblemType Bitmap into a list of all permutations
-// e.g. pt = 5 -> 101 in binary -> [1,4,5]
-func GetProblemTypePermutations(pt ProblemType) []ProblemType {
-	var positions []int
-
-	// Find all positions of 1 bits in pt
-	for i := 0; i < 64; i++ {
-		if (pt & (1 << i)) != 0 {
-			positions = append(positions, i)
-		}
-	}
-
-	return getProblemTypePermutationsHelper(ProblemType(0), positions, 0)
-}
-
-func getProblemTypePermutationsHelper(p ProblemType, positions []int, i int) []ProblemType {
-	if i >= len(positions) {
-		if p == 0 {
-			return []ProblemType{}
-		}
-		return []ProblemType{p}
-	}
-	p1 := getProblemTypePermutationsHelper(p, positions, i+1)
-	p2 := getProblemTypePermutationsHelper(p|ProblemType(1<<positions[i]), positions, i+1)
-	return append(p1, p2...)
-}

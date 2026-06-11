@@ -1,3 +1,6 @@
+// Part of the problem-generation system - documented in docs/problem-generation.md.
+// Behavior changes here (bits, formula, pipeline, masks) REQUIRE updating that
+// doc in the same PR. Formula changes also require a DifficultyVersion bump.
 // recompute_problem_difficulty walks all rows in the problems table, computes
 // the universal difficulty via api.ComputeProblemDifficulty(expression), and
 // writes it back to the difficulty column.

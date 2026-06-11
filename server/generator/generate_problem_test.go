@@ -48,12 +48,12 @@ func evalSimple(t *testing.T, expr string) int {
 	return n
 }
 
-// TestGenerateProblem_Grade1 verifies grade 1 produces add/sub within [1,20]
-// with non-trivial operands.
-func TestGenerateProblem_Grade1(t *testing.T) {
+// TestGenerateProblem_SmallNumbers verifies the default magnitude envelope
+// produces add/sub within MaxOperand with non-trivial operands.
+func TestGenerateProblem_SmallNumbers(t *testing.T) {
 	opts := &Options{
 		Operations: []string{"+", "-"},
-		GradeLevel: 1,
+		MaxOperand: 20,
 	}
 	for i := 0; i < 100; i++ {
 		expr, ans, _, err := GenerateProblem(opts)
@@ -79,11 +79,13 @@ func TestGenerateProblem_Grade1(t *testing.T) {
 	}
 }
 
-// TestGenerateProblem_Grade5 verifies grade 5 can produce fractions.
-func TestGenerateProblem_Grade5(t *testing.T) {
+// TestGenerateProblem_Fractions verifies the FRACTIONS option produces
+// fraction problems.
+func TestGenerateProblem_Fractions(t *testing.T) {
 	opts := &Options{
 		Operations: []string{"+", "-", "*", "/"},
-		GradeLevel: 5,
+		Fractions:  true,
+		MaxOperand: 99,
 	}
 	sawFraction := false
 	sawMul := false
@@ -101,10 +103,10 @@ func TestGenerateProblem_Grade5(t *testing.T) {
 		}
 	}
 	if !sawFraction {
-		t.Error("grade 5 with fractions enabled never produced a fraction in 200 tries")
+		t.Error("fractions enabled but never produced a fraction in 200 tries")
 	}
 	if !sawMul {
-		t.Error("grade 5 with multiplication enabled never produced a multiplication in 200 tries")
+		t.Error("multiplication enabled but never produced a multiplication in 200 tries")
 	}
 }
 
@@ -113,7 +115,7 @@ func TestGenerateProblem_Grade5(t *testing.T) {
 func TestGenerateProblem_CleanFormatting(t *testing.T) {
 	opts := &Options{
 		Operations: []string{"+", "-", "*", "/"},
-		GradeLevel: 4,
+		MaxOperand: 99,
 	}
 	for i := 0; i < 100; i++ {
 		expr, _, _, err := GenerateProblem(opts)
@@ -139,7 +141,7 @@ func TestGenerateProblem_CleanFormatting(t *testing.T) {
 func TestGenerateProblem_DivisionAlwaysClean(t *testing.T) {
 	opts := &Options{
 		Operations: []string{"/"},
-		GradeLevel: 4,
+		MaxOperand: 144,
 	}
 	for i := 0; i < 100; i++ {
 		expr, ans, _, err := GenerateProblem(opts)
@@ -174,8 +176,9 @@ func TestGenerateProblem_DivisionAlwaysClean(t *testing.T) {
 // grade config allows them.
 func TestGenerateProblem_MissingNumber(t *testing.T) {
 	opts := &Options{
-		Operations: []string{"+", "-"},
-		GradeLevel: 3,
+		Operations:   []string{"+", "-"},
+		MaxOperand:   99,
+		AllowMissing: true,
 	}
 	sawMissing := false
 	for i := 0; i < 200; i++ {
@@ -191,7 +194,7 @@ func TestGenerateProblem_MissingNumber(t *testing.T) {
 		}
 	}
 	if !sawMissing {
-		t.Error("grade 3 with AllowMissing never produced a missing-number problem in 200 tries")
+		t.Error("AllowMissing never produced a missing-number problem in 200 tries")
 	}
 }
 
@@ -209,11 +212,10 @@ func TestGenerateProblem_NoEmptyOrInvalid(t *testing.T) {
 		name string
 		opts *Options
 	}{
-		{"grade1 +/-", &Options{Operations: []string{"+", "-"}, GradeLevel: 1}},
-		{"grade2 +/-/*", &Options{Operations: []string{"+", "-", "*"}, GradeLevel: 2}},
-		{"grade3 all", &Options{Operations: []string{"+", "-", "*", "/"}, GradeLevel: 3}},
-		{"grade8 all", &Options{Operations: []string{"+", "-", "*", "/"}, GradeLevel: 8}},
-		{"no grade", &Options{Operations: []string{"+", "-"}, GradeLevel: 0}},
+		{"small +/-", &Options{Operations: []string{"+", "-"}, MaxOperand: 12}},
+		{"small +/-/*", &Options{Operations: []string{"+", "-", "*"}, MaxOperand: 12}},
+		{"medium all", &Options{Operations: []string{"+", "-", "*", "/"}, MaxOperand: 99}},
+		{"large all", &Options{Operations: []string{"+", "-", "*", "/"}, MaxOperand: 9999, Fractions: true, Negatives: true, AllowMultiOp: true, AllowMissing: true, MaxChainLen: 5}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -239,9 +241,13 @@ func TestGenerateProblem_InvalidOptions(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for empty operations")
 	}
-	_, _, _, err = GenerateProblem(&Options{Operations: []string{"bogus"}})
+	_, _, _, err = GenerateProblem(&Options{Operations: []string{"bogus"}, MaxOperand: 12})
 	if err == nil {
 		t.Error("expected error for invalid operation")
+	}
+	_, _, _, err = GenerateProblem(&Options{Operations: []string{"+"}})
+	if err == nil {
+		t.Error("expected error when MaxOperand is unset")
 	}
 }
 
@@ -252,7 +258,7 @@ func TestGenerateProblem_InvalidOptions(t *testing.T) {
 func TestGenerateProblem_NoTrivialProblems(t *testing.T) {
 	opts := &Options{
 		Operations: []string{"+", "-", "*"},
-		GradeLevel: 3,
+		MaxOperand: 99,
 	}
 	trivialCount := 0
 	total := 500

@@ -127,9 +127,13 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	if event.EventType == LOGGED_IN {
 		// no-op
 	} else if event.EventType == SET_TARGET_DIFFICULTY {
+		// Upper bound is the bitmap-derived ceiling: a target above the
+		// hardest problem the envelope can express lands in an empty band
+		// (see MaxDiffForBitmap).
+		ceiling := MaxDiffForBitmap(settings.ProblemTypeBitmap)
 		val, parseErr := strconv.ParseFloat(event.Value, 64)
-		if parseErr != nil || val < 3 || val > 50 {
-			msg := fmt.Sprintf("Invalid target_difficulty: %s (must be 3-50)", event.Value)
+		if parseErr != nil || val < MinTargetDifficulty || val > ceiling {
+			msg := fmt.Sprintf("Invalid target_difficulty: %s (must be %.0f-%.1f for the current problem types)", event.Value, MinTargetDifficulty, ceiling)
 			glog.Errorf("%s %s", logPrefix, msg)
 			c.JSON(http.StatusBadRequest, msg)
 			return errors.New(msg)
@@ -144,9 +148,15 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			return errors.New(msg)
 		}
 	} else if event.EventType == SET_PROBLEM_TYPE_BITMAP {
+		// Only shape validity is checked here (nonzero, defined bits). The
+		// dependency rules (core-op required, LARGE=>MEDIUM,
+		// MISMATCHED=>FRACTIONS, PEMDAS=>CHAINED) are enforced by the
+		// settings UI's validateBitmap; an API client bypassing
+		// them gets an incoherent-but-harmless envelope (the ceiling and
+		// subset selection both degrade gracefully).
 		val, parseErr := strconv.ParseUint(event.Value, 10, 64)
-		if parseErr != nil || val == 0 || val > 255 {
-			msg := fmt.Sprintf("Invalid problem_type_bitmap: %s (must be 1-255)", event.Value)
+		if parseErr != nil || val == 0 || ProblemType(val)&^ALL_PROBLEM_TYPES != 0 {
+			msg := fmt.Sprintf("Invalid problem_type_bitmap: %s (must be 1-%d)", event.Value, uint64(ALL_PROBLEM_TYPES))
 			glog.Errorf("%s %s", logPrefix, msg)
 			c.JSON(http.StatusBadRequest, msg)
 			return errors.New(msg)
@@ -238,19 +248,22 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		var diffIncrease float64 = 0.05
 		var minDiff float64 = 3
 		var minProbs uint32 = 5
-		// Maximum difficulty cap, grade-aware when set. Prevents runaway growth.
-		// The LLM interprets difficulty as "age in years" - grade 5 kid is ~10-11,
-		// so cap at (gradeLevel * 2 + 4). Default ceiling of 20 when grade unset.
-		var maxDiff float64 = 20
-		if settings.GradeLevel > 0 {
-			maxDiff = float64(settings.GradeLevel)*2 + 4
-		}
+		// Difficulty ceiling, derived from the user's settings bitmap: the
+		// difficulty of the hardest problem their enabled bits can express.
+		// WHY: this adjuster ratchets target_difficulty upward on success.
+		// Without the ceiling, the target can drift above anything the
+		// envelope can produce - into a band that is empty BY CONSTRUCTION -
+		// and selection's +/-epsilon window then never matches, every serve
+		// falls through to the synchronous fallback, and the system churns
+		// permanently (generation cannot fill an unreachable band). See
+		// MaxDiffForBitmap in difficulty.go.
+		maxDiff := MaxDiffForBitmap(settings.ProblemTypeBitmap)
 		// End difficulty adjustment limits
 
 		// Defensive: clamp any previously-runaway difficulty back into range.
 		// If TargetDifficulty was set to a wildly high value (from the unbounded
 		// adjuster bug), reset it to maxDiff immediately so even if later processing
-		// fails, the user gets grade-appropriate problems on their next session.
+		// fails, the user gets appropriately-hard problems on their next session.
 		if settings.TargetDifficulty > maxDiff {
 			glog.Infof("%s TargetDifficulty %.2f exceeds cap %.2f, clamping down",
 				logPrefix, settings.TargetDifficulty, maxDiff)
@@ -525,14 +538,14 @@ func (a *Api) loadGamestateAndSettings(userID uint32) (*Gamestate, *Settings, er
 	err := a.DB.QueryRow(`
 		SELECT
 		  g.user_id, g.problem_id, g.video_id, g.solved, g.target,
-		  s.problem_type_bitmap, s.target_difficulty, s.target_work_percentage, s.grade_level
+		  s.problem_type_bitmap, s.target_difficulty, s.target_work_percentage
 		FROM gamestates g
 		JOIN settings s ON s.user_id = g.user_id
 		WHERE g.user_id = ?`,
 		userID,
 	).Scan(
 		&gs.UserId, &gs.ProblemId, &gs.VideoId, &gs.Solved, &gs.Target,
-		&s.ProblemTypeBitmap, &s.TargetDifficulty, &s.TargetWorkPercentage, &s.GradeLevel,
+		&s.ProblemTypeBitmap, &s.TargetDifficulty, &s.TargetWorkPercentage,
 	)
 	if err != nil {
 		return nil, nil, err

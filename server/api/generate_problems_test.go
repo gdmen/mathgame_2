@@ -119,8 +119,11 @@ func llmTestProblem() llm_generator.Problem {
 }
 
 // withCannedLLM swaps llmGenerateProblemFn + llmValidateProblemFn for the
-// duration of the test. Validation defaults to accept (returns nil); pass
-// validateErr to simulate a rejection.
+// duration of the test. Validation defaults to accept (echoes the problem's
+// own features); pass validateErr to simulate a WORD-validator rejection.
+// Note: the validator seam is only consulted for WORD problems - symbolic
+// canned problems are answer-checked by the in-process evaluator, so their
+// Answer fields must actually be correct.
 func withCannedLLM(t *testing.T, problems []llm_generator.Problem, genErr error, validateErr error) {
 	t.Helper()
 	originalGen := llmGenerateProblemFn
@@ -131,8 +134,11 @@ func withCannedLLM(t *testing.T, problems []llm_generator.Problem, genErr error,
 		}
 		return problems, nil
 	}
-	llmValidateProblemFn = func(p *llm_generator.Problem, gradeLevel int) error {
-		return validateErr
+	llmValidateProblemFn = func(p *llm_generator.Problem, constraints string, featureNames []string) ([]string, error) {
+		if validateErr != nil {
+			return nil, validateErr
+		}
+		return p.Features, nil
 	}
 	t.Cleanup(func() {
 		llmGenerateProblemFn = originalGen
@@ -157,7 +163,6 @@ func TestGenerateProblems_LLM_HappyPath(t *testing.T) {
 		UserId:            1,
 		ProblemTypeBitmap: uint64(ADDITION),
 		TargetDifficulty:  5,
-		GradeLevel:        3,
 	}
 	problem, err := api.generateProblems("[test-llm-happy]", settings, 1)
 	if err != nil {
@@ -185,9 +190,6 @@ func TestGenerateProblems_LLM_HappyPath(t *testing.T) {
 	}
 	if persisted.ProblemTypeBitmap != uint64(ADDITION) {
 		t.Errorf("ProblemTypeBitmap = %d, want %d", persisted.ProblemTypeBitmap, uint64(ADDITION))
-	}
-	if persisted.GradeLevel != 3 {
-		t.Errorf("GradeLevel = %d, want 3", persisted.GradeLevel)
 	}
 	if persisted.DifficultyVersion != DifficultyVersion {
 		t.Errorf("DifficultyVersion = %q, want %q", persisted.DifficultyVersion, DifficultyVersion)
@@ -219,7 +221,6 @@ func TestGenerateProblems_LLM_IdCollisionSkipped(t *testing.T) {
 		Answer:            "1000",
 		Difficulty:        5,
 		Generator:         "test-seed",
-		GradeLevel:        3,
 	}
 	if status, msg, err := api.problemManager.Create(existing); err != nil || status != http.StatusCreated {
 		t.Fatalf("pre-seed: status=%d msg=%s err=%v", status, msg, err)
@@ -231,7 +232,6 @@ func TestGenerateProblems_LLM_IdCollisionSkipped(t *testing.T) {
 		UserId:            1,
 		ProblemTypeBitmap: uint64(ADDITION),
 		TargetDifficulty:  5,
-		GradeLevel:        3,
 	}
 	_, err = api.generateProblems("[test-llm-collision]", settings, 1)
 	// All canned problems collided, so no new problem produced -> error.
@@ -267,7 +267,6 @@ func TestGenerateProblems_LLM_ValidationReject(t *testing.T) {
 		UserId:            1,
 		ProblemTypeBitmap: uint64(ADDITION),
 		TargetDifficulty:  5,
-		GradeLevel:        3,
 	}
 	_, err = api.generateProblems("[test-llm-validate-reject]", settings, 1)
 	if err == nil {
@@ -303,7 +302,6 @@ func TestGenerateProblems_LLM_CalibrationReject(t *testing.T) {
 		UserId:            1,
 		ProblemTypeBitmap: uint64(ADDITION),
 		TargetDifficulty:  5,
-		GradeLevel:        3,
 	}
 	_, err = api.generateProblems("[test-llm-calibration]", settings, 1)
 	if err == nil {
@@ -335,7 +333,6 @@ func TestGenerateProblems_LLM_FallbackToHeuristic(t *testing.T) {
 		UserId:            1,
 		ProblemTypeBitmap: uint64(ADDITION | WORD), // WORD will be stripped on fallback
 		TargetDifficulty:  5,
-		GradeLevel:        3,
 	}
 	problem, err := api.generateProblems("[test-llm-fallback]", settings, 1)
 	if err != nil {
@@ -365,7 +362,6 @@ func TestRunHeuristicGenerator_StampsDifficultyVersion(t *testing.T) {
 	settings := &Settings{
 		UserId:           1,
 		TargetDifficulty: 5,
-		GradeLevel:       3,
 	}
 	problem, count, _ := api.runHeuristicGenerator("[test-difficulty-version]", settings, 1, ADDITION)
 	if count == 0 || problem == nil {
@@ -383,5 +379,169 @@ func TestRunHeuristicGenerator_StampsDifficultyVersion(t *testing.T) {
 	}
 	if persisted.DifficultyVersion != DifficultyVersion {
 		t.Errorf("persisted row: DifficultyVersion = %q, want %q", persisted.DifficultyVersion, DifficultyVersion)
+	}
+}
+
+// TestGenerateProblems_WordPath: a WORD problem flows through the validator
+// seam; validator-extracted topic features stamp the bitmap on top of the
+// parser's shape bits.
+func TestGenerateProblems_WordPath(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+
+	p := llmTestProblem()
+	p.Expression = `\text{Mia has 12 stickers. She gives away 5. How many are left?}`
+	p.Answer = "7"
+	p.Features = []string{"subtraction", "word"}
+	withCannedLLM(t, []llm_generator.Problem{p}, nil, nil)
+
+	settings := &Settings{
+		UserId:            1,
+		ProblemTypeBitmap: uint64(SUBTRACTION | WORD),
+		TargetDifficulty:  6,
+	}
+	problem, err := api.generateProblems("[test-word-path]", settings, 1)
+	if err != nil {
+		t.Fatalf("generateProblems: %v", err)
+	}
+	want := uint64(WORD | SUBTRACTION)
+	if problem.ProblemTypeBitmap != want {
+		t.Errorf("bitmap = %d (%v), want %d (parser WORD + validator subtraction)",
+			problem.ProblemTypeBitmap,
+			ProblemTypeToFeatures(ProblemType(problem.ProblemTypeBitmap)), want)
+	}
+	if problem.Expression != p.Expression {
+		t.Errorf("word expression mutated: %q", problem.Expression)
+	}
+}
+
+// TestGenerateProblems_WordEnvelopeReject: validator-reported features
+// outside the user's envelope reject the problem (the final subset check
+// covers validator-stamped bits too).
+func TestGenerateProblems_WordEnvelopeReject(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+
+	p := llmTestProblem()
+	p.Expression = `\text{A sale takes 0.5 off the price of 8 dollars. What do you pay?}`
+	p.Answer = "4"
+	p.Features = []string{"decimals", "multiplication", "word"}
+	withCannedLLM(t, []llm_generator.Problem{p}, nil, nil)
+
+	settings := &Settings{
+		UserId:            1,
+		ProblemTypeBitmap: uint64(MULTIPLICATION | WORD), // no DECIMALS
+		TargetDifficulty:  6,
+	}
+	if got, err := api.generateProblems("[test-word-envelope]", settings, 1); err == nil {
+		t.Fatalf("expected envelope reject, got problem %v", got)
+	}
+}
+
+// TestGenerateProblems_RewriteConsistency: a lone bare letter is rewritten to
+// '?' in the stored expression AND in the explanation prose.
+func TestGenerateProblems_RewriteConsistency(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+
+	p := llmTestProblem()
+	p.Expression = "12 - x = 5"
+	p.Answer = "7"
+	p.Explanation = `\text{x is 7 because 12 - 7 = 5}`
+	withCannedLLM(t, []llm_generator.Problem{p}, nil, nil)
+
+	settings := &Settings{
+		UserId:            1,
+		ProblemTypeBitmap: uint64(SUBTRACTION | MISSING_NUMBER),
+		TargetDifficulty:  6,
+	}
+	problem, err := api.generateProblems("[test-rewrite]", settings, 1)
+	if err != nil {
+		t.Fatalf("generateProblems: %v", err)
+	}
+	if problem.Expression != "12 - ? = 5" {
+		t.Errorf("expression = %q, want rewritten form", problem.Expression)
+	}
+	if problem.Explanation != `\text{? is 7 because 12 - 7 = 5}` {
+		t.Errorf("explanation letter not substituted: %q", problem.Explanation)
+	}
+	if problem.ProblemTypeBitmap != uint64(SUBTRACTION|MISSING_NUMBER) {
+		t.Errorf("bitmap = %d", problem.ProblemTypeBitmap)
+	}
+}
+
+// TestGenerateProblems_PreservesLatexNotation: storage keeps the original
+// notation (KaTeX renders it); normalization is parsing-only.
+func TestGenerateProblems_PreservesLatexNotation(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+
+	p := llmTestProblem()
+	p.Expression = `\frac{1}{2} + \frac{1}{4}`
+	p.Answer = "3/4"
+	withCannedLLM(t, []llm_generator.Problem{p}, nil, nil)
+
+	settings := &Settings{
+		UserId:            1,
+		ProblemTypeBitmap: uint64(ADDITION | FRACTIONS | MISMATCHED_DENOMINATORS),
+		TargetDifficulty:  6,
+	}
+	problem, err := api.generateProblems("[test-latex]", settings, 1)
+	if err != nil {
+		t.Fatalf("generateProblems: %v", err)
+	}
+	if problem.Expression != p.Expression {
+		t.Errorf("stored expression = %q, want original LaTeX preserved", problem.Expression)
+	}
+	want := uint64(ADDITION | FRACTIONS | MISMATCHED_DENOMINATORS)
+	if problem.ProblemTypeBitmap != want {
+		t.Errorf("bitmap = %d, want %d", problem.ProblemTypeBitmap, want)
+	}
+}
+
+// TestGenerateProblems_CollisionFunnel: a duplicate expression in the same
+// batch hits the collision stage; exactly one row lands.
+func TestGenerateProblems_CollisionFunnel(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+
+	p := llmTestProblem() // "12 + 7" = "19"
+	withCannedLLM(t, []llm_generator.Problem{p, p}, nil, nil)
+
+	settings := &Settings{
+		UserId:            1,
+		ProblemTypeBitmap: uint64(ADDITION | MEDIUM_NUMBERS),
+		TargetDifficulty:  5,
+	}
+	problem, err := api.generateProblems("[test-collision]", settings, 2)
+	if err != nil {
+		t.Fatalf("generateProblems: %v", err)
+	}
+	var n int
+	if err := api.DB.QueryRow(`SELECT COUNT(*) FROM problems WHERE id = ?`, problem.Id).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("duplicate batch produced %d rows, want 1", n)
 	}
 }

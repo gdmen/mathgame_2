@@ -27,7 +27,7 @@ func TestChooseWeightedTopic_WeakTopicWeighted(t *testing.T) {
 	for i := 0; i < n; i++ {
 		topic, _ := chooseWeightedTopic(stats, enabledBitmap, 3, func(max int) int {
 			return i % max
-		})
+		}, nil)
 		counts[topic]++
 	}
 
@@ -44,7 +44,7 @@ func TestChooseWeightedTopic_NoStats(t *testing.T) {
 	stats := map[uint64]*TopicStat{}
 	enabledBitmap := uint64(ADDITION | SUBTRACTION)
 
-	topic, diff := chooseWeightedTopic(stats, enabledBitmap, 5.0, func(max int) int { return 0 })
+	topic, diff := chooseWeightedTopic(stats, enabledBitmap, 5.0, func(max int) int { return 0 }, nil)
 	if topic == 0 {
 		t.Error("expected a topic even with no stats")
 	}
@@ -72,7 +72,7 @@ func TestChooseWeightedTopic_InsufficientAttempts(t *testing.T) {
 	counts := map[uint64]int{}
 	n := 10000
 	for i := 0; i < n; i++ {
-		topic, _ := chooseWeightedTopic(stats, enabledBitmap, 3, func(max int) int { return i % max })
+		topic, _ := chooseWeightedTopic(stats, enabledBitmap, 3, func(max int) int { return i % max }, nil)
 		counts[topic]++
 	}
 
