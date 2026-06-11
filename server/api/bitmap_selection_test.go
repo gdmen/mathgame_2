@@ -10,7 +10,7 @@ import (
 
 // TestBitwiseSubsetSelection_Semantics: the subset SQL returns exactly the
 // rows whose bits are a subset of the enabled bitmap - equivalence check
-// against a manual subset filter (the old permutation+IN semantics).
+// against a manual subset filter.
 func TestBitwiseSubsetSelection_Semantics(t *testing.T) {
 	c, err := common.ReadConfig("../../test_conf.json")
 	if err != nil {
@@ -167,21 +167,21 @@ func TestHeuristicFromBits_ChainedOff(t *testing.T) {
 	}
 }
 
-// TestCoverageBoost: thin pools boost, average pools don't, cap holds.
-func TestCoverageBoost(t *testing.T) {
-	if b := coverageBoost(100, 100); b != 1.0 {
+// TestThinPoolBoost: thin pools boost, average pools don't, cap holds.
+func TestThinPoolBoost(t *testing.T) {
+	if b := thinPoolBoost(100, 100); b != 1.0 {
 		t.Errorf("average pool boost = %v, want 1.0", b)
 	}
-	if b := coverageBoost(200, 100); b != 1.0 {
+	if b := thinPoolBoost(200, 100); b != 1.0 {
 		t.Errorf("rich pool boost = %v, want 1.0", b)
 	}
-	if b := coverageBoost(50, 100); b != 2.0 {
+	if b := thinPoolBoost(50, 100); b != 2.0 {
 		t.Errorf("half pool boost = %v, want 2.0", b)
 	}
-	if b := coverageBoost(1, 100); b != coverageBoostMax {
-		t.Errorf("thin pool boost = %v, want cap %v", b, coverageBoostMax)
+	if b := thinPoolBoost(1, 100); b != thinPoolBoostMax {
+		t.Errorf("thin pool boost = %v, want cap %v", b, thinPoolBoostMax)
 	}
-	if b := coverageBoost(0, 100); b != coverageBoostMax {
-		t.Errorf("empty pool boost = %v, want cap %v", b, coverageBoostMax)
+	if b := thinPoolBoost(0, 100); b != thinPoolBoostMax {
+		t.Errorf("empty pool boost = %v, want cap %v", b, thinPoolBoostMax)
 	}
 }

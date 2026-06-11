@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	VERSION         = "llm_0.2"
+	VERSION         = "llm_0.3"
 	OPENAI_URL      = "https://api.openai.com/v1/completions"
 	PROMPT_QUESTION = `
 Generate math questions in the format of this example:
@@ -46,7 +46,8 @@ Return these problems as a valid JSON list with no additional text.
 Do not wrap the JSON in markdown or any other JSON markers.
 `
 	PROMPT_QUANTITY = "Produce %d unique %sproblems in this format."
-	MAX_QUANTITY    = 20
+	// MAX_QUANTITY caps problems per OpenAI call.
+	MAX_QUANTITY = 20
 )
 
 func GenerateProblem(opts *Options) ([]Problem, error) {

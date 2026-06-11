@@ -9,11 +9,14 @@ const PreprocessExpression = (expression) => {
   // Split each \text{...} block at internal whitespace into per-word
   // \text{} blocks so word-wrap can happen between words.
   expression = expression.replace(/\\text\{[^\}]+\}/g, (match) =>
-    match.replace(/\s/g, " }\\text{"),
+    match.replace(/\s/g, " }\\text{")
   );
   // Wrap math-mode multi-digit numbers in \text{} so KaTeX renders them
   // as a single atomic span instead of one <span class="mord"> per digit.
-  expression = expression.replace(/(?<![A-Za-z\\])(\d{2,})(?![A-Za-z])/g, "\\text{$1}");
+  expression = expression.replace(
+    /(?<![A-Za-z\\])(\d{2,})(?![A-Za-z])/g,
+    "\\text{$1}"
+  );
   return expression;
 };
 

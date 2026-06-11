@@ -22,15 +22,15 @@ Each user has two controls:
 
 - **`problem_type_bitmap`** — the *envelope*: the set of problem shapes
   that are OK for this kid. Enabled bit = the generator MAY include that
-  feature; disabled bit = MUST NOT. There is no grade level; the audience
-  (kids on the autism spectrum) has spiky skill profiles, and grade-as-band
-  was the wrong primary control.
+  feature; disabled bit = MUST NOT. The audience (kids on the autism
+  spectrum) has spiky skill profiles, so the controls are independent
+  per-skill toggles rather than a single banded level.
 - **`target_difficulty`** — the adaptive lever *within* that envelope,
   bounded by the formula-derived ceiling (below).
 
 A problem is served to a user iff its stamped bits are a **subset** of the
 user's bitmap: `(problem_type_bitmap & ~enabled) = 0` (plus the difficulty
-window and disabled/zero-bitmap filters). No permutation enumeration.
+window and disabled/zero-bitmap filters).
 
 ## Bit reference
 
@@ -195,10 +195,12 @@ Shared shape constants (generator mapping AND ceiling, lockstep):
   practice topic iff per-topic difficulty coheres for it; magnitude IS
   difficulty, so "weak at LARGE_NUMBERS → serve large numbers, easier"
   fights itself. Size progression is target_difficulty's job.
-- **Coverage balancing** (server/api/coverage.go): thin-pool topics get up
-  to 4× lottery weight (5-min cached per-bit counts). This replaces the old
-  hard "force WORD when enabled" wart: rare bits stay in rotation by weight,
-  not by force.
+- **Pool-supply weighting** (server/api/pool_supply.go): thin-pool topics
+  get up to 4× lottery weight (5-min cached per-bit counts), so
+  hard-to-generate bits stay in rotation by weight, not by force. Both
+  lottery signals - per-kid skill (demand, topic_stats.go) and pool
+  supply - act at serving time; a picked-but-thin topic also triggers
+  background generation.
 
 ## Generation
 

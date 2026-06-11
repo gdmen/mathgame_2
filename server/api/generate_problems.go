@@ -68,8 +68,8 @@ func formatUintsForSQLIn[T ~uint32 | ~uint64](vals []T) string {
 // selection regardless.
 //
 // An enabled bit means that feature MAY be served, never that it MUST be:
-// coverage balancing in chooseWeightedTopic keeps rare topics in rotation
-// by lottery weight, not by force.
+// pool-supply weighting in chooseWeightedTopic keeps rare topics in
+// rotation by lottery weight, not by force.
 func (a *Api) getSatisfyingProblemIds(logPrefix string, c *gin.Context, settings *Settings, prevIds *[]uint32) (*[]uint32, error) {
 	diffLowerBound := settings.TargetDifficulty - problemSelectionEpsilon
 	diffUpperBound := settings.TargetDifficulty + problemSelectionEpsilon
@@ -468,7 +468,7 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 	newCount := 0
 	inputProblemType := ProblemType(settings.ProblemTypeBitmap)
 	// Try the LLM generator first. It produces richer content (word problems,
-	// varied phrasings, curriculum-aligned context) and should be the primary
+	// varied phrasings) and should be the primary
 	// source for every problem type it can handle. The heuristic generator is
 	// a deterministic, offline fallback for when OpenAI is unreachable or
 	// returns no valid problems.

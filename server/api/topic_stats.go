@@ -147,11 +147,17 @@ func (a *Api) adjustTopicDifficulty(logPrefix string, userID uint32, stats map[u
 	}
 }
 
-// chooseWeightedTopic picks a problem type to focus on. Weak topics (accuracy < 60%
-// with 10+ attempts) are weighted 2x. Topics with thin problem pools get a
-// coverage boost of up to coverageBoostMax (the WORD wart's replacement -
-// hard-to-generate bits stay in rotation by weight, not by force; see
-// coverage.go). poolCounts may be nil, which disables coverage weighting.
+// chooseWeightedTopic is the serving lottery: it picks the problem type to
+// focus this serve on. Two independent weight signals multiply:
+//
+//   - skill (demand side, this file): weak topics (accuracy < 60% with 10+
+//     attempts) are weighted 2x, and the chosen topic is served at its own
+//     per-topic difficulty.
+//   - pool supply (pool_supply.go): topics with thin pools get up to
+//     thinPoolBoostMax x weight, so hard-to-generate bits stay in rotation
+//     by weight, not by force. poolCounts may be nil, which disables
+//     supply weighting.
+//
 // Returns a single ProblemType value and its target difficulty. If no
 // candidates exist, returns 0 (caller should use default behavior).
 func chooseWeightedTopic(stats map[uint64]*TopicStat, enabledBitmap uint64, baseDifficulty float64, rng func(int) int, poolCounts map[uint64]int64) (uint64, float64) {
@@ -188,7 +194,7 @@ func chooseWeightedTopic(stats map[uint64]*TopicStat, enabledBitmap uint64, base
 		return 0, baseDifficulty
 	}
 
-	// Coverage boost: thin-pool topics get up to coverageBoostMax more
+	// Supply weighting: thin-pool topics get up to thinPoolBoostMax more
 	// weight, relative to the average pool among THESE candidates.
 	if len(poolCounts) > 0 {
 		var sum int64
@@ -197,7 +203,7 @@ func chooseWeightedTopic(stats map[uint64]*TopicStat, enabledBitmap uint64, base
 		}
 		avg := sum / int64(len(candidates))
 		for i := range candidates {
-			candidates[i].weight *= coverageBoost(poolCounts[candidates[i].problemType], avg)
+			candidates[i].weight *= thinPoolBoost(poolCounts[candidates[i].problemType], avg)
 		}
 	}
 

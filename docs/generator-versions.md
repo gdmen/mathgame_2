@@ -83,6 +83,26 @@ Changes vs `0.1`:
   difficulty diverges >100% from the requested target
 - Added GPT5/GPT5Nano model constants (go-openai v1.41.2)
 
+### `llm_0.3` — bitmap constraint block
+
+The prompt is driven by the user's problem-type bitmap
+(see docs/problem-generation.md). Changes vs `0.2`:
+- The MAY / MUST NOT constraint block (api.BuildBitConstraints) is the
+  sole shape guidance: per-bit allow/forbid pairs, magnitude clause,
+  chain clause, unknown rules, closed-world clause. Grade-level
+  curriculum context, few-shot curriculum examples, and the
+  "age in years" difficulty framing are removed (`curriculum.json`
+  deleted).
+- Generator self-report is no longer trusted: features are stamped by
+  the admission pipeline's detector, difficulty by
+  ComputeProblemDifficulty. The self-reported-difficulty calibration
+  gate is removed.
+- Validation is local-first: symbolic problems are answer-checked by the
+  exact evaluator with no API call; word problems get one 3-line
+  validator round-trip (answer, envelope yes/no, observed features).
+- Storage preserves original notation (\frac, \times render through
+  KaTeX); normalization is internal to parsing.
+
 ## Universal Difficulty Scale
 
 Every problem's `difficulty` column stores a universal score on a 1-20 scale
