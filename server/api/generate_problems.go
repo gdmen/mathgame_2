@@ -1,3 +1,6 @@
+// Part of the problem-generation system - documented in docs/problem-generation.md.
+// Behavior changes here (bits, formula, pipeline, masks) REQUIRE updating that
+// doc in the same PR. Formula changes also require a DifficultyVersion bump.
 // Package api contains api routes, handlers, and models
 package api // import "garydmenezes.com/mathgame/server/api"
 
@@ -43,40 +46,7 @@ const (
 	// problemSelectionEpsilon: candidate difficulty must be within this
 	// additive window of the user's target_difficulty (target ± epsilon).
 	problemSelectionEpsilon = 1.5
-
-	// defaultGradeLevel is used when settings.GradeLevel is 0 (legacy users
-	// or users who somehow skipped the grade-selection step in onboarding).
-	// Stops us from ever writing a grade_level=0 problem which the selection
-	// filter (grade_level > 0) would then permanently exclude.
-	defaultGradeLevel = 3
 )
-
-// effectiveGradeLevel returns the grade we should tag a newly-generated
-// problem with. Never zero: legacy users still on grade_level=0 get a
-// sensible fallback derived from their target_difficulty, or a hard
-// default if that isn't useful either.
-//
-// Derivation: the adaptive cap is grade*2+4, so invert: grade = (target-4)/2.
-// target=6  -> grade 1
-// target=10 -> grade 3
-// target=14 -> grade 5
-// target=20 -> grade 8
-func effectiveGradeLevel(settings *Settings) int {
-	if settings.GradeLevel > 0 {
-		return settings.GradeLevel
-	}
-	if settings.TargetDifficulty >= 6 {
-		g := int((settings.TargetDifficulty - 4) / 2)
-		if g < 1 {
-			g = 1
-		}
-		if g > 8 {
-			g = 8
-		}
-		return g
-	}
-	return defaultGradeLevel
-}
 
 // formatUintsForSQLIn formats a slice of unsigned integers as "1,2,3" for use in a SQL "IN (...)" clause.
 func formatUintsForSQLIn[T ~uint32 | ~uint64](vals []T) string {
@@ -347,9 +317,6 @@ func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numPro
 		MaxChainLen:      MaxChainLen,
 		SameDenomOnly:    (MISMATCHED_DENOMINATORS & problemType) == 0,
 	}
-	// grade_level still exists as a column until PR3; keep stamping a
-	// non-zero value so rollback to pre-#225 selection SQL stays possible.
-	effectiveGrade := effectiveGradeLevel(settings)
 	funnel := newGenerationFunnel(numProblems)
 	for i := 0; i < numProblems; i++ {
 		expr, answer, _, err := heuristic_generator.GenerateProblem(generatorOpts)
@@ -395,7 +362,6 @@ func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numPro
 		// requester's target - the pool is shared across users.
 		model.Difficulty = ComputeProblemDifficulty(adm.Expr)
 		model.DifficultyVersion = DifficultyVersion
-		model.GradeLevel = effectiveGrade
 		glog.Infof("%s heuristic problem: %s = %s (computed_diff=%g bitmap=%d)", logPrefix, model.Expression, model.Answer, model.Difficulty, model.ProblemTypeBitmap)
 		h := fnv.New32a()
 		h.Write([]byte(model.Expression))
@@ -516,10 +482,6 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 			NumProblems:      numProblems, // we still return just one problem, but this lets us reduce the number of OpenAI calls we need to make
 			Constraints:      constraints,
 		}
-		// grade_level still exists as a column until PR3; keep stamping a
-		// non-zero value so rollback to pre-#225 selection SQL stays possible.
-		effectiveGrade := effectiveGradeLevel(settings)
-
 		var err error
 		var generatorProblems []llm_generator.Problem
 		generatorProblems, err = llmGenerateProblemFn(generatorOpts)
@@ -597,7 +559,6 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 				// Computed difficulty only; LLM self-report is debug logging.
 				model.Difficulty = ComputeProblemDifficulty(adm.Expr)
 				model.DifficultyVersion = DifficultyVersion
-				model.GradeLevel = effectiveGrade
 				glog.Infof("%s LLM problem: %s computed_diff=%g bitmap=%d (LLM raw=%g)", logPrefix, model.Expression, model.Difficulty, model.ProblemTypeBitmap, p.Difficulty)
 
 				// Use expression hash as model.Id

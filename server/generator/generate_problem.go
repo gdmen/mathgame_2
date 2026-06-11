@@ -18,24 +18,17 @@ func (e *OptionsError) Error() string {
 	return e.s
 }
 
-// Options configures problem generation. Backwards compatible with
-// heuristic_0.0 signatures.
-//
-// Bit-driven configuration (#225): when MaxOperand > 0, the generator builds
-// its config from these explicit fields and ignores GradeLevel entirely. The
-// grade path remains only for legacy callers and is deleted with the
-// grade_level column (PR3).
+// Options configures problem generation. Bit-driven (#225): every field maps
+// off the user's settings bitmap; MaxOperand is required.
 type Options struct {
 	Operations       []string `json:"operations" form:"operations"`
 	Fractions        bool     `json:"fractions" form:"fractions"`
 	Negatives        bool     `json:"negatives" form:"negatives"`
 	TargetDifficulty float64  `json:"target_difficulty" form:"target_difficulty"`
-	GradeLevel       int      `json:"grade_level" form:"grade_level"`
 
 	// MaxOperand bounds EVERY number that appears in the expression -
 	// operands, fraction numerators/denominators, and values embedded by
-	// missing-number templates (the sum in "? + 5 = 12"). 0 disables the
-	// bit-driven path.
+	// missing-number templates (the sum in "? + 5 = 12"). Required (> 0).
 	MaxOperand int `json:"max_operand" form:"max_operand"`
 	// AllowMissing enables "? + b = c" templates (MISSING_NUMBER bit).
 	AllowMissing bool `json:"allow_missing" form:"allow_missing"`
@@ -49,11 +42,11 @@ type Options struct {
 }
 
 // configFromBitOptions builds the generation config from explicit bit-driven
-// options - no grade involved. Every numeric range respects MaxOperand
+// options. Every numeric range respects MaxOperand
 // because the insert pipeline stamps magnitude bits from every number in the
 // expression: a single out-of-range embedded value would push the problem
 // outside the user's envelope and waste the candidate.
-func configFromBitOptions(opts *Options) GradeConfig {
+func configFromBitOptions(opts *Options) GenConfig {
 	maxOp := opts.MaxOperand
 	capAt := func(c int) int {
 		if maxOp < c {
@@ -65,7 +58,7 @@ func configFromBitOptions(opts *Options) GradeConfig {
 	if chainLen < 2 {
 		chainLen = 2
 	}
-	return GradeConfig{
+	return GenConfig{
 		Label:     "bitmap",
 		MinAddSub: 1, MaxAddSub: maxOp,
 		MinMul: 2, MaxMul: capAt(12),
@@ -82,7 +75,7 @@ func configFromBitOptions(opts *Options) GradeConfig {
 
 // templateChoice picks a template probabilistically based on grade config.
 // Returns the chosen template along with a short label for logging.
-func pickTemplate(cfg GradeConfig, ops []Op, rng randFunc) (Template, string) {
+func pickTemplate(cfg GenConfig, ops []Op, rng randFunc) (Template, string) {
 	type entry struct {
 		name   string
 		weight int
@@ -133,14 +126,7 @@ func GenerateProblem(opts *Options) (string, string, float64, error) {
 		return "", "", 0, err
 	}
 
-	var cfg GradeConfig
-	if opts.MaxOperand > 0 {
-		cfg = configFromBitOptions(opts)
-	} else {
-		cfg = getGradeConfig(opts.GradeLevel)
-		// Apply option-level toggles on top of grade config (legacy path).
-		cfg = applyOptionOverrides(cfg, opts)
-	}
+	cfg := configFromBitOptions(opts)
 	ops := opsFromStrings(opts.Operations)
 	if len(ops) == 0 {
 		return "", "", 0, &OptionsError{s: "no valid operations"}
@@ -189,28 +175,15 @@ func withinMaxOperand(expr string, maxOperand int) bool {
 	return true
 }
 
-// applyOptionOverrides lets old callers force-enable fractions/negatives
-// even if the grade config wouldn't have them. Grade config still sets the
-// ranges; these just flip the allow flags.
-func applyOptionOverrides(cfg GradeConfig, opts *Options) GradeConfig {
-	if opts.Fractions {
-		cfg.AllowFrac = true
-		if cfg.MaxFracDenom < 4 {
-			cfg.MaxFracDenom = 8
-		}
-	}
-	if opts.Negatives {
-		cfg.AllowNeg = true
-	}
-	return cfg
-}
-
 func validateOptions(opts *Options) error {
 	if opts == nil {
 		return &OptionsError{s: "nil options"}
 	}
 	if len(opts.Operations) == 0 {
 		return &OptionsError{s: "no operations specified"}
+	}
+	if opts.MaxOperand <= 0 {
+		return &OptionsError{s: "MaxOperand is required (map it from the magnitude bits)"}
 	}
 	for _, s := range opts.Operations {
 		switch s {

@@ -7,7 +7,7 @@ import (
 
 // Template produces a problem expression and its answer.
 // Each template is parameterized by the grade config and a random source.
-type Template func(cfg GradeConfig, ops []Op, rng randFunc) (expr string, answer string, ok bool)
+type Template func(cfg GenConfig, ops []Op, rng randFunc) (expr string, answer string, ok bool)
 
 // Missing-answer placeholder used in templates like "? + 5 = 12".
 // KaTeX renders this as a readable question mark.
@@ -17,7 +17,7 @@ const blank = "?"
 // For +/- keeps operands >= MinAddSub to avoid trivial (a+0, a-0) problems.
 // For * keeps operands within [MinMul, MaxMul].
 // For / picks a clean divisor so result is a whole number.
-func tBasic(cfg GradeConfig, ops []Op, rng randFunc) (string, string, bool) {
+func tBasic(cfg GenConfig, ops []Op, rng randFunc) (string, string, bool) {
 	op := pickOp(ops, rng)
 	switch op {
 	case OpAdd, OpSub:
@@ -60,7 +60,7 @@ func tBasic(cfg GradeConfig, ops []Op, rng randFunc) (string, string, bool) {
 //	? - b = c   (answer: c + b)
 //	a - ? = c   (answer: a - c)
 //	? * b = c   (answer: c / b, only if clean)
-func tMissing(cfg GradeConfig, ops []Op, rng randFunc) (string, string, bool) {
+func tMissing(cfg GenConfig, ops []Op, rng randFunc) (string, string, bool) {
 	op := pickOp(ops, rng)
 	// Position of the blank: 0 = left operand, 1 = right operand
 	pos := rng(2)
@@ -111,7 +111,7 @@ func tMissing(cfg GradeConfig, ops []Op, rng randFunc) (string, string, bool) {
 // Uses left-to-right evaluation (no precedence mixing) to keep mental math
 // approachable. For higher grades we allow longer chains.
 // Avoids producing negative intermediate results when negatives aren't allowed.
-func tMultiOp(cfg GradeConfig, ops []Op, rng randFunc) (string, string, bool) {
+func tMultiOp(cfg GenConfig, ops []Op, rng randFunc) (string, string, bool) {
 	// Only use add/sub in chains - mixing in mul/div would require explicit
 	// precedence handling that makes problems harder to read for this grade.
 	chainOps := []Op{}

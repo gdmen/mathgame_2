@@ -9,7 +9,4 @@ type Options struct {
 	// settings bitmap (api.BuildBitConstraints). The api side owns bit
 	// semantics; this package treats the block as opaque prompt text.
 	Constraints string `json:"constraints" form:"constraints"`
-	// GradeLevel is vestigial (unread by the prompt since #225 PR2); the
-	// column and field disappear in PR3.
-	GradeLevel int `json:"grade_level" form:"grade_level"`
 }

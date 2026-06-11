@@ -21,8 +21,14 @@ DEALLOCATE PREPARE stmt;
 -- difficulty window further cuts to ~3.6% of that. Without this
 -- index, every Stage 1/2 hit scans the entire problems table
 -- (observed at 3.5s in prod with 316K rows).
+-- #225 note: the column-existence guard below protects against schemas
+-- where grade_level never exists. In practice migrations 30/33 re-add the
+-- column on fresh bootstraps before this runs, so the index is still
+-- transiently created there - migration 39 replaces it and migration 40
+-- drops the column, so the end state is identical either way.
 SET @sql = (SELECT IF(
-  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'problems' AND INDEX_NAME = 'idx_problems_disabled_diff_grade_bitmap') = 0,
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'problems' AND INDEX_NAME = 'idx_problems_disabled_diff_grade_bitmap') = 0
+  AND (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'problems' AND COLUMN_NAME = 'grade_level') > 0,
   'CREATE INDEX idx_problems_disabled_diff_grade_bitmap ON problems (disabled, difficulty, grade_level, problem_type_bitmap)',
   'SELECT 1'
 ));

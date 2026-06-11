@@ -1,3 +1,6 @@
+// Part of the problem-generation system - documented in docs/problem-generation.md.
+// Behavior changes here (bits, formula, pipeline, masks) REQUIRE updating that
+// doc in the same PR. Formula changes also require a DifficultyVersion bump.
 // Package api contains api routes, handlers, and models
 package api // import "garydmenezes.com/mathgame/server/api"
 

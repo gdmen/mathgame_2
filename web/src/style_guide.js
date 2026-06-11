@@ -21,14 +21,37 @@ const COLORS = [
   { name: "color-one-contrast", hex: "#007200", note: "contrast on color-one" },
   { name: "color-inactive", hex: "#a9a9a9", note: "disabled / muted" },
   { name: "color-error", hex: "#dc143c", note: "errors, destructive" },
+  {
+    name: "color-card-tint-a",
+    hex: "#f3faf3",
+    note: "problem-type card surface A",
+  },
+  {
+    name: "color-card-tint-b",
+    hex: "#f7faf5",
+    note: "problem-type card surface B",
+  },
+  {
+    name: "color-chip-border",
+    hex: "#c9d2c7",
+    note: "toggle chip / card borders",
+  },
   { name: "background-color", hex: "#ffffff", note: "page background" },
   { name: "font-color", hex: "#000000", note: "default text" },
 ];
 
 // Used in production but not assigned to an SCSS variable.
 const UNTOKENIZED_COLORS = [
-  { name: "whitesmoke", hex: "#f5f5f5", note: "subtle row backgrounds, hover states" },
-  { name: "lightgray", hex: "#d3d3d3", note: "disabled-state button background, dotted borders" },
+  {
+    name: "whitesmoke",
+    hex: "#f5f5f5",
+    note: "subtle row backgrounds, hover states",
+  },
+  {
+    name: "lightgray",
+    hex: "#d3d3d3",
+    note: "disabled-state button background, dotted borders",
+  },
   { name: "gray", hex: "#808080", note: "settings-hint text, generic borders" },
 ];
 
@@ -45,7 +68,10 @@ const FONT_WEIGHTS = [
 const SMALL_TEXT = [
   { value: "0.95em", note: "report-modal copy + error text" },
   { value: "0.9em", note: ".settings-hint, report-problem-link, sub-headings" },
-  { value: "0.875rem", note: ".progress-by-month-table, .progress-summary-label" },
+  {
+    value: "0.875rem",
+    note: ".progress-by-month-table, .progress-summary-label",
+  },
   { value: "0.85em", note: ".report-char-count, .report-modal-actions" },
 ];
 
@@ -55,13 +81,29 @@ const SPACING = [
 ];
 
 const SHAPE = [
-  { name: "base-radius", value: "0.5em", note: "default corner radius (token)" },
-  { name: "small radius", value: "0.25em", note: "pills, pin inputs, modal/textarea corners (not tokenized — used inline)" },
+  {
+    name: "base-radius",
+    value: "0.5em",
+    note: "default corner radius (token)",
+  },
+  {
+    name: "small radius",
+    value: "0.25em",
+    note: "pills, pin inputs, modal/textarea corners (not tokenized — used inline)",
+  },
 ];
 
 const BREAKPOINTS = [
-  { name: "Mobile (home)", value: "max-width: 768px", note: "hero collapses; image hidden" },
-  { name: "Mobile (setup/settings)", value: "max-width: 870px", note: "tab labels hidden, form widens to 100%" },
+  {
+    name: "Mobile (home)",
+    value: "max-width: 768px",
+    note: "hero collapses; image hidden",
+  },
+  {
+    name: "Mobile (setup/settings)",
+    value: "max-width: 870px",
+    note: "tab labels hidden, form widens to 100%",
+  },
 ];
 
 const Section = ({ title, children }) => (
@@ -105,18 +147,18 @@ const StyleGuideView = () => {
       <header className="sg-header">
         <h1>Style Guide</h1>
         <p>
-          Live reference for the design tokens and components used across
-          the site. Token values come from <code>web/src/styles.scss</code>.
-          Compound components are rendered using the production SCSS, so
-          what you see here is what users see.
+          Live reference for the design tokens and components used across the
+          site. Token values come from <code>web/src/styles.scss</code>.
+          Compound components are rendered using the production SCSS, so what
+          you see here is what users see.
         </p>
         <p>
-          Scope is the design system as of commit{" "}
-          <code>930927d</code> (the last commit before LLM-driven UI
-          additions started landing without referencing this guide). Newer
-          UI may introduce patterns that aren&rsquo;t documented here on
-          purpose — the goal is for this page to define what&rsquo;s
-          canonical, not to ratify whatever shipped most recently.
+          Scope is the design system as of commit <code>930927d</code> (the last
+          commit before LLM-driven UI additions started landing without
+          referencing this guide). Newer UI may introduce patterns that
+          aren&rsquo;t documented here on purpose — the goal is for this page to
+          define what&rsquo;s canonical, not to ratify whatever shipped most
+          recently.
         </p>
       </header>
 
@@ -139,8 +181,8 @@ const StyleGuideView = () => {
         </div>
         <h3>Untokenized but used</h3>
         <p>
-          These show up in production CSS as bare named colors. Worth
-          knowing about, worth not inventing more of them.
+          These show up in production CSS as bare named colors. Worth knowing
+          about, worth not inventing more of them.
         </p>
         <div className="sg-grid">
           {UNTOKENIZED_COLORS.map((c) => (
@@ -162,8 +204,8 @@ const StyleGuideView = () => {
 
       <Section title="Typography">
         <p>
-          Font family: <code>Josefin Sans, sans-serif</code> (loaded from
-          Google Fonts).
+          Font family: <code>Josefin Sans, sans-serif</code> (loaded from Google
+          Fonts).
         </p>
         <div className="sg-type-scale">
           <div className="sg-type-row">
@@ -212,15 +254,11 @@ const StyleGuideView = () => {
         </div>
 
         <h3>Small text</h3>
-        <p>
-          Below 1em sit two recurring sizes used for hints and metadata.
-        </p>
+        <p>Below 1em sit two recurring sizes used for hints and metadata.</p>
         <div className="sg-type-scale">
           {SMALL_TEXT.map((s) => (
             <div className="sg-type-row" key={s.value}>
-              <span style={{ fontSize: s.value }}>
-                Sample at {s.value}
-              </span>
+              <span style={{ fontSize: s.value }}>Sample at {s.value}</span>
               <code>{s.note}</code>
             </div>
           ))}
@@ -305,12 +343,11 @@ const StyleGuideView = () => {
 
       <Section title="Buttons">
         <p>
-          The bare <code>&lt;button&gt;</code> reset sets a white
-          background, no border, base-radius corners, and base-space
-          padding. The <code>.submit</code> variant (used by setup and
-          settings forms) inverts: green background, white text. Its{" "}
-          <code>.error</code> state mutes to lightgray and disables
-          interaction.
+          The bare <code>&lt;button&gt;</code> reset sets a white background, no
+          border, base-radius corners, and base-space padding. The{" "}
+          <code>.submit</code> variant (used by setup and settings forms)
+          inverts: green background, white text. Its <code>.error</code> state
+          mutes to lightgray and disables interaction.
         </p>
         <div className="sg-button-row">
           <button>default</button>
@@ -388,8 +425,8 @@ const StyleGuideView = () => {
 
       <Section title="Numbered step tabs">
         <p>
-          The multi-step setup flow. Active tab gets a colored
-          border-bottom and a colored circular number.
+          The multi-step setup flow. Active tab gets a colored border-bottom and
+          a colored circular number.
         </p>
         <CompoundExample
           name="#setup-tabs"
@@ -415,9 +452,7 @@ const StyleGuideView = () => {
       </Section>
 
       <Section title="Circular badge">
-        <p>
-          The numbered badge primitive from setup tabs, usable on its own.
-        </p>
+        <p>The numbered badge primitive from setup tabs, usable on its own.</p>
         <CompoundExample
           name=".number"
           context="#setup-tabs .tab .number (inactive) / .tab.active .number (active)"
@@ -495,9 +530,9 @@ const StyleGuideView = () => {
 
       <Section title="PIN input">
         <p>
-          Four-digit PIN entry using <code>react-pin-input</code>. Used in
-          the parent-gate pin screen and in the report-problem /
-          delete-account modals. The shared modal extraction is tracked in{" "}
+          Four-digit PIN entry using <code>react-pin-input</code>. Used in the
+          parent-gate pin screen and in the report-problem / delete-account
+          modals. The shared modal extraction is tracked in{" "}
           <a
             href="https://github.com/gdmen/mathgame_2/issues/217"
             target="_blank"
@@ -527,10 +562,9 @@ const StyleGuideView = () => {
 
       <Section title="Modal">
         <p>
-          Centered overlay card. Used today in the report-problem flow
-          (
-          <code>.report-modal</code>) and the delete-account flow. Will
-          collapse into a single shared component per{" "}
+          Centered overlay card. Used today in the report-problem flow (
+          <code>.report-modal</code>) and the delete-account flow. Will collapse
+          into a single shared component per{" "}
           <a
             href="https://github.com/gdmen/mathgame_2/issues/217"
             target="_blank"
@@ -552,14 +586,11 @@ const StyleGuideView = () => {
               className="report-modal-overlay"
               onClick={() => setShowModal(false)}
             />
-            <div
-              className="report-modal"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div className="report-modal" onClick={(e) => e.stopPropagation()}>
               <h4>Confirm action</h4>
               <p className="report-modal-copy">
-                Demonstration of the modal shape: centered card with
-                shadow, overlay closes on outside click.
+                Demonstration of the modal shape: centered card with shadow,
+                overlay closes on outside click.
               </p>
               <div className="report-modal-pin">
                 <label>Enter PIN to confirm</label>
@@ -583,10 +614,9 @@ const StyleGuideView = () => {
 
       <Section title="Landing hero">
         <p>
-          The homepage hero band. Color-one background, two-column flex
-          layout, primary CTA in the contrast color. On{" "}
-          <code>max-width: 768px</code> the image hides and the copy goes
-          full-width.
+          The homepage hero band. Color-one background, two-column flex layout,
+          primary CTA in the contrast color. On <code>max-width: 768px</code>{" "}
+          the image hides and the copy goes full-width.
         </p>
         <CompoundExample
           name="#landing-hero"
@@ -612,8 +642,8 @@ const StyleGuideView = () => {
 
       <Section title="Stat cards">
         <p>
-          The progress page's summary tiles. Big value, small label, light
-          gray block.
+          The progress page's summary tiles. Big value, small label, light gray
+          block.
         </p>
         <CompoundExample
           name=".progress-summary-item"
@@ -679,8 +709,8 @@ const StyleGuideView = () => {
 
       <Section title="Playlist list item">
         <p>
-          Row layout for playlists and videos: optional thumbnail
-          (16:9), title (ellipsizes), remove/action cell on the right.
+          Row layout for playlists and videos: optional thumbnail (16:9), title
+          (ellipsizes), remove/action cell on the right.
         </p>
         <CompoundExample
           name=".playlist-item"
@@ -694,9 +724,7 @@ const StyleGuideView = () => {
                     <span style={{ marginLeft: "0.5em" }}>Title</span>
                   </li>
                   <li className="playlist-item">
-                    <div
-                      className="playlist-thumbnail sg-thumb-placeholder"
-                    />
+                    <div className="playlist-thumbnail sg-thumb-placeholder" />
                     <a
                       href="#"
                       className="playlist-title"
@@ -720,8 +748,8 @@ const StyleGuideView = () => {
 
       <footer className="sg-footer">
         <p>
-          This page lives at <code>/style-guide</code> and is intentionally
-          not linked from anywhere in the site navigation. Tracked in{" "}
+          This page lives at <code>/style-guide</code> and is intentionally not
+          linked from anywhere in the site navigation. Tracked in{" "}
           <a
             href="https://github.com/gdmen/mathgame_2/issues/213"
             target="_blank"

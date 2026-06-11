@@ -163,7 +163,6 @@ func TestGenerateProblems_LLM_HappyPath(t *testing.T) {
 		UserId:            1,
 		ProblemTypeBitmap: uint64(ADDITION),
 		TargetDifficulty:  5,
-		GradeLevel:        3,
 	}
 	problem, err := api.generateProblems("[test-llm-happy]", settings, 1)
 	if err != nil {
@@ -191,9 +190,6 @@ func TestGenerateProblems_LLM_HappyPath(t *testing.T) {
 	}
 	if persisted.ProblemTypeBitmap != uint64(ADDITION) {
 		t.Errorf("ProblemTypeBitmap = %d, want %d", persisted.ProblemTypeBitmap, uint64(ADDITION))
-	}
-	if persisted.GradeLevel != 3 {
-		t.Errorf("GradeLevel = %d, want 3", persisted.GradeLevel)
 	}
 	if persisted.DifficultyVersion != DifficultyVersion {
 		t.Errorf("DifficultyVersion = %q, want %q", persisted.DifficultyVersion, DifficultyVersion)
@@ -225,7 +221,6 @@ func TestGenerateProblems_LLM_IdCollisionSkipped(t *testing.T) {
 		Answer:            "1000",
 		Difficulty:        5,
 		Generator:         "test-seed",
-		GradeLevel:        3,
 	}
 	if status, msg, err := api.problemManager.Create(existing); err != nil || status != http.StatusCreated {
 		t.Fatalf("pre-seed: status=%d msg=%s err=%v", status, msg, err)
@@ -237,7 +232,6 @@ func TestGenerateProblems_LLM_IdCollisionSkipped(t *testing.T) {
 		UserId:            1,
 		ProblemTypeBitmap: uint64(ADDITION),
 		TargetDifficulty:  5,
-		GradeLevel:        3,
 	}
 	_, err = api.generateProblems("[test-llm-collision]", settings, 1)
 	// All canned problems collided, so no new problem produced -> error.
@@ -273,7 +267,6 @@ func TestGenerateProblems_LLM_ValidationReject(t *testing.T) {
 		UserId:            1,
 		ProblemTypeBitmap: uint64(ADDITION),
 		TargetDifficulty:  5,
-		GradeLevel:        3,
 	}
 	_, err = api.generateProblems("[test-llm-validate-reject]", settings, 1)
 	if err == nil {
@@ -309,7 +302,6 @@ func TestGenerateProblems_LLM_CalibrationReject(t *testing.T) {
 		UserId:            1,
 		ProblemTypeBitmap: uint64(ADDITION),
 		TargetDifficulty:  5,
-		GradeLevel:        3,
 	}
 	_, err = api.generateProblems("[test-llm-calibration]", settings, 1)
 	if err == nil {
@@ -341,7 +333,6 @@ func TestGenerateProblems_LLM_FallbackToHeuristic(t *testing.T) {
 		UserId:            1,
 		ProblemTypeBitmap: uint64(ADDITION | WORD), // WORD will be stripped on fallback
 		TargetDifficulty:  5,
-		GradeLevel:        3,
 	}
 	problem, err := api.generateProblems("[test-llm-fallback]", settings, 1)
 	if err != nil {
@@ -371,7 +362,6 @@ func TestRunHeuristicGenerator_StampsDifficultyVersion(t *testing.T) {
 	settings := &Settings{
 		UserId:           1,
 		TargetDifficulty: 5,
-		GradeLevel:       3,
 	}
 	problem, count, _ := api.runHeuristicGenerator("[test-difficulty-version]", settings, 1, ADDITION)
 	if count == 0 || problem == nil {

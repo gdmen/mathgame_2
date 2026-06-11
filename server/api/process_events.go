@@ -538,14 +538,14 @@ func (a *Api) loadGamestateAndSettings(userID uint32) (*Gamestate, *Settings, er
 	err := a.DB.QueryRow(`
 		SELECT
 		  g.user_id, g.problem_id, g.video_id, g.solved, g.target,
-		  s.problem_type_bitmap, s.target_difficulty, s.target_work_percentage, s.grade_level
+		  s.problem_type_bitmap, s.target_difficulty, s.target_work_percentage
 		FROM gamestates g
 		JOIN settings s ON s.user_id = g.user_id
 		WHERE g.user_id = ?`,
 		userID,
 	).Scan(
 		&gs.UserId, &gs.ProblemId, &gs.VideoId, &gs.Solved, &gs.Target,
-		&s.ProblemTypeBitmap, &s.TargetDifficulty, &s.TargetWorkPercentage, &s.GradeLevel,
+		&s.ProblemTypeBitmap, &s.TargetDifficulty, &s.TargetWorkPercentage,
 	)
 	if err != nil {
 		return nil, nil, err

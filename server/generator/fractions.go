@@ -5,9 +5,9 @@ import (
 	"strconv"
 )
 
-// tFractionSameDenom produces a/c op b/c where op is + or -.
-// Used for grade 3+ (same-denominator fraction arithmetic).
-func tFractionSameDenom(cfg GradeConfig, ops []Op, rng randFunc) (string, string, bool) {
+// tFractionSameDenom produces a/c op b/c (same-denominator fraction
+// arithmetic) where op is + or -.
+func tFractionSameDenom(cfg GenConfig, ops []Op, rng randFunc) (string, string, bool) {
 	if !cfg.AllowFrac || cfg.MaxFracDenom < 2 {
 		return "", "", false
 	}
@@ -52,8 +52,7 @@ func tFractionSameDenom(cfg GradeConfig, ops []Op, rng randFunc) (string, string
 }
 
 // tFractionDiffDenom produces a/c op b/d with unlike denominators.
-// Used for grade 4+ (unlike-denominator fraction arithmetic).
-func tFractionDiffDenom(cfg GradeConfig, ops []Op, rng randFunc) (string, string, bool) {
+func tFractionDiffDenom(cfg GenConfig, ops []Op, rng randFunc) (string, string, bool) {
 	if !cfg.AllowFrac || cfg.MaxFracDenom < 3 {
 		return "", "", false
 	}

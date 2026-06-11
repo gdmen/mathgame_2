@@ -35,8 +35,8 @@ func TestBitwiseSubsetSelection_Semantics(t *testing.T) {
 	}
 	for _, s := range seed {
 		if _, err := api.DB.Exec(
-			`INSERT INTO problems (id, problem_type_bitmap, expression, answer, difficulty, disabled, generator, grade_level, difficulty_version)
-			 VALUES (?, ?, 'seed', '1', 5, 0, 'test', 3, '0.2')`,
+			`INSERT INTO problems (id, problem_type_bitmap, expression, answer, difficulty, disabled, generator, difficulty_version)
+			 VALUES (?, ?, 'seed', '1', 5, 0, 'test', '0.2')`,
 			s.id, s.bitmap,
 		); err != nil {
 			t.Fatalf("seed %d: %v", s.id, err)
