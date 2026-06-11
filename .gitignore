@@ -25,3 +25,4 @@ __pycache__/
 
 # Local DB dumps in the repo root (migrations live under server/)
 /*.sql
+.gstack/

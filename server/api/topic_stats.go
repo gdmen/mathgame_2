@@ -1,3 +1,6 @@
+// Part of the problem-generation system - documented in docs/problem-generation.md.
+// Behavior changes here (bits, formula, pipeline, masks) REQUIRE updating that
+// doc in the same PR. Formula changes also require a DifficultyVersion bump.
 package api
 
 import (
@@ -56,11 +59,17 @@ func getOrDefaultTopicStat(stats map[uint64]*TopicStat, userID uint32, problemTy
 }
 
 // recordTopicAttempt increments attempts (and correct if isCorrect) for each
-// individual problem type bit set in the problem's bitmap.
+// individual problem type bit set in the problem's bitmap. Gated by
+// WEIGHTED_TOPIC_MASK: magnitude bits never get stats rows - magnitude IS
+// difficulty, so per-topic accuracy tracking for it is meaningless (see the
+// mask comment in enums.go).
 func (a *Api) recordTopicAttempt(logPrefix string, userID uint32, problemTypeBitmap uint64, isCorrect bool, baseDifficulty float64) {
 	for i := 0; i < 64; i++ {
 		pt := uint64(1 << i)
 		if (problemTypeBitmap & pt) == 0 {
+			continue
+		}
+		if pt&uint64(WEIGHTED_TOPIC_MASK) == 0 {
 			continue
 		}
 		correctDelta := 0
@@ -138,14 +147,24 @@ func (a *Api) adjustTopicDifficulty(logPrefix string, userID uint32, stats map[u
 	}
 }
 
-// chooseWeightedTopic picks a problem type to focus on. Weak topics (accuracy < 60%
-// with 10+ attempts) are weighted 2x. Returns a single ProblemType value and its
-// target difficulty. If no stats exist, returns 0 (caller should use default behavior).
-func chooseWeightedTopic(stats map[uint64]*TopicStat, enabledBitmap uint64, baseDifficulty float64, rng func(int) int) (uint64, float64) {
+// chooseWeightedTopic is the serving lottery: it picks the problem type to
+// focus this serve on. Two independent weight signals multiply:
+//
+//   - skill (demand side, this file): weak topics (accuracy < 60% with 10+
+//     attempts) are weighted 2x, and the chosen topic is served at its own
+//     per-topic difficulty.
+//   - pool supply (pool_supply.go): topics with thin pools get up to
+//     thinPoolBoostMax x weight, so hard-to-generate bits stay in rotation
+//     by weight, not by force. poolCounts may be nil, which disables
+//     supply weighting.
+//
+// Returns a single ProblemType value and its target difficulty. If no
+// candidates exist, returns 0 (caller should use default behavior).
+func chooseWeightedTopic(stats map[uint64]*TopicStat, enabledBitmap uint64, baseDifficulty float64, rng func(int) int, poolCounts map[uint64]int64) (uint64, float64) {
 	type candidate struct {
 		problemType uint64
 		difficulty  float64
-		weight      int
+		weight      float64
 	}
 
 	var candidates []candidate
@@ -154,8 +173,14 @@ func chooseWeightedTopic(stats map[uint64]*TopicStat, enabledBitmap uint64, base
 		if (enabledBitmap & pt) == 0 {
 			continue
 		}
+		// Magnitude bits are not practice topics: "weak at LARGE_NUMBERS ->
+		// serve large numbers, easier" fights itself. Size progression is
+		// target_difficulty's job (see WEIGHTED_TOPIC_MASK in enums.go).
+		if pt&uint64(WEIGHTED_TOPIC_MASK) == 0 {
+			continue
+		}
 		diff := baseDifficulty
-		weight := 1
+		weight := 1.0
 		if ts, ok := stats[pt]; ok {
 			diff = ts.TargetDifficulty
 			if ts.Attempts >= 10 && ts.Accuracy() < 0.60 {
@@ -169,14 +194,31 @@ func chooseWeightedTopic(stats map[uint64]*TopicStat, enabledBitmap uint64, base
 		return 0, baseDifficulty
 	}
 
+	// Supply weighting: thin-pool topics get up to thinPoolBoostMax more
+	// weight, relative to the average pool among THESE candidates.
+	if len(poolCounts) > 0 {
+		var sum int64
+		for _, c := range candidates {
+			sum += poolCounts[c.problemType]
+		}
+		avg := sum / int64(len(candidates))
+		for i := range candidates {
+			candidates[i].weight *= thinPoolBoost(poolCounts[candidates[i].problemType], avg)
+		}
+	}
+
+	// Integer lottery over weights scaled x100 (rng is an int source).
 	totalWeight := 0
 	for _, c := range candidates {
-		totalWeight += c.weight
+		totalWeight += int(c.weight * 100)
+	}
+	if totalWeight <= 0 {
+		return 0, baseDifficulty
 	}
 	pick := rng(totalWeight)
 	cumulative := 0
 	for _, c := range candidates {
-		cumulative += c.weight
+		cumulative += int(c.weight * 100)
 		if pick < cumulative {
 			return c.problemType, c.difficulty
 		}
@@ -192,6 +234,12 @@ func (a *Api) initTopicStats(userID uint32, enabledBitmap uint64, baseDifficulty
 	for i := 0; i < 64; i++ {
 		pt := uint64(1 << i)
 		if (enabledBitmap & pt) == 0 {
+			continue
+		}
+		// Never seed magnitude-bit rows: getEffectiveDifficulty consults
+		// seeded rows, and a magnitude "topic difficulty" is meaningless
+		// (see WEIGHTED_TOPIC_MASK in enums.go).
+		if pt&uint64(WEIGHTED_TOPIC_MASK) == 0 {
 			continue
 		}
 		_, err := a.DB.Exec(`

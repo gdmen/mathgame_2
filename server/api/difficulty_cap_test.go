@@ -12,8 +12,9 @@ import (
 )
 
 // TestDifficultyCap_ClampsRunawayValue verifies that a user with a pathologically
-// high TargetDifficulty (from the pre-fix adjustment bug) gets clamped to maxDiff
-// on their next DONE_WATCHING_VIDEO cycle.
+// high TargetDifficulty (from the pre-fix adjustment bug) gets clamped to the
+// bitmap-derived ceiling (MaxDiffForBitmap) on their next DONE_WATCHING_VIDEO
+// cycle: the ceiling is the hardest problem the enabled bits can express.
 func TestDifficultyCap_ClampsRunawayValue(t *testing.T) {
 	c, err := common.ReadConfig("../../test_conf.json")
 	if err != nil {
@@ -25,11 +26,12 @@ func TestDifficultyCap_ClampsRunawayValue(t *testing.T) {
 	user := createTestUser(t, r, "auth0id|difftest", "diff@test.com", "difftest")
 	insertVideosAndUserHasVideo(t, api, user.Id, 1)
 
-	// Set the user's grade level and a pathologically high target_difficulty
-	// that could result from the old unbounded adjuster.
+	// Give the user a moderate envelope and a pathologically high
+	// target_difficulty that could result from the old unbounded adjuster.
+	bitmap := uint64(ADDITION | SUBTRACTION | MULTIPLICATION | DIVISION | MEDIUM_NUMBERS | MISSING_NUMBER)
 	_, err = api.DB.Exec(
-		`UPDATE settings SET target_difficulty = 74082001, grade_level = 5 WHERE user_id = ?`,
-		user.Id,
+		`UPDATE settings SET target_difficulty = 74082001, problem_type_bitmap = ? WHERE user_id = ?`,
+		bitmap, user.Id,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -56,19 +58,19 @@ func TestDifficultyCap_ClampsRunawayValue(t *testing.T) {
 		t.Fatalf("query difficulty: %v", err)
 	}
 
-	// For grade 5, maxDiff = 5*2+4 = 14
-	expectedMax := 14.0
-	if difficulty > expectedMax {
-		t.Errorf("expected difficulty <= %.0f (grade 5 cap), got %.0f", expectedMax, difficulty)
+	expectedMax := MaxDiffForBitmap(bitmap)
+	if difficulty > expectedMax+0.01 {
+		t.Errorf("expected difficulty <= %.2f (bitmap ceiling), got %.2f", expectedMax, difficulty)
 	}
 	if difficulty < 3 {
 		t.Errorf("difficulty dropped too low: %.2f", difficulty)
 	}
 }
 
-// TestDifficultyCap_NoGradeLevel verifies the default cap of 20 applies when
-// grade_level is not set.
-func TestDifficultyCap_NoGradeLevel(t *testing.T) {
+// TestDifficultyCap_FullBitmap verifies the ceiling scales with the envelope:
+// an everything-enabled bitmap clamps at the open-scale system maximum
+// (~62), not at the old hard 20.
+func TestDifficultyCap_FullBitmap(t *testing.T) {
 	c, err := common.ReadConfig("../../test_conf.json")
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
@@ -79,10 +81,11 @@ func TestDifficultyCap_NoGradeLevel(t *testing.T) {
 	user := createTestUser(t, r, "auth0id|difftest2", "diff2@test.com", "difftest2")
 	insertVideosAndUserHasVideo(t, api, user.Id, 1)
 
-	// Set pathological difficulty with grade_level = 0 (not set)
+	// Set pathological difficulty with every bit enabled.
+	fullBitmap := uint64(ALL_PROBLEM_TYPES)
 	_, err = api.DB.Exec(
-		`UPDATE settings SET target_difficulty = 10000, grade_level = 0 WHERE user_id = ?`,
-		user.Id,
+		`UPDATE settings SET target_difficulty = 10000, problem_type_bitmap = ? WHERE user_id = ?`,
+		fullBitmap, user.Id,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -108,7 +111,11 @@ func TestDifficultyCap_NoGradeLevel(t *testing.T) {
 		t.Fatalf("query difficulty: %v", err)
 	}
 
-	if difficulty > 20.0 {
-		t.Errorf("expected difficulty <= 20 (default cap), got %.0f", difficulty)
+	ceiling := MaxDiffForBitmap(fullBitmap)
+	if difficulty > ceiling+0.01 {
+		t.Errorf("expected difficulty <= %.2f (full-bitmap ceiling), got %.2f", ceiling, difficulty)
+	}
+	if ceiling < 20.0 {
+		t.Errorf("full-bitmap ceiling %.2f should exceed the old hard cap of 20", ceiling)
 	}
 }

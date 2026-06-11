@@ -5,56 +5,9 @@ import {
   PlaylistsSettingsView,
   VideosSettingsView,
 } from "./settings.js";
-import { ProblemTypes } from "./enums.js";
 import { GetSessionPin, PinView } from "./pin.js";
 import "./settings.scss";
 import "./setup.scss";
-
-// Grade-to-default-problem-type mapping (matches curriculum.json on the server)
-const GRADE_DEFAULTS = {
-  1: ["addition", "subtraction"],
-  2: ["addition", "subtraction"],
-  3: ["addition", "subtraction", "multiplication", "division"],
-  4: ["addition", "subtraction", "multiplication", "division", "fractions"],
-  5: ["addition", "subtraction", "multiplication", "division", "fractions"],
-  6: [
-    "addition",
-    "subtraction",
-    "multiplication",
-    "division",
-    "fractions",
-    "negatives",
-  ],
-  7: [
-    "addition",
-    "subtraction",
-    "multiplication",
-    "division",
-    "fractions",
-    "negatives",
-    "word",
-  ],
-  8: [
-    "addition",
-    "subtraction",
-    "multiplication",
-    "division",
-    "fractions",
-    "negatives",
-    "word",
-  ],
-};
-
-const GRADE_OPTIONS = [
-  { value: 1, label: "1st Grade" },
-  { value: 2, label: "2nd Grade" },
-  { value: 3, label: "3rd Grade" },
-  { value: 4, label: "4th Grade" },
-  { value: 5, label: "5th Grade" },
-  { value: 6, label: "6th Grade" },
-  { value: 7, label: "7th Grade" },
-  { value: 8, label: "8th Grade" },
-];
 
 const postSettings = async function (token, apiUrl, model) {
   try {
@@ -75,87 +28,6 @@ const postSettings = async function (token, apiUrl, model) {
   }
 };
 
-const GradeLevelTabView = ({ token, apiUrl, user, settings, advanceSetup }) => {
-  const [gradeLevel, setGradeLevel] = useState(settings.grade_level || 0);
-
-  const handleGradeSelect = (grade) => {
-    setGradeLevel(grade);
-    settings.grade_level = grade;
-    // Auto-set problem types based on grade
-    const defaults = GRADE_DEFAULTS[grade] || ["addition"];
-    let bitmap = 0;
-    for (const name of defaults) {
-      if (ProblemTypes[name]) {
-        bitmap += ProblemTypes[name];
-      }
-    }
-    settings.problem_type_bitmap = bitmap;
-    postSettings(token, apiUrl, settings);
-  };
-
-  const handleSubmitClick = () => {
-    if (gradeLevel > 0) {
-      advanceSetup();
-    }
-  };
-
-  return (
-    <>
-      <h2>Hi there! What grade is your child in?</h2>
-      <div className="settings-form">
-        <div
-          id="grade-buttons"
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "8px",
-            justifyContent: "center",
-            margin: "16px 0",
-          }}
-        >
-          {GRADE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              className={
-                gradeLevel === opt.value
-                  ? "grade-button active"
-                  : "grade-button"
-              }
-              onClick={() => handleGradeSelect(opt.value)}
-              style={{
-                padding: "12px 20px",
-                fontSize: "16px",
-                border:
-                  gradeLevel === opt.value
-                    ? "2px solid #4CAF50"
-                    : "2px solid #ddd",
-                borderRadius: "8px",
-                background: gradeLevel === opt.value ? "#E8F5E9" : "#fff",
-                cursor: "pointer",
-              }}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        {gradeLevel > 0 && (
-          <p className="settings-hint" style={{ textAlign: "center" }}>
-            Problems will be aligned to{" "}
-            {GRADE_OPTIONS.find((o) => o.value === gradeLevel)?.label} math
-            curriculum.
-          </p>
-        )}
-      </div>
-      <button
-        className={gradeLevel === 0 ? "submit error" : "submit"}
-        onClick={handleSubmitClick}
-      >
-        continue
-      </button>
-    </>
-  );
-};
-
 const ProblemTypesTabView = ({
   token,
   apiUrl,
@@ -163,22 +35,24 @@ const ProblemTypesTabView = ({
   settings,
   advanceSetup,
 }) => {
-  const [error, setError] = useState(false);
+  const [error, setError] = useState(settings.problem_type_bitmap < 1);
 
   const errCallback = (e) => {
     setError(e);
   };
 
   const handleSubmitClick = (e) => {
-    // redirect to next setup step
+    // validateBitmap gates continue (errCallback tracks validity)
+    if (error) return;
     advanceSetup();
   };
 
   return (
     <>
-      <h2>Fine-tune which types of problems to show</h2>
+      <h2>Hi there! What kinds of math can your child do?</h2>
       <p className="settings-hint" style={{ textAlign: "center" }}>
-        We pre-selected types based on the grade level. Adjust if needed.
+        Turn on what your child can do — leave off what they can't yet. You can
+        change everything later.
       </p>
       <ProblemTypesSettingsView
         token={token}
@@ -333,7 +207,6 @@ const SetupView = ({
   const [activeTab, setActiveTab] = useState(null);
 
   const allTabs = [
-    "Grade Level",
     "Problem Types",
     "Add Videos",
     "Set Parent Pin",
@@ -341,7 +214,7 @@ const SetupView = ({
   ];
 
   if (activeTab == null) {
-    setActiveTab("Grade Level");
+    setActiveTab("Problem Types");
   }
 
   const advanceSetup = function () {
@@ -375,17 +248,6 @@ const SetupView = ({
           );
         })}
       </div>
-      {activeTab === "Grade Level" && (
-        <div className="tab-content">
-          <GradeLevelTabView
-            token={token}
-            apiUrl={apiUrl}
-            user={user}
-            settings={settings}
-            advanceSetup={advanceSetup}
-          />
-        </div>
-      )}
       {activeTab === "Problem Types" && (
         <div className="tab-content">
           <ProblemTypesTabView

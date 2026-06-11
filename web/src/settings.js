@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
 
 import { ProblemTypes } from "./enums.js";
+import {
+  validateBitmap,
+  maxDiffForBitmap,
+  MIN_TARGET_DIFFICULTY,
+} from "./bitmap_validation.js";
 import { RequirePin } from "./pin.js";
 import "./settings.scss";
 
@@ -23,67 +28,199 @@ const postSettings = async function (token, apiUrl, model) {
   }
 };
 
+// Problem-type taxonomy: each bit is placed by one question -
+// verb / noun-kind / noun-size / framing. Labels are parent vocabulary;
+// internal constants are feature-named (see server/api/enums.go).
+// Dependent entries (dependsOn) always render on their own row directly
+// below their parent and are disabled until the parent is on; parents with
+// dependents (hasDependent) sit at the bottom of their card. Toggle chips
+// never change size on any state change (selection is color-only).
+const PROBLEM_TYPE_GROUPS = [
+  {
+    title: "Operations",
+    question: "What can your child do?",
+    tint: "a",
+    entries: [
+      { bit: ProblemTypes.ADDITION, label: "Addition" },
+      { bit: ProblemTypes.SUBTRACTION, label: "Subtraction" },
+      { bit: ProblemTypes.MULTIPLICATION, label: "Multiplication" },
+      { bit: ProblemTypes.DIVISION, label: "Division" },
+    ],
+  },
+  {
+    title: "Number types",
+    question: "What kinds of numbers?",
+    tint: "b",
+    entries: [
+      { bit: ProblemTypes.DECIMALS, label: "Decimals" },
+      { bit: ProblemTypes.PERCENTAGES, label: "Percentages" },
+      { bit: ProblemTypes.NEGATIVES, label: "Negative numbers" },
+      // Parents with dependents sit at the bottom of the card; the
+      // dependent renders on its own row directly below.
+      { bit: ProblemTypes.FRACTIONS, label: "Fractions", hasDependent: true },
+      {
+        bit: ProblemTypes.MISMATCHED_DENOMINATORS,
+        label: "Different denominators",
+        dependsOn: ProblemTypes.FRACTIONS,
+      },
+    ],
+  },
+  {
+    title: "Number size",
+    question: "How big can the numbers be?",
+    tint: "b",
+    hint: "Without these, numbers stay 1–12.",
+    entries: [
+      { bit: ProblemTypes.MEDIUM_NUMBERS, label: "Numbers up to 99" },
+      { bit: ProblemTypes.LARGE_NUMBERS, label: "Numbers 100 and up" },
+    ],
+  },
+  {
+    title: "Problem format",
+    question: "How can problems be posed?",
+    tint: "a",
+    entries: [
+      { bit: ProblemTypes.WORD, label: "Word problems" },
+      {
+        bit: ProblemTypes.MISSING_NUMBER,
+        label: "Fill in the blank (? + 5 = 12)",
+      },
+      { bit: ProblemTypes.SINGLE_VARIABLE, label: "Algebra (3x + 7 = 22)" },
+      {
+        bit: ProblemTypes.CHAINED_OPERATIONS,
+        label: "Multi-step (2+ operations)",
+        hasDependent: true,
+      },
+      {
+        bit: ProblemTypes.PEMDAS,
+        label: "Order of operations",
+        dependsOn: ProblemTypes.CHAINED_OPERATIONS,
+      },
+    ],
+  },
+];
+
+// applyToggleRules keeps dependent bits coherent when one toggles:
+// enabling LARGE auto-enables MEDIUM (no size gap), disabling a parent
+// auto-clears its dependents.
+const applyToggleRules = (bitmap, bit, enabled) => {
+  let b = enabled ? bitmap | bit : bitmap & ~bit;
+  if (enabled && bit === ProblemTypes.LARGE_NUMBERS) {
+    b |= ProblemTypes.MEDIUM_NUMBERS;
+  }
+  if (!enabled && bit === ProblemTypes.MEDIUM_NUMBERS) {
+    b &= ~ProblemTypes.LARGE_NUMBERS;
+  }
+  if (!enabled && bit === ProblemTypes.FRACTIONS) {
+    b &= ~ProblemTypes.MISMATCHED_DENOMINATORS;
+  }
+  if (!enabled && bit === ProblemTypes.CHAINED_OPERATIONS) {
+    b &= ~ProblemTypes.PEMDAS;
+  }
+  return b;
+};
+
 const ProblemTypesSettingsView = ({
   token,
   apiUrl,
   user,
   settings,
   errCallback,
+  onBitmapChange,
 }) => {
-  const [error, setError] = useState(settings.problem_type_bitmap < 1);
   const [problemTypeBitmap, setProblemTypeBitmap] = useState(
     settings.problem_type_bitmap
   );
+  const validation = validateBitmap(problemTypeBitmap);
 
   useEffect(() => {
-    errCallback(error);
-  }, [errCallback, error]);
+    errCallback(!validation.valid);
+  }, [errCallback, validation.valid]);
 
-  const handleCheckboxChange = (e) => {
-    let newBitmap =
-      problemTypeBitmap +
-      (2 * e.target.checked - 1) * ProblemTypes[e.target.id];
+  const commit = (newBitmap) => {
     setProblemTypeBitmap(newBitmap);
-    let newError = newBitmap < 1;
-    setError(newError);
-    errCallback(newError);
-    if (!newError) {
-      // post updated settings
+    const v = validateBitmap(newBitmap);
+    errCallback(!v.valid);
+    if (onBitmapChange) onBitmapChange(newBitmap);
+    if (v.valid) {
       settings.problem_type_bitmap = newBitmap;
       postSettings(token, apiUrl, settings);
     }
   };
 
+  const handleToggle = (entry, checked) => {
+    commit(applyToggleRules(problemTypeBitmap, entry.bit, checked));
+  };
+
+  // Anchor each validation error to the card it concerns.
+  const ERROR_GROUPS = {
+    NO_CORE_OP: "Operations",
+    LARGE_REQUIRES_MEDIUM: "Number size",
+    MISMATCHED_REQUIRES_FRACTIONS: "Number types",
+    PEMDAS_REQUIRES_CHAINED: "Problem format",
+  };
+  const errorsFor = (groupTitle) =>
+    validation.valid
+      ? []
+      : validation.errors.filter(
+          (err) => ERROR_GROUPS[err.code] === groupTitle
+        );
+
   return (
     <>
       <div id="problem-types-settings" className="settings-form">
-        <h4>
-          Which types of problems should we show?{" "}
-          <span className={error ? "error" : ""}>Select one or more.</span>
-        </h4>
-        <ul id="problem-type-buttons">
-          {Object.keys(ProblemTypes).map(function (problemType, i) {
-            return (
-              <li key={problemType}>
-                <input
-                  type="checkbox"
-                  id={problemType}
-                  onChange={handleCheckboxChange}
-                  checked={
-                    "checked"
-                      ? (ProblemTypes[problemType] & problemTypeBitmap) > 0
-                      : ""
-                  }
-                />
-                <label htmlFor={problemType}>
-                  <div className="problem-type-button">
-                    <span>{problemType}</span>
-                  </div>
-                </label>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="problem-type-grid">
+          {PROBLEM_TYPE_GROUPS.map((group) => (
+            <div
+              key={group.title}
+              className={"problem-type-card tint-" + group.tint}
+            >
+              <h5>{group.title}</h5>
+              <p className="settings-hint group-question">{group.question}</p>
+              <ul id="problem-type-buttons">
+                {group.entries.map((entry) => {
+                  const id = "pt-" + entry.bit;
+                  const parentOff =
+                    entry.dependsOn != null &&
+                    (problemTypeBitmap & entry.dependsOn) === 0;
+                  const cls =
+                    entry.dependsOn != null
+                      ? "dep" + (parentOff ? " parent-off" : "")
+                      : entry.hasDependent
+                      ? "has-dep"
+                      : "";
+                  return (
+                    <li key={entry.bit} className={cls}>
+                      <input
+                        type="checkbox"
+                        id={id}
+                        disabled={parentOff}
+                        onChange={(e) => handleToggle(entry, e.target.checked)}
+                        checked={(entry.bit & problemTypeBitmap) > 0}
+                      />
+                      <label htmlFor={id}>
+                        <div className="problem-type-button">
+                          {entry.dependsOn != null && (
+                            <span className="dep-arrow">↳</span>
+                          )}
+                          <span>{entry.label}</span>
+                        </div>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+              {errorsFor(group.title).map((err) => (
+                <p key={err.code} className="error">
+                  {err.message}
+                </p>
+              ))}
+              {group.hint && (
+                <p className="settings-hint group-hint">{group.hint}</p>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </>
   );
@@ -271,41 +408,64 @@ const PlaylistsSettingsView = ({ token, apiUrl, user, onPlaylistsChange }) => {
   );
 };
 
-const GRADE_OPTIONS = [
-  { value: 0, label: "Not set" },
-  { value: 1, label: "1st Grade" },
-  { value: 2, label: "2nd Grade" },
-  { value: 3, label: "3rd Grade" },
-  { value: 4, label: "4th Grade" },
-  { value: 5, label: "5th Grade" },
-  { value: 6, label: "6th Grade" },
-  { value: 7, label: "7th Grade" },
-  { value: 8, label: "8th Grade" },
-];
-
-const GradeLevelSettingsView = ({ token, apiUrl, user, settings }) => {
-  const [gradeLevel, setGradeLevel] = useState(settings.grade_level || 0);
+// TargetDifficultySettingsView: the slider's max IS the envelope - the
+// ceiling of the hardest problem the current bitmap can express (mirrors the
+// server's MaxDiffForBitmap; the server clamps authoritatively on save).
+const TargetDifficultySettingsView = ({
+  token,
+  apiUrl,
+  user,
+  settings,
+  bitmap,
+}) => {
+  const ceiling = maxDiffForBitmap(bitmap);
+  const [targetDifficulty, setTargetDifficulty] = useState(
+    settings.target_difficulty
+  );
+  const shown = Math.min(targetDifficulty, ceiling);
 
   const handleChange = (e) => {
-    const val = parseInt(e.target.value);
-    setGradeLevel(val);
-    settings.grade_level = val;
+    const val = parseFloat(e.target.value);
+    setTargetDifficulty(val);
+    settings.target_difficulty = val;
+  };
+
+  const handleSubmit = () => {
     postSettings(token, apiUrl, settings);
   };
 
+  // The raw difficulty numbers are formula internals - parents only need
+  // the relative position within what the enabled problem types allow,
+  // shown as an integer percent (1-100) like the work-percentage slider.
+  const percent = Math.max(
+    1,
+    Math.round(
+      ((shown - MIN_TARGET_DIFFICULTY) / (ceiling - MIN_TARGET_DIFFICULTY)) *
+        100
+    )
+  );
+
   return (
-    <div id="grade-level-settings" className="settings-form">
-      <h4>Grade Level</h4>
+    <div id="target-difficulty-settings" className="settings-form">
+      <h4>Current difficulty:</h4>
       <p className="settings-hint">
-        Problems will be aligned to this grade's math curriculum.
+        Adjusts automatically as your child plays.
       </p>
-      <select value={gradeLevel} onChange={handleChange}>
-        {GRADE_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+      <div>{percent} %</div>
+      <input
+        type="range"
+        min={MIN_TARGET_DIFFICULTY}
+        max={ceiling.toFixed(1)}
+        step="0.1"
+        value={shown}
+        onChange={handleChange}
+        onMouseUp={handleSubmit}
+        onBlur={handleSubmit}
+      />
+      <div className="scale-labels">
+        <span>easiest</span>
+        <span>hardest these settings allow</span>
+      </div>
     </div>
   );
 };
@@ -446,6 +606,7 @@ const VideosSettingsView = ({
 
 const SettingsView = ({ token, apiUrl, user, settings }) => {
   const [videosRefreshKey, setVideosRefreshKey] = useState(0);
+  const [bitmap, setBitmap] = useState(settings.problem_type_bitmap);
   if (!RequirePin(user.id)) {
     return <div className="content-loading"></div>;
   }
@@ -453,21 +614,23 @@ const SettingsView = ({ token, apiUrl, user, settings }) => {
     <div id="settings" className="settings">
       <h2>Settings</h2>
       <div className="tab-content">
-        <GradeLevelSettingsView
-          token={token}
-          apiUrl={apiUrl}
-          user={user}
-          settings={settings}
-        />
-      </div>
-
-      <div className="tab-content">
         <ProblemTypesSettingsView
           token={token}
           apiUrl={apiUrl}
           user={user}
           settings={settings}
           errCallback={(e) => null}
+          onBitmapChange={setBitmap}
+        />
+      </div>
+
+      <div className="tab-content">
+        <TargetDifficultySettingsView
+          token={token}
+          apiUrl={apiUrl}
+          user={user}
+          settings={settings}
+          bitmap={bitmap}
         />
       </div>
 

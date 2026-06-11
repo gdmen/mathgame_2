@@ -63,8 +63,8 @@ func setupRecomputeTestDB(t *testing.T) (*sql.DB, func()) {
 func seedProblem(t *testing.T, db *sql.DB, id uint32, expr string, difficulty float64, ver string) {
 	t.Helper()
 	_, err := db.Exec(
-		`INSERT INTO problems (id, problem_type_bitmap, expression, answer, difficulty, generator, grade_level, difficulty_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, 1, expr, "0", difficulty, "test-seed", 3, ver,
+		`INSERT INTO problems (id, problem_type_bitmap, expression, answer, difficulty, generator, difficulty_version) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		id, 1, expr, "0", difficulty, "test-seed", ver,
 	)
 	if err != nil {
 		t.Fatalf("seed problem id=%d: %v", id, err)

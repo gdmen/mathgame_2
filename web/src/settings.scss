@@ -50,8 +50,40 @@ $add-video-bg: linear-gradient(
       }
     }
     #problem-types-settings {
-      h4 {
-        margin-bottom: 0;
+      .error {
+        color: $color-error;
+        margin-top: $base-space;
+      }
+      .problem-type-grid {
+        display: grid;
+        gap: 1.25 * $base-space;
+        grid-template-columns: 1fr 1fr;
+        margin-top: $base-space;
+        @media (max-width: 760px) {
+          grid-template-columns: 1fr;
+        }
+      }
+      .problem-type-card {
+        border: 1px solid $color-chip-border;
+        border-radius: $base-radius * 4;
+        padding: 1.25 * $base-space 1.4 * $base-space;
+        &.tint-a {
+          background: $color-card-tint-a;
+        }
+        &.tint-b {
+          background: $color-card-tint-b;
+        }
+        h5 {
+          font-size: 1.15em;
+          margin-bottom: 0;
+        }
+        .group-question {
+          margin-bottom: 0.6 * $base-space;
+        }
+        .group-hint {
+          font-size: 0.8em;
+          margin: 0.6em 0 0 0;
+        }
       }
       #problem-type-buttons {
         display: flex;
@@ -60,33 +92,79 @@ $add-video-bg: linear-gradient(
         list-style-type: none;
         li {
           display: inline-block;
-          margin-top: 1em;
-          margin-right: 1em;
+          margin-top: 0.7em;
+          margin-right: 0.7em;
           input[type="checkbox"] {
             display: none;
+            // Selection is COLOR-ONLY: chips must never change size on any
+            // state change (no glyphs, no font-weight shifts).
             &:checked + label .problem-type-button {
               background-color: $color-two;
+              border-color: $color-one-contrast;
             }
           }
           label {
             cursor: pointer;
             .problem-type-button {
-              border: 1px solid gray;
-              border-radius: 0.25em;
+              background: #fff;
+              border: 1.5px solid $color-chip-border;
+              border-radius: $base-radius * 2.5;
               display: flex;
               justify-content: center;
-              padding: 0.5em 0.75em;
+              padding: 0.6em 0.85em 0.5em;
+            }
+          }
+          // Parents with dependents sit at the bottom of the card on their
+          // own row; their dependent renders on the row below, indented,
+          // disabled until the parent is on. Constant size in all states.
+          &.has-dep {
+            flex-basis: 100%;
+            label .problem-type-button {
+              display: inline-flex;
+            }
+          }
+          &.dep {
+            flex-basis: 100%;
+            margin-left: 1.6 * $base-space;
+            margin-top: 0.45em;
+            label .problem-type-button {
+              border-style: dashed;
+              display: inline-flex;
+              font-size: 0.92em;
+              .dep-arrow {
+                color: $color-one-contrast;
+                font-weight: 700;
+                margin-right: 0.35em;
+              }
+            }
+            &.parent-off {
+              opacity: 0.45;
+              label {
+                cursor: not-allowed;
+              }
             }
           }
         }
       }
     }
+    #target-difficulty-settings {
+      .scale-labels {
+        color: gray;
+        display: flex;
+        font-size: 0.8em;
+        justify-content: space-between;
+        margin-top: 0.3em;
+      }
+    }
+    #target-difficulty-settings,
     #target-work-percentage-settings {
       input[type="range"] {
         background: $color-two;
         border: 1px solid gray;
         border-radius: 0.25em;
+        display: block;
         height: 0.5em;
+        width: 100%;
       }
     }
     .settings-hint {
