@@ -36,6 +36,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -54,12 +55,67 @@ func newBitmapFor(expr string, features []string) uint64 {
 	return api.DetectProblemTypeBitmap(expr) | uint64(api.FeaturesToProblemType(features))
 }
 
+var reNumeral = regexp.MustCompile(`[0-9]+(\.[0-9]+)?`)
+
+// spelledNumbers count toward the quantity tally: "one sheep runs away" is
+// a third quantity with no digits.
+var spelledNumbers = []string{
+	" one ", " two ", " three ", " four ", " five ", " six ", " seven ",
+	" eight ", " nine ", " ten ", " eleven ", " twelve ", " dozen ", " half ",
+}
+
+// chainCues mark multi-step or multiplicative structure that two digit
+// numerals alone don't reveal ("3 textbooks and 4 times as many").
+var chainCues = []string{
+	"times as many", "twice", "double", "fewer", " each ", " per ",
+	"as many as",
+}
+
+// mulDivCues flag prose whose stamp may be missing a real operation
+// ("5 flowers in each of 4 sections" stamped ADD-only).
+var mulDivCues = []string{
+	" each ", " every ", " per ", " times ", "twice", "double",
+	"groups of", "rows of", "split", "share", "equally", "divide",
+}
+
+// needsValidation is the LLM-call prefilter, measured against the
+// validator's own verdicts on 8.7K prod rows plus a hand-verified 200-row
+// window: send rows with >=3 quantities (a two-step problem needs three),
+// rows with multi-step/comparative cues, and rows whose prose suggests an
+// operation the stamp lacks. Recall on genuine chained rows ~99.9%; what
+// it skips are simple rows whose worst defect is a phantom op claim, which
+// only narrows their audience.
+func needsValidation(expr string, bitmap uint64) bool {
+	quantities := len(reNumeral.FindAllString(expr, -1))
+	prose := strings.ToLower(expr)
+	for _, w := range spelledNumbers {
+		quantities += strings.Count(prose, w)
+	}
+	if quantities >= 3 {
+		return true
+	}
+	for _, c := range chainCues {
+		if strings.Contains(prose, c) {
+			return true
+		}
+	}
+	if bitmap&uint64(api.MULTIPLICATION|api.DIVISION) == 0 {
+		for _, c := range mulDivCues {
+			if strings.Contains(prose, c) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func main() {
 	configPath := flag.String("config", "conf.json", "path to config JSON")
 	dryRun := flag.Bool("dry-run", false, "don't write; print what would change")
 	limit := flag.Int("limit", 0, "process only this many rows (0 = all)")
 	workers := flag.Int("workers", 16, "concurrent validator calls (retry wrapper absorbs rate-limit pushback)")
 	startID := flag.Int64("start-id", 0, "skip rows below this id (resume)")
+	prefilter := flag.Bool("prefilter", true, "skip rows the quantity/cue filter marks single-step with a safe stamp")
 	flag.Parse()
 
 	c, err := common.ReadConfig(*configPath)
@@ -114,6 +170,24 @@ func main() {
 		glog.Fatalf("rows iteration: %v", err)
 	}
 	rows.Close()
+
+	prefiltered := 0
+	if *prefilter {
+		kept := recs[:0]
+		for _, r := range recs {
+			if needsValidation(r.expr, r.oldBitmap) {
+				kept = append(kept, r)
+			} else {
+				prefiltered++
+				if *dryRun {
+					fmt.Printf("SKIP id=%d bitmap %d (%v) %q\n",
+						r.id, r.oldBitmap, api.ProblemTypeToFeatures(api.ProblemType(r.oldBitmap)), r.expr)
+				}
+			}
+		}
+		recs = kept
+		fmt.Fprintf(os.Stderr, "prefilter: validating %d rows, skipping %d\n", len(recs), prefiltered)
+	}
 
 	// The validator judges compliance against generation constraints; with
 	// everything enabled only the hard caps remain (operand size, chain
@@ -220,8 +294,8 @@ func main() {
 	wg.Wait()
 
 	fmt.Printf("\n=== revalidate_word_problems report ===\n")
-	fmt.Printf("total=%d updated=%d unchanged=%d dry_run=%v\n",
-		len(recs), updated, unchanged, *dryRun)
+	fmt.Printf("total=%d updated=%d unchanged=%d prefiltered=%d dry_run=%v\n",
+		len(recs), updated, unchanged, prefiltered, *dryRun)
 	fmt.Printf("rows gaining CHAINED_OPERATIONS: %d\n", gainedChained)
 	fmt.Printf("validator answer mismatches (REVIEW; rows unchanged): %d rows", len(mismatchRows))
 	printIDList(mismatchRows)
