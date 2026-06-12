@@ -39,6 +39,7 @@ build-cmds: build-api
 	$(GOBUILD) -o ./bin/recompute_problem_difficulty ./cmd/recompute_problem_difficulty/
 	$(GOBUILD) -o ./bin/recompute_problem_type_bitmap ./cmd/recompute_problem_type_bitmap/
 	$(GOBUILD) -o ./bin/trim_recently_shown_problems ./cmd/trim_recently_shown_problems/
+	$(GOBUILD) -o ./bin/maintenance_server ./cmd/maintenance_server/
 
 test: build-api test-api
 
@@ -100,8 +101,20 @@ test-bundle-secrets:
 # Full local parity with CI: Go tests + the web bundle secret scan.
 test-all: test test-bundle-secrets
 
+# Fails loudly if the TLS paths are missing from $(CONF): with empty --ssl
+# args, serve silently falls back to plain HTTP on 443 and every HTTPS
+# client sees the site as down.
 prod-web:
-	cd web && serve -s build -l 443 --ssl-cert "/etc/letsencrypt/live/mikeymath.org/fullchain.pem" --ssl-key "/etc/letsencrypt/live/mikeymath.org/privkey.pem"
+	set -e; \
+	CERT=$$(python3 -c "import json; print(json.load(open('$(CONF)')).get('tls_cert_file',''))"); \
+	KEY=$$(python3 -c "import json; print(json.load(open('$(CONF)')).get('tls_key_file',''))"); \
+	if [ -z "$$CERT" ] || [ -z "$$KEY" ]; then echo "tls_cert_file/tls_key_file not set in $(CONF)" >&2; exit 1; fi; \
+	cd web && serve -s build -l 443 --ssl-cert "$$CERT" --ssl-key "$$KEY"
 
 prod-api:
 	GIN_MODE=release $(GOBIN)/apiserver
+
+# Static "down for maintenance" page on the web port; deploy/update.sh swaps
+# this in for mathgame-web around the disruptive part of a deploy.
+prod-maintenance:
+	$(GOBIN)/maintenance_server -config $(CONF) -logtostderr

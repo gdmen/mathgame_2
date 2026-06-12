@@ -24,6 +24,7 @@ cd mathgame_2
 make
 sudo cp deploy/mathgame-api.service /etc/systemd/system
 sudo cp deploy/mathgame-web.service /etc/systemd/system
+sudo cp deploy/mathgame-maintenance.service /etc/systemd/system
 sudo cp deploy/mathgame-compress-events.service /etc/systemd/system
 sudo cp deploy/mathgame-check-disabled-videos.service /etc/systemd/system
 sudo cp deploy/mathgame-compress-events.timer /etc/systemd/system
@@ -37,6 +38,13 @@ sudo cp deploy/mathgame-watchdog.timer /etc/systemd/system
 
 # Journal watchdog: pick an unguessable ntfy.sh topic, subscribe to it in the
 # ntfy phone app, then set "ntfy_topic" in conf.json (gitignored).
+
+# TLS for the web port: set "tls_cert_file" and "tls_key_file" in conf.json to
+# the letsencrypt paths, e.g.
+#   "tls_cert_file": "/etc/letsencrypt/live/mikeymath.org/fullchain.pem",
+#   "tls_key_file": "/etc/letsencrypt/live/mikeymath.org/privkey.pem"
+# Both prod-web and the maintenance page (deploy/update.sh serves it during
+# the disruptive part of an update) read these.
 
 sudo systemctl daemon-reload
 sudo systemctl enable mathgame-api

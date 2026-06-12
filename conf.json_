@@ -12,6 +12,8 @@
   "openai_api_key": "",
   "youtube_api_key": "",
   "ntfy_topic": "",
+  "tls_cert_file": "",
+  "tls_key_file": "",
   "event_reporting_interval": 500,
   "debug_quickplay": false
 }

@@ -6,6 +6,7 @@ set -euo pipefail
 SERVICES=(
     mathgame-api
     mathgame-web
+    mathgame-maintenance
     mathgame-compress-events
     mathgame-check-disabled-videos
     mathgame-update-statistics
@@ -20,7 +21,8 @@ TIMERS=(
     mathgame-watchdog
 )
 
-# Rebuild from whatever is currently checked out.
+# Rebuild from whatever is currently checked out. Building before touching
+# any service keeps the site fully up if the build fails (set -e aborts).
 make
 
 # Sync systemd unit files to /etc/systemd/system.
@@ -33,13 +35,19 @@ done
 
 sudo systemctl daemon-reload
 
-# Restart long-running services.
+# Serve the maintenance page during the disruptive window (Conflicts= in the
+# unit stops mathgame-web). If anything below fails, set -e exits with the
+# maintenance page still up - users see "down for maintenance", not errors.
+sudo systemctl start mathgame-maintenance
+
 sudo systemctl restart mathgame-api
-sudo systemctl restart mathgame-web
 
 # Restart timers (in case schedule changed).
 for t in "${TIMERS[@]}"; do
     sudo systemctl restart "${t}.timer"
 done
+
+# Back to the real web server (Conflicts= stops the maintenance page).
+sudo systemctl start mathgame-web
 
 echo "Update complete."
