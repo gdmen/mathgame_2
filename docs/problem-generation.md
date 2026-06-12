@@ -70,7 +70,10 @@ Letters, `?`s, and operators inside prose can never fire structural bits
 split: magnitude/decimal/percent scanning for *difficulty* and for the
 magnitude *shape bits* DOES read prose numerals (a word problem about 47
 apples is a MEDIUM_NUMBERS problem); concept-bit detection never does — WORD
-problems' topic bits come from the validator.
+problems' topic bits come from the validator. Legacy WORD rows carry
+preserved self-reported topic bits until re-stamped by
+`cmd/revalidate_word_problems`, which replaces them with
+validator-observed features.
 
 **The lone-letter rewrite (stage 1.5).** A bare letter occurring exactly
 once with no coefficient (`12 - x = 5`) carries no algebraic load and is
@@ -238,6 +241,12 @@ Single server, single DB. Deploy order matters:
    forces every row). MUST run after the bitmap tool (the rewrite mutates
    expressions).
 5. Start the server.
+
+`revalidate_word_problems` (optional, costs one LLM call per WORD row):
+re-stamps WORD rows' topic bits from the validator's observed features,
+replacing preserved legacy self-report. Bitmap-only writes; answer
+mismatches and constraint NOs are reported and left unchanged. Run any
+time after the bitmap backfill; `-dry-run`/`-limit` to sample first.
 
 ## The new-bit checklist
 
