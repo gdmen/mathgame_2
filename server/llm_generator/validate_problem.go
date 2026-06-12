@@ -45,6 +45,12 @@ var ErrEnvelopeMismatch = errors.New("ENVELOPE_MISMATCH")
 // featureNames is the closed list the validator may use on line 3 (the api
 // side owns it). Returns the observed features on success.
 func ValidateWordProblem(p *Problem, constraints string, featureNames []string) ([]string, error) {
+	return ValidateWordProblemWithModel(p, constraints, featureNames, openai.GPT5)
+}
+
+// ValidateWordProblemWithModel is ValidateWordProblem with an explicit
+// model, for bulk tools that trade per-call accuracy for cost.
+func ValidateWordProblemWithModel(p *Problem, constraints string, featureNames []string, model string) ([]string, error) {
 	if strings.ContainsAny(p.Answer, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") {
 		msg := fmt.Sprintf("Answer contained text: %v\n", p)
 		glog.Info(msg)
@@ -68,7 +74,7 @@ func ValidateWordProblem(p *Problem, constraints string, featureNames []string) 
 		context.Background(),
 		client,
 		openai.ChatCompletionRequest{
-			Model: openai.GPT5,
+			Model: model,
 			Messages: []openai.ChatCompletionMessage{
 				{
 					Role:    openai.ChatMessageRoleUser,

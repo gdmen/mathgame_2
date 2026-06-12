@@ -12,8 +12,8 @@
 //     are stable and legacy false-positive bits don't survive forever.
 //   - WORD rows keep their existing legacy topic bits (the 7 original
 //     self-reported bits) OR'd onto the detected shape bits: the parser
-//     can't see topics inside prose, and re-validating 300K rows through the
-//     LLM is not worth it for legacy data.
+//     can't see topics inside prose. cmd/revalidate_word_problems re-stamps
+//     WORD topic bits from the LLM validator when better data is wanted.
 //   - Lone-letter rewrite: a single bare variable becomes '?'
 //     (12 - x = 5 -> 12 - ? = 5) in the expression - the first time this
 //     tool mutates expression text. The same standalone-letter substitution
