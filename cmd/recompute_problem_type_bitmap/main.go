@@ -108,8 +108,17 @@ func main() {
 		zeroRows, rewriteRows, lexRows, unknownRows []uint32
 	)
 
+	// Print progress every progressStep rows so a multi-minute run isn't silent.
+	progressStep := len(recs) / 100
+	if progressStep < 1000 {
+		progressStep = 1000
+	}
+
 	for _, r := range recs {
 		total++
+		if total%progressStep == 0 || total == len(recs) {
+			fmt.Fprintf(os.Stderr, "  %d/%d (%.1f%%)\n", total, len(recs), 100*float64(total)/float64(len(recs)))
+		}
 		newExpr := r.expr
 		newAnswer := r.answer
 		newExplanation := r.explanation
