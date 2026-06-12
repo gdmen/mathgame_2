@@ -1,0 +1,25 @@
+[Unit]
+Description=Mathgame Maintenance Page
+After=network-online.target
+Wants=network-online.target systemd-networkd-wait-online.service
+
+# Conflicts with the real web server: both bind the web port. Starting one
+# stops the other, so update.sh can't accidentally run both. After= adds
+# ordering (Conflicts alone queues the stop and start in parallel): systemd
+# runs the stop before the start in BOTH swap directions, so neither server
+# tries to bind 443 while the other still holds it.
+Conflicts=mathgame-web.service
+After=mathgame-web.service
+
+StartLimitIntervalSec=500
+StartLimitBurst=5
+
+[Service]
+Restart=always
+RestartSec=1s
+
+WorkingDirectory=/home/ubuntu/mathgame_2
+ExecStart=make prod-maintenance
+
+[Install]
+WantedBy=multi-user.target

@@ -23,6 +23,18 @@ type Config struct {
 	YouTubeAPIKey          string `json:"youtube_api_key"`
 	EventReportingInterval int    `json:"event_reporting_interval"`
 	DebugQuickplay         bool   `json:"debug_quickplay"`
+	// TLS cert/key paths for processes that serve HTTPS directly
+	// (maintenance_server, the prod-web serve invocation). Optional:
+	// empty on dev hosts, where nothing serves TLS.
+	TLSCertFile string `json:"tls_cert_file"`
+	TLSKeyFile  string `json:"tls_key_file"`
+}
+
+// optionalConfigFields may legitimately be empty (set only on hosts that
+// need them); Validate skips these.
+var optionalConfigFields = map[string]bool{
+	"tls_cert_file": true,
+	"tls_key_file":  true,
 }
 
 func ReadConfig(path string) (*Config, error) {
@@ -51,6 +63,9 @@ func (c *Config) Validate() error {
 		name := t.Field(i).Tag.Get("json")
 		if name == "" {
 			name = t.Field(i).Name
+		}
+		if optionalConfigFields[name] {
+			continue
 		}
 		if strings.TrimSpace(v.Field(i).String()) == "" {
 			missing = append(missing, name)
