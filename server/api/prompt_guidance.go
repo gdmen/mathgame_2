@@ -123,7 +123,16 @@ func BuildBitConstraints(enabled ProblemType) string {
 // validator may report on its features line. Only these names are mapped to
 // bits when stamping validator-extracted topics (FeaturesToProblemType
 // ignores unknown names, but the prompt should not invite free-form output).
+//
+// The last three names cover features the parser cannot see when they are
+// expressed entirely in prose - multi-step solutions, algebra-style unknowns,
+// and fractions with differing denominators. Without them, such WORD
+// problems carry no corresponding bit and serve to users whose settings
+// disable the feature. (missing_number and pemdas are deliberately absent:
+// both are notation-specific - every word problem has an implicit unknown,
+// and prose narration carries no operator-precedence trap.)
 var ValidatorFeatureNames = []string{
 	"addition", "subtraction", "multiplication", "division",
 	"fractions", "negatives", "decimals", "percentages", "word",
+	"chained_operations", "single_variable", "mismatched_denominators",
 }

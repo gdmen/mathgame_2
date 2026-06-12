@@ -419,6 +419,116 @@ func TestGenerateProblems_WordPath(t *testing.T) {
 	}
 }
 
+// TestGenerateProblems_WordProseOnlyFeatures: features expressed entirely in
+// prose are invisible to the parser; the validator's reports stamp the bits
+// so the corresponding toggles govern word problems at serve time. Each case
+// also proves the envelope rejects the problem for a user missing the bit.
+func TestGenerateProblems_WordProseOnlyFeatures(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+
+	cases := []struct {
+		name     string
+		expr     string
+		answer   string
+		features []string
+		want     uint64 // full expected bitmap incl. parser shape bits
+		bit      uint64 // the prose-only bit under test
+	}{
+		{
+			name:     "pure-prose algebra",
+			expr:     `\text{Solve for x: 3x + 7 = 22}`,
+			answer:   "5",
+			features: []string{"single_variable", "word"},
+			want:     uint64(SINGLE_VARIABLE | WORD | MEDIUM_NUMBERS), // 22 in prose -> MEDIUM
+			bit:      uint64(SINGLE_VARIABLE),
+		},
+		{
+			name:     "prose mismatched denominators",
+			expr:     `\text{Tom ate 1/2 of a pizza and Jane ate 1/3 of it. How much did they eat together?}`,
+			answer:   "5/6",
+			features: []string{"fractions", "mismatched_denominators", "addition", "word"},
+			want:     uint64(FRACTIONS | MISMATCHED_DENOMINATORS | ADDITION | WORD),
+			bit:      uint64(MISMATCHED_DENOMINATORS),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := llmTestProblem()
+			p.Expression = tc.expr
+			p.Answer = tc.answer
+			p.Features = tc.features
+			withCannedLLM(t, []llm_generator.Problem{p}, nil, nil)
+
+			settings := &Settings{
+				UserId:            1,
+				ProblemTypeBitmap: tc.want,
+				TargetDifficulty:  6,
+			}
+			problem, err := api.generateProblems("[test-prose-feature]", settings, 1)
+			if err != nil {
+				t.Fatalf("generateProblems: %v", err)
+			}
+			if problem.ProblemTypeBitmap != tc.want {
+				t.Errorf("bitmap = %d (%v), want %d",
+					problem.ProblemTypeBitmap,
+					ProblemTypeToFeatures(ProblemType(problem.ProblemTypeBitmap)), tc.want)
+			}
+
+			// The same problem must NOT reach an envelope missing the bit.
+			settings.ProblemTypeBitmap = tc.want &^ tc.bit
+			if got, err := api.generateProblems("[test-prose-feature-reject]", settings, 1); err == nil {
+				t.Fatalf("expected envelope reject without bit %d, got %v", tc.bit, got)
+			}
+		})
+	}
+}
+
+// TestGenerateProblems_WordMultiStep: the validator reports
+// chained_operations on multi-step prose (the parser cannot count
+// operations inside \text{}), so the CHAINED bit stamps and the multi-step
+// toggle governs word problems at serve time too.
+func TestGenerateProblems_WordMultiStep(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+
+	p := llmTestProblem()
+	p.Expression = `\text{A garden has 5 rows of 12 plants. If 3 plants die, how many are left?}`
+	p.Answer = "57"
+	p.Features = []string{"multiplication", "subtraction", "chained_operations", "word"}
+	withCannedLLM(t, []llm_generator.Problem{p}, nil, nil)
+
+	settings := &Settings{
+		UserId:            1,
+		ProblemTypeBitmap: uint64(MULTIPLICATION | SUBTRACTION | CHAINED_OPERATIONS | WORD),
+		TargetDifficulty:  6,
+	}
+	problem, err := api.generateProblems("[test-word-multistep]", settings, 1)
+	if err != nil {
+		t.Fatalf("generateProblems: %v", err)
+	}
+	want := uint64(MULTIPLICATION | SUBTRACTION | CHAINED_OPERATIONS | WORD)
+	if problem.ProblemTypeBitmap != want {
+		t.Errorf("bitmap = %d (%v), want %d (validator chained_operations must stamp)",
+			problem.ProblemTypeBitmap,
+			ProblemTypeToFeatures(ProblemType(problem.ProblemTypeBitmap)), want)
+	}
+
+	// The same problem must NOT reach a multi-step-off envelope.
+	settings.ProblemTypeBitmap = uint64(MULTIPLICATION | SUBTRACTION | WORD)
+	if got, err := api.generateProblems("[test-word-multistep-reject]", settings, 1); err == nil {
+		t.Fatalf("expected envelope reject for multi-step-off user, got %v", got)
+	}
+}
+
 // TestGenerateProblems_WordEnvelopeReject: validator-reported features
 // outside the user's envelope reject the problem (the final subset check
 // covers validator-stamped bits too).
