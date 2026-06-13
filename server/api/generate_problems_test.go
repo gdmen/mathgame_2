@@ -529,6 +529,48 @@ func TestGenerateProblems_WordMultiStep(t *testing.T) {
 	}
 }
 
+// TestGenerateProblems_WordMultiStep_ValidatorOmitsChained: the bug #246
+// guards. The validator reports two core ops but OMITS chained_operations
+// (its independent-checkbox failure mode); the stamp-time invariant must OR
+// it in, so the row both stamps correctly and rejects for a multi-step-off
+// user - even though the LLM never said "chained".
+func TestGenerateProblems_WordMultiStep_ValidatorOmitsChained(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+
+	p := llmTestProblem()
+	p.Expression = `\text{A garden has 5 rows of 12 plants. If 3 plants die, how many are left?}`
+	p.Answer = "57"
+	p.Features = []string{"multiplication", "subtraction", "word"} // NOTE: no chained
+	withCannedLLM(t, []llm_generator.Problem{p}, nil, nil)
+
+	settings := &Settings{
+		UserId:            1,
+		ProblemTypeBitmap: uint64(MULTIPLICATION | SUBTRACTION | CHAINED_OPERATIONS | WORD),
+		TargetDifficulty:  6,
+	}
+	problem, err := api.generateProblems("[test-word-omits-chained]", settings, 1)
+	if err != nil {
+		t.Fatalf("generateProblems: %v", err)
+	}
+	if problem.ProblemTypeBitmap&uint64(CHAINED_OPERATIONS) == 0 {
+		t.Errorf("bitmap = %d (%v): invariant must OR in CHAINED despite validator omitting it",
+			problem.ProblemTypeBitmap,
+			ProblemTypeToFeatures(ProblemType(problem.ProblemTypeBitmap)))
+	}
+
+	// And it must reject for a multi-step-off user, even though the validator
+	// never reported chained.
+	settings.ProblemTypeBitmap = uint64(MULTIPLICATION | SUBTRACTION | WORD)
+	if got, err := api.generateProblems("[test-word-omits-chained-reject]", settings, 1); err == nil {
+		t.Fatalf("expected envelope reject for multi-step-off user, got %v", got)
+	}
+}
+
 // TestGenerateProblems_WordEnvelopeReject: validator-reported features
 // outside the user's envelope reject the problem (the final subset check
 // covers validator-stamped bits too).
