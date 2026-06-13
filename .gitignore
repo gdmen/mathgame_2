@@ -26,3 +26,8 @@ __pycache__/
 # Local DB dumps in the repo root (migrations live under server/)
 /*.sql
 .gstack/
+
+# Web build output + the staged-build swap dirs (see build-web)
+web/build/
+web/build.next/
+web/build.prev/
