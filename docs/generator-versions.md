@@ -103,6 +103,18 @@ The prompt is driven by the user's problem-type bitmap
 - Storage preserves original notation (\frac, \times render through
   KaTeX); normalization is internal to parsing.
 
+### `llm_0.4` — self-contained word problems
+
+Prompt-only change vs `0.3`. A prod audit (issue #249) found ~84% of
+llm_0.3 word problems appended the bare computation to the prose
+(`\text{...3 bags of 6 apples...}3 * 6`), and a subset appended the full
+equation including the result (`...= 18`), revealing the answer. The
+model was over-applying the "symbolic math goes outside \text{}" rule to
+story problems. The prompt now says: write the ENTIRE word problem as
+prose, never append the arithmetic or its result, and use symbolic math
+outside \text{} ONLY when the statement itself is an expression to
+manipulate (e.g. "Solve for x: 3x + 7 = 22"). No code path changed.
+
 ## Universal Difficulty Scale
 
 Every problem's `difficulty` column stores a universal score on a 1-20 scale
