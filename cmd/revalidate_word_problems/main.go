@@ -50,9 +50,11 @@ import (
 )
 
 // newBitmapFor combines the parser's shape bits (magnitude, word, any
-// symbolic structure) with the validator's observed topic features.
+// symbolic structure) with the validator's observed topic features, then
+// enforces the structural invariants the validator can violate (#246).
 func newBitmapFor(expr string, features []string) uint64 {
-	return api.DetectProblemTypeBitmap(expr) | uint64(api.FeaturesToProblemType(features))
+	return api.NormalizeProblemBitmap(
+		api.DetectProblemTypeBitmap(expr) | uint64(api.FeaturesToProblemType(features)))
 }
 
 var reNumeral = regexp.MustCompile(`[0-9]+(\.[0-9]+)?`)

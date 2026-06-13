@@ -344,8 +344,11 @@ func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numPro
 		}
 		// Envelope is the problemType param (the caller-masked request for
 		// THIS generation call, always a subset of the user's settings), not
-		// settings.ProblemTypeBitmap directly.
-		if v := envelopeViolation(adm.Bitmap, uint64(problemType)); v != "" {
+		// settings.ProblemTypeBitmap directly. NormalizeProblemBitmap is a
+		// no-op on the parser's own output (it co-sets these bits already);
+		// applied for uniformity with the WORD path.
+		bitmap := NormalizeProblemBitmap(adm.Bitmap)
+		if v := envelopeViolation(bitmap, uint64(problemType)); v != "" {
 			funnel.reject(rejectEnvelope)
 			glog.Infof("%s heuristic envelope reject [%s]: %q", logPrefix, v, expr)
 			continue
@@ -355,7 +358,7 @@ func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numPro
 		model.Generator = heuristic_generator.VERSION
 		model.Expression = adm.Expr
 		model.Answer = answer
-		model.ProblemTypeBitmap = adm.Bitmap
+		model.ProblemTypeBitmap = bitmap
 		// Stored difficulty is a function of the problem itself, not the
 		// requester's target - the pool is shared across users.
 		model.Difficulty = ComputeProblemDifficulty(adm.Expr)
@@ -536,6 +539,12 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 					// are already in the bitmap.
 					bitmap |= uint64(FeaturesToProblemType(features))
 				}
+
+				// Enforce structural invariants before the envelope check, so
+				// a multi-step problem the validator under-reported is both
+				// stamped correctly AND correctly rejected for a user who
+				// can't have it (#246).
+				bitmap = NormalizeProblemBitmap(bitmap)
 
 				// Envelope: every stamped bit must be enabled for this user.
 				if v := envelopeViolation(bitmap, settings.ProblemTypeBitmap); v != "" {

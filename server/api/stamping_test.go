@@ -200,3 +200,45 @@ func TestGenerationFunnel_NoSilentDrops(t *testing.T) {
 		}
 	}
 }
+
+// TestNormalizeProblemBitmap: structural invariants that the WORD validator
+// (independent feature checkboxes) can violate. Each ORs in an implied bit;
+// the operation only narrows a problem's audience, never widens it.
+func TestNormalizeProblemBitmap(t *testing.T) {
+	cases := []struct {
+		name string
+		in   ProblemType
+		want ProblemType
+	}{
+		{"two core ops imply chained",
+			MULTIPLICATION | SUBTRACTION | WORD,
+			MULTIPLICATION | SUBTRACTION | WORD | CHAINED_OPERATIONS},
+		{"three core ops imply chained",
+			ADDITION | SUBTRACTION | MULTIPLICATION | WORD,
+			ADDITION | SUBTRACTION | MULTIPLICATION | WORD | CHAINED_OPERATIONS},
+		{"pemdas implies chained",
+			ADDITION | PEMDAS | WORD,
+			ADDITION | PEMDAS | WORD | CHAINED_OPERATIONS},
+		{"mismatched implies fractions",
+			MISMATCHED_DENOMINATORS | WORD,
+			MISMATCHED_DENOMINATORS | WORD | FRACTIONS},
+		{"single core op untouched",
+			SUBTRACTION | WORD | MEDIUM_NUMBERS,
+			SUBTRACTION | WORD | MEDIUM_NUMBERS},
+		{"already-chained untouched",
+			ADDITION | SUBTRACTION | CHAINED_OPERATIONS,
+			ADDITION | SUBTRACTION | CHAINED_OPERATIONS},
+		{"zero stays zero",
+			0, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := NormalizeProblemBitmap(uint64(tc.in))
+			if got != uint64(tc.want) {
+				t.Errorf("NormalizeProblemBitmap(%d) = %d (%v), want %d (%v)",
+					tc.in, got, ProblemTypeToFeatures(ProblemType(got)),
+					tc.want, ProblemTypeToFeatures(tc.want))
+			}
+		})
+	}
+}

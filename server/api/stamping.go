@@ -23,9 +23,36 @@ package api
 import (
 	"fmt"
 	"math/big"
+	"math/bits"
 	"regexp"
 	"strings"
 )
+
+// NormalizeProblemBitmap enforces structural invariants on a final problem
+// stamp: a feature that definitionally implies another gets that bit OR'd in.
+// It only ever NARROWS a problem's serving audience (never widens it), so it
+// cannot leak a problem to a kid whose settings exclude it.
+//
+// Why it exists: the WORD-problem validator reports topic features as
+// independent items and can omit one that's implied by the others (e.g.
+// multiplication + subtraction without chained_operations). The parser path
+// never needs this - it co-sets these from the token stream - so this is the
+// deterministic backstop for the validator and legacy-preserved stamps.
+// Apply at every FINAL stamp site, after any validator/legacy merge. (#246)
+func NormalizeProblemBitmap(b uint64) uint64 {
+	pt := ProblemType(b)
+	coreOps := ADDITION | SUBTRACTION | MULTIPLICATION | DIVISION
+	if bits.OnesCount64(uint64(pt&coreOps)) >= 2 {
+		b |= uint64(CHAINED_OPERATIONS) // two distinct operations are two steps
+	}
+	if pt&PEMDAS != 0 {
+		b |= uint64(CHAINED_OPERATIONS) // a precedence problem needs >=2 ops
+	}
+	if pt&MISMATCHED_DENOMINATORS != 0 {
+		b |= uint64(FRACTIONS) // mismatched denominators require fractions
+	}
+	return b
+}
 
 // Funnel stage names: every drop between "LLM returned N problems"
 // and "M were inserted" must land in exactly one of these.

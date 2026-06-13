@@ -156,6 +156,9 @@ func main() {
 			// Preserve legacy self-reported topic bits on WORD rows.
 			newBitmap |= r.oldBitmap & legacyTopicMask
 		}
+		// Legacy topic bits can carry 2 core ops without chained (etc.);
+		// enforce the structural invariants (#246).
+		newBitmap = api.NormalizeProblemBitmap(newBitmap)
 		if newBitmap == 0 {
 			zeroBitmap++
 			zeroRows = append(zeroRows, r.id)

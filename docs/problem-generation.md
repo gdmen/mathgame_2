@@ -47,12 +47,12 @@ concern. Users compose their envelope directly.
 |---|---|---|
 | `ADDITION` `SUBTRACTION` `MULTIPLICATION` `DIVISION` | operator token present | opWeight max: 1.0 / 1.1 / 2.2 / 2.8 |
 | `FRACTIONS` | any fraction token (`3/8` unspaced; `\frac{a}{b}` normalizes to it) | ×2.0 (same denominators) |
-| `MISMATCHED_DENOMINATORS` | ≥2 fractions, differing denominators; on WORD problems, validator-observed (prose fractions) | ×1.5, stacks on the fractions ×2.0 → net ×3.0 |
+| `MISMATCHED_DENOMINATORS` | ≥2 fractions, differing denominators; on WORD problems, validator-observed (prose fractions); forces FRACTIONS via the stamp-time invariant | ×1.5, stacks on the fractions ×2.0 → net ×3.0 |
 | `NEGATIVES` | unary-minus number token | ×1.3 |
 | `WORD` | `\text{...}` present | ×1.3 (stacks with SINGLE_VARIABLE) |
 | `MEDIUM_NUMBERS` | maxMagnitude 13–99 (bracket) | via magnitude |
 | `LARGE_NUMBERS` | maxMagnitude ≥ 100 (bracket — `1 + 999` is LARGE, not MEDIUM) | via magnitude |
-| `CHAINED_OPERATIONS` | numOps ≥ 2 (`=` does not count); on WORD problems, validator-observed (multi-step prose) | structure 1 + 0.15·(numOps−1) |
+| `CHAINED_OPERATIONS` | numOps ≥ 2 (`=` does not count); on WORD problems, validator-observed (multi-step prose), and OR'd in by the stamp-time invariant whenever ≥2 core-op bits or PEMDAS are set | structure 1 + 0.15·(numOps−1) |
 | `MISSING_NUMBER` | a single `?` outside `\text{}` | structure +0.2 |
 | `DECIMALS` | symbolic decimal token | ×2.0 |
 | `PEMDAS` | the dual-evaluation rule (below) | ×1.5 |
