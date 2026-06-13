@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	VERSION         = "llm_0.3"
+	VERSION         = "llm_0.4"
 	OPENAI_URL      = "https://api.openai.com/v1/completions"
 	PROMPT_QUESTION = `
 Generate math questions in the format of this example:
@@ -39,7 +39,7 @@ or this example:
   "explanation": "\\text{The distance traveled is calculated by multiplying the speed by the time: }60\\text{ miles/hour }* 2\\text{ hours }= 120\\text{ miles.}",
   "difficulty": 15
 }
-where "question" is the math question in LaTeX math mode e.g. it might use \\text{} tags as shown, "answer" is the correct answer with no other text, "explanation" is the explanation for the correct answer in LaTeX math mode e.g. it might use \\text{} tags as shown, and "features" are the allowed features that were actually used in this problem. In word problems, keep prose inside \\text{...} and write any symbolic math OUTSIDE the \\text{} blocks. If NOT a word problem, do not use any LaTeX. For example, fractions should be returned as e.g. 1/2 in this case. If it IS a word problem, fractions can be returned as e.g. \frac{1}{2}.
+where "question" is the math question in LaTeX math mode e.g. it might use \\text{} tags as shown, "answer" is the correct answer with no other text, "explanation" is the explanation for the correct answer in LaTeX math mode e.g. it might use \\text{} tags as shown, and "features" are the allowed features that were actually used in this problem. In word problems, write the ENTIRE problem as prose inside \\text{...}. Do NOT append the arithmetic the student must perform or its result - a problem like 'There are 3 bags with 6 apples each. How many apples?' must NOT include '3 * 6' or '3 * 6 = 18'; the student derives that. Write symbolic math outside \\text{} ONLY when the problem statement itself is an expression to manipulate, e.g. \\text{Solve for }x: 3x + 7 = 22. If NOT a word problem, do not use any LaTeX. For example, fractions should be returned as e.g. 1/2 in this case. If it IS a word problem, fractions can be returned as e.g. \frac{1}{2}.
 Return the answers to fractional expressions as fractions, not decimals.
 The "answer" should NEVER be in LaTeX format. It should be purely numeric, possibly including mathematical symbols like / and -.
 Return these problems as a valid JSON list with no additional text.
