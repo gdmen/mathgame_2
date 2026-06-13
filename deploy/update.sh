@@ -21,8 +21,10 @@ TIMERS=(
     mathgame-watchdog
 )
 
-# Rebuild from whatever is currently checked out. Building before touching
-# any service keeps the site fully up if the build fails (set -e aborts).
+# Rebuild from whatever is currently checked out, before touching any
+# service. build-web stages into web/build.next and swaps, so the running
+# web server keeps serving valid content through the whole build and a
+# failed build (set -e aborts) leaves the live site untouched.
 make
 
 # Sync systemd unit files to /etc/systemd/system.

@@ -75,15 +75,25 @@ clean:
 	$(RM) ./server/api/*.generated.go
 	GOBIN=$(GOBIN) $(GOCLEAN) -testcache
 	$(GOMOD) tidy
-	$(RM) ./web/build/*
+	$(RM) ./web/build/* ./web/build.next ./web/build.prev
 
 # Emit web/src/conf.json with ONLY the public fields the frontend reads.
 frontend-conf:
 	python3 web/gen_frontend_conf.py $(CONF) web/src/conf.json
 
+# Build into web/build.next, then swap it into place, so the live web/build
+# (served by prod-web) is never emptied mid-build. react-scripts starts every
+# build by wiping its output dir; building in place left web/build a directory
+# listing for the whole npm-install+webpack window while the old server kept
+# serving it (#243). The swap is two renames (sub-ms); serve re-reads per
+# request, so no restart is needed and the live dir holds valid content right
+# up to the swap. A failed build aborts (set -e) with web/build untouched.
 build-web: frontend-conf
-	cd web && npm install --force && npm run build; cd -
+	cd web && npm install --force && BUILD_PATH=build.next npm run build; cd -
 	cd web/src && npx prettier --write .; cd -
+	$(RM) ./web/build.prev
+	if [ -d ./web/build ]; then mv ./web/build ./web/build.prev; fi
+	mv ./web/build.next ./web/build
 
 # Fail if any secret value from $(CONF) (or a known secret pattern) made it into
 # the public web bundle. Run after build-web; safe to run pre-deploy.
