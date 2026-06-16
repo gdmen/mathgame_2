@@ -31,3 +31,6 @@ __pycache__/
 web/build/
 web/build.next/
 web/build.prev/
+
+# OS files
+.DS_Store
