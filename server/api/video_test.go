@@ -52,6 +52,7 @@ func TestVideoBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 	user.Id = resp_user.Id
+	user.Role = resp_user.Role // server-assigned default; not set by the test
 	if resp_user != *user {
 		t.Fatalf("Model mismatch. Received: %v, but expected: %v", resp_user, user)
 	}

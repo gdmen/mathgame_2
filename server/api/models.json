@@ -28,6 +28,11 @@
           "name": "Pin",
           "type": "string",
           "sql": "VARCHAR(4) NOT NULL DEFAULT ''"
+        },
+        {
+          "name": "Role",
+          "type": "string",
+          "sql": "VARCHAR(16) NOT NULL DEFAULT 'student'"
         }
       ]
     },

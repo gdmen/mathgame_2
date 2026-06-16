@@ -444,6 +444,48 @@ func (a *Api) customListVideo(c *gin.Context) {
 	c.JSON(http.StatusOK, models)
 }
 
+// customUpdateUser updates a user's mutable fields (email, username, pin) by
+// auth0_id. A caller may only update their own row. Privileged/immutable fields
+// are never taken from client input: role and id are forced from the stored
+// row, so this endpoint cannot be used to self-promote to admin or rewrite a
+// user's id (the generated User struct binds every field, including role, from
+// the request body). See #253.
+func (a *Api) customUpdateUser(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	glog.Infof("%s fcn start", logPrefix)
+
+	// Parse input
+	model := &User{}
+	if BindModelFromForm(logPrefix, c, model) != nil {
+		return
+	}
+	if BindModelFromURI(logPrefix, c, model) != nil {
+		return
+	}
+
+	// A caller may only update their own row. The target auth0_id comes from the
+	// URL; reject if it isn't the authenticated user (otherwise any user could
+	// edit another user's email/username/pin).
+	if model.Auth0Id != GetAuth0IdFromContext(c) {
+		c.AbortWithStatusJSON(http.StatusForbidden, common.GetError("Cannot update another user."))
+		return
+	}
+
+	// Re-read the stored row and force privileged/immutable fields from it,
+	// regardless of what the client sent.
+	existing, status, msg, err := a.userManager.Get(model.Auth0Id)
+	if HandleMngrResp(logPrefix, c, status, msg, err, nil) != nil {
+		return
+	}
+	model.Id = existing.Id
+	model.Role = existing.Role
+
+	status, msg, err = a.userManager.Update(model)
+	if HandleMngrRespWriteCtx(logPrefix, c, status, msg, err, model) != nil {
+		return
+	}
+}
+
 func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)

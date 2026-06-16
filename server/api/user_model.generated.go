@@ -15,7 +15,8 @@ const (
 	id BIGINT UNSIGNED AUTO_INCREMENT UNIQUE,
 	email VARCHAR(320) NOT NULL,
 	username VARCHAR(128) NOT NULL,
-	pin VARCHAR(4) NOT NULL DEFAULT ''
+	pin VARCHAR(4) NOT NULL DEFAULT '',
+	role VARCHAR(16) NOT NULL DEFAULT 'student'
     ) DEFAULT CHARSET=utf8mb4 ;`
 
 	createUserSQL = `INSERT INTO users (auth0_id, email, username) VALUES (?, ?, ?);`
@@ -26,7 +27,7 @@ const (
 
 	listUserSQL = `SELECT * FROM users;`
 
-	updateUserSQL = `UPDATE users SET id=?, email=?, username=?, pin=? WHERE auth0_id=?;`
+	updateUserSQL = `UPDATE users SET id=?, email=?, username=?, pin=?, role=? WHERE auth0_id=?;`
 
 	deleteUserSQL = `DELETE FROM users WHERE auth0_id=?;`
 )
@@ -37,10 +38,11 @@ type User struct {
 	Email    string `json:"email" uri:"email" form:"email"`
 	Username string `json:"username" uri:"username" form:"username"`
 	Pin      string `json:"pin" uri:"pin" form:"pin"`
+	Role     string `json:"role" uri:"role" form:"role"`
 }
 
 func (model User) String() string {
-	return fmt.Sprintf("Auth0Id: %v, Id: %v, Email: %v, Username: %v, Pin: %v", model.Auth0Id, model.Id, model.Email, model.Username, model.Pin)
+	return fmt.Sprintf("Auth0Id: %v, Id: %v, Email: %v, Username: %v, Pin: %v, Role: %v", model.Auth0Id, model.Id, model.Email, model.Username, model.Pin, model.Role)
 }
 
 type UserManager struct {
@@ -71,7 +73,7 @@ func (m *UserManager) Create(model *User) (int, string, error) {
 
 func (m *UserManager) Get(auth0_id string) (*User, int, string, error) {
 	model := &User{}
-	err := m.DB.QueryRow(getUserSQL, auth0_id).Scan(&model.Auth0Id, &model.Id, &model.Email, &model.Username, &model.Pin)
+	err := m.DB.QueryRow(getUserSQL, auth0_id).Scan(&model.Auth0Id, &model.Id, &model.Email, &model.Username, &model.Pin, &model.Role)
 	if err == sql.ErrNoRows {
 		msg := "Couldn't find a user with that auth0_id"
 		return nil, http.StatusNotFound, msg, err
@@ -93,7 +95,7 @@ func (m *UserManager) List() (*[]User, int, string, error) {
 	}
 	for rows.Next() {
 		model := User{}
-		err = rows.Scan(&model.Auth0Id, &model.Id, &model.Email, &model.Username, &model.Pin)
+		err = rows.Scan(&model.Auth0Id, &model.Id, &model.Email, &model.Username, &model.Pin, &model.Role)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -120,7 +122,7 @@ func (m *UserManager) CustomList(sql string) (*[]User, int, string, error) {
 	}
 	for rows.Next() {
 		model := User{}
-		err = rows.Scan(&model.Auth0Id, &model.Id, &model.Email, &model.Username, &model.Pin)
+		err = rows.Scan(&model.Auth0Id, &model.Id, &model.Email, &model.Username, &model.Pin, &model.Role)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -178,7 +180,7 @@ func (m *UserManager) Update(model *User) (int, string, error) {
 		return status, msg, err
 	}
 	// Update
-	_, err = m.DB.Exec(updateUserSQL, model.Id, model.Email, model.Username, model.Pin, model.Auth0Id)
+	_, err = m.DB.Exec(updateUserSQL, model.Id, model.Email, model.Username, model.Pin, model.Role, model.Auth0Id)
 	if err != nil {
 		msg := "Couldn't update user in database"
 		return http.StatusInternalServerError, msg, err

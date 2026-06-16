@@ -153,7 +153,7 @@ func (a *Api) GetRouter() *gin.Engine {
 		{
 			user.POST("", userMiddlewareLenient, a.customCreateOrUpdateUser)
 			user.POST("/", userMiddlewareLenient, a.customCreateOrUpdateUser)
-			user.POST("/:auth0_id", userMiddleware, a.updateUser)
+			user.POST("/:auth0_id", userMiddleware, a.customUpdateUser)
 			user.GET("/:auth0_id", userMiddleware, a.getUser)
 		}
 		settings := v1.Group("/settings")
@@ -192,6 +192,12 @@ func (a *Api) GetRouter() *gin.Engine {
 			event.GET("/:user_id/:seconds", userMiddleware, a.customListEvent)
 			event.POST("", userMiddleware, a.customCreateEvent)
 			event.POST("/", userMiddleware, a.customCreateEvent)
+		}
+		// Operator-only surfaces. Gated by RequireAdmin (after userMiddleware
+		// loads the user from the validated token's identity). See #253.
+		admin := v1.Group("/admin", userMiddleware, a.RequireAdmin())
+		{
+			admin.GET("/whoami", a.adminWhoami)
 		}
 	}
 	return router
