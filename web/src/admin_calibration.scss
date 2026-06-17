@@ -1,0 +1,105 @@
+@import "styles.scss";
+
+.calib-page {
+  max-width: $max-width;
+  margin: 0 auto;
+  padding: 0 $base-space;
+
+  h1 {
+    margin-bottom: 0.25em;
+  }
+
+  .calib-hint {
+    color: $color-inactive;
+    font-size: 0.9em;
+    margin-bottom: $base-space;
+  }
+
+  .calib-error {
+    color: $color-error;
+  }
+
+  .calib-control {
+    display: block;
+    margin-bottom: $base-space;
+    font-size: 0.9em;
+
+    select {
+      font-family: $base-font-family;
+    }
+  }
+
+  .calib-summary {
+    border-collapse: collapse;
+    margin-bottom: 2 * $base-space;
+
+    th,
+    td {
+      border: 1px solid $color-chip-border;
+      padding: 0.25em 0.5em;
+      text-align: left;
+      font-size: 0.875rem;
+    }
+
+    th {
+      background: $color-card-tint-a;
+      font-weight: 600;
+    }
+  }
+
+  .calib-bucket {
+    margin: $base-space 0;
+    padding-top: 0.5 * $base-space;
+    border-top: 2px solid $color-chip-border;
+
+    h2 {
+      font-size: 1.5em;
+      margin-bottom: 0.25em;
+    }
+  }
+
+  .calib-muted {
+    color: $color-inactive;
+  }
+
+  .calib-gen {
+    margin: 0.5 * $base-space 0 $base-space;
+
+    .calib-gen-head {
+      font-size: 1em;
+      font-weight: 600;
+      margin: 0 0 0.1em;
+      padding-bottom: 0.1em;
+      border-bottom: 1px solid $color-chip-border;
+    }
+  }
+
+  .calib-prob {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.75 * $base-space;
+    padding: 0.25em 0;
+    border-bottom: 1px solid $color-card-tint-b;
+    font-size: 0.9em;
+  }
+
+  .calib-diff {
+    font-weight: 600;
+    min-width: 3em;
+  }
+
+  .calib-render {
+    min-width: 12em;
+  }
+
+  .calib-raw {
+    color: $color-inactive;
+    font-size: 0.85em;
+  }
+
+  .calib-factors {
+    color: $font-color;
+    font-size: 0.85em;
+  }
+}

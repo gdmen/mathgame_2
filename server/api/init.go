@@ -198,6 +198,7 @@ func (a *Api) GetRouter() *gin.Engine {
 		admin := v1.Group("/admin", userMiddleware, a.RequireAdmin())
 		{
 			admin.GET("/whoami", a.adminWhoami)
+			admin.GET("/difficulty-calibration", a.adminDifficultyCalibration)
 		}
 	}
 	return router

@@ -326,8 +326,41 @@ func parseProblemFeaturesFallback(expr string) problemFeatures {
 // floored at 1.0; NO upper clamp (see the scale comment at the top of this
 // file).
 func ComputeProblemDifficulty(expr string) float64 {
+	return ComputeDifficultyBreakdown(expr).Scaled
+}
+
+// ConceptFactor is one enabled concept multiplier and the factor it contributed,
+// for inspection tools. Presentation (labels/formatting) is the caller's job.
+type ConceptFactor struct {
+	Name   string  `json:"name"`
+	Factor float64 `json:"factor"`
+}
+
+// DifficultyBreakdown exposes the intermediate factors that
+// ComputeProblemDifficulty combines. It exists for inspection (the admin
+// difficulty-calibration page) and does NOT affect scoring:
+// ComputeProblemDifficulty returns Scaled, computed by exactly the formula
+// below. Keep this output-identical to the documented v0.2 formula - any change
+// to Scaled requires a DifficultyVersion bump (see docs/problem-generation.md).
+type DifficultyBreakdown struct {
+	Magnitude    float64         `json:"magnitude"`
+	OpWeight     float64         `json:"op_weight"`
+	Concept      float64         `json:"concept"`
+	Structure    float64         `json:"structure"`
+	Raw          float64         `json:"raw"`
+	Scaled       float64         `json:"scaled"`
+	MaxMagnitude float64         `json:"max_magnitude"`
+	NumOps       int             `json:"num_ops"`
+	HasMissing   bool            `json:"has_missing"`
+	Concepts     []ConceptFactor `json:"concepts"` // enabled concept multipliers, in formula order
+}
+
+// ComputeDifficultyBreakdown computes the difficulty score and every
+// intermediate factor. ComputeProblemDifficulty delegates here, so the two can
+// never disagree.
+func ComputeDifficultyBreakdown(expr string) DifficultyBreakdown {
 	if strings.TrimSpace(expr) == "" {
-		return 3.0
+		return DifficultyBreakdown{Scaled: 3.0}
 	}
 	f := parseProblemFeatures(expr)
 
@@ -345,29 +378,38 @@ func ComputeProblemDifficulty(expr string) float64 {
 	}
 
 	concept := 1.0
+	var concepts []ConceptFactor
 	if f.numFractions > 0 {
 		concept *= conceptFractions
+		concepts = append(concepts, ConceptFactor{"fractions", conceptFractions})
 		if f.numFractions >= 2 && !f.sameDenom {
 			concept *= conceptMismatched
+			concepts = append(concepts, ConceptFactor{"mismatched", conceptMismatched})
 		}
 	}
 	if f.hasNegatives {
 		concept *= conceptNegatives
+		concepts = append(concepts, ConceptFactor{"negatives", conceptNegatives})
 	}
 	if f.hasVariables {
 		concept *= conceptVariable
+		concepts = append(concepts, ConceptFactor{"variable", conceptVariable})
 	}
 	if f.isWord {
 		concept *= conceptWord
+		concepts = append(concepts, ConceptFactor{"word", conceptWord})
 	}
 	if f.requiresPEMDAS {
 		concept *= conceptPEMDAS
+		concepts = append(concepts, ConceptFactor{"pemdas", conceptPEMDAS})
 	}
 	if f.hasDecimals {
 		concept *= conceptDecimals
+		concepts = append(concepts, ConceptFactor{"decimals", conceptDecimals})
 	}
 	if f.hasPercent {
 		concept *= conceptPercent
+		concepts = append(concepts, ConceptFactor{"percent", conceptPercent})
 	}
 
 	structure := 1.0 + structurePerExtraOp*float64(maxInt(0, f.numOps-1))
@@ -376,7 +418,18 @@ func ComputeProblemDifficulty(expr string) float64 {
 	}
 
 	raw := magnitude * opWeight * concept * structure
-	return compressRaw(raw)
+	return DifficultyBreakdown{
+		Magnitude:    magnitude,
+		OpWeight:     opWeight,
+		Concept:      concept,
+		Structure:    structure,
+		Raw:          raw,
+		Scaled:       compressRaw(raw),
+		MaxMagnitude: f.maxMagnitude,
+		NumOps:       f.numOps,
+		HasMissing:   f.hasMissing,
+		Concepts:     concepts,
+	}
 }
 
 // compressRaw maps a raw composite onto the difficulty scale with a log
