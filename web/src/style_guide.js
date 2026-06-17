@@ -748,16 +748,8 @@ const StyleGuideView = () => {
 
       <footer className="sg-footer">
         <p>
-          This page lives at <code>/style-guide</code> and is intentionally not
-          linked from anywhere in the site navigation. Tracked in{" "}
-          <a
-            href="https://github.com/gdmen/mathgame_2/issues/213"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            issue #213
-          </a>
-          .
+          This page lives at <code>/admin/style-guide</code> and is linked from
+          the admin home (admin only).
         </p>
       </footer>
     </div>
