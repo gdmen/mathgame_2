@@ -14,6 +14,7 @@ import { SettingsView } from "./settings.js";
 import { PlayView } from "./play.js";
 import { ProgressView } from "./progress.js";
 import { CompanionView } from "./companion.js";
+import { DifficultyCalibrationView } from "./admin_calibration.js";
 import { StyleGuideView } from "./style_guide.js";
 
 import "./index.scss";
@@ -50,9 +51,18 @@ const MainView = ({
       </main>
     );
   }
+  // Admin pages bypass the kid-facing setup gate (an admin can use them
+  // without completing setup), and a non-admin who hits one gets the 404 page
+  // rather than the setup wizard or any hint the admin surface exists.
+  const isAdmin = user != null && user.role === "admin";
+  const onAdminPath = window.location.pathname.startsWith("/admin");
   if (isLoading || (isAuthenticated && settings == null)) {
     return <div className="content-loading"></div>;
-  } else if (settings != null && (user.pin === "" || numEnabledVideos < 3)) {
+  } else if (
+    settings != null &&
+    !onAdminPath &&
+    (user.pin === "" || numEnabledVideos < 3)
+  ) {
     return (
       <SetupView
         token={token}
@@ -108,6 +118,17 @@ const MainView = ({
           <Route exact path="/companion/:student_id">
             {!isLoading && isAuthenticated && (
               <CompanionView token={token} apiUrl={apiUrl} user={user} />
+            )}
+          </Route>
+          <Route exact path="/admin/difficulty-calibration">
+            {isAdmin ? (
+              <DifficultyCalibrationView
+                token={token}
+                apiUrl={apiUrl}
+                user={user}
+              />
+            ) : (
+              <NotFound />
             )}
           </Route>
           <Route path="*" component={NotFound} />
@@ -238,6 +259,17 @@ const AppView = () => {
             {isAuthenticated ? (
               <button onClick={() => (window.location.pathname = "settings")}>
                 Adults
+              </button>
+            ) : (
+              <></>
+            )}
+            {isAuthenticated && appUser && appUser.role === "admin" ? (
+              <button
+                onClick={() =>
+                  (window.location.pathname = "/admin/difficulty-calibration")
+                }
+              >
+                Calibration
               </button>
             ) : (
               <></>
