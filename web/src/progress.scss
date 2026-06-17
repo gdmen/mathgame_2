@@ -1,67 +1,70 @@
+@import "styles.scss";
+
 .progress-page {
-  padding: 1rem;
-  max-width: 900px;
+  max-width: $max-width;
   margin: 0 auto;
+  padding: 0 $base-space;
 }
 
 .progress-header {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
+  margin-bottom: $base-space;
 }
 
 .progress-error {
-  color: #c00;
+  color: $color-error;
 }
 
 .progress-summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 2rem;
+  gap: $base-space;
+  margin-bottom: 2 * $base-space;
 }
 
 .progress-summary-item {
   display: flex;
   flex-direction: column;
-  min-width: 6rem;
-  padding: 0.75rem 1rem;
-  background: #f5f5f5;
-  border-radius: 0.25rem;
+  min-width: 7em;
+  padding: 0.75 * $base-space $base-space;
+  background: $color-card-tint-a;
+  border: 1px solid $color-chip-border;
+  border-radius: $base-radius;
 }
 
 .progress-summary-value {
-  font-size: 1.25rem;
+  font-size: 1.5em;
   font-weight: 600;
+  color: $color-one-contrast;
 }
 
 .progress-summary-label {
-  font-size: 0.875rem;
-  color: #666;
+  font-size: 0.9em;
+  color: $color-inactive;
 }
 
 .progress-by-month {
-  margin-bottom: 2rem;
+  margin-bottom: 2 * $base-space;
 
   h2 {
-    font-size: 1.125rem;
-    margin-bottom: 0.5rem;
+    border-bottom: 1px solid $color-chip-border;
+    padding-bottom: 0.25 * $base-space;
+    margin-bottom: $base-space;
   }
 }
 
 .progress-by-month-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.875rem;
 
   th,
   td {
-    padding: 0.35rem 0.75rem;
+    padding: 0.5 * $base-space $base-space;
     text-align: left;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid $color-chip-border;
   }
 
   th {
     font-weight: 600;
-    color: #444;
+    background: $color-card-tint-a;
   }
 }
