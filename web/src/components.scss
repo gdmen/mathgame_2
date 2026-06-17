@@ -39,3 +39,27 @@ button {
     transform: rotate(360deg);
   }
 }
+
+.not-found {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  gap: 0.5 * $base-space;
+
+  h1 {
+    margin: 0;
+    color: $color-one-contrast;
+  }
+
+  p {
+    margin: 0;
+    color: $color-inactive;
+  }
+
+  a {
+    color: $color-one-contrast;
+  }
+}

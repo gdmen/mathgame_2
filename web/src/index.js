@@ -25,8 +25,10 @@ const ApiUrl = conf.api_host + ":" + conf.api_port + "/api/v1";
 const NotFound = () => {
   ClearSessionPin();
   return (
-    <div>
-      <h3>404 page not found</h3>
+    <div className="not-found">
+      <h1>404</h1>
+      <p>We couldn't find that page.</p>
+      <a href="/">Back to the game</a>
     </div>
   );
 };
