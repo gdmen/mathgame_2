@@ -1,0 +1,41 @@
+@import "styles.scss";
+
+.admin-home {
+  max-width: $max-width;
+  margin: 0 auto;
+  padding: 0 $base-space;
+
+  .admin-tools {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: $base-space;
+
+    a {
+      display: block;
+      padding: $base-space;
+      border: 1px solid $color-chip-border;
+      border-radius: $base-radius;
+      background: $color-card-tint-a;
+      text-decoration: none;
+      color: $font-color;
+
+      &:hover {
+        background: $color-two;
+      }
+    }
+
+    .admin-tool-label {
+      display: block;
+      font-weight: 600;
+      color: $color-one-contrast;
+    }
+
+    .admin-tool-desc {
+      display: block;
+      color: $color-inactive;
+      font-size: 0.9em;
+    }
+  }
+}

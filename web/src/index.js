@@ -14,6 +14,7 @@ import { SettingsView } from "./settings.js";
 import { PlayView } from "./play.js";
 import { ProgressView } from "./progress.js";
 import { CompanionView } from "./companion.js";
+import { AdminHomeView } from "./admin_home.js";
 import { DifficultyCalibrationView } from "./admin_calibration.js";
 import { StyleGuideView } from "./style_guide.js";
 
@@ -44,15 +45,6 @@ const MainView = ({
   refreshPageLoadData,
   postEvent,
 }) => {
-  // Style guide is intentionally unlinked; render it before any auth or
-  // setup gate so a direct URL hit works even when logged out.
-  if (window.location.pathname === "/style-guide") {
-    return (
-      <main>
-        <StyleGuideView />
-      </main>
-    );
-  }
   // Admin pages bypass the kid-facing setup gate (an admin can use them
   // without completing setup), and a non-admin who hits one gets the 404 page
   // rather than the setup wizard or any hint the admin surface exists.
@@ -122,6 +114,9 @@ const MainView = ({
               <CompanionView token={token} apiUrl={apiUrl} user={user} />
             )}
           </Route>
+          <Route exact path="/admin">
+            {isAdmin ? <AdminHomeView /> : <NotFound />}
+          </Route>
           <Route exact path="/admin/difficulty-calibration">
             {isAdmin ? (
               <DifficultyCalibrationView
@@ -132,6 +127,9 @@ const MainView = ({
             ) : (
               <NotFound />
             )}
+          </Route>
+          <Route exact path="/admin/style-guide">
+            {isAdmin ? <StyleGuideView /> : <NotFound />}
           </Route>
           <Route path="*" component={NotFound} />
         </Switch>
@@ -266,12 +264,8 @@ const AppView = () => {
               <></>
             )}
             {isAuthenticated && appUser && appUser.role === "admin" ? (
-              <button
-                onClick={() =>
-                  (window.location.pathname = "/admin/difficulty-calibration")
-                }
-              >
-                Calibration
+              <button onClick={() => (window.location.pathname = "/admin")}>
+                Admin
               </button>
             ) : (
               <></>
