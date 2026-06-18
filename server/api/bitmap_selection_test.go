@@ -46,7 +46,7 @@ func TestBitwiseSubsetSelection_Semantics(t *testing.T) {
 	enabled := uint64(ADDITION | SUBTRACTION | MEDIUM_NUMBERS)
 	settings := &Settings{UserId: 1, ProblemTypeBitmap: enabled, TargetDifficulty: 5}
 	prevIds := []uint32{}
-	pids, err := api.getSatisfyingProblemIds("[test-subset]", nil, settings, &prevIds)
+	pids, err := api.getSatisfyingProblemIds("[test-subset]", settings, &prevIds)
 	if err != nil {
 		t.Fatalf("getSatisfyingProblemIds: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestBitwiseSubsetSelection_Semantics(t *testing.T) {
 	}
 
 	// Topic-filtered variant: only rows containing SUBTRACTION.
-	pids, err = api.getSatisfyingProblemIdsForTopic("[test-subset-topic]", nil, settings, &prevIds, uint64(SUBTRACTION))
+	pids, err = api.getSatisfyingProblemIdsForTopic("[test-subset-topic]", settings, &prevIds, uint64(SUBTRACTION))
 	if err != nil {
 		t.Fatalf("getSatisfyingProblemIdsForTopic: %v", err)
 	}
@@ -78,6 +78,69 @@ func TestBitwiseSubsetSelection_Semantics(t *testing.T) {
 			t.Errorf("topic filter id=%d bitmap=%d: served=%v, want %v", s.id, s.bitmap, got[s.id], want)
 		}
 	}
+}
+
+// TestSelection_PrefersNewestGeneratorVersion: getSatisfyingProblemIds returns
+// only the highest-ranked generator version present, and falls back to the
+// next-highest version when the top tier is excluded. Seeds share one family so
+// the assertions don't depend on the cross-family rank ordering.
+func TestSelection_PrefersNewestGeneratorVersion(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+
+	// Same envelope (ADDITION) + difficulty 5, three llm versions.
+	seed := []struct {
+		id  uint32
+		gen string
+	}{
+		{7001, "llm_0.1"},
+		{7002, "llm_0.1"},
+		{7003, "llm_0.2"},
+		{7004, "llm_0.4"}, // newest
+		{7005, "llm_0.4"},
+	}
+	for _, s := range seed {
+		if _, err := api.DB.Exec(
+			`INSERT INTO problems (id, problem_type_bitmap, expression, answer, difficulty, disabled, generator, difficulty_version)
+			 VALUES (?, ?, 'seed', '1', 5, 0, ?, '0.2')`,
+			s.id, uint64(ADDITION), s.gen,
+		); err != nil {
+			t.Fatalf("seed %d: %v", s.id, err)
+		}
+	}
+
+	settings := &Settings{UserId: 1, ProblemTypeBitmap: uint64(ADDITION), TargetDifficulty: 5}
+
+	assertTier := func(label string, prevIds []uint32, want ...uint32) {
+		t.Helper()
+		pids, err := api.getSatisfyingProblemIds(label, settings, &prevIds)
+		if err != nil {
+			t.Fatalf("%s: %v", label, err)
+		}
+		got := map[uint32]bool{}
+		for _, id := range *pids {
+			got[id] = true
+		}
+		if len(got) != len(want) {
+			t.Fatalf("%s tier = %v, want %v", label, *pids, want)
+		}
+		for _, id := range want {
+			if !got[id] {
+				t.Errorf("%s tier missing id %d (got %v)", label, id, *pids)
+			}
+		}
+	}
+
+	// Newest tier only: the two llm_0.4 rows.
+	assertTier("[newest]", nil, 7004, 7005)
+	// Exclude the llm_0.4 tier: falls back to the next-highest (llm_0.2).
+	assertTier("[fallback]", []uint32{7004, 7005}, 7003)
+	// Exclude llm_0.4 and llm_0.2: falls back to the llm_0.1 tier.
+	assertTier("[fallback2]", []uint32{7004, 7005, 7003}, 7001, 7002)
 }
 
 // TestWeightedTopicMaskGates: all three gate sites exclude magnitude bits.

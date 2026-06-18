@@ -70,24 +70,55 @@ func formatUintsForSQLIn[T ~uint32 | ~uint64](vals []T) string {
 // An enabled bit means that feature MAY be served, never that it MUST be:
 // pool-supply weighting in chooseWeightedTopic keeps rare topics in
 // rotation by lottery weight, not by force.
-func (a *Api) getSatisfyingProblemIds(logPrefix string, c *gin.Context, settings *Settings, prevIds *[]uint32) (*[]uint32, error) {
+func (a *Api) getSatisfyingProblemIds(logPrefix string, settings *Settings, prevIds *[]uint32) (*[]uint32, error) {
 	diffLowerBound := settings.TargetDifficulty - problemSelectionEpsilon
 	diffUpperBound := settings.TargetDifficulty + problemSelectionEpsilon
-	sql := fmt.Sprintf("(problem_type_bitmap & ~%d) = 0 AND problem_type_bitmap != 0 AND difficulty >= %g and difficulty <= %g AND disabled=0;",
+	clause := fmt.Sprintf("(problem_type_bitmap & ~%d) = 0 AND problem_type_bitmap != 0 AND difficulty >= %g AND difficulty <= %g AND disabled=0",
 		settings.ProblemTypeBitmap,
 		diffLowerBound,
 		diffUpperBound,
 	)
 	if len(*prevIds) > 0 {
-		idFilter := fmt.Sprintf("id NOT IN (%s) AND ", formatUintsForSQLIn(*prevIds))
-		sql = idFilter + sql
+		clause = fmt.Sprintf("id NOT IN (%s) AND ", formatUintsForSQLIn(*prevIds)) + clause
 	}
-	glog.Infof("getSatisfyingProblemIds sql: select * from problems where %s\n", sql)
-	problemIds, status, msg, err := a.problemManager.CustomIdList(sql)
-	if HandleMngrResp(logPrefix, c, status, msg, err, problemIds) != nil {
+	return a.newestVersionTier(logPrefix, clause)
+}
+
+// newestVersionTier runs the satisfying-set query for whereClause and returns
+// the ids of the highest-ranked generator version present (see generatorRank),
+// so selection prefers newer generators and falls back to an older version only
+// when no newer version matches the envelope + difficulty window.
+func (a *Api) newestVersionTier(logPrefix string, whereClause string) (*[]uint32, error) {
+	query := "SELECT id, generator FROM problems WHERE " + whereClause
+	glog.Infof("%s newestVersionTier: %s", logPrefix, query)
+	rows, err := a.DB.Query(query)
+	if err != nil {
+		glog.Errorf("%s newestVersionTier query: %v", logPrefix, err)
 		return nil, err
 	}
-	return problemIds, nil
+	defer rows.Close()
+
+	byRank := map[int][]uint32{}
+	bestRank := 0
+	haveBest := false
+	for rows.Next() {
+		var id uint32
+		var generator string
+		if err := rows.Scan(&id, &generator); err != nil {
+			continue
+		}
+		r := generatorRank[generator]
+		byRank[r] = append(byRank[r], id)
+		if !haveBest || r > bestRank {
+			bestRank = r
+			haveBest = true
+		}
+	}
+	ids := byRank[bestRank]
+	if ids == nil {
+		ids = []uint32{}
+	}
+	return &ids, nil
 }
 
 func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings, prevIds *[]uint32) (*Problem, error) {
@@ -118,7 +149,12 @@ func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings
 			topicSettings.TargetDifficulty = topicDiff
 			// Only include permutations that contain the target topic
 			topicSettings.ProblemTypeBitmap = settings.ProblemTypeBitmap // keep all enabled, filter below
-			pids, err := a.getSatisfyingProblemIdsForTopic(logPrefix, c, &topicSettings, prevIds, targetTopic)
+			pids, err := a.getSatisfyingProblemIdsForTopic(logPrefix, &topicSettings, prevIds, targetTopic)
+			// Topic-specific pool too small, trigger background generation
+			if err == nil && len(*pids) < minSelectionPool {
+				glog.Infof("%s topic pool small (%d), generating more", logPrefix, len(*pids))
+				a.generateProblemsBackground(logPrefix, &topicSettings)
+			}
 			if err == nil && len(*pids) > 0 {
 				pid := a.pickWithRecencyBias(logPrefix, settings.UserId, *pids)
 				p, status, msg, err := a.problemManager.Get(pid)
@@ -127,16 +163,11 @@ func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings
 				}
 				glog.Infof("%s topic-weighted fetch failed (id=%d): %s : %v", logPrefix, pid, msg, err)
 			}
-			// Topic-specific pool too small, trigger background generation
-			if err == nil && len(*pids) < minSelectionPool {
-				glog.Infof("%s topic pool small (%d), generating more", logPrefix, len(*pids))
-				a.generateProblemsBackground(logPrefix, &topicSettings)
-			}
 		}
 	}
 
 	// Fall back to default (non-topic-weighted) selection
-	pids, err := a.getSatisfyingProblemIds(logPrefix, c, settings, prevIds)
+	pids, err := a.getSatisfyingProblemIds(logPrefix, settings, prevIds)
 	if err != nil {
 		return nil, err
 	}
@@ -180,25 +211,19 @@ func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings
 // getSatisfyingProblemIdsForTopic is like getSatisfyingProblemIds but only
 // returns problems whose bitmap contains the target topic: the same
 // bitwise-subset clause plus (problem_type_bitmap & targetTopic) != 0.
-func (a *Api) getSatisfyingProblemIdsForTopic(logPrefix string, c *gin.Context, settings *Settings, prevIds *[]uint32, targetTopic uint64) (*[]uint32, error) {
+func (a *Api) getSatisfyingProblemIdsForTopic(logPrefix string, settings *Settings, prevIds *[]uint32, targetTopic uint64) (*[]uint32, error) {
 	diffLowerBound := settings.TargetDifficulty - problemSelectionEpsilon
 	diffUpperBound := settings.TargetDifficulty + problemSelectionEpsilon
-	sql := fmt.Sprintf("(problem_type_bitmap & ~%d) = 0 AND problem_type_bitmap != 0 AND (problem_type_bitmap & %d) != 0 AND difficulty >= %g and difficulty <= %g AND disabled=0;",
+	clause := fmt.Sprintf("(problem_type_bitmap & ~%d) = 0 AND problem_type_bitmap != 0 AND (problem_type_bitmap & %d) != 0 AND difficulty >= %g AND difficulty <= %g AND disabled=0",
 		settings.ProblemTypeBitmap,
 		targetTopic,
 		diffLowerBound,
 		diffUpperBound,
 	)
 	if len(*prevIds) > 0 {
-		idFilter := fmt.Sprintf("id NOT IN (%s) AND ", formatUintsForSQLIn(*prevIds))
-		sql = idFilter + sql
+		clause = fmt.Sprintf("id NOT IN (%s) AND ", formatUintsForSQLIn(*prevIds)) + clause
 	}
-	glog.Infof("getSatisfyingProblemIdsForTopic sql: select id from problems where %s\n", sql)
-	problemIds, status, msg, err := a.problemManager.CustomIdList(sql)
-	if HandleMngrResp(logPrefix, c, status, msg, err, problemIds) != nil {
-		return nil, err
-	}
-	return problemIds, nil
+	return a.newestVersionTier(logPrefix, clause)
 }
 
 func (a *Api) generateProblem(logPrefix string, settings *Settings) (*Problem, error) {
