@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	VERSION         = "llm_0.4"
+	VERSION         = "llm_0.5"
 	OPENAI_URL      = "https://api.openai.com/v1/completions"
 	PROMPT_QUESTION = `
 Generate math questions in the format of this example:
@@ -46,6 +46,10 @@ Return these problems as a valid JSON list with no additional text.
 Do not wrap the JSON in markdown or any other JSON markers.
 `
 	PROMPT_QUANTITY = "Produce %d unique %sproblems in this format."
+	// PROMPT_DIFFICULTY steers the generator toward the target difficulty using
+	// the levers the difficulty formula scores on, all within the constraint
+	// block. Built from opts.TargetDifficulty.
+	PROMPT_DIFFICULTY = "Aim for a difficulty of about %.0f (1 is trivial, 20+ is very hard). Within the constraints above, difficulty rises with larger numbers, harder operations (division is hardest, then multiplication, then subtraction, then addition), and more operations chained into one expression - calibrate these to reach it."
 	// MAX_QUANTITY caps problems per OpenAI call.
 	MAX_QUANTITY = 20
 )
@@ -79,6 +83,9 @@ func GenerateProblem(opts *Options) ([]Problem, error) {
 	prompt := PROMPT_QUESTION + "\n" + fmt.Sprintf(PROMPT_QUANTITY, opts.NumProblems, ptype)
 	if opts.Constraints != "" {
 		prompt += "\n" + opts.Constraints
+	}
+	if opts.TargetDifficulty > 0 {
+		prompt += "\n" + fmt.Sprintf(PROMPT_DIFFICULTY, opts.TargetDifficulty)
 	}
 	// Add topic-specific variety hint
 	for _, feature := range opts.Features {

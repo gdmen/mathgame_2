@@ -115,6 +115,17 @@ prose, never append the arithmetic or its result, and use symbolic math
 outside \text{} ONLY when the statement itself is an expression to
 manipulate (e.g. "Solve for x: 3x + 7 = 22"). No code path changed.
 
+### `llm_0.5` — difficulty steering
+
+Prompt-only change vs `0.4` (issue #263). `Options.TargetDifficulty` was
+plumbed into the generator but never reached the prompt, so output clustered
+below high targets — a diagnostic for envelope 968 / target 20.32 produced an
+8–18 spread with 0 problems in the `[18.82, 21.82]` selection window. The
+prompt now appends an advisory line built from the target: difficulty rises
+with larger numbers, harder operations (division > multiplication >
+subtraction > addition), and more chained operations, calibrated toward the
+target within the constraint block. No code path or formula changed.
+
 ## Universal Difficulty Scale
 
 Every problem's `difficulty` column stores a universal score on a 1-20 scale
