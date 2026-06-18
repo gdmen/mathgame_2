@@ -199,6 +199,7 @@ func (a *Api) GetRouter() *gin.Engine {
 		{
 			admin.GET("/whoami", a.adminWhoami)
 			admin.GET("/difficulty-calibration", a.adminDifficultyCalibration)
+			admin.POST("/difficulty-calibration/recompute", a.adminRecomputeCalibration)
 		}
 	}
 	return router

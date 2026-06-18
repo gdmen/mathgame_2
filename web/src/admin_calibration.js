@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import parse from "html-react-parser";
 import katex from "katex";
 import "katex/dist/katex.min.css";
@@ -43,7 +43,6 @@ const Breakdown = ({ bd }) => {
   if (!bd) {
     return null;
   }
-  // concept = product of the enabled concept multipliers.
   const conceptDetail =
     Array.isArray(bd.concepts) && bd.concepts.length
       ? " = " +
@@ -51,7 +50,6 @@ const Breakdown = ({ bd }) => {
           .map((c) => `${c.name} ×${Number(c.factor).toFixed(1)}`)
           .join(" × ")
       : "";
-  // structure = 1 + additive increments (per extra op, missing-number bump).
   const structAdds = [];
   if (bd.num_ops > 1) {
     structAdds.push(`${bd.num_ops - 1} extra op${bd.num_ops > 2 ? "s" : ""}`);
@@ -86,47 +84,65 @@ const Problem = ({ p }) => (
 );
 
 const DifficultyCalibrationView = ({ token, apiUrl, user }) => {
-  const [data, setData] = useState(null);
+  const [resp, setResp] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Access is gated by the route (non-admins get the 404 page) and enforced
-  // server-side by RequireAdmin; this component just needs an authed user.
-  useEffect(() => {
+  const authHeaders = useCallback(
+    () => ({
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token,
+    }),
+    [token]
+  );
+
+  const fetchReport = useCallback(async () => {
     if (!token || !apiUrl || !user) {
       return;
     }
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const reqParams = {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + token,
-          },
-        };
-        const res = await fetch(
-          apiUrl + "/admin/difficulty-calibration",
-          reqParams
-        );
-        if (!res.ok) {
-          setError("Could not load calibration data");
-          setData(null);
-          return;
-        }
-        setData(await res.json());
-      } catch (e) {
-        setError(e.message || "Could not load calibration data");
-        setData(null);
-      } finally {
-        setLoading(false);
+    try {
+      const res = await fetch(apiUrl + "/admin/difficulty-calibration", {
+        method: "GET",
+        headers: authHeaders(),
+      });
+      if (!res.ok) {
+        setError("Could not load calibration data");
+        return;
       }
-    };
-    fetchData();
-  }, [token, apiUrl, user]);
+      setResp(await res.json());
+      setError(null);
+    } catch (e) {
+      setError(e.message || "Could not load calibration data");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, apiUrl, user, authHeaders]);
+
+  useEffect(() => {
+    fetchReport();
+  }, [fetchReport]);
+
+  // While a rebuild is running, poll so the report appears when it lands.
+  useEffect(() => {
+    if (!resp || !resp.computing) {
+      return;
+    }
+    const t = setInterval(fetchReport, 3000);
+    return () => clearInterval(t);
+  }, [resp, fetchReport]);
+
+  const recompute = async () => {
+    try {
+      await fetch(apiUrl + "/admin/difficulty-calibration/recompute", {
+        method: "POST",
+        headers: authHeaders(),
+      });
+    } catch (e) {
+      // The next fetch reflects the real state.
+    }
+    fetchReport();
+  };
 
   if (loading) {
     return <div className="content-loading"></div>;
@@ -138,83 +154,102 @@ const DifficultyCalibrationView = ({ token, apiUrl, user }) => {
       </div>
     );
   }
-  if (!data || !Array.isArray(data.buckets)) {
-    return (
-      <div className="calib-page">
-        <p>No calibration data.</p>
-      </div>
-    );
-  }
 
+  const report = resp && resp.report;
   return (
     <div className="calib-page">
       <h1>Difficulty calibration</h1>
       <p className="calib-hint">
         Read-only view of live problems per difficulty bucket, grouped by
         generator version: one example of each distinct problem-type bitmap that
-        generator produced in the bucket. Buckets are [center−0.5, center+0.5);
-        the scale is open-ended above 20 (system max ≈ 62). Each problem shows
-        its ComputeProblemDifficulty factor breakdown.
+        generator produced in the bucket. The report is cached; rebuild it with
+        Recompute. Buckets are [center−0.5, center+0.5); the scale is open-ended
+        above 20 (system max ≈ 62). Each problem shows its
+        ComputeProblemDifficulty factor breakdown.
       </p>
 
-      <table className="calib-summary">
-        <thead>
-          <tr>
-            <th>Bucket</th>
-            <th>Live</th>
-            <th>Disabled</th>
-            <th>Examples</th>
-            <th>Generator mix</th>
-            <th>Dominant bits</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.buckets.map((b) => (
-            <tr key={b.label}>
-              <td>
-                <a href={"#bucket-" + b.label}>{b.label}</a>
-              </td>
-              <td>{b.live_count}</td>
-              <td>{b.disabled_count}</td>
-              <td>{sampledCount(b.generators)}</td>
-              <td>{generatorMix(b.generators)}</td>
-              <td>{nameCounts(b.dominant_bits)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="calib-control">
+        <span className="calib-muted">
+          {resp && resp.computed_at
+            ? "Last computed: " + resp.computed_at
+            : "Not computed yet"}
+          {resp && resp.computing ? " · computing…" : ""}
+        </span>{" "}
+        <button onClick={recompute} disabled={resp && resp.computing}>
+          Recompute
+        </button>
+      </div>
 
-      {data.buckets.map((b) => (
-        <section
-          className="calib-bucket"
-          id={"bucket-" + b.label}
-          key={b.label}
-        >
-          <h2>
-            Difficulty {b.label}{" "}
-            <span className="calib-muted">
-              ({b.live_count} live, {b.disabled_count} disabled)
-            </span>
-          </h2>
-          {(!b.generators || b.generators.length === 0) && (
-            <p className="calib-muted">— no live problems in this bucket —</p>
-          )}
-          {b.generators &&
-            b.generators.map((g) => (
-              <div className="calib-gen" key={g.generator}>
-                <h3 className="calib-gen-head">
-                  {g.generator}{" "}
-                  <span className="calib-muted">
-                    ({g.live_count} live, {g.problems ? g.problems.length : 0}{" "}
-                    distinct shapes)
-                  </span>
-                </h3>
-                {g.problems &&
-                  g.problems.map((p, i) => <Problem p={p} key={i} />)}
-              </div>
-            ))}
-        </section>
-      ))}
+      {!report && resp && !resp.computing && (
+        <p className="calib-muted">
+          No report yet. Click Recompute to build it.
+        </p>
+      )}
+
+      {report && (
+        <>
+          <table className="calib-summary">
+            <thead>
+              <tr>
+                <th>Bucket</th>
+                <th>Live</th>
+                <th>Disabled</th>
+                <th>Examples</th>
+                <th>Generator mix</th>
+                <th>Dominant bits</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.buckets.map((b) => (
+                <tr key={b.label}>
+                  <td>
+                    <a href={"#bucket-" + b.label}>{b.label}</a>
+                  </td>
+                  <td>{b.live_count}</td>
+                  <td>{b.disabled_count}</td>
+                  <td>{sampledCount(b.generators)}</td>
+                  <td>{generatorMix(b.generators)}</td>
+                  <td>{nameCounts(b.dominant_bits)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {report.buckets.map((b) => (
+            <section
+              className="calib-bucket"
+              id={"bucket-" + b.label}
+              key={b.label}
+            >
+              <h2>
+                Difficulty {b.label}{" "}
+                <span className="calib-muted">
+                  ({b.live_count} live, {b.disabled_count} disabled)
+                </span>
+              </h2>
+              {(!b.generators || b.generators.length === 0) && (
+                <p className="calib-muted">
+                  — no live problems in this bucket —
+                </p>
+              )}
+              {b.generators &&
+                b.generators.map((g) => (
+                  <div className="calib-gen" key={g.generator}>
+                    <h3 className="calib-gen-head">
+                      {g.generator}{" "}
+                      <span className="calib-muted">
+                        ({g.live_count} live,{" "}
+                        {g.problems ? g.problems.length : 0} distinct shapes)
+                      </span>
+                    </h3>
+                    {g.problems &&
+                      g.problems.map((p, i) => <Problem p={p} key={i} />)}
+                  </div>
+                ))}
+            </section>
+          ))}
+        </>
+      )}
     </div>
   );
 };
