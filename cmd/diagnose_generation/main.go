@@ -36,6 +36,7 @@ func main() {
 	target := flag.Float64("target", 20.32, "target difficulty")
 	epsilon := flag.Float64("epsilon", 1.5, "selection window half-width (problemSelectionEpsilon)")
 	n := flag.Int("n", 50, "number of candidates to request from the LLM")
+	model := flag.String("model", "", "OpenAI model id override, e.g. gpt-5-mini or gpt-5; empty uses the generator default (gpt-5-nano)")
 	flag.Parse()
 
 	c, err := common.ReadConfig(*configPath)
@@ -52,11 +53,16 @@ func main() {
 		TargetDifficulty: *target,
 		NumProblems:      *n,
 		Constraints:      api.BuildBitConstraints(pt),
+		Model:            *model,
 	}
 
+	modelLabel := *model
+	if modelLabel == "" {
+		modelLabel = "gpt-5-nano (default)"
+	}
 	lo, hi := *target-*epsilon, *target+*epsilon
-	fmt.Printf("Requesting %d candidates for bitmap=%d target=%.2f (window [%.2f, %.2f])\n",
-		*n, *envelope, *target, lo, hi)
+	fmt.Printf("Requesting %d candidates for bitmap=%d target=%.2f (window [%.2f, %.2f]) model=%s\n",
+		*n, *envelope, *target, lo, hi, modelLabel)
 
 	problems, err := llm_generator.GenerateProblem(opts)
 	if err != nil {
