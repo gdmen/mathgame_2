@@ -55,7 +55,18 @@ Calls OpenAI (GPT-4o-mini for generation, GPT-4o for validation). Produces
 richer, more varied problems, especially word problems. Slower and costs
 money per problem; offset by batching (5-20 problems per call).
 
-### `llm_0.1` — first LLM prompt
+### `llm_0.0` — initial OpenAI generator
+
+The first LLM-backed generator (commit `6d5cacf`). The generator string was
+hardcoded at the call site (`model.Generator = "llm_0.0"`); the `VERSION`
+constant did not exist yet — it arrived with `llm_0.1`, where the documented
+prompt lineage below begins. Roughly 2,981 problems in prod carry this tag.
+
+Ranked below `heuristic_0.0` in `generatorRank` (issue #263): it is the
+earliest LLM output, predating any prompt iteration, so among the present
+versions it is the least preferred for selection.
+
+### `llm_0.1` — first versioned LLM prompt
 
 Initial prompt template. Features:
 - Generates problems via GPT-4o-mini with a single generic prompt
