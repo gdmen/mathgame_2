@@ -49,7 +49,7 @@ Do not wrap the JSON in markdown or any other JSON markers.
 	// PROMPT_DIFFICULTY steers the generator toward the target difficulty using
 	// the levers the difficulty formula scores on, all within the constraint
 	// block. Built from opts.TargetDifficulty.
-	PROMPT_DIFFICULTY = "Aim for a difficulty of about %.0f (1 is trivial, 20+ is very hard). Within the constraints above, difficulty rises with larger numbers, harder operations (division is hardest, then multiplication, then subtraction, then addition), and more operations chained into one expression. The higher the target, the more of these you must COMBINE in one problem - a single operation, even on large numbers, plateaus in the mid-range. A computation spelled out in prose counts only its numbers toward difficulty, not its operation, so for hard targets prefer a symbolic expression or an equation to solve over a prose word problem."
+	PROMPT_DIFFICULTY = "Aim for a difficulty of about %.0f (1 is trivial, 20+ is very hard). The strongest driver is the SIZE of the numbers paired with a hard operation: within the constraints above, use the LARGEST numbers allowed with the hardest operation available (division, then multiplication, then subtraction, then addition). To push higher, chain an extra operation onto those large numbers WITHOUT making the numbers smaller. A computation spelled out in prose is scored only on its numbers, not its operation, so for a hard target write a symbolic expression or an equation to solve rather than a prose word problem."
 	// MAX_QUANTITY caps problems per OpenAI call.
 	MAX_QUANTITY = 20
 )

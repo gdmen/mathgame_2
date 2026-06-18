@@ -138,10 +138,14 @@ subtraction > addition), and more chained operations, within the constraint
 block.
 
 The advisory adds two things the diagnostic showed the model needed. First,
-it must **combine** the levers in one problem — the model tends to pull a
-single lever (one big division), which plateaus in the mid-range; high
-targets need large numbers *and* chaining together. Second, it steers away
-from prose for hard targets: in `ComputeProblemDifficulty`, `opWeight` and
+it leads with the dominant lever — the SIZE of the numbers — and makes
+chaining strictly additive ("chain an extra operation … WITHOUT making the
+numbers smaller"). An earlier "combine the levers" phrasing backfired: the
+model chained operations but shrank the operands, and since magnitude
+dominates the formula, difficulty fell (`96/8/3` = 14.8 vs `9999/9` = 18.4).
+The target shape is a large number with one or two chained operations
+(`9999/9/3` = 19.4). Second, it steers away from prose for hard targets: in
+`ComputeProblemDifficulty`, `opWeight` and
 `structure` are token-level and `\text{}` contents never contribute, so a
 story problem scores its operation as addition (`opWeight 1.0`, `structure
 1.0`) — only its numbers and the `×1.3` word concept count. A hard target is
