@@ -20,12 +20,27 @@
   }
 
   .calib-control {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: $base-space;
     margin-bottom: $base-space;
     font-size: 0.9em;
 
-    select {
-      font-family: $base-font-family;
+    button {
+      background-color: $color-one-contrast;
+      color: white;
+      font-weight: 400;
+      transition-duration: 0.1s;
+
+      &:active {
+        transform: scale(0.95);
+      }
+
+      &:disabled {
+        background-color: $color-inactive;
+        cursor: default;
+      }
     }
   }
 

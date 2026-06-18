@@ -1,20 +1,21 @@
-// Package api: the admin difficulty-calibration endpoint.
+// Package api: the admin difficulty-calibration report.
 //
-// A read-only JSON endpoint that samples real problems per difficulty bucket
-// and returns the ComputeProblemDifficulty factor breakdown for each, so the
-// hand-tuned formula constants (server/api/difficulty.go) can be eyeballed
-// against the actual prod pool. The web app renders it (web/src/admin_calibration.js).
-// Registered under /api/v1/admin behind RequireAdmin. No writes.
-//
-// The data is gathered in two passes: a GROUP BY for per-bucket live/disabled
-// and per-generator counts, then a window-function query for the sample
-// problems.
+// computeCalibrationReport samples real problems per difficulty bucket with the
+// ComputeProblemDifficulty factor breakdown, so the formula constants
+// (server/api/difficulty.go) can be eyeballed against the prod pool. It scans
+// the whole pool, so the result is cached in the calibration_report table: the
+// GET endpoint reads the cache, and the POST recompute endpoint rebuilds it in
+// the background. Registered under /api/v1/admin behind RequireAdmin.
+// The web app renders it (web/src/admin_calibration.js).
 package api
 
 import (
+	"database/sql"
+	"encoding/json"
 	"net/http"
 	"sort"
 	"strconv"
+	"sync/atomic"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
@@ -56,34 +57,101 @@ type CalibrationData struct {
 	Buckets []CalibrationBucket `json:"buckets"`
 }
 
+// CalibrationReportResponse is the GET payload: the cached report (nil until
+// first computed), when it was computed, and whether a rebuild is in flight.
+type CalibrationReportResponse struct {
+	Report     *CalibrationData `json:"report"`
+	ComputedAt string           `json:"computed_at"`
+	Computing  bool             `json:"computing"`
+}
+
+// calibrationComputing is true while a background recompute is running. It also
+// serves as the dedup guard: only the goroutine that flips it false->true runs.
+var calibrationComputing atomic.Bool
+
 // calibBucketExpr maps a row's difficulty to its bucket key: round-to-nearest,
-// so a row falls in the half-open bucket [center-0.5, center+0.5). Shared by
-// both passes.
+// so a row falls in the half-open bucket [center-0.5, center+0.5).
 const calibBucketExpr = "CAST(FLOOR(difficulty + 0.5) AS SIGNED)"
 
-// adminDifficultyCalibration samples the live pool into difficulty buckets and
-// returns, per bucket and per generator version present, one example of EACH
-// distinct problem-type bitmap that generator produced in the bucket (with the
-// generator's live count and each example's factor breakdown), as JSON.
+// adminDifficultyCalibration returns the cached calibration report.
 func (a *Api) adminDifficultyCalibration(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
+	resp := CalibrationReportResponse{Computing: calibrationComputing.Load()}
 
-	// Pass 1: live/disabled counts and per-generator live counts for every
-	// bucket, in one GROUP BY scan.
+	var blob, computedAt string
+	err := a.DB.QueryRow("SELECT report, computed_at FROM calibration_report WHERE id = 1").Scan(&blob, &computedAt)
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+	if err != nil {
+		glog.Errorf("%s calibration cache read: %v", logPrefix, err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, common.GetError("calibration read failed"))
+		return
+	}
+	var report CalibrationData
+	if err := json.Unmarshal([]byte(blob), &report); err != nil {
+		glog.Errorf("%s calibration cache unmarshal: %v", logPrefix, err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, common.GetError("calibration read failed"))
+		return
+	}
+	resp.Report = &report
+	resp.ComputedAt = computedAt
+	c.JSON(http.StatusOK, resp)
+}
+
+// adminRecomputeCalibration rebuilds the report in the background and stores it,
+// returning immediately. A second request while one is running is a no-op.
+func (a *Api) adminRecomputeCalibration(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	if !calibrationComputing.CompareAndSwap(false, true) {
+		c.JSON(http.StatusOK, gin.H{"computing": true})
+		return
+	}
+	go func() {
+		defer calibrationComputing.Store(false)
+		defer func() {
+			if r := recover(); r != nil {
+				glog.Errorf("%s calibration recompute panicked: %v", logPrefix, r)
+			}
+		}()
+		report, err := a.computeCalibrationReport()
+		if err != nil {
+			glog.Errorf("%s calibration recompute: %v", logPrefix, err)
+			return
+		}
+		blob, err := json.Marshal(report)
+		if err != nil {
+			glog.Errorf("%s calibration marshal: %v", logPrefix, err)
+			return
+		}
+		if _, err := a.DB.Exec(
+			"INSERT INTO calibration_report (id, report, computed_at) VALUES (1, ?, NOW()) "+
+				"ON DUPLICATE KEY UPDATE report = VALUES(report), computed_at = VALUES(computed_at)",
+			string(blob),
+		); err != nil {
+			glog.Errorf("%s calibration cache write: %v", logPrefix, err)
+		}
+	}()
+	c.JSON(http.StatusOK, gin.H{"computing": true})
+}
+
+// computeCalibrationReport samples the live pool into difficulty buckets: per
+// bucket and generator version, one example of each distinct problem-type
+// bitmap, with that generator's live count and each example's factor breakdown.
+func (a *Api) computeCalibrationReport() (CalibrationData, error) {
+	// Pass 1: live/disabled counts and per-generator live counts per bucket.
 	type aggBucket struct {
 		live, disabled int
 		liveByGen      map[string]int
 	}
 	agg := map[int]*aggBucket{}
 	maxBucket := 0
-
 	rows, err := a.DB.Query(
 		"SELECT " + calibBucketExpr + " AS bucket, disabled, generator, COUNT(*) " +
 			"FROM problems GROUP BY bucket, disabled, generator")
 	if err != nil {
-		glog.Errorf("%s calibration counts: %v", logPrefix, err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, common.GetError("calibration query failed"))
-		return
+		return CalibrationData{}, err
 	}
 	for rows.Next() {
 		var bucket, disabled, count int
@@ -108,29 +176,25 @@ func (a *Api) adminDifficultyCalibration(c *gin.Context) {
 	}
 	rows.Close()
 
-	// Pass 2: one example per (bucket, generator, problem_type_bitmap) in one
-	// window-function scan - rn = 1 over a partition that includes the bitmap,
-	// so every distinct problem shape a generator produced in a bucket appears
-	// exactly once. ORDER BY id (a content hash, so representative and stable)
-	// avoids an ORDER BY RAND() sort.
+	// Pass 2: one example per (bucket, generator, problem_type_bitmap). Rank on
+	// small columns only, then PK-join back for the expression, so the
+	// ROW_NUMBER sort never carries the TEXT expression column.
 	type sampleKey struct {
 		bucket    int
 		generator string
 	}
 	samples := map[sampleKey][]CalibrationProblem{}
 	srows, err := a.DB.Query(
-		"WITH live AS (" +
-			"SELECT id, expression, difficulty, problem_type_bitmap, generator, " +
-			calibBucketExpr + " AS bucket " +
-			"FROM problems WHERE disabled = 0) " +
-			"SELECT bucket, generator, expression, difficulty, problem_type_bitmap FROM (" +
-			"SELECT bucket, generator, expression, difficulty, problem_type_bitmap, " +
-			"ROW_NUMBER() OVER (PARTITION BY bucket, generator, problem_type_bitmap ORDER BY id) AS rn FROM live) t " +
-			"WHERE rn = 1 ORDER BY bucket, generator, problem_type_bitmap")
+		"WITH ranked AS (" +
+			"SELECT id, bucket, generator FROM (" +
+			"SELECT id, " + calibBucketExpr + " AS bucket, generator, " +
+			"ROW_NUMBER() OVER (PARTITION BY " + calibBucketExpr + ", generator, problem_type_bitmap ORDER BY id) AS rn " +
+			"FROM problems WHERE disabled = 0) t WHERE rn = 1) " +
+			"SELECT r.bucket, r.generator, p.expression, p.difficulty, p.problem_type_bitmap " +
+			"FROM ranked r JOIN problems p ON p.id = r.id " +
+			"ORDER BY r.bucket, r.generator")
 	if err != nil {
-		glog.Errorf("%s calibration samples: %v", logPrefix, err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, common.GetError("calibration query failed"))
-		return
+		return CalibrationData{}, err
 	}
 	for srows.Next() {
 		var bucket int
@@ -149,21 +213,19 @@ func (a *Api) adminDifficultyCalibration(c *gin.Context) {
 	}
 	srows.Close()
 
-	// Assemble buckets 1..topCenter from the two maps. topCenter follows the
-	// data (no clamp); always show at least the full 1..20 scale.
+	// Assemble buckets 1..topCenter; topCenter follows the data, at least 1..20.
 	topCenter := maxBucket
 	if topCenter < 20 {
 		topCenter = 20
 	}
-
 	data := CalibrationData{Buckets: []CalibrationBucket{}}
-	appendBucket := func(key int, label string) {
+	for k := 1; k <= topCenter; k++ {
 		bucket := CalibrationBucket{
-			Label:        label,
+			Label:        strconv.Itoa(k),
 			Generators:   []CalibrationGenGroup{},
 			DominantBits: []NameCount{},
 		}
-		if b := agg[key]; b != nil {
+		if b := agg[k]; b != nil {
 			bucket.LiveCount = b.live
 			bucket.DisabledCount = b.disabled
 			gens := make([]string, 0, len(b.liveByGen))
@@ -178,7 +240,7 @@ func (a *Api) adminDifficultyCalibration(c *gin.Context) {
 					LiveCount: b.liveByGen[g],
 					Problems:  []CalibrationProblem{},
 				}
-				for _, p := range samples[sampleKey{key, g}] {
+				for _, p := range samples[sampleKey{k, g}] {
 					group.Problems = append(group.Problems, p)
 					for _, n := range p.Bits {
 						bitTally[n]++
@@ -190,11 +252,7 @@ func (a *Api) adminDifficultyCalibration(c *gin.Context) {
 		}
 		data.Buckets = append(data.Buckets, bucket)
 	}
-	for k := 1; k <= topCenter; k++ {
-		appendBucket(k, strconv.Itoa(k))
-	}
-
-	c.JSON(http.StatusOK, data)
+	return data, nil
 }
 
 // topNameCounts returns the n most frequent entries in the tally, ties broken
