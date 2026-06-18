@@ -90,12 +90,17 @@ func GenerateProblem(opts *Options) ([]Problem, error) {
 	}
 	glog.Infof("OpenAI question prompt: %s\n", prompt)
 
+	model := openai.GPT5Nano
+	if opts.Model != "" {
+		model = opts.Model
+	}
+
 	client := openai.NewClient(c.OpenAiApiKey)
 	resp, err := chatCompletionWithRetry(
 		context.Background(),
 		client,
 		openai.ChatCompletionRequest{
-			Model: openai.GPT5Nano,
+			Model: model,
 			Messages: []openai.ChatCompletionMessage{
 				{
 					Role:    openai.ChatMessageRoleUser,

@@ -9,4 +9,8 @@ type Options struct {
 	// settings bitmap (api.BuildBitConstraints). The api side owns bit
 	// semantics; this package treats the block as opaque prompt text.
 	Constraints string `json:"constraints" form:"constraints"`
+	// Model overrides the OpenAI model id (e.g. "gpt-5-mini", "gpt-5"). Empty
+	// uses the package default (GPT5Nano). Lets the diagnostic A/B model tiers
+	// without touching the production default.
+	Model string `json:"model" form:"model"`
 }
