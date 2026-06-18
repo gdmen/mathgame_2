@@ -134,8 +134,21 @@ below high targets — a diagnostic for envelope 968 / target 20.32 produced an
 8–18 spread with 0 problems in the `[18.82, 21.82]` selection window. The
 prompt now appends an advisory line built from the target: difficulty rises
 with larger numbers, harder operations (division > multiplication >
-subtraction > addition), and more chained operations, calibrated toward the
-target within the constraint block. No code path or formula changed.
+subtraction > addition), and more chained operations, within the constraint
+block.
+
+The advisory adds two things the diagnostic showed the model needed. First,
+it must **combine** the levers in one problem — the model tends to pull a
+single lever (one big division), which plateaus in the mid-range; high
+targets need large numbers *and* chaining together. Second, it steers away
+from prose for hard targets: in `ComputeProblemDifficulty`, `opWeight` and
+`structure` are token-level and `\text{}` contents never contribute, so a
+story problem scores its operation as addition (`opWeight 1.0`, `structure
+1.0`) — only its numbers and the `×1.3` word concept count. A hard target is
+reachable in prose only as an equation to solve (a symbolic operator outside
+`\text{}`), so the prompt asks for a symbolic expression or equation rather
+than a story problem when the target is high. No code path or formula
+changed.
 
 ## Universal Difficulty Scale
 
