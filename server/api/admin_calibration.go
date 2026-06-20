@@ -190,7 +190,7 @@ func (a *Api) computeCalibrationReport() (CalibrationData, error) {
 			"SELECT id, " + calibBucketExpr + " AS bucket, generator, " +
 			"ROW_NUMBER() OVER (PARTITION BY " + calibBucketExpr + ", generator, problem_type_bitmap ORDER BY id) AS rn " +
 			"FROM problems WHERE disabled = 0) t WHERE rn = 1) " +
-			"SELECT r.bucket, r.generator, p.expression, p.difficulty, p.problem_type_bitmap " +
+			"SELECT r.bucket, r.generator, p.expression, p.symbolic_expression, p.difficulty, p.problem_type_bitmap " +
 			"FROM ranked r JOIN problems p ON p.id = r.id " +
 			"ORDER BY r.bucket, r.generator")
 	if err != nil {
@@ -198,16 +198,17 @@ func (a *Api) computeCalibrationReport() (CalibrationData, error) {
 	}
 	for srows.Next() {
 		var bucket int
-		var generator, expr string
+		var generator, expr, symbolic string
 		var difficulty float64
 		var bitmap uint64
-		if srows.Scan(&bucket, &generator, &expr, &difficulty, &bitmap) != nil {
+		if srows.Scan(&bucket, &generator, &expr, &symbolic, &difficulty, &bitmap) != nil {
 			continue
 		}
 		p := CalibrationProblem{Expression: expr, Difficulty: difficulty}
 		p.Bits = ProblemTypeToFeatures(ProblemType(bitmap))
 		sort.Strings(p.Bits)
-		p.Breakdown = ComputeDifficultyBreakdown(expr)
+		// Scored the same way storage is, so the page matches stored difficulty.
+		p.Breakdown = ComputeDifficultyBreakdownFor(expr, symbolic)
 		k := sampleKey{bucket, generator}
 		samples[k] = append(samples[k], p)
 	}

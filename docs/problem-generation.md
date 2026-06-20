@@ -9,7 +9,7 @@ undocumented. Design history: issue #225.
 
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
-difficulty_version: 0.2
+difficulty_version: 0.3
 max_chain_len: 5
 large_max_operand: 9999
 bits: addition, subtraction, multiplication, division, fractions, negatives, word, medium_numbers, large_numbers, chained_operations, missing_number, mismatched_denominators, decimals, pemdas, single_variable, percentages
@@ -130,7 +130,14 @@ The deterministic tool is authoritative wherever it can operate:
 | Problem class | Answer check | Envelope | Topic bits | LLM calls |
 |---|---|---|---|---|
 | Symbolic (incl. `?`/variable equations, fractions, decimals, `%`) | exact `big.Rat` evaluator | bit-subset check | parser | **zero** |
-| WORD (prose) | LLM validator | LLM validator (same constraints as the generator) | validator's features line | one |
+| WORD (prose) | LLM validator + in-code form eval | LLM validator (same constraints as the generator) | validator's features line + form bits | one |
+
+A WORD problem also carries a `symbolic_expression` (the bare computation it
+asks for; see the Difficulty formula section). It is checked in-code to lex and
+evaluate to the answer, its detected bits are folded into the stamp, and the
+validator's line 4 confirms it uses the operations the problem actually requires
+— catching a form that hits the answer with the wrong computation, which the
+exact evaluator alone cannot. Difficulty is scored from the form.
 
 Disagreement = reject, not auto-correct. The answer check, the PEMDAS
 dual-eval, and bit detection share one evaluator over one token stream, so
@@ -144,9 +151,10 @@ multiplication at all. Unknowns are bound to fixed rational probes — the
 formula stays a pure function of the expression because the recompute
 fast-path depends on that.
 
-## Difficulty formula (v0.2) and ceiling
+## Difficulty formula (v0.3) and ceiling
 
-`ComputeProblemDifficulty` (server/api/difficulty.go):
+`ComputeProblemDifficulty(expression, symbolic_expression)`
+(server/api/difficulty.go):
 
 ```
 magnitude = log10(maxMagnitude + 1) + 0.3      (digit-based for decimals)
@@ -167,6 +175,18 @@ that test owns them; this table is prose.
 
 Changing the formula in ANY way requires bumping `DifficultyVersion` and
 running `recompute_problem_difficulty` on deploy. Calibration: #35.
+
+**Word problems (v0.3):** a word problem's `expression` is prose inside
+`\text{...}`, so its operators are invisible to the token-level
+`opWeight`/`structure` (the prose rule). It instead carries a
+`symbolic_expression` — the bare computation it asks for (e.g. `9999 / 3 / 3`)
+— and difficulty is scored from THAT, with the word concept (×1.3) forced on.
+So a division word problem scores like its symbolic twin plus the word bonus,
+not as addition. `symbolic_expression` is empty for non-word problems (whose
+`expression` is already symbolic) and is never shown to the student: the
+generator emits it and the WORD validator checks it lexes and evaluates to the
+answer before storing it. A legacy word problem with no `symbolic_expression`
+falls back to scoring its prose. Issue #266.
 
 **The ceiling, `MaxDiffForBitmap`** — the difficulty of the hardest problem
 the enabled bits can express. WHY IT EXISTS: adaptive difficulty ratchets

@@ -66,6 +66,12 @@
           "sql": "TEXT"
         },
         {
+          "name": "SymbolicExpression",
+          "type": "string",
+          "_note": "The canonical symbolic form a WORD problem computes (e.g. '9999 / 3 / 3'), used to score its difficulty; empty for non-word problems, whose Expression is already symbolic. DEFAULT intentionally absent here so codegen includes it in INSERT (generator paths set it); migration 43 adds it with DEFAULT '' for backfill.",
+          "sql": "VARCHAR(512) NOT NULL"
+        },
+        {
           "name": "Difficulty",
           "type": "float64",
           "sql": "FLOAT NOT NULL"

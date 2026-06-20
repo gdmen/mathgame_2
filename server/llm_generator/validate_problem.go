@@ -19,11 +19,13 @@ import (
 // The WORD-problem validator. Called for word problems ONLY - symbolic
 // problems are verified by the exact in-process evaluator (api package) with
 // zero LLM calls. The validator receives the SAME MAY/MUST NOT constraints
-// the generator was given, and answers three lines:
+// the generator was given, and answers:
 //
 //	line 1: the numeric answer (authoritative for prose math)
 //	line 2: YES/NO - does the problem comply with ALL the constraints?
 //	line 3: comma-separated features actually present (closed name list)
+//	line 4: YES/NO - does the candidate symbolic_expression match the
+//	        problem? (only when one was sent)
 //
 // Line 3 stamps the WORD problem's topic bits; generator self-report is
 // not trusted.
@@ -32,12 +34,20 @@ const PROMPT_VALIDATION_WORD = `Given this word problem: %s
 2. The problem was generated under these constraints:
 %s
 Does the problem comply with ALL of them? Answer YES or NO on line 2.
-3. On line 3, list the features actually present in the problem, comma-separated, using only these names: %s.
-Return exactly three lines and nothing else.`
+3. On line 3, list the features actually present in the problem, comma-separated, using only these names: %s.`
+
+// PROMPT_VALIDATION_FORM is appended when a candidate symbolic_expression is
+// present: it checks the form uses the operations the problem actually
+// requires, catching a form that hits the answer with the wrong computation.
+const PROMPT_VALIDATION_FORM = "\n4. The intended computation is %q. On line 4, answer YES only if it uses the operations and numbers this problem actually requires, NO otherwise."
 
 // ErrEnvelopeMismatch marks a validator NO on the constraints line
 // (the replacement for the old GRADE_MISMATCH).
 var ErrEnvelopeMismatch = errors.New("ENVELOPE_MISMATCH")
+
+// ErrFormMismatch marks a validator NO on the symbolic_expression line: the
+// form doesn't represent the problem's actual computation.
+var ErrFormMismatch = errors.New("FORM_MISMATCH")
 
 // ValidateWordProblem checks a word problem's answer and envelope compliance
 // in one LLM round-trip and extracts its observed features.
@@ -67,6 +77,12 @@ func ValidateWordProblemWithModel(p *Problem, constraints string, featureNames [
 
 	prompt := fmt.Sprintf(PROMPT_VALIDATION_WORD,
 		p.Expression, constraints, strings.Join(featureNames, ", "))
+	wantLines := 3
+	if p.SymbolicExpression != "" {
+		prompt += fmt.Sprintf(PROMPT_VALIDATION_FORM, p.SymbolicExpression)
+		wantLines = 4
+	}
+	prompt += fmt.Sprintf("\nReturn exactly %d lines and nothing else.", wantLines)
 	glog.Infof("OpenAI validation prompt = expected answer: %s = %s\n", prompt, p.Answer)
 
 	client := openai.NewClient(c.OpenAiApiKey)
@@ -88,32 +104,43 @@ func ValidateWordProblemWithModel(p *Problem, constraints string, featureNames [
 		return nil, err
 	}
 
-	lines := strings.Split(strings.TrimSpace(resp.Choices[0].Message.Content), "\n")
+	features, err := parseValidatorResponse(resp.Choices[0].Message.Content, p)
+	if err != nil {
+		glog.Infof("validator reject: %v (%q)", err, p.Expression)
+	}
+	return features, err
+}
+
+// parseValidatorResponse interprets the validator's lines: answer (1), envelope
+// YES/NO (2), features (3), and - when a symbolic_expression was sent -
+// form-matches-problem YES/NO (4). Returns the observed features, or an error
+// for an answer mismatch / envelope NO / form NO.
+func parseValidatorResponse(content string, p *Problem) ([]string, error) {
+	lines := strings.Split(strings.TrimSpace(content), "\n")
 	if len(lines) < 2 {
-		return nil, fmt.Errorf("validator returned %d lines, want 3: %q",
-			len(lines), resp.Choices[0].Message.Content)
+		return nil, fmt.Errorf("validator returned %d lines: %q", len(lines), content)
 	}
 
-	answer := strings.TrimSpace(lines[0])
-	if answer != p.Answer {
-		msg := fmt.Sprintf("MISMATCH with validator: got %s, expected %s", answer, p.Answer)
-		glog.Info(msg)
-		return nil, errors.New(msg)
+	if answer := strings.TrimSpace(lines[0]); answer != p.Answer {
+		return nil, fmt.Errorf("validator answer %q, expected %q", answer, p.Answer)
 	}
 
-	envelope := strings.TrimSpace(strings.ToUpper(lines[1]))
-	if !strings.HasPrefix(envelope, "YES") {
-		glog.Infof("%v: %s", ErrEnvelopeMismatch, p.Expression)
+	if !strings.HasPrefix(strings.TrimSpace(strings.ToUpper(lines[1])), "YES") {
 		return nil, ErrEnvelopeMismatch
 	}
 
 	var features []string
 	if len(lines) >= 3 {
 		for _, f := range strings.Split(lines[2], ",") {
-			f = strings.ToLower(strings.TrimSpace(f))
-			if f != "" {
+			if f = strings.ToLower(strings.TrimSpace(f)); f != "" {
 				features = append(features, f)
 			}
+		}
+	}
+
+	if p.SymbolicExpression != "" && len(lines) >= 4 {
+		if !strings.HasPrefix(strings.TrimSpace(strings.ToUpper(lines[3])), "YES") {
+			return nil, ErrFormMismatch
 		}
 	}
 	return features, nil

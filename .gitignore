@@ -34,3 +34,6 @@ web/build.prev/
 
 # OS files
 .DS_Store
+
+# stray binary from `go build ./cmd/diagnose_generation/` (use `go build ./...`)
+/diagnose_generation

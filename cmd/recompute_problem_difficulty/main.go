@@ -2,8 +2,9 @@
 // Behavior changes here (bits, formula, pipeline, masks) REQUIRE updating that
 // doc in the same PR. Formula changes also require a DifficultyVersion bump.
 // recompute_problem_difficulty walks all rows in the problems table, computes
-// the universal difficulty via api.ComputeProblemDifficulty(expression), and
-// writes it back to the difficulty column.
+// the universal difficulty via
+// api.ComputeProblemDifficulty(expression, symbolic_expression), and writes it
+// back to the difficulty column.
 //
 // Safe to run repeatedly. Idempotent. Use after deploying the universal
 // difficulty change to migrate existing problems from their legacy pinned
@@ -48,7 +49,7 @@ func main() {
 	}
 	defer db.Close()
 
-	query := `SELECT id, expression, difficulty, difficulty_version FROM problems ORDER BY id`
+	query := `SELECT id, expression, symbolic_expression, difficulty, difficulty_version FROM problems ORDER BY id`
 	if *limit > 0 {
 		query = fmt.Sprintf("%s LIMIT %d", query, *limit)
 	}
@@ -62,15 +63,16 @@ func main() {
 	var deltaSum float64
 	// Collect rows first so we can close the query cursor before updating.
 	type rec struct {
-		id      uint32
-		expr    string
-		oldDiff float64
-		oldVer  string
+		id       uint32
+		expr     string
+		symbolic string
+		oldDiff  float64
+		oldVer   string
 	}
 	var recs []rec
 	for rows.Next() {
 		var r rec
-		if err := rows.Scan(&r.id, &r.expr, &r.oldDiff, &r.oldVer); err != nil {
+		if err := rows.Scan(&r.id, &r.expr, &r.symbolic, &r.oldDiff, &r.oldVer); err != nil {
 			glog.Errorf("scan: %v", err)
 			continue
 		}
@@ -90,7 +92,7 @@ func main() {
 	}
 	for _, r := range recs {
 		total++
-		action, newDiff, err := recomputeProblemRow(db, r.id, r.expr, r.oldDiff, r.oldVer, *dryRun)
+		action, newDiff, err := recomputeProblemRow(db, r.id, r.expr, r.symbolic, r.oldDiff, r.oldVer, *dryRun)
 		if err != nil {
 			glog.Error(err)
 			continue

@@ -115,6 +115,23 @@ prose, never append the arithmetic or its result, and use symbolic math
 outside \text{} ONLY when the statement itself is an expression to
 manipulate (e.g. "Solve for x: 3x + 7 = 22"). No code path changed.
 
+### `llm_0.5` — symbolic_expression for word problems
+
+Issue #266. Word problems were being scored as addition: the difficulty
+formula reads operators from tokens, and a story problem's operation lives in
+prose inside `\text{}`, invisible to it. The generator now emits a
+`symbolic_expression` alongside each word problem — the exact computation it
+asks for (e.g. `9999 / 3 / 3`), prompted as the same operations and numbers the
+student would use, not merely something that hits the answer. It is stored,
+never shown to the student, and validated three ways: it must lex and evaluate
+to the answer in-code, and the WORD validator's line 4 confirms it matches the
+problem's actual operations (catching a form that reaches the answer with the
+wrong computation). Difficulty is scored from the form with the word concept
+applied, so a division word problem scores like its symbolic twin plus the word
+bonus. Non-word problems leave it empty (their expression is already symbolic).
+Carries a `DifficultyVersion` bump (0.2 → 0.3) and a
+`recompute_problem_difficulty` run on deploy.
+
 ## Universal Difficulty Scale
 
 Every problem's `difficulty` column stores a universal score on a 1-20 scale

@@ -45,7 +45,7 @@ func TestComputeProblemDifficulty_ReferenceValues(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.expr, func(t *testing.T) {
-			got := ComputeProblemDifficulty(tc.expr)
+			got := ComputeProblemDifficulty(tc.expr, "")
 			if math.Abs(got-tc.want) > tol {
 				t.Errorf("ComputeProblemDifficulty(%q) = %.2f, want %.2f +/- %.1f",
 					tc.expr, got, tc.want, tol)
@@ -93,7 +93,7 @@ func TestComputeProblemDifficulty_AnchorTable(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			d := ComputeProblemDifficulty(tc.expr)
+			d := ComputeProblemDifficulty(tc.expr, "")
 			if d < tc.minD || d > tc.maxD {
 				t.Errorf("expr=%q: computed=%.2f, expected range [%.1f, %.1f] (%s)",
 					tc.expr, d, tc.minD, tc.maxD, tc.comment)
@@ -117,8 +117,8 @@ func TestComputeProblemDifficulty_OrderingWithinTopic(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			a := ComputeProblemDifficulty(tc.easier)
-			b := ComputeProblemDifficulty(tc.harder)
+			a := ComputeProblemDifficulty(tc.easier, "")
+			b := ComputeProblemDifficulty(tc.harder, "")
 			if a >= b {
 				t.Errorf("expected %q (%.2f) < %q (%.2f)", tc.easier, a, tc.harder, b)
 			}
@@ -131,12 +131,12 @@ func TestComputeProblemDifficulty_OrderingWithinTopic(t *testing.T) {
 func TestComputeProblemDifficulty_OrderingAcrossTopics(t *testing.T) {
 	// At similar operand sizes, mul should outrank add, fractions should outrank
 	// plain arithmetic, algebra should outrank fractions.
-	simple := ComputeProblemDifficulty("8 + 9")
-	mul := ComputeProblemDifficulty("8 * 9")
-	frac := ComputeProblemDifficulty("2/3 + 3/4")
+	simple := ComputeProblemDifficulty("8 + 9", "")
+	mul := ComputeProblemDifficulty("8 * 9", "")
+	frac := ComputeProblemDifficulty("2/3 + 3/4", "")
 	// Mixed symbolic-in-text form: the v0.2 prose rule means pure-prose
 	// algebra is invisible to the parser (validator territory).
-	algebra := ComputeProblemDifficulty("\\text{Solve for x: }3x + 7 = 22")
+	algebra := ComputeProblemDifficulty("\\text{Solve for x: }3x + 7 = 22", "")
 
 	if mul <= simple {
 		t.Errorf("expected mul (%.2f) > add (%.2f)", mul, simple)
@@ -162,7 +162,7 @@ func TestComputeProblemDifficulty_Bounds(t *testing.T) {
 		"some garbage string with no pattern",
 	}
 	for _, expr := range cases {
-		d := ComputeProblemDifficulty(expr)
+		d := ComputeProblemDifficulty(expr, "")
 		if d < 1.0 {
 			t.Errorf("expr=%q: difficulty %.2f below the 1.0 floor", expr, d)
 		}
@@ -177,7 +177,7 @@ func TestComputeProblemDifficulty_Bounds(t *testing.T) {
 func TestComputeProblemDifficulty_OpenScale(t *testing.T) {
 	// A multi-concept stack exceeds 20 - the truth the old clamp hid.
 	monster := "(25% * x - 3/4 + 5/8) / 0.8 - 99.99 = -1234"
-	d := ComputeProblemDifficulty(monster)
+	d := ComputeProblemDifficulty(monster, "")
 	if d <= 20 {
 		t.Errorf("six-concept monster scored %.1f, want > 20 (clamp should be gone)", d)
 	}
@@ -189,8 +189,8 @@ func TestComputeProblemDifficulty_OpenScale(t *testing.T) {
 // TestComputeProblemDifficulty_MissingNumber verifies missing-number templates
 // get a structure bump but stay sensible.
 func TestComputeProblemDifficulty_MissingNumber(t *testing.T) {
-	plain := ComputeProblemDifficulty("5 + 7")
-	missing := ComputeProblemDifficulty("? + 7 = 12")
+	plain := ComputeProblemDifficulty("5 + 7", "")
+	missing := ComputeProblemDifficulty("? + 7 = 12", "")
 	if missing <= plain {
 		t.Errorf("missing template (%.2f) should be >= plain (%.2f)", missing, plain)
 	}
@@ -198,8 +198,8 @@ func TestComputeProblemDifficulty_MissingNumber(t *testing.T) {
 
 // TestComputeProblemDifficulty_Fractions distinguishes same vs unlike denom.
 func TestComputeProblemDifficulty_Fractions(t *testing.T) {
-	same := ComputeProblemDifficulty("1/4 + 2/4")
-	unlike := ComputeProblemDifficulty("1/4 + 2/3")
+	same := ComputeProblemDifficulty("1/4 + 2/4", "")
+	unlike := ComputeProblemDifficulty("1/4 + 2/3", "")
 	if unlike <= same {
 		t.Errorf("unlike-denom (%.2f) should be > same-denom (%.2f)", unlike, same)
 	}
@@ -209,13 +209,35 @@ func TestComputeProblemDifficulty_Fractions(t *testing.T) {
 // alphabet; such expressions take the legacy fallback path and carry no
 // exponent weight.
 func TestComputeProblemDifficulty_ExponentsExcluded(t *testing.T) {
-	d := ComputeProblemDifficulty("2^3 * 2^4")
+	d := ComputeProblemDifficulty("2^3 * 2^4", "")
 	if d > 10 {
 		t.Errorf("exponent expression scored %.1f - exponent weight should be gone", d)
 	}
 	f := parseProblemFeatures("2^3 * 2^4")
 	if !f.lexFailed {
 		t.Error("'^' should be rejected by the lexer (fallback path)")
+	}
+}
+
+// TestComputeProblemDifficulty_WordScoredFromSymbolic: a word problem is scored
+// from its symbolic_expression (the operators the prose hides), with the word
+// concept applied - so a division word problem scores like its symbolic twin
+// plus the word bonus, not as addition.
+func TestComputeProblemDifficulty_WordScoredFromSymbolic(t *testing.T) {
+	prose := `\text{There are 9999 beads shared equally among 11 jars; how many per jar?}`
+
+	proseOnly := ComputeProblemDifficulty(prose, "") // division invisible -> opWeight 1.0
+	symbolic := ComputeProblemDifficulty("9999 / 11", "")
+	withForm := ComputeProblemDifficulty(prose, "9999 / 11")
+
+	if withForm <= proseOnly+3 {
+		t.Errorf("scored from symbolic_expression (%.2f) should far exceed scored-from-prose (%.2f)", withForm, proseOnly)
+	}
+	if withForm <= symbolic {
+		t.Errorf("word problem (%.2f) should exceed its bare symbolic twin (%.2f) by the word concept", withForm, symbolic)
+	}
+	if got := ComputeProblemDifficulty(prose, ""); got != proseOnly {
+		t.Errorf("empty symbolic_expression should score the expression itself, got %.2f", got)
 	}
 }
 

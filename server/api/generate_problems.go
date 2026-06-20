@@ -385,8 +385,9 @@ func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numPro
 		model.Answer = answer
 		model.ProblemTypeBitmap = bitmap
 		// Stored difficulty is a function of the problem itself, not the
-		// requester's target - the pool is shared across users.
-		model.Difficulty = ComputeProblemDifficulty(adm.Expr)
+		// requester's target - the pool is shared across users. The heuristic
+		// only emits symbolic problems, so there is no symbolic_expression.
+		model.Difficulty = ComputeProblemDifficulty(adm.Expr, "")
 		model.DifficultyVersion = DifficultyVersion
 		glog.Infof("%s heuristic problem: %s = %s (computed_diff=%g bitmap=%d)", logPrefix, model.Expression, model.Answer, model.Difficulty, model.ProblemTypeBitmap)
 		h := fnv.New32a()
@@ -541,6 +542,11 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 				}
 				bitmap := adm.Bitmap
 
+				// symbolicExpr is the bare computation a WORD problem asks for,
+				// set from the validated symbolic_expression below; empty for
+				// symbolic problems, whose Expression is already the computation.
+				symbolicExpr := ""
+
 				// Local-first validation: symbolic problems are verified by
 				// the exact evaluator with zero LLM calls; WORD problems get
 				// one validator round-trip that checks the answer, judges
@@ -563,6 +569,31 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 					// parser-derived shape bits (magnitude, chained, word)
 					// are already in the bitmap.
 					bitmap |= uint64(FeaturesToProblemType(features))
+
+					// The symbolic_expression is the bare computation the word
+					// problem asks for; its difficulty is scored from this. Trust
+					// it only after it lexes and evaluates to the stated answer.
+					if p.SymbolicExpression != "" {
+						admSym := AdmitExpression(p.SymbolicExpression)
+						if admSym.RejectStage != "" {
+							funnel.reject(admSym.RejectStage)
+							glog.Infof("%s LLM symbolic_expression reject [%s]: %q", logPrefix, admSym.RejectStage, p.SymbolicExpression)
+							continue
+						}
+						if err := verifyAnswerSymbolic(admSym.Tokens, p.Answer); err != nil {
+							funnel.reject(rejectAnswer)
+							glog.Infof("%s LLM symbolic_expression answer reject: %v (%q = %q)", logPrefix, err, admSym.Expr, p.Answer)
+							continue
+						}
+						symbolicExpr = admSym.Expr
+						// The form reveals the true computation shape (operations,
+						// magnitude, chaining) the prose hides. Stamp those bits so
+						// the bitmap matches the difficulty scored from the form, and
+						// the envelope check rejects a form the user can't have.
+						bitmap |= admSym.Bitmap
+					} else {
+						glog.Warningf("%s LLM word problem missing symbolic_expression; scoring from prose (under-rated): %q", logPrefix, adm.Expr)
+					}
 				}
 
 				// Enforce structural invariants before the envelope check, so
@@ -584,12 +615,14 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 				model.Generator = llm_generator.VERSION
 				model.ProblemTypeBitmap = bitmap
 				model.Expression = adm.Expr
+				model.SymbolicExpression = symbolicExpr
 				model.Answer = p.Answer
 				// Keep the explanation consistent with a stage-1.5 rewrite:
 				// the kid must not see the letter the expression no longer has.
 				model.Explanation = RewriteLetterInProse(p.Explanation, adm.RewroteLetter)
-				// Computed difficulty only; LLM self-report is debug logging.
-				model.Difficulty = ComputeProblemDifficulty(adm.Expr)
+				// Computed difficulty only; LLM self-report is debug logging. A
+				// word problem is scored from its symbolic_expression.
+				model.Difficulty = ComputeProblemDifficulty(adm.Expr, symbolicExpr)
 				model.DifficultyVersion = DifficultyVersion
 				glog.Infof("%s LLM problem: %s computed_diff=%g bitmap=%d (LLM raw=%g)", logPrefix, model.Expression, model.Difficulty, model.ProblemTypeBitmap, p.Difficulty)
 

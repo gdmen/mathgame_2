@@ -18,14 +18,14 @@ const (
 // (unless dryRun) writes the corresponding UPDATE. Returns the action and
 // the newly-computed difficulty (zero when skipped, since we didn't bother
 // recomputing it).
-func recomputeProblemRow(db *sql.DB, id uint32, expr string, oldDiff float64, oldVer string, dryRun bool) (action string, newDiff float64, err error) {
+func recomputeProblemRow(db *sql.DB, id uint32, expr, symbolic string, oldDiff float64, oldVer string, dryRun bool) (action string, newDiff float64, err error) {
 	// Fast path: row was stamped under the current formula version.
 	// ComputeProblemDifficulty is deterministic, so newDiff would equal
 	// oldDiff. No recompute, no write.
 	if oldVer == api.DifficultyVersion {
 		return actionSkipped, 0, nil
 	}
-	newDiff = api.ComputeProblemDifficulty(expr)
+	newDiff = api.ComputeProblemDifficulty(expr, symbolic)
 	if recomputeFuzzyEqual(newDiff, oldDiff) {
 		// Value matches the current formula but the version stamp is
 		// stale. Forward-stamp the version without changing the value.

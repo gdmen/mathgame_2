@@ -15,8 +15,8 @@ func seedCalibrationProblems(t *testing.T, api *Api) {
 	t.Helper()
 	seed := func(id int, expr string, diff float64, disabled int, gen string, bitmap uint64) {
 		_, err := api.DB.Exec(
-			"INSERT INTO problems (id, problem_type_bitmap, expression, answer, explanation, difficulty, disabled, generator, difficulty_version) VALUES (?,?,?,?,?,?,?,?,?)",
-			id, bitmap, expr, "7", "", diff, disabled, gen, "0.2")
+			"INSERT INTO problems (id, problem_type_bitmap, expression, answer, explanation, symbolic_expression, difficulty, disabled, generator, difficulty_version) VALUES (?,?,?,?,?,?,?,?,?,?)",
+			id, bitmap, expr, "7", "", "", diff, disabled, gen, "0.2")
 		if err != nil {
 			t.Fatalf("seed problem %d: %v", id, err)
 		}
