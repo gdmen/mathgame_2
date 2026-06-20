@@ -242,3 +242,21 @@ func TestNormalizeProblemBitmap(t *testing.T) {
 		})
 	}
 }
+
+// TestVerifyAnswer covers the exported answer check used by tooling: a form
+// that evaluates to the answer passes; a wrong answer or an unlexable form
+// fails.
+func TestVerifyAnswer(t *testing.T) {
+	if err := VerifyAnswer("9999 / 3 / 3", "1111"); err != nil {
+		t.Errorf("valid form rejected: %v", err)
+	}
+	if err := VerifyAnswer("60 * 2", "120"); err != nil {
+		t.Errorf("valid form rejected: %v", err)
+	}
+	if VerifyAnswer("60 * 2", "121") == nil {
+		t.Error("wrong answer accepted")
+	}
+	if VerifyAnswer("2 ^ 3", "8") == nil {
+		t.Error("unlexable form accepted")
+	}
+}

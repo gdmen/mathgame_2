@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-// The difficulty scale (formula v0.2):
+// The difficulty scale (formula v0.3):
 //
 // Open-ended, floored at 1.0, NO upper clamp. Inputs are bounded by
 // construction (MaxChainLen, LargeMaxOperand, the fixed multiplier set), so
@@ -39,7 +39,7 @@ import (
 // any new feature in parseProblemFeatures, any change to the compression
 // curve). 0.x while the scale is still in active calibration; 1.0 once
 // stable. Minor bumps for tuning, major bumps for structural rewrites.
-const DifficultyVersion = "0.2"
+const DifficultyVersion = "0.3"
 
 // Shared shape constants - used by BOTH the generators' option mapping and
 // MaxDiffForBitmap so the ceiling and what generation can actually produce
@@ -67,7 +67,7 @@ const (
 // (web/src/bitmap_validation.js MIN_TARGET_DIFFICULTY).
 const MinTargetDifficulty = 3.0
 
-// Formula v0.2 factor constants, combined as
+// Formula v0.3 factor constants, combined as
 // magnitude * opWeight * concept * structure (see ComputeProblemDifficulty).
 const (
 	// Op weights: opWeight is the MAX over the operators present
@@ -314,7 +314,7 @@ func parseProblemFeaturesFallback(expr string) problemFeatures {
 // DifficultyVersion machinery depends on this: rows stamped
 // with the current version are skipped by recompute without re-evaluation.
 //
-// Formula v0.2 (canonical spec in docs/problem-generation.md):
+// Formula v0.3 (canonical spec in docs/problem-generation.md):
 //
 //	magnitude = log10(maxMagnitude+1) + 0.3   (digit-based for decimals)
 //	opWeight  = max over present ops: add 1.0 | sub 1.1 | mul 2.2 | div 2.8
@@ -325,8 +325,24 @@ func parseProblemFeaturesFallback(expr string) problemFeatures {
 //
 // floored at 1.0; NO upper clamp (see the scale comment at the top of this
 // file).
-func ComputeProblemDifficulty(expr string) float64 {
-	return ComputeDifficultyBreakdown(expr).Scaled
+// ComputeProblemDifficulty scores a problem. For a word problem, pass its
+// symbolic_expression (the bare symbolic form it computes) as symbolic and the
+// difficulty is scored from that, with the word concept applied; the prose expr
+// is ignored. For every other problem symbolic is empty and expr is scored
+// directly.
+func ComputeProblemDifficulty(expr, symbolic string) float64 {
+	return ComputeDifficultyBreakdownFor(expr, symbolic).Scaled
+}
+
+// ComputeDifficultyBreakdownFor returns the breakdown a problem is scored by:
+// from its symbolic form (a word problem's symbolic_expression, with the word
+// concept applied) when symbolic is non-empty, else from expr directly. The
+// single source of truth for the expr-vs-symbolic dispatch.
+func ComputeDifficultyBreakdownFor(expr, symbolic string) DifficultyBreakdown {
+	if symbolic != "" {
+		return computeBreakdown(symbolic, true)
+	}
+	return computeBreakdown(expr, false)
 }
 
 // ConceptFactor is one enabled concept multiplier and the factor it contributed,
@@ -340,7 +356,7 @@ type ConceptFactor struct {
 // ComputeProblemDifficulty combines. It exists for inspection (the admin
 // difficulty-calibration page) and does NOT affect scoring:
 // ComputeProblemDifficulty returns Scaled, computed by exactly the formula
-// below. Keep this output-identical to the documented v0.2 formula - any change
+// below. Keep this output-identical to the documented v0.3 formula - any change
 // to Scaled requires a DifficultyVersion bump (see docs/problem-generation.md).
 type DifficultyBreakdown struct {
 	Magnitude    float64         `json:"magnitude"`
@@ -359,10 +375,21 @@ type DifficultyBreakdown struct {
 // intermediate factor. ComputeProblemDifficulty delegates here, so the two can
 // never disagree.
 func ComputeDifficultyBreakdown(expr string) DifficultyBreakdown {
-	if strings.TrimSpace(expr) == "" {
+	return computeBreakdown(expr, false)
+}
+
+// computeBreakdown scores scoredExpr through the universal formula. forceWord
+// credits the word concept even when scoredExpr carries no \text{} marker -
+// used to score a word problem from its (bare-symbolic) symbolic_expression
+// while still applying the ×1.3 word concept.
+func computeBreakdown(scoredExpr string, forceWord bool) DifficultyBreakdown {
+	if strings.TrimSpace(scoredExpr) == "" {
 		return DifficultyBreakdown{Scaled: 3.0}
 	}
-	f := parseProblemFeatures(expr)
+	f := parseProblemFeatures(scoredExpr)
+	if forceWord {
+		f.isWord = true
+	}
 
 	magnitude := math.Log10(f.maxMagnitude+1) + 0.3
 

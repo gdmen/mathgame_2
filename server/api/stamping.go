@@ -298,3 +298,14 @@ func verifyAnswerSymbolic(toks []Token, answer string) error {
 	}
 	return nil
 }
+
+// VerifyAnswer admits expr and checks it evaluates to answer - the exported
+// form of the generation path's symbolic answer check, for tools that validate
+// a candidate computation (e.g. cmd/diagnose_generation).
+func VerifyAnswer(expr, answer string) error {
+	adm := AdmitExpression(expr)
+	if adm.RejectStage != "" {
+		return fmt.Errorf("%s: %s", adm.RejectStage, adm.RejectWhy)
+	}
+	return verifyAnswerSymbolic(adm.Tokens, answer)
+}

@@ -419,6 +419,55 @@ func TestGenerateProblems_WordPath(t *testing.T) {
 	}
 }
 
+// TestGenerateProblems_WordPath_SymbolicExpression: a word problem's
+// symbolic_expression is validated and stored, its computation-shape bits are
+// folded into the bitmap, and its difficulty is scored from the form (division
+// on large, chained operands) rather than the prose (which would score as a
+// small addition).
+func TestGenerateProblems_WordPath_SymbolicExpression(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+
+	p := llmTestProblem()
+	p.Expression = `\text{There are 9999 beads shared equally among 3 jars, then each jar is split among 3 friends. How many beads per friend?}`
+	p.SymbolicExpression = "9999 / 3 / 3"
+	p.Answer = "1111"
+	p.Features = []string{"division", "word"}
+	withCannedLLM(t, []llm_generator.Problem{p}, nil, nil)
+
+	settings := &Settings{
+		UserId:            1,
+		ProblemTypeBitmap: uint64(DIVISION | WORD | MEDIUM_NUMBERS | LARGE_NUMBERS | CHAINED_OPERATIONS),
+		TargetDifficulty:  20,
+	}
+	problem, err := api.generateProblems("[test-word-symbolic]", settings, 1)
+	if err != nil {
+		t.Fatalf("generateProblems: %v", err)
+	}
+
+	if problem.Expression != p.Expression {
+		t.Errorf("word expression mutated: %q", problem.Expression)
+	}
+	if want := AdmitExpression(p.SymbolicExpression).Expr; problem.SymbolicExpression != want {
+		t.Errorf("symbolic_expression = %q, want %q", problem.SymbolicExpression, want)
+	}
+	// The form's shape bits are folded in alongside the validator's WORD/DIVISION.
+	for _, bit := range []ProblemType{WORD, DIVISION, LARGE_NUMBERS, CHAINED_OPERATIONS} {
+		if problem.ProblemTypeBitmap&uint64(bit) == 0 {
+			t.Errorf("bitmap %d (%v) missing %v from the symbolic form",
+				problem.ProblemTypeBitmap, ProblemTypeToFeatures(ProblemType(problem.ProblemTypeBitmap)), bit)
+		}
+	}
+	// Scored from the form (~21), not the prose (~12 as addition).
+	if problem.Difficulty < 18 {
+		t.Errorf("difficulty = %.2f, want >=18 (scored from the symbolic form)", problem.Difficulty)
+	}
+}
+
 // TestGenerateProblems_WordProseOnlyFeatures: features expressed entirely in
 // prose are invisible to the parser; the validator's reports stamp the bits
 // so the corresponding toggles govern word problems at serve time. Each case

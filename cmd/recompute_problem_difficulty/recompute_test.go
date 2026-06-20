@@ -63,8 +63,8 @@ func setupRecomputeTestDB(t *testing.T) (*sql.DB, func()) {
 func seedProblem(t *testing.T, db *sql.DB, id uint32, expr string, difficulty float64, ver string) {
 	t.Helper()
 	_, err := db.Exec(
-		`INSERT INTO problems (id, problem_type_bitmap, expression, answer, difficulty, generator, difficulty_version) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		id, 1, expr, "0", difficulty, "test-seed", ver,
+		`INSERT INTO problems (id, problem_type_bitmap, expression, symbolic_expression, answer, difficulty, generator, difficulty_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, 1, expr, "", "0", difficulty, "test-seed", ver,
 	)
 	if err != nil {
 		t.Fatalf("seed problem id=%d: %v", id, err)
@@ -91,7 +91,7 @@ func TestRecomputeProblemRow_Skipped(t *testing.T) {
 	const sentinel = 99.0
 	seedProblem(t, db, 12345, "1 + 1", sentinel, api.DifficultyVersion)
 
-	action, newDiff, err := recomputeProblemRow(db, 12345, "1 + 1", sentinel, api.DifficultyVersion, false)
+	action, newDiff, err := recomputeProblemRow(db, 12345, "1 + 1", "", sentinel, api.DifficultyVersion, false)
 	if err != nil {
 		t.Fatalf("recomputeProblemRow: %v", err)
 	}
@@ -116,10 +116,10 @@ func TestRecomputeProblemRow_Stamped(t *testing.T) {
 	defer cleanup()
 
 	expr := "2 + 3"
-	correctDiff := api.ComputeProblemDifficulty(expr)
+	correctDiff := api.ComputeProblemDifficulty(expr, "")
 	seedProblem(t, db, 23456, expr, correctDiff, "")
 
-	action, _, err := recomputeProblemRow(db, 23456, expr, correctDiff, "", false)
+	action, _, err := recomputeProblemRow(db, 23456, expr, "", correctDiff, "", false)
 	if err != nil {
 		t.Fatalf("recomputeProblemRow: %v", err)
 	}
@@ -146,9 +146,9 @@ func TestRecomputeProblemRow_Updated(t *testing.T) {
 	expr := "4 + 7"
 	const wrongDiff = 99.0
 	seedProblem(t, db, 34567, expr, wrongDiff, "")
-	want := api.ComputeProblemDifficulty(expr)
+	want := api.ComputeProblemDifficulty(expr, "")
 
-	action, newDiff, err := recomputeProblemRow(db, 34567, expr, wrongDiff, "", false)
+	action, newDiff, err := recomputeProblemRow(db, 34567, expr, "", wrongDiff, "", false)
 	if err != nil {
 		t.Fatalf("recomputeProblemRow: %v", err)
 	}
@@ -175,10 +175,10 @@ func TestRecomputeProblemRow_DryRun_Stamped(t *testing.T) {
 	defer cleanup()
 
 	expr := "6 + 5"
-	correctDiff := api.ComputeProblemDifficulty(expr)
+	correctDiff := api.ComputeProblemDifficulty(expr, "")
 	seedProblem(t, db, 56789, expr, correctDiff, "")
 
-	action, _, err := recomputeProblemRow(db, 56789, expr, correctDiff, "", true)
+	action, _, err := recomputeProblemRow(db, 56789, expr, "", correctDiff, "", true)
 	if err != nil {
 		t.Fatalf("recomputeProblemRow: %v", err)
 	}
@@ -202,7 +202,7 @@ func TestRecomputeProblemRow_DryRun(t *testing.T) {
 	const wrongDiff = 99.0
 	seedProblem(t, db, 45678, expr, wrongDiff, "")
 
-	action, _, err := recomputeProblemRow(db, 45678, expr, wrongDiff, "", true)
+	action, _, err := recomputeProblemRow(db, 45678, expr, "", wrongDiff, "", true)
 	if err != nil {
 		t.Fatalf("recomputeProblemRow: %v", err)
 	}

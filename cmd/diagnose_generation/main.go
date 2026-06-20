@@ -1,8 +1,9 @@
 // diagnose_generation runs the real LLM generator for a fixed envelope and
 // target difficulty, then reports the distribution of COMPUTED difficulties of
-// what it produced, the admission/envelope outcome of each candidate, and how
-// many land in the selection window. It writes nothing - pure in-memory compute
-// on top of the real OpenAI call.
+// what it produced, the admission/envelope outcome of each candidate, how many
+// land in the selection window, and - for word problems - whether the LLM
+// emitted a valid symbolic_expression. It writes nothing - pure in-memory
+// compute on top of the real OpenAI call.
 //
 // It mirrors the generation path in server/api/generate_problems.go (build the
 // constraint block from the bitmap, call the generator, run AdmitExpression +
@@ -73,9 +74,10 @@ func main() {
 	admitRejects := map[string]int{}
 	var diffs []float64
 	admitted, envelopePass, inWindow, inWindowAndEnvelope := 0, 0, 0, 0
+	wordCount, formOK, formMissing, formInvalid := 0, 0, 0, 0
 	histogram := map[int]int{}
 
-	fmt.Printf("  %-7s %-9s %-7s %s\n", "diff", "envelope", "window", "expression")
+	fmt.Printf("  %-7s %-9s %-7s %-8s %s\n", "diff", "envelope", "window", "form", "expression")
 	for _, p := range problems {
 		adm := api.AdmitExpression(p.Expression)
 		if adm.RejectStage != "" {
@@ -86,7 +88,23 @@ func main() {
 		bits := api.NormalizeProblemBitmap(adm.Bitmap)
 		inEnvelope := bits != 0 && bits&^*envelope == 0
 
-		diff := api.ComputeProblemDifficulty(adm.Expr)
+		// For WORD problems, flag whether the LLM emitted a valid
+		// symbolic_expression (the form difficulty is scored from).
+		isWord := bits&uint64(api.WORD) != 0
+		form := "-"
+		if isWord {
+			wordCount++
+			switch {
+			case p.SymbolicExpression == "":
+				form, formMissing = "MISSING", formMissing+1
+			case api.VerifyAnswer(p.SymbolicExpression, p.Answer) != nil:
+				form, formInvalid = "INVALID", formInvalid+1
+			default:
+				form, formOK = "ok", formOK+1
+			}
+		}
+
+		diff := api.ComputeProblemDifficulty(adm.Expr, p.SymbolicExpression)
 		diffs = append(diffs, diff)
 		histogram[int(math.Floor(diff))]++
 
@@ -109,11 +127,13 @@ func main() {
 		if inWin {
 			win = "IN"
 		}
-		expr := adm.Expr
-		if len(expr) > 80 {
-			expr = expr[:80] + "…"
+		// For a WORD problem, the full prose AND the symbolic form it's scored
+		// from, so the form's fidelity to the problem is eyeballable.
+		shown := adm.Expr
+		if isWord && p.SymbolicExpression != "" {
+			shown = "⟨" + p.SymbolicExpression + "⟩ " + adm.Expr
 		}
-		fmt.Printf("  %-7.2f %-9s %-7s %s\n", diff, env, win, expr)
+		fmt.Printf("  %-7.2f %-9s %-7s %-8s %s\n", diff, env, win, form, shown)
 	}
 
 	fmt.Printf("\nSummary (%d returned):\n", len(problems))
@@ -149,4 +169,10 @@ func main() {
 	}
 	fmt.Printf("  in window [%.2f, %.2f]: %d/%d admitted (%d also envelope-pass)\n",
 		lo, hi, inWindow, admitted, inWindowAndEnvelope)
+	if wordCount > 0 {
+		fmt.Printf("  word problems: %d (of %d admitted; %d symbolic)\n", wordCount, admitted, admitted-wordCount)
+		fmt.Printf("    valid form:   %d/%d (%.0f%%)\n", formOK, wordCount, 100*float64(formOK)/float64(wordCount))
+		fmt.Printf("    missing form: %d\n", formMissing)
+		fmt.Printf("    invalid form: %d (rejected at generation)\n", formInvalid)
+	}
 }
