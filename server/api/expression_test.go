@@ -145,6 +145,25 @@ func TestLexExpression_VariableEdgeCases(t *testing.T) {
 	}
 }
 
+// TestReduceLabeledUnknown: a label-the-answer form reduces to its bare
+// computation; a genuine operand unknown is left alone; prose '=' is not split.
+func TestReduceLabeledUnknown(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"? = 100 - 25", "100 - 25"},                         // degenerate label -> bare computation
+		{"100 - 25 = ?", "100 - 25"},                         // either side
+		{"x = 100 - 25", "100 - 25"},                         // lone variable label too
+		{"? - 5 = 10", "? - 5 = 10"},                         // operand unknown stays
+		{"2x = 50", "2x = 50"},                               // coefficient = real algebra, stays
+		{"60 * 2", "60 * 2"},                                 // no equation, unchanged
+		{`\text{Is 2 = 2?} 3 + 4`, `\text{Is 2 = 2?} 3 + 4`}, // '=' inside prose: untouched
+	}
+	for _, tc := range cases {
+		if got := reduceLabeledUnknown(tc.in); got != tc.want {
+			t.Errorf("reduceLabeledUnknown(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
 // TestRewriteLoneVariable: the stage-1.5 rewrite table.
 func TestRewriteLoneVariable(t *testing.T) {
 	cases := []struct {

@@ -378,6 +378,63 @@ func RewriteLoneVariable(toks []Token, expr string) ([]Token, string, bool) {
 	return toks, rewritten, true
 }
 
+// reduceLabeledUnknown reduces a degenerate "unknown = <computable>" expression
+// - a direct computation merely labeled with an unknown, e.g. "? = 100 - 25" or
+// "x = 100 - 25" - to the bare computation, so it stamps the real operations and
+// NOT a spurious MISSING_NUMBER/SINGLE_VARIABLE. A genuine find-the-unknown form,
+// where the unknown is an OPERAND ("? - 5 = 10", "2x = 50"), is left untouched.
+// Run as the first AdmitExpression step, so every path (LLM generation, the
+// backfill) is covered - the model can emit this on any path. The '=' search
+// skips \text{} so prose is never split on.
+func reduceLabeledUnknown(expr string) string {
+	eq := topLevelEqualsPos(expr)
+	if eq < 0 {
+		return expr
+	}
+	l := strings.TrimSpace(expr[:eq])
+	r := strings.TrimSpace(expr[eq+1:])
+	if isLoneUnknown(l) {
+		return r
+	}
+	if isLoneUnknown(r) {
+		return l
+	}
+	return expr
+}
+
+// topLevelEqualsPos returns the byte index of the single '=' outside any
+// \text{} block, or -1 unless there is exactly one.
+func topLevelEqualsPos(expr string) int {
+	pos, count := -1, 0
+	for i, n := 0, len(expr); i < n; {
+		if strings.HasPrefix(expr[i:], `\text{`) {
+			i += len(`\text{`)
+			for depth := 1; i < n && depth > 0; i++ {
+				if expr[i] == '{' {
+					depth++
+				} else if expr[i] == '}' {
+					depth--
+				}
+			}
+			continue
+		}
+		if expr[i] == '=' {
+			pos, count = i, count+1
+		}
+		i++
+	}
+	if count != 1 {
+		return -1
+	}
+	return pos
+}
+
+// isLoneUnknown reports whether s is a single unknown standing alone: a bare
+// '?' or one variable letter (no coefficient, no operator, nothing else).
+func isLoneUnknown(s string) bool {
+	return s == "?" || (len(s) == 1 && isLetter(s[0]))
+}
+
 // CountDistinctUnknowns returns the number of distinct unknowns in the token
 // stream: distinct variable letters, plus one if any '?' is present. Also
 // returns the count of '?' occurrences. Per-problem rules:

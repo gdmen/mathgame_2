@@ -241,6 +241,39 @@ func TestComputeProblemDifficulty_WordScoredFromSymbolic(t *testing.T) {
 	}
 }
 
+// TestComputeProblemDifficulty_WordFormSuppressesPEMDAS: a form whose
+// operators need precedence (`3*50 - 1*50`) carries the PEMDAS concept as a
+// symbolic problem, but NOT when it scores a word problem - the story solver
+// reads the operation order from the narrative, never the written form.
+func TestComputeProblemDifficulty_WordFormSuppressesPEMDAS(t *testing.T) {
+	const form = "3 * 50 - 1 * 50" // multiplications bind before subtraction
+
+	sym := ComputeDifficultyBreakdown(form)
+	if !hasConcept(sym.Concepts, "pemdas") {
+		t.Fatalf("symbolic form should carry the pemdas concept, got %v", sym.Concepts)
+	}
+
+	word := ComputeDifficultyBreakdownFor(`\text{A ticket is 50; buy 3, return 1; how much spent?}`, form)
+	if hasConcept(word.Concepts, "pemdas") {
+		t.Errorf("word form should suppress the pemdas concept, got %v", word.Concepts)
+	}
+	if !hasConcept(word.Concepts, "word") {
+		t.Errorf("word form should still carry the word concept, got %v", word.Concepts)
+	}
+	if word.Scaled >= sym.Scaled {
+		t.Errorf("suppressing pemdas should drop the word score (%.2f) below the symbolic-with-pemdas score (%.2f)", word.Scaled, sym.Scaled)
+	}
+}
+
+func hasConcept(cs []ConceptFactor, name string) bool {
+	for _, c := range cs {
+		if c.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 // TestMaxDiffForBitmap_PerBitCeilings pins the per-bit ceiling-lift table
 // (each row = ADD|SUB baseline plus the named bits).
 func TestMaxDiffForBitmap_PerBitCeilings(t *testing.T) {

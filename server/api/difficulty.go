@@ -39,7 +39,7 @@ import (
 // any new feature in parseProblemFeatures, any change to the compression
 // curve). 0.x while the scale is still in active calibration; 1.0 once
 // stable. Minor bumps for tuning, major bumps for structural rewrites.
-const DifficultyVersion = "0.3"
+const DifficultyVersion = "0.4"
 
 // Shared shape constants - used by BOTH the generators' option mapping and
 // MaxDiffForBitmap so the ceiling and what generation can actually produce
@@ -426,7 +426,13 @@ func computeBreakdown(scoredExpr string, forceWord bool) DifficultyBreakdown {
 		concept *= conceptWord
 		concepts = append(concepts, ConceptFactor{"word", conceptWord})
 	}
-	if f.requiresPEMDAS {
+	// PEMDAS is suppressed when scoring a word problem from its derived form
+	// (forceWord): operator-precedence parsing is a written-notation skill the
+	// story solver never performs - they take the operation order from the
+	// narrative, not from reading the form. Symbolic problems and equation-style
+	// word problems (scored from their expression, forceWord=false) keep it.
+	// The PEMDAS bit is dropped in lockstep by WordFormBitmap.
+	if f.requiresPEMDAS && !forceWord {
 		concept *= conceptPEMDAS
 		concepts = append(concepts, ConceptFactor{"pemdas", conceptPEMDAS})
 	}
@@ -457,6 +463,18 @@ func computeBreakdown(scoredExpr string, forceWord bool) DifficultyBreakdown {
 		HasMissing:   f.hasMissing,
 		Concepts:     concepts,
 	}
+}
+
+// WordFormBitmap drops, from a symbolic_expression's detected bits, the bits
+// that don't transfer from a written form to a prose word problem. Only PEMDAS
+// qualifies: operator-precedence parsing is a notation skill a story solver
+// never performs (it reads the narrative, not the form), so a word problem is
+// neither gated on PEMDAS nor charged its difficulty - in lockstep with the
+// forceWord suppression in computeBreakdown. SINGLE_VARIABLE/MISSING_NUMBER are
+// real structure and stay; a lone variable is already folded to '?' upstream by
+// RewriteLoneVariable.
+func WordFormBitmap(formBitmap uint64) uint64 {
+	return formBitmap &^ uint64(PEMDAS)
 }
 
 // compressRaw maps a raw composite onto the difficulty scale with a log

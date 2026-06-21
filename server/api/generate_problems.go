@@ -590,7 +590,9 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 						// magnitude, chaining) the prose hides. Stamp those bits so
 						// the bitmap matches the difficulty scored from the form, and
 						// the envelope check rejects a form the user can't have.
-						bitmap |= admSym.Bitmap
+						// PEMDAS is dropped (WordFormBitmap): a story solver never
+						// parses the written form, matching its suppression in scoring.
+						bitmap |= WordFormBitmap(admSym.Bitmap)
 					} else {
 						glog.Warningf("%s LLM word problem missing symbolic_expression; scoring from prose (under-rated): %q", logPrefix, adm.Expr)
 					}
