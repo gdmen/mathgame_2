@@ -286,6 +286,17 @@ replacing preserved legacy self-report. Bitmap-only writes; answer
 mismatches and constraint NOs are reported and left unchanged. Run any
 time after the bitmap backfill; `-dry-run`/`-limit` to sample first.
 
+`backfill_symbolic_expression` (optional, one LLM call per formless WORD row):
+derives a word problem's `symbolic_expression` from its prose, verifies the
+form lexes and evaluates to the stored answer, then writes the form, a bitmap
+re-derived from it (`WORD` | the form's detected bits, minus the notation-only
+ones `WordFormBitmap` drops), the form-based difficulty, and the current
+`DifficultyVersion`. It supersedes `revalidate_word_problems` for any row it
+touches - the form is a deterministic, free, and more complete source of bits
+(it captures exact chaining and operation structure, which the validator's
+feature list can't). `-dry-run`/`-limit` to sample first; `-start-id` to
+resume.
+
 ## The new-bit checklist
 
 Every future bit (#228 EXPONENTS is the first consumer; roadmap in #231)

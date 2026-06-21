@@ -41,6 +41,7 @@ build-cmds: build-api
 	$(GOBUILD) -o ./bin/trim_recently_shown_problems ./cmd/trim_recently_shown_problems/
 	$(GOBUILD) -o ./bin/maintenance_server ./cmd/maintenance_server/
 	$(GOBUILD) -o ./bin/revalidate_word_problems ./cmd/revalidate_word_problems/
+	$(GOBUILD) -o ./bin/backfill_symbolic_expression ./cmd/backfill_symbolic_expression/
 	$(GOBUILD) -o ./bin/diagnose_generation ./cmd/diagnose_generation/
 
 test: build-api test-api
