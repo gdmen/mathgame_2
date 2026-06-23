@@ -6,7 +6,7 @@ import (
 )
 
 // VERSION is the generator version string stamped on created problems.
-// See docs/generator_versions.md for version history.
+// See docs/generator-versions.md for version history.
 const VERSION = "heuristic_1.0"
 
 // OptionsError is returned when options don't allow valid problem generation.
