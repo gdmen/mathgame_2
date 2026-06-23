@@ -115,9 +115,9 @@ func pickTemplate(cfg GenConfig, ops []Op, rng randFunc) (Template, string) {
 // GenerateProblem produces a grade-appropriate math problem.
 //
 // Returns (expression, answer, difficulty, error). The difficulty return
-// value is kept for backward compatibility with heuristic_0.0 callers but
-// is always the requested TargetDifficulty (callers pin stored difficulty
-// anyway via settings.TargetDifficulty).
+// value is unused by callers and always echoes the requested
+// TargetDifficulty; stored difficulty is assigned by the difficulty/admission
+// pipeline, not here.
 //
 // If the grade + operations combination can't produce a valid problem after
 // several attempts, returns a best-effort simple addition problem.
