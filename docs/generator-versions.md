@@ -1,202 +1,128 @@
-# Problem Generator Versions
+# Problem generator versions
 
-Every problem in the database is tagged with a `generator` string that records
-which version of which generator produced it. This lets us track provenance,
-compare quality across versions, and filter/audit old content when regenerating
-problems.
+The provenance ledger for the two generators. Every problem stores a `generator` string recording
+which version of which generator produced it; this doc is the human-readable history behind those
+strings. The `generator` column is written once at create time and **never modified**, so
+old-version problems stay in the pool and are served normally after new versions ship.
 
-The `generator` column is never modified after a problem is created; it's
-written once at generation time and preserved for history even when new
-versions ship.
+**Update contract.** Bump the `VERSION` constant in the generator package AND add an entry here in
+the same PR. `server/api/docs_sync_test.go` (`TestDocsSyncGeneratorVersions`) fails CI when either
+anchor below disagrees with the live `generator.VERSION` / `llm_generator.VERSION`, and
+`make docs-check` fires when the owned files change without this doc being touched — so a version
+bump cannot land undocumented.
 
-## Heuristic Generator (`server/generator`)
+This doc owns **generator version provenance only**. The difficulty formula, the open-ended scale,
+the `DifficultyVersion` history, and selection/serving mechanics are owned by
+[problem-generation.md](problem-generation.md) and [selection.md](selection.md) — point there,
+don't re-derive them here.
 
-Deterministic Go code that generates arithmetic problems in-process. No API
-calls, no cost, fast. Grade-aware in 1.0+.
+<!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
+```
+heuristic_version: heuristic_1.0
+llm_version: llm_0.5
+```
+<!-- END DOC-SYNC ANCHORS -->
 
-### `heuristic_0.0` — human alpha
+## The model
 
-The original hand-written generator. Features:
-- Addition, subtraction, multiplication operations only
-- Iterative problem building driven by a log₃(number) difficulty scale
-- Output format wrapped single numbers in parens: `(3)+(5)-(2)`
-- No grade awareness; same output for all ages
-- Only wired up for add/sub at difficulty ≤ 5 (via `runHeuristicGenerator`
-  check in `server/api/generate_problems.go`)
-- No fraction support (code path existed but was commented out)
-- Multiplication supported in the generator but not exposed by the runner
+Two generators, each with its own `VERSION` string and its own version line. A problem's stored
+`difficulty` is the score the admission pipeline computes from the expression
+(`api.ComputeProblemDifficulty`), never the requester's target — so a `heuristic_0.0` and an
+`llm_0.5` problem at the same stored difficulty are genuinely comparable. A formula-version bump
+re-scores legacy problems via `recompute_problem_difficulty`; the version strings themselves are
+permanent (see [problem-generation.md](problem-generation.md)).
 
-Active from project start through commit before `heuristic_1.0` landed.
-Problems tagged `heuristic_0.0` remain in the DB for history.
+| Generator | Package | Current version | Nature |
+|-----------|---------|-----------------|--------|
+| Heuristic | `server/generator` | `heuristic_1.0` (`VERSION`) | Deterministic in-process Go; no API, no cost, fast. Default for non-word generation. |
+| LLM | `server/llm_generator` | `llm_0.5` (`VERSION`) | Calls OpenAI; richer/varied, especially word problems. Slower, costs per problem, batched up to `MAX_QUANTITY` per call. |
 
-### `heuristic_1.0` — first LLM-written version
+## Heuristic versions
 
-Complete rewrite. Grade-aware, template-based, produces clean output. Written
-by Claude as the first AI-authored generator version.
+| Version | What it is |
+|---------|-----------|
+| `heuristic_0.0` | Original hand-written generator. Add/sub/mul only, wired up only for add/sub at low difficulty; output wrapped single numbers in parens (`(3)+(5)-(2)`); no grade awareness; no fractions. Problems remain in the DB for history. |
+| `heuristic_1.0` (current) | Complete rewrite, first AI-authored version. Four operations end-to-end (`+ - * /`, division yields whole numbers); template-driven shapes (basic binary, missing-number, multi-term chains, same- and different-denominator fractions — `pickTemplate`); clean spaced formatting; fraction slashes distinguished from division; trivial-problem guards. |
 
-Changes vs `0.0`:
-- Grade-aware number ranges and capabilities per Common Core progression
-  (grades 1-8 in `config.go`)
-- Four operations supported end-to-end: `+`, `-`, `*`, `/` (division
-  guaranteed to produce whole-number results)
-- Multiple problem shape templates: basic binary, missing-number
-  (`? + 5 = 12`), multi-term chains (`a + b - c`), same-denominator
-  fractions, different-denominator fractions
-- Clean expression formatting with spaces around operators: `3 + 5`
-  not `(3)+(5)`
-- Distinguishes fraction slashes (`1/2`) from division operators (` / `)
-- Trivial-problem guards (no `a + 0`, `a - a`, `a × 1`, etc.)
-- Heuristic is now the default for non-word-problem generation, not just
-  a fallback. Covers all grades and all non-word problem types.
+`heuristic_1.0` is **bit-driven, not grade-driven**: the whole generation config comes from the
+user's settings bitmap via `Options` → `configFromBitOptions` — `MaxOperand` from the magnitude
+bits, the concept flags (`AllowMissing` / `AllowMultiOp` / `MaxChainLen` / `SameDenomOnly` /
+`Fractions` / `Negatives`) from the concept bits. There is no per-grade range table; `Operations`
+is an allowlist checked by `validateOptions`.
 
-## LLM Generator (`server/llm_generator`)
+DECIMALS / PEMDAS / PERCENTAGES / SINGLE_VARIABLE have no heuristic template and are LLM-only for
+now (#227); see [problem-generation.md](problem-generation.md).
 
-Calls OpenAI (GPT-4o-mini for generation, GPT-4o for validation). Produces
-richer, more varied problems, especially word problems. Slower and costs
-money per problem; offset by batching (5-20 problems per call).
+## LLM versions
 
-### `llm_0.1` — first LLM prompt
-
-Initial prompt template. Features:
-- Generates problems via GPT-4o-mini with a single generic prompt
-- Difficulty specified to the LLM as "age in years" (the LLM returns
-  its own self-assessed difficulty)
-- Validation via GPT-4o: checks the generated answer is correct, flags
-  mismatches
-- No grade-level context; all problems come from the same generic prompt
-- Supports word problems, fractions, negatives, and all four basic
-  operations through the `Features` bitmap
-
-### `llm_0.2` — curriculum alignment (WS2)
-
-Added grade-level curriculum context and few-shot examples.
-Changes vs `0.1`:
-- Prompt now includes grade-level context when `GradeLevel > 0`:
-  Common Core strand references, grade description, and 3 few-shot
-  example problems at the target grade level (from `curriculum.json`)
-- Validation prompt extended to also check grade-level appropriateness
-  when grade is set (still a single API call — answer correctness and
-  grade alignment checked together)
-- Topic-specific variety hints injected into the prompt to encourage
-  diverse problem shapes (missing addend, word problems, arrays, etc.)
-- Difficulty calibration: rejects problems where the LLM's self-reported
-  difficulty diverges >100% from the requested target
-- Added GPT5/GPT5Nano model constants (go-openai v1.41.2)
-
-### `llm_0.3` — bitmap constraint block
-
-The prompt is driven by the user's problem-type bitmap
-(see docs/problem-generation.md). Changes vs `0.2`:
-- The MAY / MUST NOT constraint block (api.BuildBitConstraints) is the
-  sole shape guidance: per-bit allow/forbid pairs, magnitude clause,
-  chain clause, unknown rules, closed-world clause. Grade-level
-  curriculum context, few-shot curriculum examples, and the
-  "age in years" difficulty framing are removed (`curriculum.json`
-  deleted).
-- Generator self-report is no longer trusted: features are stamped by
-  the admission pipeline's detector, difficulty by
-  ComputeProblemDifficulty. The self-reported-difficulty calibration
-  gate is removed.
-- Validation is local-first: symbolic problems are answer-checked by the
-  exact evaluator with no API call; word problems get one 3-line
-  validator round-trip (answer, envelope yes/no, observed features).
-- Storage preserves original notation (\frac, \times render through
-  KaTeX); normalization is internal to parsing.
-
-### `llm_0.4` — self-contained word problems
-
-Prompt-only change vs `0.3`. A prod audit (issue #249) found ~84% of
-llm_0.3 word problems appended the bare computation to the prose
-(`\text{...3 bags of 6 apples...}3 * 6`), and a subset appended the full
-equation including the result (`...= 18`), revealing the answer. The
-model was over-applying the "symbolic math goes outside \text{}" rule to
-story problems. The prompt now says: write the ENTIRE word problem as
-prose, never append the arithmetic or its result, and use symbolic math
-outside \text{} ONLY when the statement itself is an expression to
-manipulate (e.g. "Solve for x: 3x + 7 = 22"). No code path changed.
+| Version | What changed |
+|---------|--------------|
+| `llm_0.1` | First prompt: one generic prompt, difficulty given to the LLM as "age in years" with a self-assessed difficulty returned, answer-correctness validation. No grade context. |
+| `llm_0.2` | Curriculum alignment (WS2): grade-level Common Core context + few-shot examples from `curriculum.json`; validation also checks grade appropriateness; topic variety hints; rejects problems whose self-reported difficulty diverges >100% from target. |
+| `llm_0.3` | Bitmap constraint block: the api-built MAY / MUST NOT block (`api.BuildBitConstraints`) becomes the sole shape guidance; curriculum context, few-shot examples, and "age in years" framing removed (`curriculum.json` deleted). Self-report no longer trusted — features stamped by the detector, difficulty by `ComputeProblemDifficulty`. Validation local-first: symbolic problems answer-checked in-code, word problems get one validator round-trip. Storage preserves original notation. |
+| `llm_0.4` | Prompt-only (#249): tells the model to write the ENTIRE word problem as prose and never append the arithmetic or its result, using symbolic math outside `\text{}` only when the statement itself is an expression to manipulate. Fixed ~84% of `llm_0.3` word problems leaking the computation. No code path changed. |
+| `llm_0.5` (current) | `symbolic_expression` for word problems (#266) — see below. |
 
 ### `llm_0.5` — symbolic_expression for word problems
 
-Issue #266. Word problems were being scored as addition: the difficulty
-formula reads operators from tokens, and a story problem's operation lives in
-prose inside `\text{}`, invisible to it. The generator now emits a
-`symbolic_expression` alongside each word problem — the exact computation it
-asks for (e.g. `9999 / 3 / 3`), prompted as the same operations and numbers the
-student would use, not merely something that hits the answer. It is stored,
-never shown to the student, and validated three ways: it must lex and evaluate
-to the answer in-code, and the WORD validator's line 4 confirms it matches the
-problem's actual operations (catching a form that reaches the answer with the
-wrong computation). Difficulty is scored from the form with the word concept
-applied, so a division word problem scores like its symbolic twin plus the word
-bonus. Non-word problems leave it empty (their expression is already symbolic).
-Carries a `DifficultyVersion` bump (0.2 → 0.3) and a
-`recompute_problem_difficulty` run on deploy.
+Word problems were being scored as addition: the difficulty formula reads operators from tokens,
+but a story problem's operation lives in prose inside `\text{}`, invisible to it. The generator now
+emits a `symbolic_expression` alongside each word problem (`PROMPT_QUESTION`) — the exact
+computation the problem asks for, in the same operations and numbers the student would use, not
+merely something that hits the answer. It is **stored, never shown**, and validated three ways: it
+must lex and evaluate to the answer in-code, and the WORD validator's form line
+(`PROMPT_VALIDATION_FORM`) confirms it matches the problem's actual operations, returning
+`ErrFormMismatch` on a NO. Difficulty is scored from the form with the word concept applied, so a
+division word problem scores like its symbolic twin plus the word bonus. Non-word problems leave it
+empty (their `expression` is already symbolic). This version carries a `DifficultyVersion` bump and
+a `recompute_problem_difficulty` run on deploy (see [problem-generation.md](problem-generation.md)).
 
-## Universal Difficulty Scale
+## Invariants
 
-Every problem's `difficulty` column stores a universal score on a 1-20 scale
-computed from the expression itself via `api.ComputeProblemDifficulty(expr)`.
-See `server/api/difficulty.go` for the formula.
+- **The `generator` string is write-once.** Never rewrite it on existing problems; old versions
+  coexist in the pool and serve normally.
+- **Every number stays inside the envelope.** `configFromBitOptions` caps every numeric range to
+  `MaxOperand`, and `GenerateProblem`'s magnitude guard (`withinMaxOperand`) rejects any candidate
+  whose embedded numbers exceed it — including values a missing-number template computes (the sum
+  in `? + 5 = 12`) — because the insert pipeline would otherwise stamp an out-of-envelope magnitude
+  bit. When a draw can't satisfy the guard, generation retries a bounded number of times, then
+  falls back to a small basic-add problem that always passes (`GenerateProblem`).
+- **Self-report is not trusted (`llm_0.3`+).** Stored features come from the admission detector and
+  stored difficulty from `ComputeProblemDifficulty`, not from the generator's own output.
+- **Stored difficulty is the computed score, not the requested target** — the source of
+  cross-version comparability.
 
-The score is a log-compressed composite of:
-- **magnitude** — `log10` of the largest operand
-- **op_weight** — hardest operation present (1.0 add → 4.0 exponent)
-- **concept** — multipliers for fractions, negatives, variables, word problems
-- **structure** — chain length and missing-number bump
+## Gotchas
 
-Rough alignment with Common Core progression:
-
-| Scale | Typical content |
-|-------|-----------------|
-| 1-3   | Grade 1: counting, basic add within 20 |
-| 3-5   | Grade 2: add/sub within 100, missing addend |
-| 5-8   | Grade 3: multiplication facts, simple fractions |
-| 8-11  | Grade 4: multi-digit mul, fraction add/sub |
-| 11-14 | Grade 5: unlike-denom fractions, order of ops |
-| 14-16 | Grade 6-7: negatives, proportional reasoning |
-| 16-20 | Grade 8+: algebra, exponents |
-
-Selection filters problems with `difficulty BETWEEN target*0.7 AND target*1.3`
-on the universal scale. `grade_level` is still saved on each problem for
-provenance and LLM prompt context but is **not** used as a pool filter. A
-struggling grade 5 kid whose target drifts to 5 gets actual difficulty-5
-problems (from any generator, any grade) — no more contradictory "difficulty 3
-for a 5th grader" requests to the LLM.
-
-The `grade_level` setting in user settings drives the `maxDiff` cap for the
-adaptive loop (`grade*2+4`) so moving a user's grade up/down raises/lowers
-their difficulty range. It's the parent's explicit lever.
-
-To recompute legacy problem difficulties after deployment:
-
-```
-./bin/recompute_problem_difficulty -config=prod_conf.json
-# or --dry-run first
-```
-
-## When a problem is served
-
-1. `generate_problems.go:selectProblem` first checks the spaced-repetition
-   review queue for due problems.
-2. If no review is due, it runs a topic-weighted selection from the
-   existing problem pool (matching `difficulty` within ±30% of target).
-3. If the pool doesn't have enough matching problems, it triggers
-   background generation.
-4. Generation routes to the **heuristic generator** when the enabled
-   problem types don't include `WORD`, otherwise to the **LLM generator**.
-5. If the LLM fails, it falls back to the heuristic generator (stripping
-   `WORD` from the bitmap).
-6. When a problem is created, its `difficulty` column is set to
-   `ComputeProblemDifficulty(expression)` — not the requester's target.
+- **Models are not part of the version string.** LLM generation defaults to `openai.GPT5Nano`
+  (`GenerateProblem`), overridable per request via `Options.Model` (used by
+  `cmd/diagnose_generation` for model-tier A/B). The WORD validator uses `openai.GPT5`
+  (`ValidateWordProblem`), with a cheaper-model override (`ValidateWordProblemWithModel`). Swapping
+  the model does **not** bump `VERSION`, so the same `llm_0.5` string can cover problems generated
+  by different models.
+- **The LLM tags missed word problems after the fact** — `GenerateProblem` adds the `word` feature
+  to any returned problem whose expression contains letters even if the model omitted it.
 
 ## Adding a new version
 
-When you ship material changes to a generator, bump the version:
+Bump when you ship material changes to a generator:
 
-- Small prompt tweaks or parameter adjustments: patch bump (`0.1` → `0.2`)
-- New templates, new operations, new grade configs: minor (`1.0` → `1.1`)
-- Complete rewrite or incompatible output format: major (`1.0` → `2.0`)
+- Small prompt tweak or parameter adjustment → patch (`0.1` → `0.2`)
+- New templates, operations, or configs → minor (`1.0` → `1.1`)
+- Complete rewrite or incompatible output format → major (`1.0` → `2.0`)
 
-Update the `VERSION` constant in the generator package and add an entry
-here describing what changed. Old-version problems remain in the DB and
-are served normally.
+Then, in the SAME PR: (1) update the `VERSION` constant in the generator package; (2) add an entry
+above; (3) update the matching anchor (`heuristic_version` / `llm_version`) or
+`TestDocsSyncGeneratorVersions` fails CI. Old-version problems remain in the DB and serve normally.
+
+## Related files
+
+- `server/generator/generate_problem.go` — heuristic `VERSION`, `Options`, `configFromBitOptions`,
+  `GenerateProblem`, `withinMaxOperand`, `validateOptions`.
+- `server/llm_generator/generate_problem.go` — LLM `VERSION`, `PROMPT_QUESTION`, `MAX_QUANTITY`,
+  default model.
+- `server/llm_generator/validate_problem.go` — `ValidateWordProblem`, `PROMPT_VALIDATION_FORM`,
+  `ErrFormMismatch`, validation model.
+- `server/api/docs_sync_test.go` — `TestDocsSyncGeneratorVersions` (anchor gate).
+- [problem-generation.md](problem-generation.md) — difficulty formula, scale, `DifficultyVersion`,
+  admission pipeline, generation routing.

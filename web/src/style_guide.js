@@ -147,10 +147,19 @@ const StyleGuideView = () => {
       <header className="sg-header">
         <h1>Style Guide</h1>
         <p>
-          Live reference for the design tokens and components used across the
-          site. Token values come from <code>web/src/styles.scss</code>.
-          Compound components are rendered using the production SCSS, so what
-          you see here is what users see.
+          Source of truth for the design-system area. Token definitions live in{" "}
+          <code>web/src/styles.scss</code> and the bare-element reset in{" "}
+          <code>web/src/components.scss</code>; compound components are rendered
+          here using the production SCSS, so what you see is what users see.
+        </p>
+        <p>
+          <strong>
+            Change this page in the same PR as any token or shared-style change.
+          </strong>{" "}
+          <code>make docs-check BASE=origin/master</code> fails CI when{" "}
+          <code>styles.scss</code> or <code>components.scss</code> change
+          without this file being touched. New tokens go here before they go
+          untokenized into production CSS.
         </p>
         <p>
           Scope is the design system as of commit <code>930927d</code> (the last
@@ -254,7 +263,10 @@ const StyleGuideView = () => {
         </div>
 
         <h3>Small text</h3>
-        <p>Below 1em sit two recurring sizes used for hints and metadata.</p>
+        <p>
+          Below the base 1em sit a handful of recurring sizes for hints,
+          metadata, and modal copy — see the rows below for where each is used.
+        </p>
         <div className="sg-type-scale">
           {SMALL_TEXT.map((s) => (
             <div className="sg-type-row" key={s.value}>

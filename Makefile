@@ -48,6 +48,13 @@ test: build-api test-api
 test-api: server/api
 	$(GOTEST) ./$^
 
+# Registry-driven documentation checks (see scripts/docs_check.py and the
+# Project Areas registry in README.md). No args = integrity only; pass
+# BASE=<ref> (e.g. origin/master) to also enforce that an area's doc is
+# updated when its owned files change.
+docs-check:
+	python3 scripts/docs_check.py $(if $(BASE),--base $(BASE),)
+
 check-swagger:
 	if ! which swagger >/dev/null; then \
 		go get github.com/go-swagger/go-swagger/cmd/swagger && \

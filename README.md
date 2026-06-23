@@ -1,71 +1,86 @@
-# installation
-- install Node.js
-- install Go 1.24.2 (see go.mod)
-- install go-swagger (optional; only needed for `make build-docs` / `make dev-docs`)
+# Project areas
 
-# config
-- Copy `conf.json_` to `conf.json` and fill in MySQL user/pass and any Auth0 or OpenAI keys you need
+This repo is organized into **project areas**, each with a single source-of-truth doc. **Update
+an area's doc in the same PR as a behavior change** — `make docs-check` enforces that an area's
+doc is touched when its code changes, and `docs_sync_test` pins the `anchored` docs to code
+constants. Create or refresh an area's doc with `/document-project-area <area>`; audit the
+registry's currency against the code with `/audit-project-areas`.
 
-# mysql
+| Area | Doc | Status |
+|------|-----|--------|
+| Problem generation & difficulty | [docs/problem-generation.md](docs/problem-generation.md) | ✅ |
+| Generator versions (provenance) | [docs/generator-versions.md](docs/generator-versions.md) | ✅ |
+| Selection & serving | [docs/selection.md](docs/selection.md) | ✅ |
+| Adaptive difficulty & progression | [docs/adaptive-difficulty.md](docs/adaptive-difficulty.md) | ✅ |
+| Events & analytics | [docs/events.md](docs/events.md) | ✅ |
+| Reward videos & playlists | [docs/videos.md](docs/videos.md) | ✅ |
+| Gameplay loop & companion | [docs/gameplay.md](docs/gameplay.md) | ✅ |
+| Settings & envelope | [docs/settings.md](docs/settings.md) | ✅ |
+| Accounts, access & onboarding | [docs/accounts.md](docs/accounts.md) | ✅ |
+| Design system | [web/src/style_guide.js](web/src/style_guide.js) | ✅ (the `/style-guide` page is the living reference) |
+| Data model & schema | [docs/schema.md](docs/schema.md) | ✅ |
+| Deploy & ops runbook | [docs/ops-runbook.md](docs/ops-runbook.md) | ✅ |
 
-The app works against any MySQL 8.0+ server (8.4 LTS recommended; 5.7 is
-EOL but functional).
+The block below is the machine-readable registry (parsed by `scripts/docs_check.py`); the
+`documenter` agent maintains it. `name → doc → type (anchored\|prose) → globs (owned files)`.
 
-## Create the database with the expected charset/collation
-
-The schema uses `utf8mb4` everywhere; the app expects `utf8mb4_unicode_ci`
-as the default collation so string sort order is consistent across hosts.
-Create the DB explicitly:
-
-```sql
-CREATE DATABASE mathgame
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
+<!-- BEGIN PROJECT-AREA REGISTRY (parsed by scripts/docs_check.py) -->
 ```
-
-For a local install, also create / update the root user if needed:
-
-```sql
-ALTER USER 'root'@'localhost' IDENTIFIED BY '<PASSWORD>';
+problem-generation  doc=docs/problem-generation.md  type=anchored
+  globs: server/api/stamping.go, server/api/difficulty.go, server/api/expression.go, server/api/evaluator.go, server/api/enums.go, server/llm_generator/**, server/generator/**
+generator-versions  doc=docs/generator-versions.md  type=anchored
+  globs: server/generator/generate_problem.go, server/llm_generator/generate_problem.go
+selection  doc=docs/selection.md  type=anchored
+  globs: server/api/generate_problems.go, server/api/select_lru.go, server/api/pool_supply.go, server/api/trim_recently_shown.go
+adaptive-difficulty  doc=docs/adaptive-difficulty.md  type=anchored
+  globs: server/api/process_events.go, server/api/topic_stats.go, server/api/spaced_repetition.go
+events  doc=docs/events.md  type=anchored
+  globs: server/api/event_compress.go, server/api/statistics_handlers.go
+videos  doc=docs/videos.md  type=anchored
+  globs: server/api/youtube.go
+gameplay  doc=docs/gameplay.md  type=prose
+  globs: web/src/play.js, web/src/problem.js, web/src/video.js, web/src/companion.js
+settings  doc=docs/settings.md  type=anchored
+  globs: web/src/settings.js, web/src/bitmap_validation.js
+accounts  doc=docs/accounts.md  type=prose
+  globs: server/api/roles.go, web/src/auth0.js, web/src/pin.js, web/src/setup.js
+design-system  doc=web/src/style_guide.js  type=prose
+  globs: web/src/styles.scss, web/src/components.scss
+schema  doc=docs/schema.md  type=anchored
+  globs: server/api/models.json, server/api/migrations/**
+ops-runbook  doc=docs/ops-runbook.md  type=prose
+  globs: deploy/**, Makefile, cmd/**
 ```
+<!-- END PROJECT-AREA REGISTRY -->
 
-## Server config
+# Local development
 
-These server-level defaults minimize surprises if `mysqldump` runs against
-the server later or `CREATE TABLE` statements omit explicit charset/collation:
+## Prerequisites
+- Node.js
+- Go 1.24.2 (see `go.mod`)
+- MySQL 8.0+ (8.4 LTS recommended)
+- go-swagger — optional, only for `make build-docs` / `make dev-docs`
 
-| Variable | Recommended |
+## Setup
+1. **Config** — copy `conf.json_` to `conf.json` and fill in MySQL user/pass and any Auth0 / OpenAI keys you need.
+2. **Database** — the schema is `utf8mb4` throughout and expects `utf8mb4_unicode_ci`, so create the DB explicitly:
+   ```sql
+   CREATE DATABASE mathgame CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   ```
+   For a local install you may also need `ALTER USER 'root'@'localhost' IDENTIFIED BY '<password>';`.
+   Migrations run automatically on apiserver startup ([docs/schema.md](docs/schema.md)). Server-level
+   charset defaults and prod host provisioning are in the [ops runbook](docs/ops-runbook.md).
+3. **Build** — `make` (use `make clean && make` to refresh after a long break).
+
+## Run
+Run from the repo root; the API reads `conf.json` from the current directory.
+
+| Command | What it does |
 |---|---|
-| `character_set_server` | `utf8mb4` |
-| `collation_server` | `utf8mb4_unicode_ci` |
-| `sql_mode` | at least `NO_ENGINE_SUBSTITUTION` (the app tolerates strict mode but isn't required to run with it) |
+| `make dev-api` | API server |
+| `make dev-web` | web dev server |
+| `make test` | run tests |
 
-Check current values with `SHOW VARIABLES LIKE '<name>';`. Where to set
-them depends on the host (managed-host config UI, `my.cnf`, etc.).
-
-## Migrations
-
-Schema migrations live in `server/api/migrations/<N>.sql` and are applied
-automatically on apiserver startup, in numeric order, recorded in a
-`schema_migrations` table. Nothing to run by hand.
-
-# build (required before first run of dev-api)
-> make
-
-# refresh after not developing for a long time
-> make clean
-> make
-
-# development
-Run from repo root. API reads conf.json from current directory.
-> make dev-api
-> make dev-web
-
-# test
-> make test
-
-# production
-> see ./deploy/README.md
-
-# drop and recreate db
-mysql -u root -proot mathgame < deploy/drop.sql
+## Production
+Build, deploy, ops, first-time host provisioning, and the destructive DB reset
+(`deploy/drop.sql`) are all in the [ops runbook](docs/ops-runbook.md).

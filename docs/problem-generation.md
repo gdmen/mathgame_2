@@ -3,9 +3,12 @@
 The canonical reference for how problems are generated, stamped, validated,
 selected, and scored. **If you change any behavior described here, update
 this document in the same PR.** Mechanical enforcement: a slim doc-sync test
-(`server/api/docs_sync_test.go`) fails CI when the anchors below disagree
-with the code, so a new bit or a formula-version bump cannot land
-undocumented. Design history: issue #225.
+(`server/api/docs_sync_test.go` `TestDocsSync`) fails CI when the anchors below
+disagree with the code, so a new bit or a formula-version bump cannot land
+undocumented. Generator version strings (`heuristic_*`, `llm_*`) and the
+`DifficultyVersion` history live in the sibling doc
+[generator-versions.md](generator-versions.md) — point there, don't inline
+them. Design history: issue #225.
 
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
@@ -29,8 +32,11 @@ Each user has two controls:
   bounded by the formula-derived ceiling (below).
 
 A problem is served to a user iff its stamped bits are a **subset** of the
-user's bitmap: `(problem_type_bitmap & ~enabled) = 0` (plus the difficulty
-window and disabled/zero-bitmap filters).
+user's bitmap (plus the difficulty window and disabled/zero-bitmap filters).
+
+The bit enum, its 1:1 name map, and `ALL_PROBLEM_TYPES` live in
+`server/api/enums.go` (`ProblemType` iota block, `problemTypeNames`); the
+inventory is pinned by the `bits` anchor above.
 
 ## Bit reference
 
@@ -45,48 +51,57 @@ concern. Users compose their envelope directly.
 
 | Bit | Fires when | Difficulty factor |
 |---|---|---|
-| `ADDITION` `SUBTRACTION` `MULTIPLICATION` `DIVISION` | operator token present | opWeight max: 1.0 / 1.1 / 2.2 / 2.8 |
-| `FRACTIONS` | any fraction token (`3/8` unspaced; `\frac{a}{b}` normalizes to it) | ×2.0 (same denominators) |
-| `MISMATCHED_DENOMINATORS` | ≥2 fractions, differing denominators; on WORD problems, validator-observed (prose fractions); forces FRACTIONS via the stamp-time invariant | ×1.5, stacks on the fractions ×2.0 → net ×3.0 |
-| `NEGATIVES` | unary-minus number token | ×1.3 |
-| `WORD` | `\text{...}` present | ×1.3 (stacks with SINGLE_VARIABLE) |
+| `ADDITION` `SUBTRACTION` `MULTIPLICATION` `DIVISION` | operator token present | `opWeight` = MAX over present ops (`weightSub`/`weightMul`/`weightDiv`; add is the 1.0 baseline) |
+| `FRACTIONS` | any fraction token (`3/8` unspaced; `\frac{a}{b}` normalizes to it) | `conceptFractions` (same denominators) |
+| `MISMATCHED_DENOMINATORS` | ≥2 fractions, differing denominators; on WORD problems, validator-observed (prose fractions); forces FRACTIONS via the stamp-time invariant | `conceptMismatched`, multiplied ON TOP of `conceptFractions` |
+| `NEGATIVES` | unary-minus number token | `conceptNegatives` |
+| `WORD` | `\text{...}` present | `conceptWord` (stacks with SINGLE_VARIABLE) |
 | `MEDIUM_NUMBERS` | maxMagnitude 13–99 (bracket) | via magnitude |
 | `LARGE_NUMBERS` | maxMagnitude ≥ 100 (bracket — `1 + 999` is LARGE, not MEDIUM) | via magnitude |
-| `CHAINED_OPERATIONS` | numOps ≥ 2 (`=` does not count); on WORD problems, validator-observed (multi-step prose), and OR'd in by the stamp-time invariant whenever ≥2 core-op bits or PEMDAS are set | structure 1 + 0.15·(numOps−1) |
-| `MISSING_NUMBER` | a single `?` outside `\text{}` | structure +0.2 |
-| `DECIMALS` | symbolic decimal token | ×2.0 |
-| `PEMDAS` | the dual-evaluation rule (below) | ×1.5 |
-| `SINGLE_VARIABLE` | variable letter with a coefficient (`3x`) or multiple occurrences (`x + x`); on WORD problems, validator-observed (pure-prose algebra) | ×5.0 |
-| `PERCENTAGES` | symbolic `n%` token (evaluates as n/100) | ×2.0 |
+| `CHAINED_OPERATIONS` | numOps ≥ 2 (`=` does not count); on WORD problems, validator-observed (multi-step prose), and OR'd in by the stamp-time invariant whenever ≥2 core-op bits or PEMDAS are set | structure `+structurePerExtraOp` per op beyond the first |
+| `MISSING_NUMBER` | a single `?` outside `\text{}` | structure `+structureMissing` |
+| `DECIMALS` | symbolic decimal token | `conceptDecimals` |
+| `PEMDAS` | the dual-evaluation rule (below) | `conceptPEMDAS` |
+| `SINGLE_VARIABLE` | variable letter with a coefficient (`3x`) or multiple occurrences (`x + x`); on WORD problems, validator-observed (pure-prose algebra) | `conceptVariable` |
+| `PERCENTAGES` | symbolic `n%` token (evaluates as n/100) | `conceptPercent` |
 
-Defaults (no bit needed): max operand ≤ 12, single operation.
-`maxMagnitude` is **digit-based for decimals** (`0.75` counts as 75) — for
-stamping, difficulty, and ceiling alike: magnitude bits mean digit
-complexity, universally.
+The factor constants (`concept*`/`weight*`/`structure*`) live in
+`server/api/difficulty.go`; their numeric values are owned by
+`TestComputeProblemDifficulty_ReferenceValues` (difficulty_test.go), not this
+doc. Magnitude brackets are `smallMaxOperand` (≤12, default) /
+`mediumMaxOperand` (99) / `LargeMaxOperand` (9999) in the same file. Defaults
+(no bit needed): max operand ≤ 12, single operation. `maxMagnitude` is
+**digit-based for decimals** (`0.75` counts as 75) — for stamping, difficulty,
+and ceiling alike: magnitude bits mean digit complexity, universally
+(`lexNumber`'s `DigitMagnitude`, `expression.go`).
 
-**The prose rule.** `\text{...}` contents are one opaque prose token.
-Letters, `?`s, and operators inside prose can never fire structural bits
-("John has **a** dog." must not stamp SINGLE_VARIABLE). One deliberate
-split: magnitude/decimal/percent scanning for *difficulty* and for the
-magnitude *shape bits* DOES read prose numerals (a word problem about 47
-apples is a MEDIUM_NUMBERS problem); concept-bit detection never does — WORD
-problems' topic bits come from the validator. Legacy WORD rows carry
-preserved self-reported topic bits until re-stamped by
-`cmd/revalidate_word_problems`, which replaces them with
-validator-observed features.
+**The prose rule.** `\text{...}` contents are one opaque prose token
+(`TokText`, `expression.go`). Letters, `?`s, and operators inside prose can
+never fire structural bits ("John has **a** dog." must not stamp
+SINGLE_VARIABLE). One deliberate split: magnitude/decimal/percent scanning
+for *difficulty* and for the magnitude *shape bits* DOES read prose numerals
+(`parseProblemFeatures`'s `TokText` branch + `reProseNumber`, `difficulty.go`)
+— a word problem about 47 apples is a MEDIUM_NUMBERS problem; concept-bit
+detection never does — WORD problems' topic bits come from the validator.
+Legacy WORD rows carry preserved self-reported topic bits until re-stamped by
+`cmd/revalidate_word_problems`, which replaces them with validator-observed
+features.
 
 **The lone-letter rewrite (stage 1.5).** A bare letter occurring exactly
 once with no coefficient (`12 - x = 5`) carries no algebraic load and is
 rewritten to `?` at insert (`12 - ? = 5`), stamping MISSING_NUMBER — one
 notation for fill-in-the-blank; a MISSING-enabled kid without
-SINGLE_VARIABLE never sees a letter. The moment the unknown must be referred
-to more than once or operated on (`3x`, `x + x`), letter notation is doing
-real work and it stays: that's SINGLE_VARIABLE.
+SINGLE_VARIABLE never sees a letter (`RewriteLoneVariable`, `expression.go`).
+The moment the unknown must be referred to more than once or operated on
+(`3x`, `x + x`), letter notation is doing real work and it stays: that's
+SINGLE_VARIABLE.
 
 **Per-problem unknown rules** (enforced at generation prompt, insert reject,
 and ceiling computation — all three sites, always together): at most ONE
 distinct unknown per problem; `?` may appear at most once (multi-`?` is
-ambiguous/multi-answer); an unknown requires an equation.
+ambiguous/multi-answer); an unknown requires an equation
+(`CountDistinctUnknowns`, `expression.go`; `verifyAnswerSymbolic`,
+`stamping.go`).
 
 **Settings-level dependency rules** (`web/src/bitmap_validation.js`,
 mirrored nowhere else — API clients bypassing them degrade gracefully):
@@ -116,12 +131,27 @@ the backfill run the same stages:
 [4]   INSERT      problemManager.Create
 ```
 
+`NormalizeExpression`/`LexExpression`/`RewriteLoneVariable` live in
+`expression.go`; `DetectProblemTypeBitmap` in `generate_problems.go` (the
+selection area); the answer ([3]) and envelope ([3.5]) checks in `stamping.go`
+(`verifyAnswerSymbolic`, `envelopeViolation`).
+
 Storage keeps the **original notation** (`\frac{1}{2}`, `\times` render
 through KaTeX); normalization is a parsing concern. Only the stage-1.5 `?`
-splice mutates stored text.
+splice mutates stored text (`Admission.Expr`; `spliceLoneLetterRaw` recovers
+the splice point in un-normalized text, falling back to the normalized form
+on dialect ambiguity).
+
+**Stamp-time structural invariant.** `NormalizeProblemBitmap` (`stamping.go`)
+OR's in implied bits at every final stamp site: ≥2 distinct core ops or PEMDAS
+⇒ CHAINED_OPERATIONS; MISMATCHED ⇒ FRACTIONS. It only ever NARROWS the
+serving audience. It exists because the WORD validator reports topic features
+as independent items and can omit an implied one; the parser path co-sets them
+from the token stream and never needs it.
 
 Every drop is counted in a per-call funnel line (#230):
-`funnel: requested= returned= lexer= unknown_rules= collision= answer= envelope= validator= create= inserted=`.
+`funnel: requested= returned= lexer= unknown_rules= collision= answer= envelope= validator= create= inserted=`
+(`generationFunnel.String`, `stamping.go`).
 
 ## Local-first validation
 
@@ -136,25 +166,31 @@ A WORD problem also carries a `symbolic_expression` (the bare computation it
 asks for; see the Difficulty formula section). It is checked in-code to lex and
 evaluate to the answer, its detected bits are folded into the stamp, and the
 validator's line 4 confirms it uses the operations the problem actually requires
-— catching a form that hits the answer with the wrong computation, which the
-exact evaluator alone cannot. Difficulty is scored from the form.
+(`FORM_MISMATCH` on a NO) — catching a form that hits the answer with the wrong
+computation, which the exact evaluator alone cannot. Difficulty is scored from
+the form.
 
 Disagreement = reject, not auto-correct. The answer check, the PEMDAS
-dual-eval, and bit detection share one evaluator over one token stream, so
-difficulty, bits, and answers cannot disagree about what an expression means.
+dual-eval, and bit detection share one evaluator over one token stream
+(`evaluator.go`, `EvalTokens`), so difficulty, bits, and answers cannot
+disagree about what an expression means.
 
-**PEMDAS dual-evaluation rule:** evaluate each equation side twice — correct
-(recursive descent, precedence + parens) vs naive (parens stripped, strict
-left-to-right fold). PEMDAS fires iff they disagree. `(3 + 5) * 2` does NOT
+**PEMDAS dual-evaluation rule** (`requiresPEMDAS`, `evaluator.go`): evaluate
+each equation side twice — correct (recursive descent, precedence + parens,
+`EvalTokens`) vs naive (parens stripped, strict left-to-right fold,
+`EvalTokensNaiveLTR`). PEMDAS fires iff they disagree. `(3 + 5) * 2` does NOT
 fire (the parens spell out the natural order); `12 - (5 - 3)` fires with no
-multiplication at all. Unknowns are bound to fixed rational probes — the
-formula stays a pure function of the expression because the recompute
-fast-path depends on that.
+multiplication at all. A naive division-by-zero where correct succeeds counts
+as disagreement; a correct-side error is malformed and never fires. Unknowns
+are bound to fixed rational probes (`pemdasProbes`) — the formula stays a pure
+function of the expression because the recompute fast-path depends on that.
 
 ## Difficulty formula (v0.3) and ceiling
 
 `ComputeProblemDifficulty(expression, symbolic_expression)`
-(server/api/difficulty.go):
+(server/api/difficulty.go); the version string is `DifficultyVersion`
+(pinned by the anchor and tracked in
+[generator-versions.md](generator-versions.md)):
 
 ```
 magnitude = log10(maxMagnitude + 1) + 0.3      (digit-based for decimals)
@@ -165,13 +201,18 @@ raw       = magnitude * opWeight * concept * structure
 scaled    = 1 + 19 * (ln(raw+1) - ln(1.5)) / (ln(16) - ln(1.5))
 ```
 
-Open-ended scale: floored at 1.0, **no upper clamp** (inputs are bounded by
-construction; system max ≈ 62). 1–20 is the band for one/two-concept
-problems; scores above 20 mean multi-concept stacks. Illustrative anchors:
-`3 + 5` ≈ 3.6 · `47 + 28` ≈ 6.5 · `9 × 12` ≈ 9.1 · `3x + 7 = 22` ≈ 15.7.
-**The canonical numbers live in
-`TestComputeProblemDifficulty_ReferenceValues`** (difficulty_v2_test.go) —
+Open-ended scale: floored at 1.0, **no upper clamp** (`compressRaw`; inputs
+are bounded by construction; system max ≈ 62). 1–20 is the band for one/two-
+concept problems; scores above 20 mean multi-concept stacks. Illustrative
+anchors: `3 + 5` ≈ 3.6 · `47 + 28` ≈ 6.5 · `9 × 12` ≈ 9.1 ·
+`3x + 7 = 22` ≈ 15.7. **The canonical numbers live in
+`TestComputeProblemDifficulty_ReferenceValues`** (difficulty_test.go) —
 that test owns them; this table is prose.
+
+`ComputeProblemDifficulty` delegates to `ComputeDifficultyBreakdownFor`, the
+single source of truth for the expr-vs-symbolic dispatch;
+`DifficultyBreakdown` exposes the intermediate factors for the admin
+calibration page without affecting scoring.
 
 Changing the formula in ANY way requires bumping `DifficultyVersion` and
 running `recompute_problem_difficulty` on deploy. Calibration: #35.
@@ -180,13 +221,15 @@ running `recompute_problem_difficulty` on deploy. Calibration: #35.
 `\text{...}`, so its operators are invisible to the token-level
 `opWeight`/`structure` (the prose rule). It instead carries a
 `symbolic_expression` — the bare computation it asks for (e.g. `9999 / 3 / 3`)
-— and difficulty is scored from THAT, with the word concept (×1.3) forced on.
-So a division word problem scores like its symbolic twin plus the word bonus,
-not as addition. `symbolic_expression` is empty for non-word problems (whose
-`expression` is already symbolic) and is never shown to the student: the
-generator emits it and the WORD validator checks it lexes and evaluates to the
-answer before storing it. A legacy word problem with no `symbolic_expression`
-falls back to scoring its prose. Issue #266.
+— and difficulty is scored from THAT, with the word concept forced on
+(`ComputeDifficultyBreakdownFor`'s `symbolic != ""` branch passes `forceWord`
+to `computeBreakdown`). So a division word problem scores like its symbolic
+twin plus the word bonus, not as addition. `symbolic_expression` is empty for
+non-word problems (whose `expression` is already symbolic) and is never shown
+to the student: the generator emits it and the WORD validator checks it lexes
+and evaluates to the answer before storing it. A legacy word problem with no
+`symbolic_expression` falls back to scoring its prose. Issue #266 (`llm_0.5`
+in [generator-versions.md](generator-versions.md)).
 
 **The ceiling, `MaxDiffForBitmap`** — the difficulty of the hardest problem
 the enabled bits can express. WHY IT EXISTS: adaptive difficulty ratchets
@@ -201,8 +244,11 @@ per-problem mutually exclusive, so the ceiling computes both branches and
 takes the higher — multiplying both in would claim an unreachable ceiling and
 recreate the exact drift the ceiling prevents.
 
-Shared shape constants (generator mapping AND ceiling, lockstep):
-`MaxChainLen = 5`, `LargeMaxOperand = 9999`.
+Shared shape constants (generator mapping AND ceiling, lockstep, pinned by the
+anchors): `MaxChainLen`, `LargeMaxOperand` (difficulty.go). `MinTargetDifficulty`
+floors the selectable target so it never aims below the band the default
+envelope populates (mirrored as `MIN_TARGET_DIFFICULTY` in
+`web/src/bitmap_validation.js`).
 
 ## Selection
 
@@ -211,39 +257,56 @@ Shared shape constants (generator mapping AND ceiling, lockstep):
   `getDueReviewProblem`. Zero-bitmap rows are excluded defensively (a zero
   bitmap is a subset of everything).
 - Index: `(disabled, difficulty, problem_type_bitmap)` — the trailing bitmap
-  column makes the subset filter covering (~20ms vs ~130ms measured at 320K
-  rows; plans in the comment block of `migrations/39.sql`).
-- **`WEIGHTED_TOPIC_MASK`** = all bits except MEDIUM/LARGE_NUMBERS. Gates
-  `chooseWeightedTopic`, `recordTopicAttempt`, `initTopicStats`: a bit is a
-  practice topic iff per-topic difficulty coheres for it; magnitude IS
+  column makes the subset filter covering (plans in the comment block of
+  `migrations/39.sql`).
+- **`WEIGHTED_TOPIC_MASK`** (`enums.go`) = all bits except MEDIUM/LARGE_NUMBERS.
+  Gates `chooseWeightedTopic`, `recordTopicAttempt`, `initTopicStats`: a bit is
+  a practice topic iff per-topic difficulty coheres for it; magnitude IS
   difficulty, so "weak at LARGE_NUMBERS → serve large numbers, easier"
   fights itself. Size progression is target_difficulty's job.
 - **Pool-supply weighting** (server/api/pool_supply.go): thin-pool topics
-  get up to 4× lottery weight (5-min cached per-bit counts), so
-  hard-to-generate bits stay in rotation by weight, not by force. Both
-  lottery signals - per-kid skill (demand, topic_stats.go) and pool
-  supply - act at serving time; a picked-but-thin topic also triggers
-  background generation.
+  get extra lottery weight (cached per-bit counts), so hard-to-generate bits
+  stay in rotation by weight, not by force. Both lottery signals — per-kid
+  skill (demand, topic_stats.go) and pool supply — act at serving time; a
+  picked-but-thin topic also triggers background generation.
+
+(Selection internals are owned by [selection.md](selection.md); the rows above
+are the generation-relevant surface.)
 
 ## Generation
 
-- **Prompt** (`api.BuildBitConstraints`): per-bit MAY/MUST NOT pairs, a
-  3-state magnitude clause, a 2-state chain clause, the unknown rules
-  whenever MISSING/SINGLE_VARIABLE is enabled, and the closed-world clause
-  ("use ONLY what is explicitly allowed — no square roots, exponents, ...").
-  All constraints are simultaneous.
-  Every constraint the insert pipeline enforces must also be communicated
-  here, or the generator wastes output on shapes that always reject.
-- **Heuristic generator** (server/generator): bit-driven `Options`
-  (MaxOperand from magnitude bits, AllowMissing/AllowMultiOp/MaxChainLen/
-  SameDenomOnly from concept bits) + an expression-wide magnitude guard
-  (missing-number templates embed computed values). DECIMALS/PEMDAS/
-  PERCENTAGES/SINGLE_VARIABLE generation is LLM-only for now (#227).
-- **WORD validator** (`llm_generator.ValidateWordProblem`): 3 lines —
-  answer / envelope YES-NO (judged against the same constraints the
-  generator saw; `ENVELOPE_MISMATCH`) / observed features (closed name
-  list, stamps the WORD problem's topic bits — generator self-report is
-  never trusted, #224).
+- **Prompt** (`api.BuildBitConstraints`, `server/api/prompt_guidance.go`):
+  per-bit MAY/MUST NOT pairs, a 3-state magnitude clause, a 2-state chain
+  clause, the unknown rules whenever MISSING/SINGLE_VARIABLE is enabled, and
+  the closed-world clause ("use ONLY what is explicitly allowed — no square
+  roots, exponents, ..."). All constraints are simultaneous. Every constraint
+  the insert pipeline enforces must also be communicated here, or the
+  generator wastes output on shapes that always reject.
+- **Heuristic generator** (server/generator, `heuristic_1.0`): bit-driven
+  `Options` (`MaxOperand` from magnitude bits, `AllowMissing`/`AllowMultiOp`/
+  `MaxChainLen`/`SameDenomOnly` from concept bits → `configFromBitOptions`) +
+  an expression-wide magnitude guard (`withinMaxOperand`; missing-number
+  templates embed computed values, and an out-of-range embedded value would
+  stamp an out-of-envelope magnitude bit). It retries a bounded number of
+  times, then falls back to a simple halved add problem that always passes the
+  guard (`GenerateProblem`). Templates: basic / missing / multi-op (add/sub
+  chains only) / same- and diff-denominator fractions (`templates.go`,
+  `fractions.go`). DECIMALS/PEMDAS/PERCENTAGES/SINGLE_VARIABLE generation is
+  LLM-only for now (#227) — no heuristic template emits them.
+- **LLM generator** (server/llm_generator, `llm_0.5`): one batched OpenAI call
+  (`MAX_QUANTITY = 20`); the `BuildBitConstraints` block is the sole shape
+  guidance (`Options.Constraints` is opaque to the package). Emits
+  `symbolic_expression` for word problems (`generate_problem.go` prompt). Model
+  defaults are owned by [generator-versions.md](generator-versions.md).
+- **WORD validator** (`llm_generator.ValidateWordProblem`): one LLM
+  round-trip, 3 lines (4 when a `symbolic_expression` was sent) —
+  answer (authoritative for prose math) / envelope YES-NO (judged against
+  the same constraints the generator saw; `ErrEnvelopeMismatch`) / observed
+  features (closed name list, stamps the WORD problem's topic bits —
+  generator self-report is never trusted, #224) / form-match YES-NO,
+  appended only when a `symbolic_expression` is present (`PROMPT_VALIDATION_FORM`):
+  does the form use the operations and numbers the problem actually requires?
+  (`ErrFormMismatch` on a NO, #266).
 
 ## Backfill tools and deployment
 
@@ -278,7 +341,7 @@ forbidden until deliberately added.
 1. Constant in `server/api/enums.go` + `problemTypeNames` entry — feature-named, not subject-named.
 2. Frontend constant in `web/src/enums.js`.
 3. Lexer token(s) for new notation (`server/api/expression.go` — the alphabet is the single source of truth).
-4. Normalizer synonyms for LaTeX/unicode dialect forms.
+4. Normalizer synonyms for LaTeX/unicode dialect forms (`normalizeReplacer`).
 5. `parseProblemFeatures` field + detection logic (token-level; the prose rule applies).
 6. `DetectProblemTypeBitmap` mapping line.
 7. Validation-tier decision: extend the evaluator? per-bit deterministic verifier? or WORD-class LLM validation?
@@ -291,3 +354,14 @@ forbidden until deliberately added.
 14. Heuristic generator support, or explicit LLM-only deferral (#227-style issue).
 15. Backfill: do legacy rows need re-stamping? (re-run `recompute_problem_type_bitmap`.)
 16. Update THIS DOCUMENT — the doc-sync test fails CI if you skip the anchors.
+
+## Related files
+
+- `server/api/enums.go` — `ProblemType` bits, `problemTypeNames`, `ALL_PROBLEM_TYPES`, `WEIGHTED_TOPIC_MASK`
+- `server/api/expression.go` — `NormalizeExpression`, `LexExpression`, `RewriteLoneVariable`, `CountDistinctUnknowns`, `lexNumber`
+- `server/api/evaluator.go` — `EvalTokens`, `EvalTokensNaiveLTR`, `requiresPEMDAS`, `pemdasProbes`
+- `server/api/stamping.go` — `AdmitExpression`, `NormalizeProblemBitmap`, `verifyAnswerSymbolic`, `envelopeViolation`, `generationFunnel`
+- `server/api/difficulty.go` — `ComputeProblemDifficulty`, `ComputeDifficultyBreakdownFor`, `computeBreakdown`, `compressRaw`, `MaxDiffForBitmap`, the `concept*`/`weight*`/`structure*` constants, `DifficultyVersion`, `MaxChainLen`, `LargeMaxOperand`
+- `server/api/generate_problems.go` — `DetectProblemTypeBitmap`
+- `server/generator` — `GenerateProblem`, `configFromBitOptions`, `withinMaxOperand`, templates
+- `server/llm_generator` — `GenerateProblem`, `ValidateWordProblem`, `PROMPT_QUESTION`, `PROMPT_VALIDATION_WORD`, `PROMPT_VALIDATION_FORM`
