@@ -6,7 +6,9 @@
 //
 // Every candidate problem - LLM-generated or heuristic - passes through:
 //
-//	[0]   NORMALIZE   notation synonyms -> one standard form
+//	[0]   NORMALIZE   reduce a degenerate "unknown = <computable>" to the
+//	                  computation (? = 100 - 25 -> 100 - 25); notation synonyms
+//	                  -> one standard form
 //	[1]   LEX         allowlist alphabet; unknown token -> reject (+ token logged)
 //	[1.5] REWRITE     lone bare variable -> ? (12 - x = 5 -> 12 - ? = 5)
 //	[2]   DETECT      problem-type bits from parsed features
@@ -118,7 +120,7 @@ type Admission struct {
 // they differ for symbolic vs WORD problems. Exported for the
 // recompute_problem_type_bitmap backfill, which runs the same pipeline.
 func AdmitExpression(rawExpr string) Admission {
-	expr := strings.TrimSpace(rawExpr)
+	expr := reduceLabeledUnknown(strings.TrimSpace(rawExpr))
 	norm := NormalizeExpression(expr)
 
 	toks, lexErr := LexExpression(norm)

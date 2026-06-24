@@ -12,7 +12,7 @@ them. Design history: issue #225.
 
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
-difficulty_version: 0.3
+difficulty_version: 0.4
 max_chain_len: 5
 large_max_operand: 9999
 bits: addition, subtraction, multiplication, division, fractions, negatives, word, medium_numbers, large_numbers, chained_operations, missing_number, mismatched_denominators, decimals, pemdas, single_variable, percentages
@@ -114,7 +114,10 @@ PEMDAS ⇒ CHAINED.
 the backfill run the same stages:
 
 ```
-[0]   NORMALIZE   \times,\cdot -> *   \div -> /   \frac{a}{b} -> a/b
+[0]   NORMALIZE   reduce a degenerate "unknown = <computable>" to the
+                  computation (? = 100 - 25 -> 100 - 25; an operand unknown
+                  like ? - 5 = 10 stays); then notation synonyms:
+                  \times,\cdot -> *   \div -> /   \frac{a}{b} -> a/b
                   \left( \right) -> ( )   unicode −×÷ -> ascii
                   $15 -> 15 (money prefix)   15,000 -> 15000 (thousands)
 [1]   LEX         allowlist alphabet; unknown token (\sqrt, ^, !, ...) ->
@@ -185,7 +188,7 @@ as disagreement; a correct-side error is malformed and never fires. Unknowns
 are bound to fixed rational probes (`pemdasProbes`) — the formula stays a pure
 function of the expression because the recompute fast-path depends on that.
 
-## Difficulty formula (v0.3) and ceiling
+## Difficulty formula (v0.4) and ceiling
 
 `ComputeProblemDifficulty(expression, symbolic_expression)`
 (server/api/difficulty.go); the version string is `DifficultyVersion`
@@ -217,7 +220,7 @@ calibration page without affecting scoring.
 Changing the formula in ANY way requires bumping `DifficultyVersion` and
 running `recompute_problem_difficulty` on deploy. Calibration: #35.
 
-**Word problems (v0.3):** a word problem's `expression` is prose inside
+**Word problems (v0.4):** a word problem's `expression` is prose inside
 `\text{...}`, so its operators are invisible to the token-level
 `opWeight`/`structure` (the prose rule). It instead carries a
 `symbolic_expression` — the bare computation it asks for (e.g. `9999 / 3 / 3`)
@@ -230,6 +233,21 @@ to the student: the generator emits it and the WORD validator checks it lexes
 and evaluates to the answer before storing it. A legacy word problem with no
 `symbolic_expression` falls back to scoring its prose. Issue #266 (`llm_0.5`
 in [generator-versions.md](generator-versions.md)).
+
+PEMDAS is the one detected feature NOT carried over from the form: operator-
+precedence parsing is a written-notation skill the story solver never performs
+(they take the operation order from the narrative), so a word problem is
+neither charged its ×1.5 nor stamped the PEMDAS bit — the scoring suppresses it
+on the `forceWord` path and `WordFormBitmap` drops the bit in lockstep. An
+equation-style word problem (`\text{Solve for }x: 3x+7=22`) presents the
+notation in its prose and is scored from the `expression` (no form), so it
+keeps PEMDAS. `SINGLE_VARIABLE`/`MISSING_NUMBER` are real structure and are
+kept; a lone variable in a form is already folded to `?` by the stage-1.5
+rewrite, so it stamps `MISSING_NUMBER`, not `SINGLE_VARIABLE`. A form that
+merely *labels* the answer with an unknown (`? = 100 - 25`) is reduced to the
+bare computation at admission (`reduceLabeledUnknown`, the first
+`AdmitExpression` step, so every path gets it) — so a direct computation isn't
+mis-stamped `MISSING_NUMBER`; only an operand unknown (`? - 5 = 10`) keeps it.
 
 **The ceiling, `MaxDiffForBitmap`** — the difficulty of the hardest problem
 the enabled bits can express. WHY IT EXISTS: adaptive difficulty ratchets
@@ -330,6 +348,17 @@ re-stamps WORD rows' topic bits from the validator's observed features,
 replacing preserved legacy self-report. Bitmap-only writes; answer
 mismatches and constraint NOs are reported and left unchanged. Run any
 time after the bitmap backfill; `-dry-run`/`-limit` to sample first.
+
+`backfill_symbolic_expression` (optional, one LLM call per formless WORD row):
+derives a word problem's `symbolic_expression` from its prose, verifies the
+form lexes and evaluates to the stored answer, then writes the form, a bitmap
+re-derived from it (`WORD` | the form's detected bits, minus the notation-only
+ones `WordFormBitmap` drops), the form-based difficulty, and the current
+`DifficultyVersion`. It supersedes `revalidate_word_problems` for any row it
+touches - the form is a deterministic, free, and more complete source of bits
+(it captures exact chaining and operation structure, which the validator's
+feature list can't). `-dry-run`/`-limit` to sample first; `-start-id` to
+resume.
 
 ## The new-bit checklist
 
