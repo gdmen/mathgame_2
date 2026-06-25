@@ -215,6 +215,8 @@ the recency sort.
 
 - `server/api/generate_problems.go` — `selectProblem`, the candidate SQL,
   `newestVersionTier`, background-generation single-flight, the constants.
+  (Bit detection, `DetectProblemTypeBitmap`, now lives in the shared
+  `server/mathcore` kernel, not here — see [problem-generation.md](problem-generation.md).)
 - `server/api/select_lru.go` — `pickWithRecencyBias`, `recencyLess`,
   `lastShownAt`.
 - `server/api/pool_supply.go` — `poolCountsByBit`, `thinPoolBoost`, supply-side

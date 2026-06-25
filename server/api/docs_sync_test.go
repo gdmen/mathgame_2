@@ -10,6 +10,7 @@ import (
 
 	"garydmenezes.com/mathgame/server/generator"
 	"garydmenezes.com/mathgame/server/llm_generator"
+	"garydmenezes.com/mathgame/server/mathcore"
 )
 
 // The DocsSync tests are the mechanical layer of the doc-drift defense: each
@@ -98,21 +99,18 @@ func TestDocsSync(t *testing.T) {
 	anchors := readDocAnchors(t, doc)
 
 	// Anchor 1: DifficultyVersion - any formula bump forces a doc touch.
-	if anchors["difficulty_version"] != DifficultyVersion {
+	if anchors["difficulty_version"] != mathcore.DifficultyVersion {
 		t.Errorf("doc difficulty_version = %q, code DifficultyVersion = %q - update docs/problem-generation.md (formula change? remember the recompute deploy step)",
-			anchors["difficulty_version"], DifficultyVersion)
+			anchors["difficulty_version"], mathcore.DifficultyVersion)
 	}
 
 	// Anchor 2: the bit inventory - a new bit cannot land undocumented.
-	var wantBits []string
-	for _, name := range problemTypeNames {
-		wantBits = append(wantBits, name)
-	}
+	wantBits := mathcore.ProblemTypeToFeatures(mathcore.ALL_PROBLEM_TYPES)
 	assertSetAnchor(t, doc, "bits", anchors["bits"], wantBits)
 
 	// Anchor 3: the shared shape constants (generator mapping + ceiling).
-	assertIntAnchor(t, doc, "max_chain_len", anchors["max_chain_len"], MaxChainLen)
-	assertIntAnchor(t, doc, "large_max_operand", anchors["large_max_operand"], LargeMaxOperand)
+	assertIntAnchor(t, doc, "max_chain_len", anchors["max_chain_len"], mathcore.MaxChainLen)
+	assertIntAnchor(t, doc, "large_max_operand", anchors["large_max_operand"], mathcore.LargeMaxOperand)
 }
 
 // TestDocsSyncGeneratorVersions pins docs/generator-versions.md to the live
@@ -145,12 +143,7 @@ func TestDocsSyncSelection(t *testing.T) {
 
 	// The mask gates which bits participate in weighted topic selection;
 	// adding a bit to (or removing one from) WEIGHTED_TOPIC_MASK forces a doc touch.
-	var want []string
-	for pt, name := range problemTypeNames {
-		if pt&WEIGHTED_TOPIC_MASK != 0 {
-			want = append(want, name)
-		}
-	}
+	want := mathcore.ProblemTypeToFeatures(mathcore.WEIGHTED_TOPIC_MASK)
 	assertSetAnchor(t, doc, "weighted_topic_mask", anchors["weighted_topic_mask"], want)
 }
 
@@ -175,7 +168,7 @@ func TestDocsSyncAdaptiveDifficulty(t *testing.T) {
 	}
 
 	assertIntAnchor(t, doc, "max_target", anchors["max_target"], maxTarget)
-	assertFloatAnchor(t, doc, "min_target_difficulty", anchors["min_target_difficulty"], MinTargetDifficulty)
+	assertFloatAnchor(t, doc, "min_target_difficulty", anchors["min_target_difficulty"], mathcore.MinTargetDifficulty)
 	assertFloatAnchor(t, doc, "problem_selection_epsilon", anchors["problem_selection_epsilon"], problemSelectionEpsilon)
 }
 
@@ -253,11 +246,11 @@ func TestDocsSyncSettings(t *testing.T) {
 	const doc = "../../docs/settings.md"
 	anchors := readDocAnchors(t, doc)
 
-	assertFloatAnchor(t, doc, "min_target_difficulty", anchors["min_target_difficulty"], MinTargetDifficulty)
-	assertIntAnchor(t, doc, "ceiling_max_chain_len", anchors["ceiling_max_chain_len"], MaxChainLen)
-	assertIntAnchor(t, doc, "ceiling_large_max_operand", anchors["ceiling_large_max_operand"], LargeMaxOperand)
-	assertIntAnchor(t, doc, "ceiling_small_max_operand", anchors["ceiling_small_max_operand"], smallMaxOperand)
-	assertIntAnchor(t, doc, "ceiling_medium_max_operand", anchors["ceiling_medium_max_operand"], mediumMaxOperand)
+	assertFloatAnchor(t, doc, "min_target_difficulty", anchors["min_target_difficulty"], mathcore.MinTargetDifficulty)
+	assertIntAnchor(t, doc, "ceiling_max_chain_len", anchors["ceiling_max_chain_len"], mathcore.MaxChainLen)
+	assertIntAnchor(t, doc, "ceiling_large_max_operand", anchors["ceiling_large_max_operand"], mathcore.LargeMaxOperand)
+	assertIntAnchor(t, doc, "ceiling_small_max_operand", anchors["ceiling_small_max_operand"], mathcore.SmallMaxOperand)
+	assertIntAnchor(t, doc, "ceiling_medium_max_operand", anchors["ceiling_medium_max_operand"], mathcore.MediumMaxOperand)
 
 	// The validation error codes are defined client-side in bitmap_validation.js;
 	// assert each documented code appears there.

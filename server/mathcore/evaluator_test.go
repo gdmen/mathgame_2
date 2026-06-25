@@ -1,4 +1,4 @@
-package api
+package mathcore
 
 import (
 	"math/big"

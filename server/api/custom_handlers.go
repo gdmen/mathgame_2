@@ -15,6 +15,7 @@ import (
 	"github.com/golang/glog"
 
 	"garydmenezes.com/mathgame/server/common"
+	"garydmenezes.com/mathgame/server/mathcore"
 )
 
 const (
@@ -132,7 +133,7 @@ func (a *Api) customUpdateSettings(c *gin.Context) {
 	// would land in the DB and 400 after the fact. Computed against the NEW
 	// bitmap: the same PUT may shrink the envelope, lowering the ceiling.
 	// (See MaxDiffForBitmap for why the ceiling exists.)
-	if ceiling := MaxDiffForBitmap(model.ProblemTypeBitmap); model.TargetDifficulty > ceiling {
+	if ceiling := mathcore.MaxDiffForBitmap(model.ProblemTypeBitmap); model.TargetDifficulty > ceiling {
 		glog.Infof("%s clamping target_difficulty %.2f to bitmap ceiling %.2f",
 			logPrefix, model.TargetDifficulty, ceiling)
 		model.TargetDifficulty = ceiling

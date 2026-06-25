@@ -6,10 +6,11 @@ duration events) and rolling it up into the per-user statistics cache behind the
 pins the anchor block below to the code and fails CI on drift, so an event-type rename or a new
 summable / counted type cannot land undocumented.
 
-This area owns `event_compress.go`, `statistics_handlers.go`, and their two job commands
-(`cmd/compress_events`, `cmd/update_statistics_cache`). The event-type enum itself lives in
-`enums.go`; the `ProblemType` bits, difficulty, and selection are a separate area
-(`docs/problem-generation.md`).
+This area owns `event_types.go` (the event-type vocabulary), `event_compress.go`,
+`statistics_handlers.go`, and their two job commands
+(`cmd/compress_events`, `cmd/update_statistics_cache`). The `ProblemType` bits, difficulty,
+and selection are a separate area (`docs/problem-generation.md`); its math kernel lives in
+`server/mathcore`.
 
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
@@ -24,7 +25,7 @@ compress_max_chunk_size: 21845
 
 `events` is an append-only log keyed by an autoincrement `id`. Each row is a
 `(id, timestamp, user_id, event_type, value)` tuple (`Event`); `event_type` is one of the string
-constants in `enums.go`, and `value` is a type-specific opaque string (each constant's comment names
+constants in `event_types.go`, and `value` is a type-specific opaque string (each constant's comment names
 what it carries — duration ms, a problem id, an answer, etc.).
 
 Two derived structures sit alongside the log, each advanced by its own checkpoint so neither rescans
@@ -161,7 +162,7 @@ runs.
 
 - `server/api/event_compress.go` — `CompressEvents`, `parseEventDurationMs`, `RunCompress`, `PlanCompress`, `maxChunkSize`, `summableEventTypes`.
 - `server/api/statistics_handlers.go` — `UpdateStatisticsForUser`, `getStatistics`, `fullProgressBackfill`, `mergeProgressEventsIntoCache`, `readStatisticsFromCache`.
-- `server/api/enums.go` — event-type constants, `recordOnlyEventTypes`.
+- `server/api/event_types.go` — event-type constants, `recordOnlyEventTypes`.
 - `server/api/event_model.generated.go` — the `Event` struct (generated from `models.json`; never hand-edit).
 - `server/api/migrations/16.sql` — `statistics_cache_meta`, `statistics_totals`, `statistics_monthly`; `migrations/28.sql` — `compress_events_meta`.
 - `server/api/event_compress_test.go`, `server/api/statistics_test.go` — own the concrete values cited above.
@@ -169,7 +170,7 @@ runs.
 
 ## Extension checklist (adding / changing an event type's role)
 
-1. Add or rename the constant in `enums.go`, and update the `event_types` anchor to match the enum.
+1. Add or rename the constant in `event_types.go`, and update the `event_types` anchor to match the enum.
 2. **Summable?** (its `value` is a duration to sum across consecutive runs) → add to
    `summableEventTypes` and to the `summable_event_types` anchor.
 3. **Counted by stats?** → add it to the `event_type IN (...)` lists in BOTH `fullProgressBackfill`

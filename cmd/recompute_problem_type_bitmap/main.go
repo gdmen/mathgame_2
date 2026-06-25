@@ -46,11 +46,12 @@ import (
 
 	"garydmenezes.com/mathgame/server/api"
 	"garydmenezes.com/mathgame/server/common"
+	"garydmenezes.com/mathgame/server/mathcore"
 )
 
 // legacyTopicMask is the original 7 self-reported bits preserved on WORD rows.
-const legacyTopicMask = uint64(api.ADDITION | api.SUBTRACTION | api.MULTIPLICATION |
-	api.DIVISION | api.FRACTIONS | api.NEGATIVES | api.WORD)
+const legacyTopicMask = uint64(mathcore.ADDITION | mathcore.SUBTRACTION | mathcore.MULTIPLICATION |
+	mathcore.DIVISION | mathcore.FRACTIONS | mathcore.NEGATIVES | mathcore.WORD)
 
 func main() {
 	configPath := flag.String("config", "conf.json", "path to config JSON")
@@ -126,7 +127,7 @@ func main() {
 		// Same admission pipeline the live insert paths use - one source of
 		// truth for stamping and the lone-letter splice (which preserves the
 		// stored text's original notation).
-		adm := api.AdmitExpression(r.expr)
+		adm := mathcore.AdmitExpression(r.expr)
 		var newBitmap uint64
 		switch adm.RejectStage {
 		case "":
@@ -145,20 +146,20 @@ func main() {
 			// Out-of-alphabet rows still get restamped via the fallback
 			// feature extraction inside DetectProblemTypeBitmap, but they
 			// are surfaced here for review/disable.
-			newBitmap = api.DetectProblemTypeBitmap(r.expr)
+			newBitmap = mathcore.DetectProblemTypeBitmap(r.expr)
 		default: // unknown_rules: multi-unknown legacy rows, flagged for review
 			unknownRuleViolation++
 			unknownRows = append(unknownRows, r.id)
-			newBitmap = api.DetectProblemTypeBitmap(r.expr)
+			newBitmap = mathcore.DetectProblemTypeBitmap(r.expr)
 		}
 
-		if newBitmap&uint64(api.WORD) != 0 {
+		if newBitmap&uint64(mathcore.WORD) != 0 {
 			// Preserve legacy self-reported topic bits on WORD rows.
 			newBitmap |= r.oldBitmap & legacyTopicMask
 		}
 		// Legacy topic bits can carry 2 core ops without chained (etc.);
 		// enforce the structural invariants (#246).
-		newBitmap = api.NormalizeProblemBitmap(newBitmap)
+		newBitmap = mathcore.NormalizeProblemBitmap(newBitmap)
 		if newBitmap == 0 {
 			zeroBitmap++
 			zeroRows = append(zeroRows, r.id)

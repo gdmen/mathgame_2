@@ -1,15 +1,13 @@
-// Package api: MAY / MUST NOT prompt constraints derived from a settings
+// prompt_guidance.go: MAY / MUST NOT prompt constraints derived from a settings
 // bitmap.
-//
-// Part of the problem-generation system - documented in docs/problem-generation.md.
-// Behavior changes here REQUIRE updating that doc in the same PR.
 //
 // Semantics: an enabled bit means the generator MAY include that feature
 // (allows, doesn't require); a disabled bit means it MUST NOT (hard
 // prohibition). Every constraint the insert pipeline enforces must also be
 // communicated here - otherwise the generator wastes output on shapes that
 // always reject.
-package api
+
+package mathcore
 
 import (
 	"fmt"

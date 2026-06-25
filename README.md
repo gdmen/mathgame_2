@@ -27,7 +27,7 @@ The block below is the machine-readable registry (parsed by `scripts/docs_check.
 <!-- BEGIN PROJECT-AREA REGISTRY (parsed by scripts/docs_check.py) -->
 ```
 problem-generation  doc=docs/problem-generation.md  type=anchored
-  globs: server/api/stamping.go, server/api/difficulty.go, server/api/expression.go, server/api/evaluator.go, server/api/enums.go, server/llm_generator/**, server/generator/**
+  globs: server/mathcore/**, server/api/stamping.go, server/llm_generator/**, server/generator/**
 generator-versions  doc=docs/generator-versions.md  type=anchored
   globs: server/generator/generate_problem.go, server/llm_generator/generate_problem.go
 selection  doc=docs/selection.md  type=anchored
@@ -35,7 +35,7 @@ selection  doc=docs/selection.md  type=anchored
 adaptive-difficulty  doc=docs/adaptive-difficulty.md  type=anchored
   globs: server/api/process_events.go, server/api/topic_stats.go, server/api/spaced_repetition.go
 events  doc=docs/events.md  type=anchored
-  globs: server/api/event_compress.go, server/api/statistics_handlers.go
+  globs: server/api/event_types.go, server/api/event_compress.go, server/api/statistics_handlers.go
 videos  doc=docs/videos.md  type=anchored
   globs: server/api/youtube.go
 gameplay  doc=docs/gameplay.md  type=prose

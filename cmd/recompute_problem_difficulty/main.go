@@ -3,7 +3,7 @@
 // doc in the same PR. Formula changes also require a DifficultyVersion bump.
 // recompute_problem_difficulty walks all rows in the problems table, computes
 // the universal difficulty via
-// api.ComputeProblemDifficulty(expression, symbolic_expression), and writes it
+// mathcore.ComputeProblemDifficulty(expression, symbolic_expression), and writes it
 // back to the difficulty column.
 //
 // Safe to run repeatedly. Idempotent. Use after deploying the universal
@@ -26,8 +26,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang/glog"
 
-	"garydmenezes.com/mathgame/server/api"
 	"garydmenezes.com/mathgame/server/common"
+	"garydmenezes.com/mathgame/server/mathcore"
 )
 
 func main() {
@@ -102,14 +102,14 @@ func main() {
 			skipped++
 		case actionStamped:
 			if *dryRun {
-				fmt.Printf("id=%d expr=%q: value unchanged (%.2f), version %q -> %q\n", r.id, r.expr, r.oldDiff, r.oldVer, api.DifficultyVersion)
+				fmt.Printf("id=%d expr=%q: value unchanged (%.2f), version %q -> %q\n", r.id, r.expr, r.oldDiff, r.oldVer, mathcore.DifficultyVersion)
 			}
 			unchanged++
 		case actionUpdated:
 			delta := newDiff - r.oldDiff
 			deltaSum += delta
 			if *dryRun {
-				fmt.Printf("id=%d expr=%q: %.2f -> %.2f (%+.2f) ver=%q->%q\n", r.id, r.expr, r.oldDiff, newDiff, delta, r.oldVer, api.DifficultyVersion)
+				fmt.Printf("id=%d expr=%q: %.2f -> %.2f (%+.2f) ver=%q->%q\n", r.id, r.expr, r.oldDiff, newDiff, delta, r.oldVer, mathcore.DifficultyVersion)
 			}
 			updated++
 		}
@@ -122,7 +122,7 @@ func main() {
 	fmt.Printf("  total:     %d\n", total)
 	fmt.Printf("  updated:   %d\n", updated)
 	fmt.Printf("  unchanged: %d\n", unchanged)
-	fmt.Printf("  skipped:   %d (already at version %s)\n", skipped, api.DifficultyVersion)
+	fmt.Printf("  skipped:   %d (already at version %s)\n", skipped, mathcore.DifficultyVersion)
 	if updated > 0 {
 		fmt.Printf("  avg delta: %+.2f\n", deltaSum/float64(updated))
 	}

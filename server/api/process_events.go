@@ -15,6 +15,7 @@ import (
 	"github.com/golang/glog"
 
 	"garydmenezes.com/mathgame/server/common"
+	"garydmenezes.com/mathgame/server/mathcore"
 )
 
 // parseBadProblemID returns the problem_id from a BAD_PROBLEM_* event's
@@ -130,10 +131,10 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		// Upper bound is the bitmap-derived ceiling: a target above the
 		// hardest problem the envelope can express lands in an empty band
 		// (see MaxDiffForBitmap).
-		ceiling := MaxDiffForBitmap(settings.ProblemTypeBitmap)
+		ceiling := mathcore.MaxDiffForBitmap(settings.ProblemTypeBitmap)
 		val, parseErr := strconv.ParseFloat(event.Value, 64)
-		if parseErr != nil || val < MinTargetDifficulty || val > ceiling {
-			msg := fmt.Sprintf("Invalid target_difficulty: %s (must be %.0f-%.1f for the current problem types)", event.Value, MinTargetDifficulty, ceiling)
+		if parseErr != nil || val < mathcore.MinTargetDifficulty || val > ceiling {
+			msg := fmt.Sprintf("Invalid target_difficulty: %s (must be %.0f-%.1f for the current problem types)", event.Value, mathcore.MinTargetDifficulty, ceiling)
 			glog.Errorf("%s %s", logPrefix, msg)
 			c.JSON(http.StatusBadRequest, msg)
 			return errors.New(msg)
@@ -155,8 +156,8 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		// them gets an incoherent-but-harmless envelope (the ceiling and
 		// subset selection both degrade gracefully).
 		val, parseErr := strconv.ParseUint(event.Value, 10, 64)
-		if parseErr != nil || val == 0 || ProblemType(val)&^ALL_PROBLEM_TYPES != 0 {
-			msg := fmt.Sprintf("Invalid problem_type_bitmap: %s (must be 1-%d)", event.Value, uint64(ALL_PROBLEM_TYPES))
+		if parseErr != nil || val == 0 || mathcore.ProblemType(val)&^mathcore.ALL_PROBLEM_TYPES != 0 {
+			msg := fmt.Sprintf("Invalid problem_type_bitmap: %s (must be 1-%d)", event.Value, uint64(mathcore.ALL_PROBLEM_TYPES))
 			glog.Errorf("%s %s", logPrefix, msg)
 			c.JSON(http.StatusBadRequest, msg)
 			return errors.New(msg)
@@ -195,7 +196,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		if HandleMngrResp(logPrefix, c, status, msg, err, problem) != nil {
 			return err
 		}
-		if !AnswersEquivalent(event.Value, problem.Answer) {
+		if !mathcore.AnswersEquivalent(event.Value, problem.Answer) {
 			msg := fmt.Sprintf("Incorrect answer: {%s}, expected: {%s}", event.Value, problem.Answer)
 			glog.Infof("%s %s", logPrefix, msg)
 			// Track incorrect attempt per topic
@@ -257,7 +258,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		// falls through to the synchronous fallback, and the system churns
 		// permanently (generation cannot fill an unreachable band). See
 		// MaxDiffForBitmap in difficulty.go.
-		maxDiff := MaxDiffForBitmap(settings.ProblemTypeBitmap)
+		maxDiff := mathcore.MaxDiffForBitmap(settings.ProblemTypeBitmap)
 		// End difficulty adjustment limits
 
 		// Defensive: clamp any previously-runaway difficulty back into range.

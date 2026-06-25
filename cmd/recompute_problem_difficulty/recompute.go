@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"garydmenezes.com/mathgame/server/api"
+	"garydmenezes.com/mathgame/server/mathcore"
 )
 
 // Per-row action codes returned by recomputeProblemRow.
@@ -22,22 +22,22 @@ func recomputeProblemRow(db *sql.DB, id uint32, expr, symbolic string, oldDiff f
 	// Fast path: row was stamped under the current formula version.
 	// ComputeProblemDifficulty is deterministic, so newDiff would equal
 	// oldDiff. No recompute, no write.
-	if oldVer == api.DifficultyVersion {
+	if oldVer == mathcore.DifficultyVersion {
 		return actionSkipped, 0, nil
 	}
-	newDiff = api.ComputeProblemDifficulty(expr, symbolic)
+	newDiff = mathcore.ComputeProblemDifficulty(expr, symbolic)
 	if recomputeFuzzyEqual(newDiff, oldDiff) {
 		// Value matches the current formula but the version stamp is
 		// stale. Forward-stamp the version without changing the value.
 		if !dryRun {
-			if _, err = db.Exec(`UPDATE problems SET difficulty_version = ? WHERE id = ?`, api.DifficultyVersion, id); err != nil {
+			if _, err = db.Exec(`UPDATE problems SET difficulty_version = ? WHERE id = ?`, mathcore.DifficultyVersion, id); err != nil {
 				return "", newDiff, fmt.Errorf("stamp version id=%d: %w", id, err)
 			}
 		}
 		return actionStamped, newDiff, nil
 	}
 	if !dryRun {
-		if _, err = db.Exec(`UPDATE problems SET difficulty = ?, difficulty_version = ? WHERE id = ?`, newDiff, api.DifficultyVersion, id); err != nil {
+		if _, err = db.Exec(`UPDATE problems SET difficulty = ?, difficulty_version = ? WHERE id = ?`, newDiff, mathcore.DifficultyVersion, id); err != nil {
 			return "", newDiff, fmt.Errorf("update id=%d: %w", id, err)
 		}
 	}

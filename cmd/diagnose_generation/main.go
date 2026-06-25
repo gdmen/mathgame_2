@@ -29,6 +29,7 @@ import (
 	"garydmenezes.com/mathgame/server/api"
 	"garydmenezes.com/mathgame/server/common"
 	"garydmenezes.com/mathgame/server/llm_generator"
+	"garydmenezes.com/mathgame/server/mathcore"
 )
 
 func main() {
@@ -48,12 +49,12 @@ func main() {
 		glog.Fatalf("invalid config: %v", err)
 	}
 
-	pt := api.ProblemType(*envelope)
+	pt := mathcore.ProblemType(*envelope)
 	opts := &llm_generator.Options{
-		Features:         api.ProblemTypeToFeatures(pt),
+		Features:         mathcore.ProblemTypeToFeatures(pt),
 		TargetDifficulty: *target,
 		NumProblems:      *n,
-		Constraints:      api.BuildBitConstraints(pt),
+		Constraints:      mathcore.BuildBitConstraints(pt),
 		Model:            *model,
 	}
 
@@ -79,18 +80,18 @@ func main() {
 
 	fmt.Printf("  %-7s %-9s %-7s %-8s %s\n", "diff", "envelope", "window", "form", "expression")
 	for _, p := range problems {
-		adm := api.AdmitExpression(p.Expression)
+		adm := mathcore.AdmitExpression(p.Expression)
 		if adm.RejectStage != "" {
 			admitRejects[adm.RejectStage]++
 			continue
 		}
 		admitted++
-		bits := api.NormalizeProblemBitmap(adm.Bitmap)
+		bits := mathcore.NormalizeProblemBitmap(adm.Bitmap)
 		inEnvelope := bits != 0 && bits&^*envelope == 0
 
 		// For WORD problems, flag whether the LLM emitted a valid
 		// symbolic_expression (the form difficulty is scored from).
-		isWord := bits&uint64(api.WORD) != 0
+		isWord := bits&uint64(mathcore.WORD) != 0
 		form := "-"
 		if isWord {
 			wordCount++
@@ -104,7 +105,7 @@ func main() {
 			}
 		}
 
-		diff := api.ComputeProblemDifficulty(adm.Expr, p.SymbolicExpression)
+		diff := mathcore.ComputeProblemDifficulty(adm.Expr, p.SymbolicExpression)
 		diffs = append(diffs, diff)
 		histogram[int(math.Floor(diff))]++
 
