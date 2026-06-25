@@ -100,8 +100,9 @@ func TestSelection_PrefersNewestGeneratorVersion(t *testing.T) {
 		{7001, "llm_0.1"},
 		{7002, "llm_0.1"},
 		{7003, "llm_0.2"},
-		{7004, "llm_0.4"}, // newest
+		{7004, "llm_0.4"},
 		{7005, "llm_0.4"},
+		{7006, "llm_0.5"},
 	}
 	for _, s := range seed {
 		if _, err := api.DB.Exec(
@@ -135,12 +136,14 @@ func TestSelection_PrefersNewestGeneratorVersion(t *testing.T) {
 		}
 	}
 
-	// Newest tier only: the two llm_0.4 rows.
-	assertTier("[newest]", nil, 7004, 7005)
-	// Exclude the llm_0.4 tier: falls back to the next-highest (llm_0.2).
-	assertTier("[fallback]", []uint32{7004, 7005}, 7003)
-	// Exclude llm_0.4 and llm_0.2: falls back to the llm_0.1 tier.
-	assertTier("[fallback2]", []uint32{7004, 7005, 7003}, 7001, 7002)
+	// Newest tier only: the single llm_0.5 row (outranks llm_0.4).
+	assertTier("[newest]", nil, 7006)
+	// Exclude llm_0.5: falls back to the llm_0.4 tier.
+	assertTier("[fallback]", []uint32{7006}, 7004, 7005)
+	// Exclude llm_0.5 and llm_0.4: falls back to the next-highest (llm_0.2).
+	assertTier("[fallback2]", []uint32{7006, 7004, 7005}, 7003)
+	// Exclude through llm_0.2: falls back to the llm_0.1 tier.
+	assertTier("[fallback3]", []uint32{7006, 7004, 7005, 7003}, 7001, 7002)
 }
 
 // TestWeightedTopicMaskGates: all three gate sites exclude magnitude bits.
