@@ -287,17 +287,17 @@ are the generation-relevant surface.)
   roots, exponents, ..."). All constraints are simultaneous. Every constraint
   the insert pipeline enforces must also be communicated here, or the
   generator wastes output on shapes that always reject.
-- **Heuristic generator** (server/generator, `heuristic_1.0`): bit-driven
-  `Options` (`MaxOperand` from magnitude bits, `AllowMissing`/`AllowMultiOp`/
-  `MaxChainLen`/`SameDenomOnly` from concept bits → `configFromBitOptions`) +
-  an expression-wide magnitude guard (`withinMaxOperand`; missing-number
-  templates embed computed values, and an out-of-range embedded value would
-  stamp an out-of-envelope magnitude bit). It retries a bounded number of
-  times, then falls back to a simple halved add problem that always passes the
-  guard (`GenerateProblem`). Templates: basic / missing / multi-op (add/sub
-  chains only) / same- and diff-denominator fractions (`templates.go`,
-  `fractions.go`). DECIMALS/PEMDAS/PERCENTAGES/SINGLE_VARIABLE generation is
-  LLM-only for now (#227) — no heuristic template emits them.
+- **Heuristic generator** (server/generator, `heuristic_2.0`): difficulty-
+  targeting and compositional (`BuildProblem(bitmap, target, rng)`). It inverts
+  the formula to a `raw_target`, samples a candidate shape under a
+  minimal-concept policy (magnitude/chain are the continuous dials, concepts the
+  coarse jumps), builds the answer-first on the `mathcore` render-only AST, and
+  selects the rendered candidate closest to target that passes the canonical
+  pipeline + envelope check (fails closed; closest-achievable then a
+  deterministic fallback near the ceiling). It covers every non-WORD bit,
+  including DECIMALS / PEMDAS / PERCENTAGES / SINGLE_VARIABLE — previously
+  LLM-only (#227). Version history and the targeting design live in
+  [generator-versions.md](generator-versions.md).
 - **LLM generator** (server/llm_generator, `llm_0.5`): one batched OpenAI call
   (`MAX_QUANTITY = 20`); the `BuildBitConstraints` block is the sole shape
   guidance (`Options.Constraints` is opaque to the package). Emits
@@ -360,7 +360,7 @@ forbidden until deliberately added.
 11. `WEIGHTED_TOPIC_MASK` membership (test: does per-topic difficulty cohere?).
 12. Settings dependency rules + `web/src/bitmap_validation.js` error code if needed.
 13. UI: group placement (verb / noun-kind / noun-size / framing), label, helper text — against `/style-guide`.
-14. Heuristic generator support, or explicit LLM-only deferral (#227-style issue).
+14. Heuristic generator support: a construction mode + concept entry in `heuristic_2.0`'s inverter (`server/generator/heuristic2.go`), or an explicit LLM-only deferral.
 15. Backfill: do legacy rows need re-stamping? (re-run `recompute_problem_type_bitmap`.)
 16. Update THIS DOCUMENT — the doc-sync test fails CI if you skip the anchors.
 
@@ -374,5 +374,5 @@ forbidden until deliberately added.
 - `server/mathcore/prompt_guidance.go` — `BuildBitConstraints`, `ValidatorFeatureNames`
 - `server/mathcore/answer_compare.go` — `AnswersEquivalent`
 - `server/api/stamping.go` — `generationFunnel`, `VerifyAnswer`, `RewriteLetterInProse` (api-side admission bookkeeping)
-- `server/generator` — `GenerateProblem`, `configFromBitOptions`, `withinMaxOperand`, templates
+- `server/generator` — `heuristic_2.0`: `BuildProblem`, the knob inverter, and the answer-first construction modes
 - `server/llm_generator` — `GenerateProblem`, `ValidateWordProblem`, `PROMPT_QUESTION`, `PROMPT_VALIDATION_WORD`, `PROMPT_VALIDATION_FORM`

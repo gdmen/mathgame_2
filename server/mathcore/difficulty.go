@@ -74,25 +74,25 @@ const MinTargetDifficulty = 3.0
 const (
 	// Op weights: opWeight is the MAX over the operators present
 	// (addition is the 1.0 baseline).
-	weightSub = 1.1
-	weightMul = 2.2
-	weightDiv = 2.8
+	WeightSub = 1.1
+	WeightMul = 2.2
+	WeightDiv = 2.8
 
 	// Concept multipliers: each enabled concept MULTIPLIES into the
 	// concept factor.
-	conceptFractions  = 2.0 // same denominators
-	conceptMismatched = 1.5 // stacks on conceptFractions -> net 3.0; the
+	ConceptFractions  = 2.0 // same denominators
+	ConceptMismatched = 1.5 // stacks on ConceptFractions -> net 3.0; the
 	// FRACTIONS dependency guarantees the base factor is always present
-	conceptNegatives = 1.3
-	conceptVariable  = 5.0 // coefficient / multi-occurrence letter forms
-	conceptWord      = 1.3 // stacks with conceptVariable as of v0.2
-	conceptPEMDAS    = 1.5
-	conceptDecimals  = 2.0
-	conceptPercent   = 2.0
+	ConceptNegatives = 1.3
+	ConceptVariable  = 5.0 // coefficient / multi-occurrence letter forms
+	ConceptWord      = 1.3 // stacks with ConceptVariable
+	ConceptPEMDAS    = 1.5
+	ConceptDecimals  = 2.0
+	ConceptPercent   = 2.0
 
 	// Structure increments: ADDED to the structure factor's 1.0 base.
-	structurePerExtraOp = 0.15 // per operator beyond the first
-	structureMissing    = 0.2  // missing-number blank present
+	StructurePerExtraOp = 0.15 // per operator beyond the first
+	StructureMissing    = 0.2  // missing-number blank present
 )
 
 // Prose-number scanning (difficulty side of the prose rule): magnitude,
@@ -397,53 +397,53 @@ func computeBreakdown(scoredExpr string, forceWord bool) DifficultyBreakdown {
 
 	opWeight := 1.0
 	if f.hasSub {
-		opWeight = math.Max(opWeight, weightSub)
+		opWeight = math.Max(opWeight, WeightSub)
 	}
 	if f.hasMul {
-		opWeight = math.Max(opWeight, weightMul)
+		opWeight = math.Max(opWeight, WeightMul)
 	}
 	if f.hasDiv {
-		opWeight = math.Max(opWeight, weightDiv)
+		opWeight = math.Max(opWeight, WeightDiv)
 	}
 
 	concept := 1.0
 	var concepts []ConceptFactor
 	if f.numFractions > 0 {
-		concept *= conceptFractions
-		concepts = append(concepts, ConceptFactor{"fractions", conceptFractions})
+		concept *= ConceptFractions
+		concepts = append(concepts, ConceptFactor{"fractions", ConceptFractions})
 		if f.numFractions >= 2 && !f.sameDenom {
-			concept *= conceptMismatched
-			concepts = append(concepts, ConceptFactor{"mismatched", conceptMismatched})
+			concept *= ConceptMismatched
+			concepts = append(concepts, ConceptFactor{"mismatched", ConceptMismatched})
 		}
 	}
 	if f.hasNegatives {
-		concept *= conceptNegatives
-		concepts = append(concepts, ConceptFactor{"negatives", conceptNegatives})
+		concept *= ConceptNegatives
+		concepts = append(concepts, ConceptFactor{"negatives", ConceptNegatives})
 	}
 	if f.hasVariables {
-		concept *= conceptVariable
-		concepts = append(concepts, ConceptFactor{"variable", conceptVariable})
+		concept *= ConceptVariable
+		concepts = append(concepts, ConceptFactor{"variable", ConceptVariable})
 	}
 	if f.isWord {
-		concept *= conceptWord
-		concepts = append(concepts, ConceptFactor{"word", conceptWord})
+		concept *= ConceptWord
+		concepts = append(concepts, ConceptFactor{"word", ConceptWord})
 	}
 	if f.requiresPEMDAS {
-		concept *= conceptPEMDAS
-		concepts = append(concepts, ConceptFactor{"pemdas", conceptPEMDAS})
+		concept *= ConceptPEMDAS
+		concepts = append(concepts, ConceptFactor{"pemdas", ConceptPEMDAS})
 	}
 	if f.hasDecimals {
-		concept *= conceptDecimals
-		concepts = append(concepts, ConceptFactor{"decimals", conceptDecimals})
+		concept *= ConceptDecimals
+		concepts = append(concepts, ConceptFactor{"decimals", ConceptDecimals})
 	}
 	if f.hasPercent {
-		concept *= conceptPercent
-		concepts = append(concepts, ConceptFactor{"percent", conceptPercent})
+		concept *= ConceptPercent
+		concepts = append(concepts, ConceptFactor{"percent", ConceptPercent})
 	}
 
-	structure := 1.0 + structurePerExtraOp*float64(maxInt(0, f.numOps-1))
+	structure := 1.0 + StructurePerExtraOp*float64(maxInt(0, f.numOps-1))
 	if f.hasMissing {
-		structure += structureMissing
+		structure += StructureMissing
 	}
 
 	raw := magnitude * opWeight * concept * structure
@@ -461,20 +461,24 @@ func computeBreakdown(scoredExpr string, forceWord bool) DifficultyBreakdown {
 	}
 }
 
+// Compression-curve anchors: raw 0.5 maps to scaled 1.0 and raw 15 maps to
+// scaled 20.0 (chosen to preserve the scale's original 1-20 calibration). Both
+// compressRaw and its inverse RawForDifficulty read these, so a curve retune
+// flows into the heuristic_2.0 aimer automatically (no private copy to drift).
+const (
+	rawAnchorLo   = 0.5
+	rawAnchorHi   = 15.0
+	scaleAnchorLo = 1.0
+	scaleAnchorHi = 20.0
+	scaleFloor    = 1.0
+)
+
 // compressRaw maps a raw composite onto the difficulty scale with a log
-// curve. The two anchor pairs define the curve's slope, NOT a range: raw 0.5
-// maps to 1.0 and raw 15 maps to 20.0 (anchors chosen to preserve the
-// scale's original 1-20 calibration), and the curve continues past the
-// upper anchor (no clamp). The floor at 1.0 is the only cutoff: degenerate
-// expressions (0 + 0) must not score below the scale minimum.
+// curve. The two anchor pairs define the curve's slope, NOT a range, and the
+// curve continues past the upper anchor (no clamp). The floor at 1.0 is the
+// only cutoff: degenerate expressions (0 + 0) must not score below the scale
+// minimum.
 func compressRaw(raw float64) float64 {
-	const (
-		rawAnchorLo   = 0.5
-		rawAnchorHi   = 15.0
-		scaleAnchorLo = 1.0
-		scaleAnchorHi = 20.0
-		scaleFloor    = 1.0
-	)
 	num := math.Log(raw+1) - math.Log(rawAnchorLo+1)
 	den := math.Log(rawAnchorHi+1) - math.Log(rawAnchorLo+1)
 	scaled := scaleAnchorLo + (scaleAnchorHi-scaleAnchorLo)*num/den
@@ -482,6 +486,16 @@ func compressRaw(raw float64) float64 {
 		scaled = scaleFloor
 	}
 	return scaled
+}
+
+// RawForDifficulty inverts compressRaw: the raw composite that scores to the
+// given scaled difficulty. The heuristic_2.0 knob inverter aims its
+// magnitude*opWeight*concept*structure product at RawForDifficulty(target).
+// (Inverse of the unclamped branch; targets at or below the floor map to <=0.)
+func RawForDifficulty(scaled float64) float64 {
+	den := math.Log(rawAnchorHi+1) - math.Log(rawAnchorLo+1)
+	lnRawPlus1 := math.Log(rawAnchorLo+1) + (scaled-scaleAnchorLo)*den/(scaleAnchorHi-scaleAnchorLo)
+	return math.Exp(lnRawPlus1) - 1
 }
 
 // MaxDiffForBitmap returns the difficulty ceiling for a settings bitmap: the
@@ -521,13 +535,13 @@ func MaxDiffForBitmap(bitmap uint64) float64 {
 
 	opWeight := 1.0
 	if pt&SUBTRACTION != 0 {
-		opWeight = math.Max(opWeight, weightSub)
+		opWeight = math.Max(opWeight, WeightSub)
 	}
 	if pt&MULTIPLICATION != 0 {
-		opWeight = math.Max(opWeight, weightMul)
+		opWeight = math.Max(opWeight, WeightMul)
 	}
 	if pt&DIVISION != 0 {
-		opWeight = math.Max(opWeight, weightDiv)
+		opWeight = math.Max(opWeight, WeightDiv)
 	}
 
 	// Concept multipliers common to both either/or branches. A plain
@@ -535,42 +549,42 @@ func MaxDiffForBitmap(bitmap uint64) float64 {
 	// parent's factor.
 	concept := 1.0
 	if pt&FRACTIONS != 0 {
-		concept *= conceptFractions
+		concept *= ConceptFractions
 	}
 	if pt&MISMATCHED_DENOMINATORS != 0 {
-		concept *= conceptMismatched
+		concept *= ConceptMismatched
 	}
 	if pt&NEGATIVES != 0 {
-		concept *= conceptNegatives
+		concept *= ConceptNegatives
 	}
 	if pt&WORD != 0 {
-		concept *= conceptWord
+		concept *= ConceptWord
 	}
 	if pt&PEMDAS != 0 {
-		concept *= conceptPEMDAS
+		concept *= ConceptPEMDAS
 	}
 	if pt&DECIMALS != 0 {
-		concept *= conceptDecimals
+		concept *= ConceptDecimals
 	}
 	if pt&PERCENTAGES != 0 {
-		concept *= conceptPercent
+		concept *= ConceptPercent
 	}
 
 	structure := 1.0
 	if pt&CHAINED_OPERATIONS != 0 {
-		structure = 1.0 + structurePerExtraOp*float64(MaxChainLen-1)
+		structure = 1.0 + StructurePerExtraOp*float64(MaxChainLen-1)
 	}
 
 	// Either/or branches over the reachable problem space.
 	rawNeither := magnitude * opWeight * concept * structure
 	rawBest := rawNeither
 	if pt&SINGLE_VARIABLE != 0 {
-		if r := magnitude * opWeight * concept * conceptVariable * structure; r > rawBest {
+		if r := magnitude * opWeight * concept * ConceptVariable * structure; r > rawBest {
 			rawBest = r
 		}
 	}
 	if pt&MISSING_NUMBER != 0 {
-		if r := magnitude * opWeight * concept * (structure + structureMissing); r > rawBest {
+		if r := magnitude * opWeight * concept * (structure + StructureMissing); r > rawBest {
 			rawBest = r
 		}
 	}

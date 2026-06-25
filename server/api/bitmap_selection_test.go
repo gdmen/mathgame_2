@@ -1,6 +1,7 @@
 package api
 
 import (
+	"math/rand"
 	"testing"
 
 	"garydmenezes.com/mathgame/server/common"
@@ -198,28 +199,23 @@ func TestWeightedTopicMaskGates(t *testing.T) {
 }
 
 // TestHeuristicFromBits_ChainedOff: with CHAINED_OPERATIONS disabled, the
-// bit-driven generator never emits multi-operator expressions, and every
-// number respects the magnitude bound, across many samples.
+// heuristic_2.0 builder never emits multi-operator expressions, and every
+// number respects the default magnitude bound, across many samples and targets.
 func TestHeuristicFromBits_ChainedOff(t *testing.T) {
-	opts := &heuristic_generator.Options{
-		Operations:    []string{"+", "-"},
-		MaxOperand:    12,
-		AllowMissing:  true,
-		AllowMultiOp:  false,
-		MaxChainLen:   mathcore.MaxChainLen,
-		SameDenomOnly: true,
-	}
+	bitmap := mathcore.ADDITION | mathcore.SUBTRACTION | mathcore.MISSING_NUMBER
+	rng := rand.New(rand.NewSource(1))
 	for i := 0; i < 200; i++ {
-		expr, answer, _, err := heuristic_generator.GenerateProblem(opts)
+		target := 3.0 + float64(i%6) // span the default-envelope band
+		expr, answer, err := heuristic_generator.BuildProblem(bitmap, target, rng)
 		if err != nil {
-			t.Fatalf("GenerateProblem: %v", err)
+			t.Fatalf("BuildProblem: %v", err)
 		}
 		bd := mathcore.ComputeDifficultyBreakdown(expr)
 		if bd.NumOps >= 2 {
 			t.Fatalf("CHAINED off but got %d ops: %q", bd.NumOps, expr)
 		}
 		if bd.MaxMagnitude > 12 {
-			t.Fatalf("MaxOperand 12 violated: %q (maxMagnitude %v)", expr, bd.MaxMagnitude)
+			t.Fatalf("default magnitude bound violated: %q (maxMagnitude %v)", expr, bd.MaxMagnitude)
 		}
 		toks, lexErr := mathcore.LexExpression(mathcore.NormalizeExpression(expr))
 		if lexErr != nil {
@@ -247,5 +243,44 @@ func TestThinPoolBoost(t *testing.T) {
 	}
 	if b := thinPoolBoost(0, 100); b != thinPoolBoostMax {
 		t.Errorf("empty pool boost = %v, want cap %v", b, thinPoolBoostMax)
+	}
+}
+
+// TestSelection_PrefersHeuristic2OverHeuristic1: heuristic_2.0 outranks the
+// legacy heuristic_1.0, so a cell holding both serves only the 2.0 rows (the
+// rank entry must accompany the VERSION bump or new output is never served).
+func TestSelection_PrefersHeuristic2OverHeuristic1(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+
+	seed := []struct {
+		id  uint32
+		gen string
+	}{
+		{8001, "heuristic_1.0"},
+		{8002, "heuristic_1.0"},
+		{8003, "heuristic_2.0"}, // newest heuristic
+	}
+	for _, s := range seed {
+		if _, err := api.DB.Exec(
+			`INSERT INTO problems (id, problem_type_bitmap, expression, symbolic_expression, answer, difficulty, disabled, generator, difficulty_version)
+			 VALUES (?, ?, 'seed', '', '1', 5, 0, ?, '0.3')`,
+			s.id, uint64(mathcore.ADDITION), s.gen,
+		); err != nil {
+			t.Fatalf("seed %d: %v", s.id, err)
+		}
+	}
+	settings := &Settings{UserId: 1, ProblemTypeBitmap: uint64(mathcore.ADDITION), TargetDifficulty: 5}
+	prevIds := []uint32{}
+	pids, err := api.getSatisfyingProblemIds("[h2]", settings, &prevIds)
+	if err != nil {
+		t.Fatalf("getSatisfyingProblemIds: %v", err)
+	}
+	if len(*pids) != 1 || (*pids)[0] != 8003 {
+		t.Errorf("expected only heuristic_2.0 row 8003, got %v", *pids)
 	}
 }

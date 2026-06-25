@@ -18,7 +18,7 @@ don't re-derive them here.
 
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
-heuristic_version: heuristic_1.0
+heuristic_version: heuristic_2.0
 llm_version: llm_0.5
 ```
 <!-- END DOC-SYNC ANCHORS -->
@@ -34,7 +34,7 @@ permanent (see [problem-generation.md](problem-generation.md)).
 
 | Generator | Package | Current version | Nature |
 |-----------|---------|-----------------|--------|
-| Heuristic | `server/generator` | `heuristic_1.0` (`VERSION`) | Deterministic in-process Go; no API, no cost, fast. Default for non-word generation. |
+| Heuristic | `server/generator` | `heuristic_2.0` (`VERSION`) | Deterministic in-process Go; no API, no cost, fast. Difficulty-targeting. Default for non-word generation. |
 | LLM | `server/llm_generator` | `llm_0.5` (`VERSION`) | Calls OpenAI; richer/varied, especially word problems. Slower, costs per problem, batched up to `MAX_QUANTITY` per call. |
 
 ## Heuristic versions
@@ -42,16 +42,23 @@ permanent (see [problem-generation.md](problem-generation.md)).
 | Version | What it is |
 |---------|-----------|
 | `heuristic_0.0` | Original hand-written generator. Add/sub/mul only, wired up only for add/sub at low difficulty; output wrapped single numbers in parens (`(3)+(5)-(2)`); no grade awareness; no fractions. Problems remain in the DB for history. |
-| `heuristic_1.0` (current) | Complete rewrite, first AI-authored version. Four operations end-to-end (`+ - * /`, division yields whole numbers); template-driven shapes (basic binary, missing-number, multi-term chains, same- and different-denominator fractions — `pickTemplate`); clean spaced formatting; fraction slashes distinguished from division; trivial-problem guards. |
+| `heuristic_1.0` | Template-enumeration rewrite, first AI-authored version. Four operations end-to-end (`+ - * /`); template-driven shapes (basic binary, missing-number, multi-term chains, same- and different-denominator fractions); clean spaced formatting. It did NOT target difficulty — it emitted a shape and let the formula score whatever fell out. Problems remain in the DB and serve normally. |
+| `heuristic_2.0` (current) | Compositional, difficulty-targeting rewrite (#283). Takes the envelope bitmap + the user's `target_difficulty` and aims each candidate at it. Covers EVERY non-WORD bit — including DECIMALS / PEMDAS / PERCENTAGES / SINGLE_VARIABLE, which `heuristic_1.0` could not do (they were LLM-only, #227) — and arbitrary stacks. Builds answer-first on the `mathcore` render-only AST, then renders and runs every candidate through the canonical pipeline; see below. |
 
-`heuristic_1.0` is **bit-driven, not grade-driven**: the whole generation config comes from the
-user's settings bitmap via `Options` → `configFromBitOptions` — `MaxOperand` from the magnitude
-bits, the concept flags (`AllowMissing` / `AllowMultiOp` / `MaxChainLen` / `SameDenomOnly` /
-`Fractions` / `Negatives`) from the concept bits. There is no per-grade range table; `Operations`
-is an allowlist checked by `validateOptions`.
+### `heuristic_2.0` — answer-first difficulty targeting
 
-DECIMALS / PEMDAS / PERCENTAGES / SINGLE_VARIABLE have no heuristic template and are LLM-only for
-now (#227); see [problem-generation.md](problem-generation.md).
+`heuristic_2.0` (`BuildProblem(bitmap, target, rng)`) inverts the difficulty formula to a
+`raw_target` (`mathcore.RawForDifficulty`) and, under a **minimal-concept policy** (magnitude and
+chain length are the near-continuous dials; concepts are coarse x2-x5 jumps added cheapest-first only
+as the target outgrows them), samples a candidate shape, builds its AST answer-first, and renders it.
+Targeting correctness comes from **generate-and-select**: every candidate is run through the
+canonical kernel (`AdmitExpression` + `VerifyAnswerSymbolic` + `DetectProblemTypeBitmap` +
+`ComputeProblemDifficulty`) and the closest in-window survivor is returned — so it **fails closed**
+(a construction bug costs a retry, never a wrong or out-of-envelope problem) and a near-ceiling or
+coarse-concept cell degrades to the closest achievable problem, then a deterministic fallback, rather
+than spinning. The knob inverter binds to the shared `mathcore` difficulty constants
+(`Concept*`/`Weight*`/`Structure*`), so a calibration retune flows into the aimer automatically.
+**No `DifficultyVersion` bump** — the formula is unchanged; this is a generation-side change only.
 
 ## LLM versions
 
@@ -81,12 +88,12 @@ a `recompute_problem_difficulty` run on deploy (see [problem-generation.md](prob
 
 - **The `generator` string is write-once.** Never rewrite it on existing problems; old versions
   coexist in the pool and serve normally.
-- **Every number stays inside the envelope.** `configFromBitOptions` caps every numeric range to
-  `MaxOperand`, and `GenerateProblem`'s magnitude guard (`withinMaxOperand`) rejects any candidate
-  whose embedded numbers exceed it — including values a missing-number template computes (the sum
-  in `? + 5 = 12`) — because the insert pipeline would otherwise stamp an out-of-envelope magnitude
-  bit. When a draw can't satisfy the guard, generation retries a bounded number of times, then
-  falls back to a small basic-add problem that always passes (`GenerateProblem`).
+- **Every candidate stays inside the envelope.** `heuristic_2.0` runs every rendered candidate
+  through the canonical admission pipeline and an explicit `EnvelopeViolation` check before
+  accepting it, so a candidate whose detected bits (magnitude included) fall outside the requested
+  bitmap is rejected, not served. When no candidate lands in the target window after a bounded
+  number of attempts it returns the closest valid one; when none is valid at all it falls back to a
+  small envelope-safe problem (`BuildProblem`).
 - **Self-report is not trusted (`llm_0.3`+).** Stored features come from the admission detector and
   stored difficulty from `ComputeProblemDifficulty`, not from the generator's own output.
 - **Stored difficulty is the computed score, not the requested target** — the source of
@@ -117,8 +124,8 @@ above; (3) update the matching anchor (`heuristic_version` / `llm_version`) or
 
 ## Related files
 
-- `server/generator/generate_problem.go` — heuristic `VERSION`, `Options`, `configFromBitOptions`,
-  `GenerateProblem`, `withinMaxOperand`, `validateOptions`.
+- `server/generator/heuristic2.go` — heuristic `VERSION`, `BuildProblem`, the knob inverter
+  (`sampleConfig` / `chooseConcepts`), and the answer-first construction modes.
 - `server/llm_generator/generate_problem.go` — LLM `VERSION`, `PROMPT_QUESTION`, `MAX_QUANTITY`,
   default model.
 - `server/llm_generator/validate_problem.go` — `ValidateWordProblem`, `PROMPT_VALIDATION_FORM`,

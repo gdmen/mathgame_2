@@ -11,4 +11,10 @@ var generatorRank = map[string]int{
 	"llm_0.2":       4,
 	"llm_0.3":       5,
 	"llm_0.4":       6,
+	// heuristic_2.0 is difficulty-targeting and free; for the symbolic cells it
+	// can fill it is preferred over the LLM (the "deterministic code owns the
+	// math" direction of #283). WORD cells are unaffected — the heuristic emits
+	// no WORD rows, so the LLM remains the only (and thus top-ranked) generator
+	// present there.
+	"heuristic_2.0": 7,
 }
