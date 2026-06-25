@@ -1,8 +1,5 @@
-// Package api: the problem insert (admission) pipeline.
-//
-// Part of the problem-generation system - documented in docs/problem-generation.md.
-// Behavior changes here (pipeline stages, reject rules, answer
-// verification) REQUIRE updating that doc in the same PR.
+// stamping.go: the problem admission pipeline (stages [0]-[3.5]), minus the
+// final DB insert.
 //
 // Every candidate problem - LLM-generated or heuristic - passes through:
 //
@@ -14,18 +11,27 @@
 //	[3]   VALIDATE    local-first: exact evaluator for symbolic problems
 //	                  (zero LLM calls); WORD problems go to the LLM validator
 //	[3.5] ENVELOPE    detected bits must be a subset of the user's bitmap
-//	[4]   INSERT      problemManager.Create (caller)
+//	[4]   INSERT      problemManager.Create (caller, in package api)
 //
 // Disagreement = reject, not auto-correct: a generator that can't compute its
 // own answer probably embedded the wrong number in the explanation prose too.
-package api
+
+package mathcore
 
 import (
 	"fmt"
 	"math/big"
 	"math/bits"
-	"regexp"
 	"strings"
+)
+
+// Reject-stage identifiers AdmitExpression can produce (Admission.RejectStage).
+// The generation funnel in package api owns the orchestration-only stages
+// (collision/answer/envelope/validator/create) and aggregates these alongside
+// them.
+const (
+	RejectLexer        = "lexer"
+	RejectUnknownRules = "unknown_rules"
 )
 
 // NormalizeProblemBitmap enforces structural invariants on a final problem
@@ -38,7 +44,7 @@ import (
 // multiplication + subtraction without chained_operations). The parser path
 // never needs this - it co-sets these from the token stream - so this is the
 // deterministic backstop for the validator and legacy-preserved stamps.
-// Apply at every FINAL stamp site, after any validator/legacy merge. (#246)
+// Apply at every FINAL stamp site, after any validator/legacy merge.
 func NormalizeProblemBitmap(b uint64) uint64 {
 	pt := ProblemType(b)
 	coreOps := ADDITION | SUBTRACTION | MULTIPLICATION | DIVISION
@@ -52,45 +58,6 @@ func NormalizeProblemBitmap(b uint64) uint64 {
 		b |= uint64(FRACTIONS) // mismatched denominators require fractions
 	}
 	return b
-}
-
-// Funnel stage names: every drop between "LLM returned N problems"
-// and "M were inserted" must land in exactly one of these.
-const (
-	rejectLexer        = "lexer"
-	rejectUnknownRules = "unknown_rules"
-	rejectCollision    = "collision"
-	rejectAnswer       = "answer"
-	rejectEnvelope     = "envelope"
-	rejectValidator    = "validator"
-	rejectCreate       = "create"
-)
-
-// generationFunnel counts candidates through the admission pipeline for one
-// generation call. Logged as a single structured line.
-type generationFunnel struct {
-	requested int
-	returned  int
-	rejects   map[string]int
-	inserted  int
-}
-
-func newGenerationFunnel(requested int) *generationFunnel {
-	return &generationFunnel{requested: requested, rejects: map[string]int{}}
-}
-
-func (f *generationFunnel) reject(stage string) { f.rejects[stage]++ }
-
-// String renders the funnel as one grep-able line.
-func (f *generationFunnel) String() string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "funnel: requested=%d returned=%d", f.requested, f.returned)
-	for _, stage := range []string{rejectLexer, rejectUnknownRules, rejectCollision,
-		rejectAnswer, rejectEnvelope, rejectValidator, rejectCreate} {
-		fmt.Fprintf(&b, " %s=%d", stage, f.rejects[stage])
-	}
-	fmt.Fprintf(&b, " inserted=%d", f.inserted)
-	return b.String()
 }
 
 // Admission is the result of running a candidate expression through the
@@ -123,7 +90,7 @@ func AdmitExpression(rawExpr string) Admission {
 
 	toks, lexErr := LexExpression(norm)
 	if lexErr != nil {
-		return Admission{RejectStage: rejectLexer,
+		return Admission{RejectStage: RejectLexer,
 			RejectWhy: fmt.Sprintf("unknown token at %d: %q", lexErr.Pos, lexErr.Snippet)}
 	}
 
@@ -131,11 +98,11 @@ func AdmitExpression(rawExpr string) Admission {
 
 	distinct, qmarks := CountDistinctUnknowns(toks)
 	if distinct > 1 {
-		return Admission{RejectStage: rejectUnknownRules,
+		return Admission{RejectStage: RejectUnknownRules,
 			RejectWhy: fmt.Sprintf("%d distinct unknowns (max 1)", distinct)}
 	}
 	if qmarks > 1 {
-		return Admission{RejectStage: rejectUnknownRules,
+		return Admission{RejectStage: RejectUnknownRules,
 			RejectWhy: fmt.Sprintf("? appears %d times (max 1)", qmarks)}
 	}
 
@@ -213,21 +180,9 @@ func spliceLoneLetterRaw(expr string, letter byte) (string, bool) {
 	return expr[:pos] + "?" + expr[pos+1:], true
 }
 
-// RewriteLetterInProse replaces standalone occurrences of a rewritten
-// variable letter in prose (explanations) with '?', keeping the explanation
-// consistent with a stage-1.5-rewritten expression. Best-effort; rewritten
-// rows are surfaced for spot-checking by the backfill.
-func RewriteLetterInProse(s string, letter byte) string {
-	if s == "" || letter == 0 {
-		return s
-	}
-	re := regexp.MustCompile(`\b` + regexp.QuoteMeta(string(letter)) + `\b`)
-	return re.ReplaceAllString(s, "?")
-}
-
-// envelopeViolation returns the names of detected bits that fall outside the
+// EnvelopeViolation returns the names of detected bits that fall outside the
 // user's enabled bitmap, or "" if the problem fits the envelope.
-func envelopeViolation(problemBits, userBitmap uint64) string {
+func EnvelopeViolation(problemBits, userBitmap uint64) string {
 	extra := problemBits &^ userBitmap
 	if extra == 0 {
 		return ""
@@ -253,14 +208,14 @@ func parseAnswerRat(answer string) (*big.Rat, bool) {
 	return v, true
 }
 
-// verifyAnswerSymbolic checks a symbolic (non-WORD) problem's stored answer
+// VerifyAnswerSymbolic checks a symbolic (non-WORD) problem's stored answer
 // against the exact evaluator - the deterministic tool is authoritative here;
 // zero LLM calls. Rules:
 //   - the answer must parse as a rational
 //   - an unknown requires an equation ('='); the answer substitutes into the
 //     unknown and every side must evaluate equal
 //   - with no unknown, every side must evaluate equal AND equal the answer
-func verifyAnswerSymbolic(toks []Token, answer string) error {
+func VerifyAnswerSymbolic(toks []Token, answer string) error {
 	ans, ok := parseAnswerRat(answer)
 	if !ok {
 		return fmt.Errorf("unparseable answer %q", answer)
@@ -299,13 +254,70 @@ func verifyAnswerSymbolic(toks []Token, answer string) error {
 	return nil
 }
 
-// VerifyAnswer admits expr and checks it evaluates to answer - the exported
-// form of the generation path's symbolic answer check, for tools that validate
-// a candidate computation (e.g. cmd/diagnose_generation).
-func VerifyAnswer(expr, answer string) error {
-	adm := AdmitExpression(expr)
-	if adm.RejectStage != "" {
-		return fmt.Errorf("%s: %s", adm.RejectStage, adm.RejectWhy)
+// DetectProblemTypeBitmap inspects an expression and returns the bitmap of
+// problem types it contains, mapped from the same parsed features the
+// difficulty formula uses - bits, difficulty, and answers cannot disagree
+// about what an expression means.
+//
+// The prose rule applies: structural bits (operators, unknowns, PEMDAS,
+// SINGLE_VARIABLE) are token-level only; \text{...} contents never fire
+// them. WORD problems' topic bits come from the validator instead. The
+// magnitude bits are SHAPE bits and deliberately read prose numerals (a word
+// problem about 999 apples is a LARGE_NUMBERS problem - multi-digit operands
+// are visually intimidating to the audience regardless of framing), while
+// DECIMALS/PERCENTAGES bits are symbolic-only.
+//
+// Magnitude bits are brackets, not cumulative: 13-99 stamps MEDIUM_NUMBERS,
+// >= 100 stamps LARGE_NUMBERS alone ("1 + 999" is LARGE, not MEDIUM).
+func DetectProblemTypeBitmap(expr string) uint64 {
+	f := parseProblemFeatures(expr)
+	var b ProblemType
+	if f.hasAdd {
+		b |= ADDITION
 	}
-	return verifyAnswerSymbolic(adm.Tokens, answer)
+	if f.hasSub {
+		b |= SUBTRACTION
+	}
+	if f.hasMul {
+		b |= MULTIPLICATION
+	}
+	if f.hasDiv {
+		b |= DIVISION
+	}
+	if f.numFractions > 0 {
+		b |= FRACTIONS
+	}
+	if f.hasNegatives {
+		b |= NEGATIVES
+	}
+	if f.isWord {
+		b |= WORD
+	}
+	if f.maxMagnitude > MediumMaxOperand {
+		b |= LARGE_NUMBERS
+	} else if f.maxMagnitude > SmallMaxOperand {
+		b |= MEDIUM_NUMBERS
+	}
+	if f.numOps >= 2 {
+		b |= CHAINED_OPERATIONS
+	}
+	if f.hasMissing {
+		b |= MISSING_NUMBER
+	}
+	if f.numFractions >= 2 && !f.sameDenom {
+		b |= MISMATCHED_DENOMINATORS
+	}
+	if f.hasDecimalsSymbolic {
+		b |= DECIMALS
+	}
+	if f.requiresPEMDAS {
+		b |= PEMDAS
+	}
+	if f.hasVariables {
+		b |= SINGLE_VARIABLE
+	}
+	if f.hasPercentSymbolic {
+		b |= PERCENTAGES
+	}
+	return uint64(b)
 }

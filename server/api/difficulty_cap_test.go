@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"garydmenezes.com/mathgame/server/common"
+	"garydmenezes.com/mathgame/server/mathcore"
 )
 
 // TestDifficultyCap_ClampsRunawayValue verifies that a user with a pathologically
@@ -28,7 +29,7 @@ func TestDifficultyCap_ClampsRunawayValue(t *testing.T) {
 
 	// Give the user a moderate envelope and a pathologically high
 	// target_difficulty that could result from the old unbounded adjuster.
-	bitmap := uint64(ADDITION | SUBTRACTION | MULTIPLICATION | DIVISION | MEDIUM_NUMBERS | MISSING_NUMBER)
+	bitmap := uint64(mathcore.ADDITION | mathcore.SUBTRACTION | mathcore.MULTIPLICATION | mathcore.DIVISION | mathcore.MEDIUM_NUMBERS | mathcore.MISSING_NUMBER)
 	_, err = api.DB.Exec(
 		`UPDATE settings SET target_difficulty = 74082001, problem_type_bitmap = ? WHERE user_id = ?`,
 		bitmap, user.Id,
@@ -58,7 +59,7 @@ func TestDifficultyCap_ClampsRunawayValue(t *testing.T) {
 		t.Fatalf("query difficulty: %v", err)
 	}
 
-	expectedMax := MaxDiffForBitmap(bitmap)
+	expectedMax := mathcore.MaxDiffForBitmap(bitmap)
 	if difficulty > expectedMax+0.01 {
 		t.Errorf("expected difficulty <= %.2f (bitmap ceiling), got %.2f", expectedMax, difficulty)
 	}
@@ -82,7 +83,7 @@ func TestDifficultyCap_FullBitmap(t *testing.T) {
 	insertVideosAndUserHasVideo(t, api, user.Id, 1)
 
 	// Set pathological difficulty with every bit enabled.
-	fullBitmap := uint64(ALL_PROBLEM_TYPES)
+	fullBitmap := uint64(mathcore.ALL_PROBLEM_TYPES)
 	_, err = api.DB.Exec(
 		`UPDATE settings SET target_difficulty = 10000, problem_type_bitmap = ? WHERE user_id = ?`,
 		fullBitmap, user.Id,
@@ -111,7 +112,7 @@ func TestDifficultyCap_FullBitmap(t *testing.T) {
 		t.Fatalf("query difficulty: %v", err)
 	}
 
-	ceiling := MaxDiffForBitmap(fullBitmap)
+	ceiling := mathcore.MaxDiffForBitmap(fullBitmap)
 	if difficulty > ceiling+0.01 {
 		t.Errorf("expected difficulty <= %.2f (full-bitmap ceiling), got %.2f", ceiling, difficulty)
 	}

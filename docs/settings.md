@@ -31,7 +31,7 @@ The settings screen exposes the two user controls described in problem-generatio
 
 - **`problem_type_bitmap`** — the envelope. Authored directly by toggling problem-type chips. Bit
   constants come from `web/src/enums.js` `ProblemTypes` (the frontend copy of
-  `server/api/enums.go`).
+  `server/mathcore/problem_type.go`).
 - **`target_difficulty`** — the adaptive lever, surfaced as a slider whose max IS the bitmap's
   difficulty ceiling.
 
@@ -189,7 +189,7 @@ completeness:
 
 Walk the full new-bit checklist in problem-generation.md; the settings-screen touchpoints are:
 
-1. Add the bit to `web/src/enums.js` `ProblemTypes` (matches `server/api/enums.go`).
+1. Add the bit to `web/src/enums.js` `ProblemTypes` (matches `server/mathcore/problem_type.go`).
 2. Place it in `PROBLEM_TYPE_GROUPS` — pick the card (verb / noun-kind / noun-size / framing), label
    (parent vocabulary), and `dependsOn`/`hasDependent` if it's part of a dependency pair.
 3. If it adds a dependency rule: add a check + error code to `validateBitmap`, an `ERROR_GROUPS`

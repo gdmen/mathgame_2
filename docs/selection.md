@@ -135,7 +135,7 @@ The final pick is an integer lottery over each candidate's weight scaled by 100
 magnitude bits (MEDIUM/LARGE_NUMBERS) are excluded because magnitude *is*
 difficulty — "weak at LARGE_NUMBERS → serve large numbers, easier" fights
 itself; size progression is `target_difficulty`'s job (`WEIGHTED_TOPIC_MASK`,
-enums.go). The same mask gates `recordTopicAttempt` and `initTopicStats`.
+problem_type.go). The same mask gates `recordTopicAttempt` and `initTopicStats`.
 
 ## The recency bias (`pickWithRecencyBias`)
 
@@ -217,6 +217,8 @@ the recency sort.
 
 - `server/api/generate_problems.go` — `selectProblem`, the candidate SQL,
   `newestVersionTier`, background-generation single-flight, the constants.
+  (Bit detection, `DetectProblemTypeBitmap`, now lives in the shared
+  `server/mathcore` kernel, not here — see [problem-generation.md](problem-generation.md).)
 - `server/api/select_lru.go` — `pickWithRecencyBias`, `recencyLess`,
   `lastShownAt`.
 - `server/api/pool_supply.go` — `poolCountsByBit`, `thinPoolBoost`, supply-side
@@ -230,5 +232,5 @@ the recency sort.
   (cache write).
 - `server/api/generator_rank.go` — `generatorRank`, the rank ordering selection
   prefers (version meanings owned by `docs/generator-versions.md`).
-- `server/api/enums.go` — `WEIGHTED_TOPIC_MASK`.
+- `server/mathcore/problem_type.go` — `WEIGHTED_TOPIC_MASK`.
 - `server/api/migrations/39.sql` — the covering selection index.

@@ -62,7 +62,7 @@ access is PIN-gated by `RequirePin`.
 
 Every event is POSTed to `/events` as `{ event_type, value }` with `value` stringified
 (`genPostEventFcn`, `web/src/index.js`). Event-type strings are bare literals on the client and
-must match the server constants in `server/api/enums.go` exactly. The table is the subset this area
+must match the server constants in `server/api/event_types.go` exactly. The table is the subset this area
 emits.
 
 | Event | Value | Emitted by | When |
@@ -147,7 +147,7 @@ otherwise flushing the buffer into `attempts`. The result is rendered with relat
 
 - **The loop branch is `solved >= target` on both surfaces.** Change one, change both (`PlayView`,
   `CompanionView`).
-- **Event-type strings must match `server/api/enums.go`.** They are bare literals on the client; a
+- **Event-type strings must match `server/api/event_types.go`.** They are bare literals on the client; a
   typo silently drops the event (#279).
 - **`PreprocessExpression` is shared** across play, problem, and companion so the kid view and the
   adult mirror can never disagree about how an expression looks.
@@ -182,7 +182,7 @@ otherwise flushing the buffer into `attempts`. The result is rendered with relat
 - `web/src/conf.json` — `event_reporting_interval`, `debug_quickplay`.
 - `web/src/problem_companion.js`, `web/src/video_companion.js` — read-only mirror sub-views.
 - `web/src/pin.js` — `RequirePin`, `ClearSessionPin` (companion gate / play PIN clear).
-- `server/api/enums.go` — authoritative event-type constants.
+- `server/api/event_types.go` — authoritative event-type constants.
 - `server/api/meta_models.go` — `PlayData`, the `/play` response shape.
 - `server/api/custom_handlers.go` — `customGetPlayData` (the `/play` handler, video-count gate,
   problem reselection).
@@ -190,7 +190,7 @@ otherwise flushing the buffer into `attempts`. The result is rendered with relat
 
 ## Extension checklist — adding a client event
 
-1. Add the constant to `server/api/enums.go` (and its server handler / record-only entry).
+1. Add the constant to `server/api/event_types.go` (and its server handler / record-only entry).
 2. Emit it from the relevant view via `eventReporter.postEvent` / `postEvent` with a stringified
    `value`.
 3. If it should advance the loop, have the server return a fresh `{ gamestate, problem, video }`

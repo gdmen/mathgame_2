@@ -5,6 +5,8 @@ package api
 
 import (
 	"github.com/golang/glog"
+
+	"garydmenezes.com/mathgame/server/mathcore"
 )
 
 // TopicStat holds per-topic accuracy and difficulty for a single user+topic.
@@ -62,14 +64,14 @@ func getOrDefaultTopicStat(stats map[uint64]*TopicStat, userID uint32, problemTy
 // individual problem type bit set in the problem's bitmap. Gated by
 // WEIGHTED_TOPIC_MASK: magnitude bits never get stats rows - magnitude IS
 // difficulty, so per-topic accuracy tracking for it is meaningless (see the
-// mask comment in enums.go).
+// mask comment in problem_type.go).
 func (a *Api) recordTopicAttempt(logPrefix string, userID uint32, problemTypeBitmap uint64, isCorrect bool, baseDifficulty float64) {
 	for i := 0; i < 64; i++ {
 		pt := uint64(1 << i)
 		if (problemTypeBitmap & pt) == 0 {
 			continue
 		}
-		if pt&uint64(WEIGHTED_TOPIC_MASK) == 0 {
+		if pt&uint64(mathcore.WEIGHTED_TOPIC_MASK) == 0 {
 			continue
 		}
 		correctDelta := 0
@@ -175,8 +177,8 @@ func chooseWeightedTopic(stats map[uint64]*TopicStat, enabledBitmap uint64, base
 		}
 		// Magnitude bits are not practice topics: "weak at LARGE_NUMBERS ->
 		// serve large numbers, easier" fights itself. Size progression is
-		// target_difficulty's job (see WEIGHTED_TOPIC_MASK in enums.go).
-		if pt&uint64(WEIGHTED_TOPIC_MASK) == 0 {
+		// target_difficulty's job (see WEIGHTED_TOPIC_MASK in problem_type.go).
+		if pt&uint64(mathcore.WEIGHTED_TOPIC_MASK) == 0 {
 			continue
 		}
 		diff := baseDifficulty
@@ -238,8 +240,8 @@ func (a *Api) initTopicStats(userID uint32, enabledBitmap uint64, baseDifficulty
 		}
 		// Never seed magnitude-bit rows: getEffectiveDifficulty consults
 		// seeded rows, and a magnitude "topic difficulty" is meaningless
-		// (see WEIGHTED_TOPIC_MASK in enums.go).
-		if pt&uint64(WEIGHTED_TOPIC_MASK) == 0 {
+		// (see WEIGHTED_TOPIC_MASK in problem_type.go).
+		if pt&uint64(mathcore.WEIGHTED_TOPIC_MASK) == 0 {
 			continue
 		}
 		_, err := a.DB.Exec(`

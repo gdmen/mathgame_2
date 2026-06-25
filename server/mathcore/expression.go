@@ -1,14 +1,11 @@
-// Package api: expression normalization, lexing, and rewriting.
-//
-// Part of the problem-generation system - documented in docs/problem-generation.md.
-// Behavior changes here (alphabet, tokens, rewrite rules) REQUIRE updating
-// that doc in the same PR.
+// expression.go: notation normalization, lexing, and the lone-variable rewrite.
 //
 // The prose rule: \text{...} contents are a single opaque prose token. Letters,
 // question marks, and symbols inside \text{} can never be unknowns, operators,
 // or any other structural feature. ("John has a dog." must not produce a
 // variable token for the 'a'.)
-package api
+
+package mathcore
 
 import (
 	"fmt"

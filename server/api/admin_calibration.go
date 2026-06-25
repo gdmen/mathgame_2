@@ -21,6 +21,7 @@ import (
 	"github.com/golang/glog"
 
 	"garydmenezes.com/mathgame/server/common"
+	"garydmenezes.com/mathgame/server/mathcore"
 )
 
 // NameCount is a label with its occurrence count (bit frequencies).
@@ -30,10 +31,10 @@ type NameCount struct {
 }
 
 type CalibrationProblem struct {
-	Expression string              `json:"expression"`
-	Difficulty float64             `json:"difficulty"`
-	Bits       []string            `json:"bits"`
-	Breakdown  DifficultyBreakdown `json:"breakdown"`
+	Expression string                       `json:"expression"`
+	Difficulty float64                      `json:"difficulty"`
+	Bits       []string                     `json:"bits"`
+	Breakdown  mathcore.DifficultyBreakdown `json:"breakdown"`
 }
 
 // CalibrationGenGroup is one generator version's presence in a bucket: how many
@@ -205,10 +206,10 @@ func (a *Api) computeCalibrationReport() (CalibrationData, error) {
 			continue
 		}
 		p := CalibrationProblem{Expression: expr, Difficulty: difficulty}
-		p.Bits = ProblemTypeToFeatures(ProblemType(bitmap))
+		p.Bits = mathcore.ProblemTypeToFeatures(mathcore.ProblemType(bitmap))
 		sort.Strings(p.Bits)
 		// Scored the same way storage is, so the page matches stored difficulty.
-		p.Breakdown = ComputeDifficultyBreakdownFor(expr, symbolic)
+		p.Breakdown = mathcore.ComputeDifficultyBreakdownFor(expr, symbolic)
 		k := sampleKey{bucket, generator}
 		samples[k] = append(samples[k], p)
 	}

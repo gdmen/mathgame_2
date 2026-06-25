@@ -1,7 +1,4 @@
-// Package api: exact expression evaluation over lexer tokens.
-//
-// Part of the problem-generation system - documented in docs/problem-generation.md.
-// Behavior changes here REQUIRE updating that doc in the same PR.
+// evaluator.go: exact rational evaluation over lexer tokens.
 //
 // Two evaluators share one token stream:
 //   - EvalTokens: the CORRECT evaluation - recursive descent honoring
@@ -11,10 +8,11 @@
 //
 // PEMDAS (requires non-left-to-right evaluation) fires iff the two disagree.
 // All arithmetic is math/big.Rat - exact rationals, no float epsilon, no LLM,
-// no eval() of untrusted input. Because the answer check (PR2), the PEMDAS
+// no eval() of untrusted input. Because the answer check, the PEMDAS
 // dual-eval, and bit detection all consume the same tokens, difficulty, bits,
 // and answers cannot disagree about what an expression means.
-package api
+
+package mathcore
 
 import (
 	"errors"

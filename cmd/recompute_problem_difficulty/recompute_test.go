@@ -10,6 +10,7 @@ import (
 
 	"garydmenezes.com/mathgame/server/api"
 	"garydmenezes.com/mathgame/server/common"
+	"garydmenezes.com/mathgame/server/mathcore"
 )
 
 var testDBCounter uint64
@@ -89,9 +90,9 @@ func TestRecomputeProblemRow_Skipped(t *testing.T) {
 	// Sentinel difficulty that ComputeProblemDifficulty would never produce
 	// (clamps at 20). If the fast-path is broken, the sentinel gets clobbered.
 	const sentinel = 99.0
-	seedProblem(t, db, 12345, "1 + 1", sentinel, api.DifficultyVersion)
+	seedProblem(t, db, 12345, "1 + 1", sentinel, mathcore.DifficultyVersion)
 
-	action, newDiff, err := recomputeProblemRow(db, 12345, "1 + 1", "", sentinel, api.DifficultyVersion, false)
+	action, newDiff, err := recomputeProblemRow(db, 12345, "1 + 1", "", sentinel, mathcore.DifficultyVersion, false)
 	if err != nil {
 		t.Fatalf("recomputeProblemRow: %v", err)
 	}
@@ -116,7 +117,7 @@ func TestRecomputeProblemRow_Stamped(t *testing.T) {
 	defer cleanup()
 
 	expr := "2 + 3"
-	correctDiff := api.ComputeProblemDifficulty(expr, "")
+	correctDiff := mathcore.ComputeProblemDifficulty(expr, "")
 	seedProblem(t, db, 23456, expr, correctDiff, "")
 
 	action, _, err := recomputeProblemRow(db, 23456, expr, "", correctDiff, "", false)
@@ -128,8 +129,8 @@ func TestRecomputeProblemRow_Stamped(t *testing.T) {
 	}
 
 	gotDiff, gotVer := getProblemRow(t, db, 23456)
-	if gotVer != api.DifficultyVersion {
-		t.Errorf("stored DifficultyVersion = %q, want %q (stamp path should have written version)", gotVer, api.DifficultyVersion)
+	if gotVer != mathcore.DifficultyVersion {
+		t.Errorf("stored DifficultyVersion = %q, want %q (stamp path should have written version)", gotVer, mathcore.DifficultyVersion)
 	}
 	// FLOAT column truncates float64 on round-trip; fuzzy compare is correct.
 	if !recomputeFuzzyEqual(gotDiff, correctDiff) {
@@ -146,7 +147,7 @@ func TestRecomputeProblemRow_Updated(t *testing.T) {
 	expr := "4 + 7"
 	const wrongDiff = 99.0
 	seedProblem(t, db, 34567, expr, wrongDiff, "")
-	want := api.ComputeProblemDifficulty(expr, "")
+	want := mathcore.ComputeProblemDifficulty(expr, "")
 
 	action, newDiff, err := recomputeProblemRow(db, 34567, expr, "", wrongDiff, "", false)
 	if err != nil {
@@ -160,8 +161,8 @@ func TestRecomputeProblemRow_Updated(t *testing.T) {
 	}
 
 	gotDiff, gotVer := getProblemRow(t, db, 34567)
-	if gotVer != api.DifficultyVersion {
-		t.Errorf("stored DifficultyVersion = %q, want %q", gotVer, api.DifficultyVersion)
+	if gotVer != mathcore.DifficultyVersion {
+		t.Errorf("stored DifficultyVersion = %q, want %q", gotVer, mathcore.DifficultyVersion)
 	}
 	if !recomputeFuzzyEqual(gotDiff, want) {
 		t.Errorf("stored Difficulty = %g, want %g", gotDiff, want)
@@ -175,7 +176,7 @@ func TestRecomputeProblemRow_DryRun_Stamped(t *testing.T) {
 	defer cleanup()
 
 	expr := "6 + 5"
-	correctDiff := api.ComputeProblemDifficulty(expr, "")
+	correctDiff := mathcore.ComputeProblemDifficulty(expr, "")
 	seedProblem(t, db, 56789, expr, correctDiff, "")
 
 	action, _, err := recomputeProblemRow(db, 56789, expr, "", correctDiff, "", true)

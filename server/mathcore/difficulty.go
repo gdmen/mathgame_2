@@ -1,11 +1,11 @@
-// Package api: the universal problem-difficulty formula and the per-bitmap
+// difficulty.go: the universal problem-difficulty formula and the per-bitmap
 // difficulty ceiling.
 //
-// Part of the problem-generation system - documented in docs/problem-generation.md.
-// Behavior changes here (formula factors, multipliers, detection semantics)
-// REQUIRE updating that doc in the same PR AND a DifficultyVersion bump +
-// recompute_problem_difficulty run on deploy.
-package api
+// A change to the formula's output semantics (factors, multipliers, detection)
+// requires a DifficultyVersion bump + a recompute_problem_difficulty run on
+// deploy.
+
+package mathcore
 
 import (
 	"math"
@@ -55,9 +55,11 @@ const (
 )
 
 // Magnitude bracket boundaries (maxMagnitude; digit-based for decimals).
+// Shared shape constants like MaxChainLen/LargeMaxOperand: the generators'
+// option mapping and the ceiling both read them, so they are exported.
 const (
-	smallMaxOperand  = 12 // default envelope: no magnitude bits enabled
-	mediumMaxOperand = 99 // MEDIUM_NUMBERS
+	SmallMaxOperand  = 12 // default envelope: no magnitude bits enabled
+	MediumMaxOperand = 99 // MEDIUM_NUMBERS
 )
 
 // MinTargetDifficulty is the lowest selectable target_difficulty. The
@@ -508,9 +510,9 @@ func compressRaw(raw float64) float64 {
 func MaxDiffForBitmap(bitmap uint64) float64 {
 	pt := ProblemType(bitmap)
 
-	maxOperand := float64(smallMaxOperand)
+	maxOperand := float64(SmallMaxOperand)
 	if pt&MEDIUM_NUMBERS != 0 {
-		maxOperand = float64(mediumMaxOperand)
+		maxOperand = float64(MediumMaxOperand)
 	}
 	if pt&LARGE_NUMBERS != 0 {
 		maxOperand = float64(LargeMaxOperand)
