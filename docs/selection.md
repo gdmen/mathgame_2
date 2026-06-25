@@ -88,10 +88,13 @@ first that yields a servable problem:
 ```
 
 Stages 1 and 2 prefer newer generators: `newestVersionTier` runs the
-satisfying-set query, buckets candidates by `generatorRank` (generator_rank.go —
-owned by `docs/generator-versions.md`), and returns only the **highest-ranked
-version present**, falling back to older versions only when no newer one matches.
-An unranked/legacy generator string ranks 0, below every known version.
+satisfying-set query, buckets candidates by `generatorRank` (generator_rank.go),
+and returns only the **highest-ranked version present**, falling back to older
+versions only when no newer one matches. An unranked/legacy generator string
+ranks 0, below every known version. The rank ordering is a selection-preference
+policy: newest-first, with the deterministic `heuristic_2.0` ranked above the
+current LLM for the symbolic cells both can fill (#283). Version provenance — what
+each generator string means — is owned by `docs/generator-versions.md`.
 
 The hard-exclusion list (`prevIds`) is the `recentProblemHistorySize`
 most-recently-shown ids, loaded by `loadRecentProblemIds` (process_events.go)
@@ -228,7 +231,7 @@ the recency sort.
 - `server/api/spaced_repetition.go` — `getDueReviewProblem`.
 - `server/api/process_events.go` — `loadRecentProblemIds`, `recordRecentlyShown`
   (cache write).
-- `server/api/generator_rank.go` — `generatorRank` (owned by
-  `docs/generator-versions.md`).
+- `server/api/generator_rank.go` — `generatorRank`, the rank ordering selection
+  prefers (version meanings owned by `docs/generator-versions.md`).
 - `server/api/enums.go` — `WEIGHTED_TOPIC_MASK`.
 - `server/api/migrations/39.sql` — the covering selection index.

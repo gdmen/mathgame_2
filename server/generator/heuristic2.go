@@ -223,6 +223,11 @@ func sampleConfig(bitmap mathcore.ProblemType, rawTarget float64, rng *rand.Rand
 	need := rawTarget / (opW * structure * assumedMag)
 	cfg.chooseConcepts(need, rng)
 
+	// The PEMDAS multiplication form introduces a '*' (weight 2.2) the chosen
+	// chain ops may not carry; account for it so the magnitude solve aims true.
+	if cfg.pemdas && bitmap&mathcore.MULTIPLICATION != 0 {
+		opW = math.Max(opW, mathcore.WeightMul)
+	}
 	conceptF := conceptFactor(cfg)
 	magNeeded := rawTarget / (opW * structure * conceptF)
 	operandCap := math.Pow(10, magNeeded-0.3) - 1
@@ -231,9 +236,13 @@ func sampleConfig(bitmap mathcore.ProblemType, rawTarget float64, rng *rand.Rand
 	return cfg
 }
 
-// chooseChainOps picks the operator sequence for the numeric-chain modes,
-// honoring PEMDAS availability (mixing additive with multiplicative without
-// PEMDAS would trip the precedence detector and waste the candidate).
+// chooseChainOps picks the operator sequence for the numeric-chain modes. It
+// returns a SAME-PRECEDENCE chain (all additive {+,-}, or all {*}, or a single
+// /) so the left-associative render and the tree agree and no precedence is
+// implied — PEMDAS is built separately by buildPemdas. The chain length is the
+// structure dial; for a magnitude-capable envelope (MEDIUM/LARGE) it biases
+// shorter so operand size, not chain length, carries more of the difficulty
+// (bigger numbers, as a LARGE_NUMBERS envelope should produce).
 func chooseChainOps(bitmap mathcore.ProblemType, rng *rand.Rand) []byte {
 	ops := enabledOps(bitmap)
 	pick := ops[rng.Intn(len(ops))]
@@ -241,18 +250,19 @@ func chooseChainOps(bitmap mathcore.ProblemType, rng *rand.Rand) []byte {
 		return []byte{pick}
 	}
 	n := 1 + rng.Intn(mathcore.MaxChainLen)
-	additive := pick == '+' || pick == '-'
+	if bitmap&(mathcore.MEDIUM_NUMBERS|mathcore.LARGE_NUMBERS) != 0 && rng.Intn(2) == 0 {
+		n = 1 + rng.Intn(2) // magnitude bias: favor short chains of big operands
+	}
+	// Same-precedence pool: multiplicative {*,/} or additive {+,-}. Mixing levels
+	// would imply precedence (that is PEMDAS's job), so the two never combine here.
+	mult := pick == '*' || pick == '/'
 	var pool []byte
-	if additive {
-		for _, o := range ops {
-			if o == '+' || o == '-' {
-				pool = append(pool, o)
-			}
+	for _, o := range ops {
+		if mult && (o == '*' || o == '/') {
+			pool = append(pool, o)
+		} else if !mult && (o == '+' || o == '-') {
+			pool = append(pool, o)
 		}
-	} else if pick == '*' {
-		pool = []byte{'*'}
-	} else { // '/'
-		return []byte{'/'} // division kept single-op for clean construction
 	}
 	out := make([]byte, n)
 	for i := range out {
@@ -461,19 +471,15 @@ func buildNumericChain(cfg buildConfig, rng *rand.Rand) (mathcore.Node, bool) {
 	if len(ops) == 0 {
 		ops = []byte{'+'}
 	}
-	if len(ops) == 1 && ops[0] == '/' {
-		b := randRange(rng, 2, max(2, min(cap, 12)))
-		q := randRange(rng, 1, max(1, cap/b))
-		a := b * q
-		return mathcore.BinaryExpr{Op: '/', L: numLit(a), R: numLit(b)}, true
+	if ops[0] == '*' || ops[0] == '/' {
+		return buildMulDivChain(ops, cap, rng), true
 	}
 
 	first := randRange(rng, 1, cap)
 	var node mathcore.Node = numLit(first)
 	acc := first // running value to bound subtraction when negatives are off
 	for _, op := range ops {
-		switch op {
-		case '-':
+		if op == '-' {
 			hi := cap
 			if !cfg.negatives && acc < hi {
 				hi = acc
@@ -484,11 +490,7 @@ func buildNumericChain(cfg buildConfig, rng *rand.Rand) (mathcore.Node, bool) {
 			b := randRange(rng, 1, hi)
 			node = mathcore.BinaryExpr{Op: '-', L: node, R: numLit(b)}
 			acc -= b
-		case '*':
-			b := randRange(rng, 2, max(2, min(cap, 12)))
-			node = mathcore.BinaryExpr{Op: '*', L: node, R: numLit(b)}
-			acc *= b
-		default: // '+'
+		} else { // '+'
 			b := randRange(rng, 1, cap)
 			node = mathcore.BinaryExpr{Op: '+', L: node, R: numLit(b)}
 			acc += b
@@ -500,28 +502,104 @@ func buildNumericChain(cfg buildConfig, rng *rand.Rand) (mathcore.Node, bool) {
 	return node, true
 }
 
-// buildPemdas builds a precedence-sensitive expression (correct != naive).
-// "a + b*c" when multiplication is enabled, else "a - (b - c)" with subtraction.
+// buildMulDivChain builds a same-precedence */ chain that stays integer
+// throughout: it starts from a large COMPOSITE dividend (a product of small
+// factors, sized toward the operand cap so a LARGE_NUMBERS envelope gets a big
+// number) so divisions have clean small divisors, multiplies by small factors,
+// and only ever divides by an actual divisor of the running value. Division can
+// now chain — the single-op restriction was self-imposed; the AST makes it free.
+func buildMulDivChain(ops []byte, cap int, rng *rand.Rand) mathcore.Node {
+	small := max(2, min(cap, 12))
+	// Compose a starting dividend out of small factors up to the cap.
+	acc := 1
+	for acc*small <= cap {
+		acc *= randRange(rng, 2, small)
+	}
+	if acc < 2 {
+		acc = randRange(rng, 2, small)
+	}
+	var node mathcore.Node = numLit(acc)
+	for _, op := range ops {
+		if op == '/' {
+			if d := pickDivisor(acc, small, rng); d > 1 {
+				node = mathcore.BinaryExpr{Op: '/', L: node, R: numLit(d)}
+				acc /= d
+				continue
+			}
+			// no clean divisor available: fall back to multiplication
+		}
+		b := randRange(rng, 2, small)
+		node = mathcore.BinaryExpr{Op: '*', L: node, R: numLit(b)}
+		acc *= b
+	}
+	return node
+}
+
+// pickDivisor returns a divisor of n in [2, maxD], or 0 if none exists.
+func pickDivisor(n, maxD int, rng *rand.Rand) int {
+	var divs []int
+	for d := 2; d <= maxD && d <= n; d++ {
+		if n%d == 0 {
+			divs = append(divs, d)
+		}
+	}
+	if len(divs) == 0 {
+		return 0
+	}
+	return divs[rng.Intn(len(divs))]
+}
+
+// buildPemdas builds a precedence-sensitive expression (correct != naive) whose
+// operator count scales with the config's chain length, so it can reach high
+// PEMDAS targets — the AST makes arbitrary chaining trivial, so there is no
+// fixed shape limit. Two forms:
+//   - MUL enabled: a sum with embedded products ("a + b*c + d + e*f"). Each
+//     product reads before the surrounding additions, so naive left-to-right
+//     disagrees. opWeight is the multiplication weight (2.2).
+//   - else SUB: a subtraction whose tail is parenthesized
+//     ("a - (b - c - d)"). The parens flip the inner operands' signs vs a naive
+//     left-to-right read. opWeight is the subtraction weight (1.1).
 func buildPemdas(cfg buildConfig, cap int, rng *rand.Rand) (mathcore.Node, bool) {
+	n := len(cfg.ops) // target operator count
+	if n < 2 {
+		n = 2
+	}
+	mulCap := max(2, min(cap, 12))
+
 	if cfg.bitmap&mathcore.MULTIPLICATION != 0 {
-		a := randRange(rng, 1, cap)
-		b := randRange(rng, 1, cap)
-		c := randRange(rng, 2, max(2, min(cap, 12)))
-		var node mathcore.Node = mathcore.BinaryExpr{Op: '+',
-			L: numLit(a),
-			R: mathcore.BinaryExpr{Op: '*', L: numLit(b), R: numLit(c)}}
+		var node mathcore.Node = numLit(randRange(rng, 1, cap))
+		ops := n
+		product := false
+		for ops > 0 {
+			if ops >= 2 && (rng.Intn(2) == 0 || (ops == 2 && !product)) {
+				// a product term costs two operators (the + and the *)
+				node = mathcore.BinaryExpr{Op: '+', L: node,
+					R: mathcore.BinaryExpr{Op: '*', L: numLit(randRange(rng, 1, cap)), R: numLit(randRange(rng, 2, mulCap))}}
+				ops -= 2
+				product = true
+			} else {
+				node = mathcore.BinaryExpr{Op: '+', L: node, R: numLit(randRange(rng, 1, cap))}
+				ops--
+			}
+		}
+		if !product { // guarantee a precedence-firing product
+			node = mathcore.BinaryExpr{Op: '+', L: node,
+				R: mathcore.BinaryExpr{Op: '*', L: numLit(randRange(rng, 1, cap)), R: numLit(randRange(rng, 2, mulCap))}}
+		}
 		if cfg.negatives {
 			node = withNegativeLead(node, cfg.bitmap, cap, rng)
 		}
 		return node, true
 	}
+
 	if cfg.bitmap&mathcore.SUBTRACTION != 0 {
-		c := randRange(rng, 1, cap)
-		b := randRange(rng, c+1, c+cap) // b>c keeps (b-c) positive
-		a := randRange(rng, b, b+cap)   // a>=b keeps a-(b-c) positive
-		node := mathcore.BinaryExpr{Op: '-',
-			L: numLit(a),
-			R: mathcore.Paren{X: mathcore.BinaryExpr{Op: '-', L: numLit(b), R: numLit(c)}}}
+		// Inner chain of n-1 subtractions, then one outer subtraction wrapping it
+		// in parens: a - (b - c - d - ...). n operators total.
+		var inner mathcore.Node = numLit(randRange(rng, 1, cap))
+		for i := 1; i < n; i++ {
+			inner = mathcore.BinaryExpr{Op: '-', L: inner, R: numLit(randRange(rng, 1, cap))}
+		}
+		node := mathcore.BinaryExpr{Op: '-', L: numLit(randRange(rng, 1, cap)), R: mathcore.Paren{X: inner}}
 		return node, true
 	}
 	return nil, false
@@ -540,11 +618,11 @@ func withNegativeLead(node mathcore.Node, bitmap mathcore.ProblemType, cap int, 
 	return mathcore.BinaryExpr{Op: op, L: mathcore.Num{Value: big.NewRat(int64(-a), 1)}, R: node}
 }
 
-// buildDecimalSum builds "x.y +/- z.w" with one or two decimal places, exact,
-// using an enabled additive operator.
+// buildDecimalSum builds a +/- chain of decimals (one or two decimal places,
+// exact), its length honoring the config's chain dial. A negative running total
+// is filtered by the caller's no-negatives guard.
 func buildDecimalSum(cfg buildConfig, rng *rand.Rand) (mathcore.Node, bool) {
-	op, ok := additiveOp(cfg.bitmap, rng)
-	if !ok {
+	if _, ok := additiveOp(cfg.bitmap, rng); !ok {
 		return nil, false
 	}
 	scale := int64([]int{10, 100}[rng.Intn(2)])
@@ -553,14 +631,18 @@ func buildDecimalSum(cfg buildConfig, rng *rand.Rand) (mathcore.Node, bool) {
 		cap = 1
 	}
 	hi := max(1, cap*int(scale)/10)
-	an := int64(randRange(rng, 1, hi))
-	bn := int64(randRange(rng, 1, hi))
-	if op == '-' && bn > an {
-		an, bn = bn, an // keep the difference non-negative
+	dec := func() mathcore.Num {
+		return mathcore.Num{Value: big.NewRat(int64(randRange(rng, 1, hi)), scale), IsDecimal: true}
 	}
-	node := mathcore.BinaryExpr{Op: op,
-		L: mathcore.Num{Value: big.NewRat(an, scale), IsDecimal: true},
-		R: mathcore.Num{Value: big.NewRat(bn, scale), IsDecimal: true}}
+	n := len(cfg.ops)
+	if n < 1 {
+		n = 1
+	}
+	var node mathcore.Node = dec()
+	for i := 0; i < n; i++ {
+		op, _ := additiveOp(cfg.bitmap, rng)
+		node = mathcore.BinaryExpr{Op: op, L: node, R: dec()}
+	}
 	return node, true
 }
 
@@ -568,29 +650,43 @@ func buildDecimalSum(cfg buildConfig, rng *rand.Rand) (mathcore.Node, bool) {
 // (mismatched). Literal denominators are pinned via Raw so reduction can't
 // collapse them. Uses an enabled additive operator.
 func buildFractionChain(cfg buildConfig, rng *rand.Rand) (mathcore.Node, bool) {
-	op, ok := additiveOp(cfg.bitmap, rng)
-	if !ok {
+	// Fractions combine under any of +, -, * (e.g. "1/2 * 3/4" for a MUL-only
+	// envelope); prefer additive for the familiar add/subtract-fractions shape.
+	if _, ok := pickEnabledOp(cfg.bitmap, []byte{'+', '-', '*'}, rng); !ok {
 		return nil, false
 	}
 	cap := cfg.operandCap
 	dmax := max(2, min(cap, 12))
+	if cfg.mismatched && dmax <= 2 {
+		return nil, false
+	}
 	d1 := randRange(rng, 2, dmax)
-	a := randRange(rng, 1, max(1, d1-1))
-	d2 := d1
-	if cfg.mismatched {
-		if dmax <= 2 {
-			return nil, false
+	// A fraction term: same denominator d1 unless mismatched, then a different one.
+	frac := func() mathcore.Num {
+		d := d1
+		if cfg.mismatched {
+			d = randRange(rng, 2, dmax)
 		}
-		d2 = randRange(rng, 2, dmax)
-		for d2 == d1 {
-			d2 = randRange(rng, 2, dmax)
+		return fracNum(randRange(rng, 1, max(1, d-1)), d)
+	}
+	// One op family for the whole chain (additive {+,-} preferred, else all '*'),
+	// so mixing precedence never accidentally trips the PEMDAS detector.
+	additive := cfg.bitmap&(mathcore.ADDITION|mathcore.SUBTRACTION) != 0
+	nextOp := func() byte {
+		if additive {
+			op, _ := additiveOp(cfg.bitmap, rng)
+			return op
 		}
+		return '*'
 	}
-	b := randRange(rng, 1, max(1, d2-1))
-	if op == '-' && big.NewRat(int64(a), int64(d1)).Cmp(big.NewRat(int64(b), int64(d2))) < 0 {
-		a, d1, b, d2 = b, d2, a, d1 // keep the difference non-negative
+	n := len(cfg.ops)
+	if n < 1 {
+		n = 1
 	}
-	node := mathcore.BinaryExpr{Op: op, L: fracNum(a, d1), R: fracNum(b, d2)}
+	var node mathcore.Node = frac()
+	for i := 0; i < n; i++ {
+		node = mathcore.BinaryExpr{Op: nextOp(), L: node, R: frac()}
+	}
 	return node, true
 }
 
