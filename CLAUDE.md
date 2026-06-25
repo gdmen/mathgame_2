@@ -12,15 +12,16 @@ new migrations cannot land undocumented. Create or refresh a doc with the `docum
 
 ## Conventions
 
-- **Never hand-edit generated files** (`*_model.generated.go`, `*_handlers.generated.go`): edit
+- **Never hand-edit generated files** (`*_model.generated.go`, `handlers.generated.go`): edit
   `server/api/models.json` and run `make build-api`. See `docs/schema.md`.
 - **Migrations** (`server/api/migrations/N.sql`) must be re-run-safe and split cleanly on `;`
   (no semicolons inside SQL comments). See `docs/schema.md`.
 - UI work follows the `/style-guide` page (`web/src/style_guide.js`): existing tokens and
   documented patterns; no new untokenized values without adding them to the style guide first.
 - **Comments carry no issue refs and no references to removed code/features.** The area's doc is
-  the only in-code authority; a `// same as elsewhere`-style comment is admitting duplication —
-  extract a helper or file a follow-up instead.
+  the only source of truth: don't restate what it owns anywhere else — a comment, a skill, a
+  README note — link to the doc instead. A `// same as elsewhere`-style restatement is admitting
+  duplication; extract a helper or file a follow-up.
 - **Build through the Makefile, and check staged files before committing.** A bare
   `go build ./cmd/X/` without `-o` followed by `git add -A` sweeps a stray binary into the commit;
   use the Makefile targets and scan `git status` for build artifacts first.

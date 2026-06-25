@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make test:*)",
+      "Bash(make test-api:*)",
+      "Bash(make test-all:*)",
+      "Bash(make all:*)",
+      "Bash(make build-api:*)",
+      "Bash(make build-cmds:*)",
+      "Bash(make build-web:*)",
+      "Bash(make fmt:*)",
+      "Bash(make fmt-file:*)",
+      "Bash(make fmt-web:*)",
+      "Bash(make fmt-web-file:*)",
+      "Bash(go test:*)",
+      "Bash(go build:*)",
+      "Bash(go vet:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git pull:*)",
+      "Bash(git checkout:*)",
+      "Bash(git branch:*)"
+    ],
+    "deny": [
+      "Edit(./server/api/*.generated.go)",
+      "Write(./server/api/*.generated.go)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/fmt-on-edit.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
