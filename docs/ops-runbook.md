@@ -63,6 +63,7 @@ boot). The three jobs that must not overlap a manual run hold a `flock`
 | `test` / `test-api` | `build-api` then `go test ./server/api` |
 | `test-bundle-secrets` | rebuilds the web bundle against a canary config and fails if a secret leaks into `web/build` (the CI scan) |
 | `test-all` | `test` + `test-bundle-secrets` — full local CI parity |
+| `fmt` / `fmt-file` / `fmt-web` / `fmt-web-file` | canonical formatters — `gofmt -s` on the tree or a single Go file (`FILE=`), and `prettier --write` on `web/src` or a single web file (`FILE=`); single source of truth, invoked by `build-api` / `build-web` and the format-on-edit hook in `.claude/hooks/fmt-on-edit.sh` |
 | `docs-check` | `scripts/docs_check.py`; pass `BASE=origin/master` to enforce per-area doc updates |
 | `frontend-conf` | emits `web/src/conf.json` with only the public config fields |
 | `check-bundle-secrets` | fails if a secret value from `$(CONF)` made it into `web/build` |
@@ -135,6 +136,9 @@ operational summary:
   `docs/problem-generation.md`. The doc-sync test
   (`server/api/docs_sync_test.go`) blocks the version bump from landing
   undocumented.
+- **Record the required steps, in order, at the bottom of the commit message** of
+  the change that needs them — they carry into the PR body, so they aren't
+  rediscovered from the diff during the deploy window.
 - `revalidate_word_problems` is optional and costs one LLM call per WORD row —
   run it out-of-band, not in the deploy window.
 

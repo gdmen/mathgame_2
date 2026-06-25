@@ -37,3 +37,7 @@ web/build.prev/
 
 # stray binary from `go build ./cmd/diagnose_generation/` (use `go build ./...`)
 /diagnose_generation
+
+# Claude Code local-only config
+.claude/settings.local.json
+.claude/worktrees/

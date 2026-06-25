@@ -325,6 +325,10 @@ Single server, single DB. Deploy order matters:
    expressions).
 5. Start the server.
 
+When a change requires these steps, record them at the bottom of the commit
+message so they reach the PR and the deploy window — see `docs/ops-runbook.md`
+→ "When a generation/difficulty change is part of the deploy".
+
 `revalidate_word_problems` (optional, costs one LLM call per WORD row):
 re-stamps WORD rows' topic bits from the validator's observed features,
 replacing preserved legacy self-report. Bitmap-only writes; answer

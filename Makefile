@@ -29,7 +29,7 @@ dev-web: frontend-conf
 build-api:
 	python3 server/code_generation/generate_models.py -c server/api/models.json -o server/api
 	python3 server/code_generation/generate_handlers.py -c server/api/models.json -o server/api
-	$(GOFMT) -s .
+	$(MAKE) fmt
 	$(GOBUILD) -o ./bin/apiserver ./cmd/apiserver/main.go
 
 build-cmds: build-api
@@ -42,6 +42,20 @@ build-cmds: build-api
 	$(GOBUILD) -o ./bin/maintenance_server ./cmd/maintenance_server/
 	$(GOBUILD) -o ./bin/revalidate_word_problems ./cmd/revalidate_word_problems/
 	$(GOBUILD) -o ./bin/diagnose_generation ./cmd/diagnose_generation/
+
+# Canonical formatters — the single source of truth for the gofmt -s / prettier
+# invocations, called by build-api / build-web and by the format-on-edit hook
+# (.claude/hooks/fmt-on-edit.sh). The web targets cd into web/ so npx finds
+# web/node_modules; fmt-web-file's FILE must therefore be an absolute path (the
+# hook passes one).
+fmt-file:
+	$(GOFMT) -s $(FILE)
+fmt:
+	$(GOFMT) -s .
+fmt-web:
+	cd web && npx prettier --write src
+fmt-web-file:
+	cd web && npx prettier --write $(FILE)
 
 test: build-api test-api
 
@@ -98,7 +112,7 @@ frontend-conf:
 # up to the swap. A failed build aborts (set -e) with web/build untouched.
 build-web: frontend-conf
 	cd web && npm install --force && BUILD_PATH=build.next npm run build; cd -
-	cd web/src && npx prettier --write .; cd -
+	$(MAKE) fmt-web
 	$(RM) ./web/build.prev
 	if [ -d ./web/build ]; then mv ./web/build ./web/build.prev; fi
 	mv ./web/build.next ./web/build
