@@ -1,4 +1,4 @@
-package api
+package mathcore
 
 import (
 	"strings"
@@ -56,11 +56,11 @@ func TestAdmitExpression_Rejects(t *testing.T) {
 		expr      string
 		wantStage string
 	}{
-		{`\sqrt{16}`, rejectLexer},
-		{"2^3 + 1", rejectLexer},
-		{"? + x = 10", rejectUnknownRules},   // two distinct unknowns
-		{"3x + 2y = 12", rejectUnknownRules}, // two distinct letters
-		{"? + ? = 10", rejectUnknownRules},   // multi-?
+		{`\sqrt{16}`, RejectLexer},
+		{"2^3 + 1", RejectLexer},
+		{"? + x = 10", RejectUnknownRules},   // two distinct unknowns
+		{"3x + 2y = 12", RejectUnknownRules}, // two distinct letters
+		{"? + ? = 10", RejectUnknownRules},   // multi-?
 	}
 	for _, tc := range cases {
 		adm := AdmitExpression(tc.expr)
@@ -110,9 +110,9 @@ func TestVerifyAnswerSymbolic(t *testing.T) {
 			t.Fatalf("lex(%q): %v", tc.expr, lexErr)
 		}
 		toks, _, _ = RewriteLoneVariable(toks, tc.expr)
-		err := verifyAnswerSymbolic(toks, tc.answer)
+		err := VerifyAnswerSymbolic(toks, tc.answer)
 		if (err == nil) != tc.wantOK {
-			t.Errorf("verifyAnswerSymbolic(%q, %q) err=%v, wantOK=%v", tc.expr, tc.answer, err, tc.wantOK)
+			t.Errorf("VerifyAnswerSymbolic(%q, %q) err=%v, wantOK=%v", tc.expr, tc.answer, err, tc.wantOK)
 		}
 	}
 }
@@ -120,10 +120,10 @@ func TestVerifyAnswerSymbolic(t *testing.T) {
 // TestEnvelopeViolation: subset check and violation naming.
 func TestEnvelopeViolation(t *testing.T) {
 	user := uint64(ADDITION | SUBTRACTION)
-	if v := envelopeViolation(uint64(ADDITION), user); v != "" {
+	if v := EnvelopeViolation(uint64(ADDITION), user); v != "" {
 		t.Errorf("subset flagged: %s", v)
 	}
-	if v := envelopeViolation(uint64(ADDITION|MEDIUM_NUMBERS), user); !strings.Contains(v, "medium_numbers") {
+	if v := EnvelopeViolation(uint64(ADDITION|MEDIUM_NUMBERS), user); !strings.Contains(v, "medium_numbers") {
 		t.Errorf("violation = %q, want medium_numbers", v)
 	}
 }
@@ -183,24 +183,6 @@ func TestBuildBitConstraints(t *testing.T) {
 	}
 }
 
-// TestGenerationFunnel_NoSilentDrops: every reject lands in a named stage and
-// the funnel line accounts for all of them.
-func TestGenerationFunnel_NoSilentDrops(t *testing.T) {
-	f := newGenerationFunnel(10)
-	f.returned = 8
-	f.reject(rejectLexer)
-	f.reject(rejectAnswer)
-	f.reject(rejectAnswer)
-	f.inserted = 5
-	line := f.String()
-	for _, want := range []string{"requested=10", "returned=8", "lexer=1", "answer=2", "inserted=5",
-		"unknown_rules=0", "collision=0", "envelope=0", "validator=0", "create=0"} {
-		if !strings.Contains(line, want) {
-			t.Errorf("funnel line missing %q: %s", want, line)
-		}
-	}
-}
-
 // TestNormalizeProblemBitmap: structural invariants that the WORD validator
 // (independent feature checkboxes) can violate. Each ORs in an implied bit;
 // the operation only narrows a problem's audience, never widens it.
@@ -240,23 +222,5 @@ func TestNormalizeProblemBitmap(t *testing.T) {
 					tc.want, ProblemTypeToFeatures(tc.want))
 			}
 		})
-	}
-}
-
-// TestVerifyAnswer covers the exported answer check used by tooling: a form
-// that evaluates to the answer passes; a wrong answer or an unlexable form
-// fails.
-func TestVerifyAnswer(t *testing.T) {
-	if err := VerifyAnswer("9999 / 3 / 3", "1111"); err != nil {
-		t.Errorf("valid form rejected: %v", err)
-	}
-	if err := VerifyAnswer("60 * 2", "120"); err != nil {
-		t.Errorf("valid form rejected: %v", err)
-	}
-	if VerifyAnswer("60 * 2", "121") == nil {
-		t.Error("wrong answer accepted")
-	}
-	if VerifyAnswer("2 ^ 3", "8") == nil {
-		t.Error("unlexable form accepted")
 	}
 }

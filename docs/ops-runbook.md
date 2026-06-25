@@ -130,8 +130,9 @@ operational summary:
   2. `./bin/recompute_problem_difficulty -config conf.json` — restamps the
      difficulty column. **Must run after** the bitmap tool, because difficulty
      is computed from the post-rewrite expressions.
-- Any change to `ComputeProblemDifficulty`'s output **requires** a
-  `DifficultyVersion` bump (otherwise `recompute_problem_difficulty` skips every
+- Any change to `ComputeProblemDifficulty`'s output (the formula now lives in the
+  shared `server/mathcore` kernel) **requires** a `DifficultyVersion` bump
+  (otherwise `recompute_problem_difficulty` skips every
   row as already-at-version) plus the recompute run on deploy — per
   `docs/problem-generation.md`. The doc-sync test
   (`server/api/docs_sync_test.go`) blocks the version bump from landing

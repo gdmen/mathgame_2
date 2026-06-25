@@ -4,22 +4,23 @@ import (
 	"testing"
 
 	"garydmenezes.com/mathgame/server/common"
+	"garydmenezes.com/mathgame/server/mathcore"
 )
 
 func TestChooseWeightedTopic_WeakTopicWeighted(t *testing.T) {
 	stats := map[uint64]*TopicStat{
-		uint64(ADDITION): {
-			UserID: 1, ProblemType: uint64(ADDITION),
+		uint64(mathcore.ADDITION): {
+			UserID: 1, ProblemType: uint64(mathcore.ADDITION),
 			Attempts: 20, Correct: 18, // 90% accuracy = strong
 			TargetDifficulty: 5,
 		},
-		uint64(MULTIPLICATION): {
-			UserID: 1, ProblemType: uint64(MULTIPLICATION),
+		uint64(mathcore.MULTIPLICATION): {
+			UserID: 1, ProblemType: uint64(mathcore.MULTIPLICATION),
 			Attempts: 15, Correct: 6, // 40% accuracy = weak
 			TargetDifficulty: 4,
 		},
 	}
-	enabledBitmap := uint64(ADDITION | MULTIPLICATION)
+	enabledBitmap := uint64(mathcore.ADDITION | mathcore.MULTIPLICATION)
 
 	// Run many iterations to check the distribution
 	counts := map[uint64]int{}
@@ -32,8 +33,8 @@ func TestChooseWeightedTopic_WeakTopicWeighted(t *testing.T) {
 	}
 
 	// Multiplication (weak, weight=2) should appear ~2x as often as addition (weight=1)
-	addCount := counts[uint64(ADDITION)]
-	mulCount := counts[uint64(MULTIPLICATION)]
+	addCount := counts[uint64(mathcore.ADDITION)]
+	mulCount := counts[uint64(mathcore.MULTIPLICATION)]
 	ratio := float64(mulCount) / float64(addCount)
 	if ratio < 1.5 || ratio > 2.5 {
 		t.Errorf("expected weak topic ~2x more frequent, got addition=%d multiplication=%d ratio=%.2f", addCount, mulCount, ratio)
@@ -42,7 +43,7 @@ func TestChooseWeightedTopic_WeakTopicWeighted(t *testing.T) {
 
 func TestChooseWeightedTopic_NoStats(t *testing.T) {
 	stats := map[uint64]*TopicStat{}
-	enabledBitmap := uint64(ADDITION | SUBTRACTION)
+	enabledBitmap := uint64(mathcore.ADDITION | mathcore.SUBTRACTION)
 
 	topic, diff := chooseWeightedTopic(stats, enabledBitmap, 5.0, func(max int) int { return 0 }, nil)
 	if topic == 0 {
@@ -55,18 +56,18 @@ func TestChooseWeightedTopic_NoStats(t *testing.T) {
 
 func TestChooseWeightedTopic_InsufficientAttempts(t *testing.T) {
 	stats := map[uint64]*TopicStat{
-		uint64(ADDITION): {
-			UserID: 1, ProblemType: uint64(ADDITION),
+		uint64(mathcore.ADDITION): {
+			UserID: 1, ProblemType: uint64(mathcore.ADDITION),
 			Attempts: 5, Correct: 1, // Low accuracy but < 10 attempts: not weighted
 			TargetDifficulty: 3,
 		},
-		uint64(SUBTRACTION): {
-			UserID: 1, ProblemType: uint64(SUBTRACTION),
+		uint64(mathcore.SUBTRACTION): {
+			UserID: 1, ProblemType: uint64(mathcore.SUBTRACTION),
 			Attempts: 5, Correct: 4,
 			TargetDifficulty: 3,
 		},
 	}
-	enabledBitmap := uint64(ADDITION | SUBTRACTION)
+	enabledBitmap := uint64(mathcore.ADDITION | mathcore.SUBTRACTION)
 
 	// Both should have weight=1 (insufficient attempts for weak weighting)
 	counts := map[uint64]int{}
@@ -76,8 +77,8 @@ func TestChooseWeightedTopic_InsufficientAttempts(t *testing.T) {
 		counts[topic]++
 	}
 
-	addCount := counts[uint64(ADDITION)]
-	subCount := counts[uint64(SUBTRACTION)]
+	addCount := counts[uint64(mathcore.ADDITION)]
+	subCount := counts[uint64(mathcore.SUBTRACTION)]
 	ratio := float64(addCount) / float64(subCount)
 	if ratio < 0.8 || ratio > 1.2 {
 		t.Errorf("expected roughly equal selection with insufficient attempts, got addition=%d subtraction=%d ratio=%.2f", addCount, subCount, ratio)
@@ -106,10 +107,10 @@ func TestRecordTopicAttempt_Integration(t *testing.T) {
 	user := createTestUser(t, r, "auth0id|topic-test", "topic@test.com", "topictest")
 
 	// Record some attempts
-	bitmap := uint64(ADDITION | MULTIPLICATION) // Both topics set
+	bitmap := uint64(mathcore.ADDITION | mathcore.MULTIPLICATION) // Both topics set
 	api.recordTopicAttempt("[test]", user.Id, bitmap, true, 3.0)
 	api.recordTopicAttempt("[test]", user.Id, bitmap, false, 3.0)
-	api.recordTopicAttempt("[test]", user.Id, uint64(ADDITION), true, 3.0) // Addition only
+	api.recordTopicAttempt("[test]", user.Id, uint64(mathcore.ADDITION), true, 3.0) // Addition only
 
 	stats, err := api.getTopicStats(user.Id)
 	if err != nil {
@@ -117,7 +118,7 @@ func TestRecordTopicAttempt_Integration(t *testing.T) {
 	}
 
 	// Addition: 3 attempts (2 from bitmap + 1 solo), 2 correct
-	addStat := stats[uint64(ADDITION)]
+	addStat := stats[uint64(mathcore.ADDITION)]
 	if addStat == nil {
 		t.Fatal("expected addition stats")
 	}
@@ -126,7 +127,7 @@ func TestRecordTopicAttempt_Integration(t *testing.T) {
 	}
 
 	// Multiplication: 2 attempts (from bitmap), 1 correct
-	mulStat := stats[uint64(MULTIPLICATION)]
+	mulStat := stats[uint64(mathcore.MULTIPLICATION)]
 	if mulStat == nil {
 		t.Fatal("expected multiplication stats")
 	}
@@ -154,16 +155,16 @@ func TestAdjustTopicDifficulty_Integration(t *testing.T) {
 
 	// Simulate 15 attempts, 14 correct for addition (93% accuracy)
 	for i := 0; i < 14; i++ {
-		api.recordTopicAttempt("[test]", user.Id, uint64(ADDITION), true, 5.0)
+		api.recordTopicAttempt("[test]", user.Id, uint64(mathcore.ADDITION), true, 5.0)
 	}
-	api.recordTopicAttempt("[test]", user.Id, uint64(ADDITION), false, 5.0)
+	api.recordTopicAttempt("[test]", user.Id, uint64(mathcore.ADDITION), false, 5.0)
 
 	// Simulate 12 attempts, 4 correct for multiplication (33% accuracy)
 	for i := 0; i < 4; i++ {
-		api.recordTopicAttempt("[test]", user.Id, uint64(MULTIPLICATION), true, 5.0)
+		api.recordTopicAttempt("[test]", user.Id, uint64(mathcore.MULTIPLICATION), true, 5.0)
 	}
 	for i := 0; i < 8; i++ {
-		api.recordTopicAttempt("[test]", user.Id, uint64(MULTIPLICATION), false, 5.0)
+		api.recordTopicAttempt("[test]", user.Id, uint64(mathcore.MULTIPLICATION), false, 5.0)
 	}
 
 	stats, _ := api.getTopicStats(user.Id)
@@ -172,7 +173,7 @@ func TestAdjustTopicDifficulty_Integration(t *testing.T) {
 	// Re-read stats after adjustment
 	stats, _ = api.getTopicStats(user.Id)
 
-	addStat := stats[uint64(ADDITION)]
+	addStat := stats[uint64(mathcore.ADDITION)]
 	if addStat == nil {
 		t.Fatal("expected addition stats after adjustment")
 	}
@@ -185,7 +186,7 @@ func TestAdjustTopicDifficulty_Integration(t *testing.T) {
 		t.Errorf("expected attempts reset to 0 after adjustment, got %d", addStat.Attempts)
 	}
 
-	mulStat := stats[uint64(MULTIPLICATION)]
+	mulStat := stats[uint64(mathcore.MULTIPLICATION)]
 	if mulStat == nil {
 		t.Fatal("expected multiplication stats after adjustment")
 	}

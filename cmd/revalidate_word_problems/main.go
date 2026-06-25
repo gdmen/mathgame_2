@@ -44,17 +44,17 @@ import (
 	"github.com/golang/glog"
 	openai "github.com/sashabaranov/go-openai"
 
-	"garydmenezes.com/mathgame/server/api"
 	"garydmenezes.com/mathgame/server/common"
 	"garydmenezes.com/mathgame/server/llm_generator"
+	"garydmenezes.com/mathgame/server/mathcore"
 )
 
 // newBitmapFor combines the parser's shape bits (magnitude, word, any
 // symbolic structure) with the validator's observed topic features, then
 // enforces the structural invariants the validator can violate (#246).
 func newBitmapFor(expr string, features []string) uint64 {
-	return api.NormalizeProblemBitmap(
-		api.DetectProblemTypeBitmap(expr) | uint64(api.FeaturesToProblemType(features)))
+	return mathcore.NormalizeProblemBitmap(
+		mathcore.DetectProblemTypeBitmap(expr) | uint64(mathcore.FeaturesToProblemType(features)))
 }
 
 var reNumeral = regexp.MustCompile(`[0-9]+(\.[0-9]+)?`)
@@ -101,7 +101,7 @@ func needsValidation(expr string, bitmap uint64) bool {
 			return true
 		}
 	}
-	if bitmap&uint64(api.MULTIPLICATION|api.DIVISION) == 0 {
+	if bitmap&uint64(mathcore.MULTIPLICATION|mathcore.DIVISION) == 0 {
 		for _, c := range mulDivCues {
 			if strings.Contains(prose, c) {
 				return true
@@ -143,7 +143,7 @@ func main() {
 	query := fmt.Sprintf(
 		`SELECT id, expression, answer, explanation, problem_type_bitmap FROM problems
 		 WHERE disabled = 0 AND (problem_type_bitmap & %d) <> 0 AND id >= ? ORDER BY id`,
-		uint64(api.WORD))
+		uint64(mathcore.WORD))
 	if *limit > 0 {
 		query = fmt.Sprintf("%s LIMIT %d", query, *limit)
 	}
@@ -183,7 +183,7 @@ func main() {
 				prefiltered++
 				if *dryRun {
 					fmt.Printf("SKIP id=%d bitmap %d (%v) %q\n",
-						r.id, r.oldBitmap, api.ProblemTypeToFeatures(api.ProblemType(r.oldBitmap)), r.expr)
+						r.id, r.oldBitmap, mathcore.ProblemTypeToFeatures(mathcore.ProblemType(r.oldBitmap)), r.expr)
 				}
 			}
 		}
@@ -195,7 +195,7 @@ func main() {
 	// everything enabled only the hard caps remain (operand size, chain
 	// length, unknown rules, closed-world notation) - legacy rows exceeding
 	// those land in the constraint-NO bucket below.
-	constraints := api.BuildBitConstraints(api.ALL_PROBLEM_TYPES)
+	constraints := mathcore.BuildBitConstraints(mathcore.ALL_PROBLEM_TYPES)
 
 	var (
 		mu                                        sync.Mutex
@@ -243,7 +243,7 @@ func main() {
 					Answer:      r.answer,
 					Explanation: r.explanation,
 				}
-				features, err := llm_generator.ValidateWordProblemWithModel(p, constraints, api.ValidatorFeatureNames, openai.GPT5Nano)
+				features, err := llm_generator.ValidateWordProblemWithModel(p, constraints, mathcore.ValidatorFeatureNames, openai.GPT5Nano)
 				if err != nil {
 					switch {
 					case errors.Is(err, llm_generator.ErrEnvelopeMismatch):
@@ -258,15 +258,15 @@ func main() {
 
 				// Never widen the audience: the stored WORD bit survives even
 				// if a lexer-failing prose row's detector or validator misses it.
-				newBitmap := newBitmapFor(r.expr, features) | (r.oldBitmap & uint64(api.WORD))
+				newBitmap := newBitmapFor(r.expr, features) | (r.oldBitmap & uint64(mathcore.WORD))
 				if newBitmap == r.oldBitmap {
 					finish(r.id, func() { unchanged++ })
 					continue
 				}
 				if *dryRun {
 					fmt.Printf("DRY id=%d bitmap %d (%v) -> %d (%v)\n",
-						r.id, r.oldBitmap, api.ProblemTypeToFeatures(api.ProblemType(r.oldBitmap)),
-						newBitmap, api.ProblemTypeToFeatures(api.ProblemType(newBitmap)))
+						r.id, r.oldBitmap, mathcore.ProblemTypeToFeatures(mathcore.ProblemType(r.oldBitmap)),
+						newBitmap, mathcore.ProblemTypeToFeatures(mathcore.ProblemType(newBitmap)))
 				} else if _, err := db.Exec(
 					`UPDATE problems SET problem_type_bitmap = ? WHERE id = ?`,
 					newBitmap, r.id,
@@ -275,8 +275,8 @@ func main() {
 					finish(r.id, func() { errorRows = append(errorRows, r.id) })
 					continue
 				}
-				gained := newBitmap&uint64(api.CHAINED_OPERATIONS) != 0 &&
-					r.oldBitmap&uint64(api.CHAINED_OPERATIONS) == 0
+				gained := newBitmap&uint64(mathcore.CHAINED_OPERATIONS) != 0 &&
+					r.oldBitmap&uint64(mathcore.CHAINED_OPERATIONS) == 0
 				finish(r.id, func() {
 					updated++
 					if gained {

@@ -19,6 +19,7 @@ import (
 
 	heuristic_generator "garydmenezes.com/mathgame/server/generator"
 	llm_generator "garydmenezes.com/mathgame/server/llm_generator"
+	"garydmenezes.com/mathgame/server/mathcore"
 )
 
 const (
@@ -192,8 +193,8 @@ func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings
 	// OpenAI request here. Serve a heuristic-generated problem synchronously
 	// so they see something immediately. The LLM backfill fills the pool for
 	// subsequent requests.
-	inputProblemType := ProblemType(settings.ProblemTypeBitmap)
-	heuristicType := inputProblemType &^ WORD
+	inputProblemType := mathcore.ProblemType(settings.ProblemTypeBitmap)
+	heuristicType := inputProblemType &^ mathcore.WORD
 	if heuristicType != 0 {
 		glog.Infof("%s pool empty; serving heuristic problem while LLM backfills", logPrefix)
 		p, _, _ := a.runHeuristicGenerator(logPrefix, settings, 3, heuristicType)
@@ -299,21 +300,21 @@ func (a *Api) generateProblemsBackground(logPrefix string, settings *Settings) e
 // after the originating request has returned. Writing to a stale/reused context
 // from a background path corrupts unrelated in-flight requests. Errors are
 // logged via glog; callers decide how to handle a nil return.
-func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numProblems int, problemType ProblemType) (*Problem, int, map[uint32]bool) {
+func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numProblems int, problemType mathcore.ProblemType) (*Problem, int, map[uint32]bool) {
 	uniqueIds := map[uint32]bool{}
 	newCount := 0
 	var newProblem *Problem
 	operations := []string{}
-	if (ADDITION & problemType) > 0 {
+	if (mathcore.ADDITION & problemType) > 0 {
 		operations = append(operations, "+")
 	}
-	if (SUBTRACTION & problemType) > 0 {
+	if (mathcore.SUBTRACTION & problemType) > 0 {
 		operations = append(operations, "-")
 	}
-	if (MULTIPLICATION & problemType) > 0 {
+	if (mathcore.MULTIPLICATION & problemType) > 0 {
 		operations = append(operations, "*")
 	}
-	if (DIVISION & problemType) > 0 {
+	if (mathcore.DIVISION & problemType) > 0 {
 		operations = append(operations, "/")
 	}
 	if len(operations) == 0 {
@@ -322,23 +323,23 @@ func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numPro
 	// Bit-driven generator config: magnitude bits set the operand
 	// bound, MISSING_NUMBER/CHAINED_OPERATIONS gate the templates, and
 	// MISMATCHED_DENOMINATORS gates unlike-denominator fractions.
-	maxOperand := smallMaxOperand
-	if (MEDIUM_NUMBERS & problemType) > 0 {
-		maxOperand = mediumMaxOperand
+	maxOperand := mathcore.SmallMaxOperand
+	if (mathcore.MEDIUM_NUMBERS & problemType) > 0 {
+		maxOperand = mathcore.MediumMaxOperand
 	}
-	if (LARGE_NUMBERS & problemType) > 0 {
-		maxOperand = LargeMaxOperand
+	if (mathcore.LARGE_NUMBERS & problemType) > 0 {
+		maxOperand = mathcore.LargeMaxOperand
 	}
 	generatorOpts := &heuristic_generator.Options{
 		Operations:       operations,
-		Fractions:        (FRACTIONS & problemType) > 0,
-		Negatives:        (NEGATIVES & problemType) > 0,
+		Fractions:        (mathcore.FRACTIONS & problemType) > 0,
+		Negatives:        (mathcore.NEGATIVES & problemType) > 0,
 		TargetDifficulty: settings.TargetDifficulty,
 		MaxOperand:       maxOperand,
-		AllowMissing:     (MISSING_NUMBER & problemType) > 0,
-		AllowMultiOp:     (CHAINED_OPERATIONS & problemType) > 0,
-		MaxChainLen:      MaxChainLen,
-		SameDenomOnly:    (MISMATCHED_DENOMINATORS & problemType) == 0,
+		AllowMissing:     (mathcore.MISSING_NUMBER & problemType) > 0,
+		AllowMultiOp:     (mathcore.CHAINED_OPERATIONS & problemType) > 0,
+		MaxChainLen:      mathcore.MaxChainLen,
+		SameDenomOnly:    (mathcore.MISMATCHED_DENOMINATORS & problemType) == 0,
 	}
 	funnel := newGenerationFunnel(numProblems)
 	for i := 0; i < numProblems; i++ {
@@ -356,13 +357,13 @@ func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numPro
 		// Heuristic candidates pass the same admission pipeline as LLM
 		// candidates: the generator is trusted to be well-formed, but the
 		// pipeline is the single source of truth for stamping and envelope.
-		adm := AdmitExpression(expr)
+		adm := mathcore.AdmitExpression(expr)
 		if adm.RejectStage != "" {
 			funnel.reject(adm.RejectStage)
 			glog.Infof("%s heuristic reject [%s]: %s (%q)", logPrefix, adm.RejectStage, adm.RejectWhy, expr)
 			continue
 		}
-		if err := verifyAnswerSymbolic(adm.Tokens, answer); err != nil {
+		if err := mathcore.VerifyAnswerSymbolic(adm.Tokens, answer); err != nil {
 			funnel.reject(rejectAnswer)
 			glog.Errorf("%s heuristic answer reject: %v (%q = %q)", logPrefix, err, expr, answer)
 			continue
@@ -372,8 +373,8 @@ func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numPro
 		// settings.ProblemTypeBitmap directly. NormalizeProblemBitmap is a
 		// no-op on the parser's own output (it co-sets these bits already);
 		// applied for uniformity with the WORD path.
-		bitmap := NormalizeProblemBitmap(adm.Bitmap)
-		if v := envelopeViolation(bitmap, uint64(problemType)); v != "" {
+		bitmap := mathcore.NormalizeProblemBitmap(adm.Bitmap)
+		if v := mathcore.EnvelopeViolation(bitmap, uint64(problemType)); v != "" {
 			funnel.reject(rejectEnvelope)
 			glog.Infof("%s heuristic envelope reject [%s]: %q", logPrefix, v, expr)
 			continue
@@ -387,8 +388,8 @@ func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numPro
 		// Stored difficulty is a function of the problem itself, not the
 		// requester's target - the pool is shared across users. The heuristic
 		// only emits symbolic problems, so there is no symbolic_expression.
-		model.Difficulty = ComputeProblemDifficulty(adm.Expr, "")
-		model.DifficultyVersion = DifficultyVersion
+		model.Difficulty = mathcore.ComputeProblemDifficulty(adm.Expr, "")
+		model.DifficultyVersion = mathcore.DifficultyVersion
 		glog.Infof("%s heuristic problem: %s = %s (computed_diff=%g bitmap=%d)", logPrefix, model.Expression, model.Answer, model.Difficulty, model.ProblemTypeBitmap)
 		h := fnv.New32a()
 		h.Write([]byte(model.Expression))
@@ -413,74 +414,6 @@ func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numPro
 	return newProblem, newCount, uniqueIds
 }
 
-// DetectProblemTypeBitmap inspects an expression and returns the bitmap of
-// problem types it contains, mapped from the same parsed features the
-// difficulty formula uses - bits, difficulty, and answers cannot disagree
-// about what an expression means.
-//
-// The prose rule applies: structural bits (operators, unknowns, PEMDAS,
-// SINGLE_VARIABLE) are token-level only; \text{...} contents never fire
-// them. WORD problems' topic bits come from the validator instead. The
-// magnitude bits are SHAPE bits and deliberately read prose numerals (a word
-// problem about 999 apples is a LARGE_NUMBERS problem - multi-digit operands
-// are visually intimidating to the audience regardless of framing), while
-// DECIMALS/PERCENTAGES bits are symbolic-only.
-//
-// Magnitude bits are brackets, not cumulative: 13-99 stamps MEDIUM_NUMBERS,
-// >= 100 stamps LARGE_NUMBERS alone ("1 + 999" is LARGE, not MEDIUM).
-func DetectProblemTypeBitmap(expr string) uint64 {
-	f := parseProblemFeatures(expr)
-	var b ProblemType
-	if f.hasAdd {
-		b |= ADDITION
-	}
-	if f.hasSub {
-		b |= SUBTRACTION
-	}
-	if f.hasMul {
-		b |= MULTIPLICATION
-	}
-	if f.hasDiv {
-		b |= DIVISION
-	}
-	if f.numFractions > 0 {
-		b |= FRACTIONS
-	}
-	if f.hasNegatives {
-		b |= NEGATIVES
-	}
-	if f.isWord {
-		b |= WORD
-	}
-	if f.maxMagnitude > mediumMaxOperand {
-		b |= LARGE_NUMBERS
-	} else if f.maxMagnitude > smallMaxOperand {
-		b |= MEDIUM_NUMBERS
-	}
-	if f.numOps >= 2 {
-		b |= CHAINED_OPERATIONS
-	}
-	if f.hasMissing {
-		b |= MISSING_NUMBER
-	}
-	if f.numFractions >= 2 && !f.sameDenom {
-		b |= MISMATCHED_DENOMINATORS
-	}
-	if f.hasDecimalsSymbolic {
-		b |= DECIMALS
-	}
-	if f.requiresPEMDAS {
-		b |= PEMDAS
-	}
-	if f.hasVariables {
-		b |= SINGLE_VARIABLE
-	}
-	if f.hasPercentSymbolic {
-		b |= PERCENTAGES
-	}
-	return uint64(b)
-}
-
 // generateProblems is the core generation routine used by both the sync
 // request path and the background goroutine. It does NOT take a gin.Context:
 // in the background path we must not share a context with the originating
@@ -495,16 +428,16 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 	}
 	uniqueIds := map[uint32]bool{}
 	newCount := 0
-	inputProblemType := ProblemType(settings.ProblemTypeBitmap)
+	inputProblemType := mathcore.ProblemType(settings.ProblemTypeBitmap)
 	// Try the LLM generator first. It produces richer content (word problems,
 	// varied phrasings) and should be the primary
 	// source for every problem type it can handle. The heuristic generator is
 	// a deterministic, offline fallback for when OpenAI is unreachable or
 	// returns no valid problems.
 	{
-		constraints := BuildBitConstraints(inputProblemType)
+		constraints := mathcore.BuildBitConstraints(inputProblemType)
 		generatorOpts := &llm_generator.Options{
-			Features:         ProblemTypeToFeatures(inputProblemType),
+			Features:         mathcore.ProblemTypeToFeatures(inputProblemType),
 			TargetDifficulty: settings.TargetDifficulty,
 			NumProblems:      numProblems, // we still return just one problem, but this lets us reduce the number of OpenAI calls we need to make
 			Constraints:      constraints,
@@ -516,7 +449,7 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 			// Fall back to heuristic when OpenAI fails. Strip WORD since the
 			// heuristic doesn't produce word problems, and fall back on the
 			// remaining arithmetic types.
-			heuristicType := inputProblemType &^ WORD
+			heuristicType := inputProblemType &^ mathcore.WORD
 			if heuristicType != 0 {
 				glog.Infof("%s OpenAI failed (%v), falling back to heuristic generator", logPrefix, err)
 				newProblem, newCount, uniqueIds = a.runHeuristicGenerator(logPrefix, settings, numProblems, heuristicType)
@@ -534,7 +467,7 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 				// Admission pipeline: normalize -> lex -> rewrite ->
 				// detect -> unknown rules. The LLM's self-reported features
 				// are NOT trusted for stamping.
-				adm := AdmitExpression(p.Expression)
+				adm := mathcore.AdmitExpression(p.Expression)
 				if adm.RejectStage != "" {
 					funnel.reject(adm.RejectStage)
 					glog.Infof("%s LLM reject [%s]: %s (%q)", logPrefix, adm.RejectStage, adm.RejectWhy, p.Expression)
@@ -552,14 +485,14 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 				// one validator round-trip that checks the answer, judges
 				// envelope compliance against the same constraints the
 				// generator saw, and extracts topic features for stamping.
-				if bitmap&uint64(WORD) == 0 {
-					if err := verifyAnswerSymbolic(adm.Tokens, p.Answer); err != nil {
+				if bitmap&uint64(mathcore.WORD) == 0 {
+					if err := mathcore.VerifyAnswerSymbolic(adm.Tokens, p.Answer); err != nil {
 						funnel.reject(rejectAnswer)
 						glog.Infof("%s LLM answer reject: %v (%q = %q)", logPrefix, err, adm.Expr, p.Answer)
 						continue
 					}
 				} else {
-					features, err := llmValidateProblemFn(&p, constraints, ValidatorFeatureNames)
+					features, err := llmValidateProblemFn(&p, constraints, mathcore.ValidatorFeatureNames)
 					if err != nil {
 						funnel.reject(rejectValidator)
 						glog.Infof("%s LLM validator reject: %v", logPrefix, err)
@@ -568,19 +501,19 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 					// Validator-extracted topic bits stamp the WORD problem;
 					// parser-derived shape bits (magnitude, chained, word)
 					// are already in the bitmap.
-					bitmap |= uint64(FeaturesToProblemType(features))
+					bitmap |= uint64(mathcore.FeaturesToProblemType(features))
 
 					// The symbolic_expression is the bare computation the word
 					// problem asks for; its difficulty is scored from this. Trust
 					// it only after it lexes and evaluates to the stated answer.
 					if p.SymbolicExpression != "" {
-						admSym := AdmitExpression(p.SymbolicExpression)
+						admSym := mathcore.AdmitExpression(p.SymbolicExpression)
 						if admSym.RejectStage != "" {
 							funnel.reject(admSym.RejectStage)
 							glog.Infof("%s LLM symbolic_expression reject [%s]: %q", logPrefix, admSym.RejectStage, p.SymbolicExpression)
 							continue
 						}
-						if err := verifyAnswerSymbolic(admSym.Tokens, p.Answer); err != nil {
+						if err := mathcore.VerifyAnswerSymbolic(admSym.Tokens, p.Answer); err != nil {
 							funnel.reject(rejectAnswer)
 							glog.Infof("%s LLM symbolic_expression answer reject: %v (%q = %q)", logPrefix, err, admSym.Expr, p.Answer)
 							continue
@@ -600,10 +533,10 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 				// a multi-step problem the validator under-reported is both
 				// stamped correctly AND correctly rejected for a user who
 				// can't have it (#246).
-				bitmap = NormalizeProblemBitmap(bitmap)
+				bitmap = mathcore.NormalizeProblemBitmap(bitmap)
 
 				// Envelope: every stamped bit must be enabled for this user.
-				if v := envelopeViolation(bitmap, settings.ProblemTypeBitmap); v != "" {
+				if v := mathcore.EnvelopeViolation(bitmap, settings.ProblemTypeBitmap); v != "" {
 					funnel.reject(rejectEnvelope)
 					glog.Infof("%s LLM envelope reject [%s]: %q", logPrefix, v, adm.Expr)
 					continue
@@ -622,8 +555,8 @@ func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems
 				model.Explanation = RewriteLetterInProse(p.Explanation, adm.RewroteLetter)
 				// Computed difficulty only; LLM self-report is debug logging. A
 				// word problem is scored from its symbolic_expression.
-				model.Difficulty = ComputeProblemDifficulty(adm.Expr, symbolicExpr)
-				model.DifficultyVersion = DifficultyVersion
+				model.Difficulty = mathcore.ComputeProblemDifficulty(adm.Expr, symbolicExpr)
+				model.DifficultyVersion = mathcore.DifficultyVersion
 				glog.Infof("%s LLM problem: %s computed_diff=%g bitmap=%d (LLM raw=%g)", logPrefix, model.Expression, model.Difficulty, model.ProblemTypeBitmap, p.Difficulty)
 
 				// Use expression hash as model.Id

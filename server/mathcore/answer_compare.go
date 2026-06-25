@@ -1,5 +1,6 @@
-// Package api contains api routes, handlers, and models
-package api
+// answer_compare.go: math-equivalence comparison of answer strings.
+
+package mathcore
 
 import (
 	"math/big"

@@ -141,7 +141,7 @@ now-easy review is still a meaningful retest. The subset clause matches the Stag
 
 - **Magnitude bits never get topic stats.** `recordTopicAttempt`, `initTopicStats`, and
   `chooseWeightedTopic` all skip bits outside `WEIGHTED_TOPIC_MASK` (= all bits except the magnitude
-  bits, `enums.go`). Magnitude IS difficulty, so "weak at LARGE_NUMBERS → serve large numbers,
+  bits, `problem_type.go`). Magnitude IS difficulty, so "weak at LARGE_NUMBERS → serve large numbers,
   easier" fights itself; size progression is `target_difficulty`'s job. The three sites must agree,
   or a seeded magnitude row would feed `getEffectiveDifficulty` a meaningless per-topic difficulty.
 - **No difficulty lever exceeds the envelope ceiling.** Both `SET_TARGET_DIFFICULTY` validation
@@ -178,9 +178,10 @@ now-easy review is still a meaningful retest. The subset clause matches the Stag
 - `server/api/topic_stats.go` — `topic_stats` CRUD, `adjustTopicDifficulty`, `chooseWeightedTopic`,
   `getEffectiveDifficulty`, `initTopicStats`.
 - `server/api/spaced_repetition.go` — `addToReviewQueue`, `advanceReviewQueue`, `getDueReviewProblem`.
-- `server/api/difficulty.go` — `MinTargetDifficulty`; `MaxDiffForBitmap` (the ceiling) and the
-  formula are owned by problem-generation.md.
-- `server/api/enums.go` — `WEIGHTED_TOPIC_MASK`.
+- `server/mathcore/difficulty.go` — `MinTargetDifficulty`; `MaxDiffForBitmap` (the ceiling) and the
+  formula are owned by problem-generation.md. (The formula kernel now lives in the shared
+  `server/mathcore` package; `process_events.go`/`topic_stats.go` import it.)
+- `server/mathcore/problem_type.go` — `WEIGHTED_TOPIC_MASK`.
 - `server/api/generate_problems.go` — `selectProblem` (caller), `problemSelectionEpsilon`.
 - `server/api/pool_supply.go` — `thinPoolBoost`, `thinPoolBoostMax`.
 - `web/src/bitmap_validation.js` — `MIN_TARGET_DIFFICULTY` slider mirror.

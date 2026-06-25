@@ -34,9 +34,13 @@ Each user has two controls:
 A problem is served to a user iff its stamped bits are a **subset** of the
 user's bitmap (plus the difficulty window and disabled/zero-bitmap filters).
 
-The bit enum, its 1:1 name map, and `ALL_PROBLEM_TYPES` live in
-`server/api/enums.go` (`ProblemType` iota block, `problemTypeNames`); the
-inventory is pinned by the `bits` anchor above.
+The math kernel — lexer, evaluator, bit inventory + detection, difficulty
+formula + ceiling, and the admission pipeline (minus the DB insert) — lives in
+the leaf package `server/mathcore`, which both `api` and the generator packages
+import (it imports neither, breaking the cycle that would otherwise force a
+second evaluator). The bit enum, its 1:1 name map, and `ALL_PROBLEM_TYPES` live
+in `server/mathcore/problem_type.go` (`ProblemType` iota block, `problemTypeNames`);
+the inventory is pinned by the `bits` anchor above.
 
 ## Bit reference
 
@@ -66,10 +70,10 @@ concern. Users compose their envelope directly.
 | `PERCENTAGES` | symbolic `n%` token (evaluates as n/100) | `conceptPercent` |
 
 The factor constants (`concept*`/`weight*`/`structure*`) live in
-`server/api/difficulty.go`; their numeric values are owned by
+`server/mathcore/difficulty.go`; their numeric values are owned by
 `TestComputeProblemDifficulty_ReferenceValues` (difficulty_test.go), not this
-doc. Magnitude brackets are `smallMaxOperand` (≤12, default) /
-`mediumMaxOperand` (99) / `LargeMaxOperand` (9999) in the same file. Defaults
+doc. Magnitude brackets are `SmallMaxOperand` (≤12, default) /
+`MediumMaxOperand` (99) / `LargeMaxOperand` (9999) in the same file. Defaults
 (no bit needed): max operand ≤ 12, single operation. `maxMagnitude` is
 **digit-based for decimals** (`0.75` counts as 75) — for stamping, difficulty,
 and ceiling alike: magnitude bits mean digit complexity, universally
@@ -100,7 +104,7 @@ SINGLE_VARIABLE.
 and ceiling computation — all three sites, always together): at most ONE
 distinct unknown per problem; `?` may appear at most once (multi-`?` is
 ambiguous/multi-answer); an unknown requires an equation
-(`CountDistinctUnknowns`, `expression.go`; `verifyAnswerSymbolic`,
+(`CountDistinctUnknowns`, `expression.go`; `VerifyAnswerSymbolic`,
 `stamping.go`).
 
 **Settings-level dependency rules** (`web/src/bitmap_validation.js`,
@@ -110,8 +114,8 @@ PEMDAS ⇒ CHAINED.
 
 ## The insert (admission) pipeline
 
-`api.AdmitExpression` (server/api/stamping.go) — both generator paths and
-the backfill run the same stages:
+`mathcore.AdmitExpression` (server/mathcore/stamping.go) — both generator paths
+and the backfill run the same stages:
 
 ```
 [0]   NORMALIZE   \times,\cdot -> *   \div -> /   \frac{a}{b} -> a/b
@@ -132,9 +136,9 @@ the backfill run the same stages:
 ```
 
 `NormalizeExpression`/`LexExpression`/`RewriteLoneVariable` live in
-`expression.go`; `DetectProblemTypeBitmap` in `generate_problems.go` (the
-selection area); the answer ([3]) and envelope ([3.5]) checks in `stamping.go`
-(`verifyAnswerSymbolic`, `envelopeViolation`).
+`mathcore/expression.go`; `DetectProblemTypeBitmap` and the answer ([3]) and
+envelope ([3.5]) checks (`VerifyAnswerSymbolic`, `EnvelopeViolation`) in
+`mathcore/stamping.go`.
 
 Storage keeps the **original notation** (`\frac{1}{2}`, `\times` render
 through KaTeX); normalization is a parsing concern. Only the stage-1.5 `?`
@@ -142,8 +146,8 @@ splice mutates stored text (`Admission.Expr`; `spliceLoneLetterRaw` recovers
 the splice point in un-normalized text, falling back to the normalized form
 on dialect ambiguity).
 
-**Stamp-time structural invariant.** `NormalizeProblemBitmap` (`stamping.go`)
-OR's in implied bits at every final stamp site: ≥2 distinct core ops or PEMDAS
+**Stamp-time structural invariant.** `NormalizeProblemBitmap`
+(`mathcore/stamping.go`) OR's in implied bits at every final stamp site: ≥2 distinct core ops or PEMDAS
 ⇒ CHAINED_OPERATIONS; MISMATCHED ⇒ FRACTIONS. It only ever NARROWS the
 serving audience. It exists because the WORD validator reports topic features
 as independent items and can omit an implied one; the parser path co-sets them
@@ -151,7 +155,8 @@ from the token stream and never needs it.
 
 Every drop is counted in a per-call funnel line (#230):
 `funnel: requested= returned= lexer= unknown_rules= collision= answer= envelope= validator= create= inserted=`
-(`generationFunnel.String`, `stamping.go`).
+(`generationFunnel.String`, `api/generation_funnel.go`; the `lexer`/`unknown_rules` stages
+are the ones `mathcore.AdmitExpression` produces).
 
 ## Local-first validation
 
@@ -188,7 +193,7 @@ function of the expression because the recompute fast-path depends on that.
 ## Difficulty formula (v0.3) and ceiling
 
 `ComputeProblemDifficulty(expression, symbolic_expression)`
-(server/api/difficulty.go); the version string is `DifficultyVersion`
+(server/mathcore/difficulty.go); the version string is `DifficultyVersion`
 (pinned by the anchor and tracked in
 [generator-versions.md](generator-versions.md)):
 
@@ -259,7 +264,7 @@ envelope populates (mirrored as `MIN_TARGET_DIFFICULTY` in
 - Index: `(disabled, difficulty, problem_type_bitmap)` — the trailing bitmap
   column makes the subset filter covering (plans in the comment block of
   `migrations/39.sql`).
-- **`WEIGHTED_TOPIC_MASK`** (`enums.go`) = all bits except MEDIUM/LARGE_NUMBERS.
+- **`WEIGHTED_TOPIC_MASK`** (`problem_type.go`) = all bits except MEDIUM/LARGE_NUMBERS.
   Gates `chooseWeightedTopic`, `recordTopicAttempt`, `initTopicStats`: a bit is
   a practice topic iff per-topic difficulty coheres for it; magnitude IS
   difficulty, so "weak at LARGE_NUMBERS → serve large numbers, easier"
@@ -275,7 +280,7 @@ are the generation-relevant surface.)
 
 ## Generation
 
-- **Prompt** (`api.BuildBitConstraints`, `server/api/prompt_guidance.go`):
+- **Prompt** (`mathcore.BuildBitConstraints`, `server/mathcore/prompt_guidance.go`):
   per-bit MAY/MUST NOT pairs, a 3-state magnitude clause, a 2-state chain
   clause, the unknown rules whenever MISSING/SINGLE_VARIABLE is enabled, and
   the closed-world clause ("use ONLY what is explicitly allowed — no square
@@ -342,9 +347,9 @@ walks these touchpoints. The blocked-by-default design (closed-world prompt +
 lexer allowlist) protects the system between additions — a new concept is
 forbidden until deliberately added.
 
-1. Constant in `server/api/enums.go` + `problemTypeNames` entry — feature-named, not subject-named.
+1. Constant in `server/mathcore/problem_type.go` + `problemTypeNames` entry — feature-named, not subject-named.
 2. Frontend constant in `web/src/enums.js`.
-3. Lexer token(s) for new notation (`server/api/expression.go` — the alphabet is the single source of truth).
+3. Lexer token(s) for new notation (`server/mathcore/expression.go` — the alphabet is the single source of truth).
 4. Normalizer synonyms for LaTeX/unicode dialect forms (`normalizeReplacer`).
 5. `parseProblemFeatures` field + detection logic (token-level; the prose rule applies).
 6. `DetectProblemTypeBitmap` mapping line.
@@ -361,11 +366,13 @@ forbidden until deliberately added.
 
 ## Related files
 
-- `server/api/enums.go` — `ProblemType` bits, `problemTypeNames`, `ALL_PROBLEM_TYPES`, `WEIGHTED_TOPIC_MASK`
-- `server/api/expression.go` — `NormalizeExpression`, `LexExpression`, `RewriteLoneVariable`, `CountDistinctUnknowns`, `lexNumber`
-- `server/api/evaluator.go` — `EvalTokens`, `EvalTokensNaiveLTR`, `requiresPEMDAS`, `pemdasProbes`
-- `server/api/stamping.go` — `AdmitExpression`, `NormalizeProblemBitmap`, `verifyAnswerSymbolic`, `envelopeViolation`, `generationFunnel`
-- `server/api/difficulty.go` — `ComputeProblemDifficulty`, `ComputeDifficultyBreakdownFor`, `computeBreakdown`, `compressRaw`, `MaxDiffForBitmap`, the `concept*`/`weight*`/`structure*` constants, `DifficultyVersion`, `MaxChainLen`, `LargeMaxOperand`
-- `server/api/generate_problems.go` — `DetectProblemTypeBitmap`
+- `server/mathcore/problem_type.go` — `ProblemType` bits, `problemTypeNames`, `ALL_PROBLEM_TYPES`, `WEIGHTED_TOPIC_MASK`
+- `server/mathcore/expression.go` — `NormalizeExpression`, `LexExpression`, `RewriteLoneVariable`, `CountDistinctUnknowns`, `lexNumber`
+- `server/mathcore/evaluator.go` — `EvalTokens`, `EvalTokensNaiveLTR`, `requiresPEMDAS`, `pemdasProbes`
+- `server/mathcore/stamping.go` — `AdmitExpression`, `DetectProblemTypeBitmap`, `NormalizeProblemBitmap`, `VerifyAnswerSymbolic`, `EnvelopeViolation`
+- `server/mathcore/difficulty.go` — `ComputeProblemDifficulty`, `ComputeDifficultyBreakdownFor`, `computeBreakdown`, `compressRaw`, `MaxDiffForBitmap`, the `concept*`/`weight*`/`structure*` constants, `DifficultyVersion`, `MaxChainLen`, `LargeMaxOperand`, `SmallMaxOperand`, `MediumMaxOperand`
+- `server/mathcore/prompt_guidance.go` — `BuildBitConstraints`, `ValidatorFeatureNames`
+- `server/mathcore/answer_compare.go` — `AnswersEquivalent`
+- `server/api/generation_funnel.go` — `generationFunnel`, `VerifyAnswer`, `RewriteLetterInProse` (api-side admission bookkeeping)
 - `server/generator` — `GenerateProblem`, `configFromBitOptions`, `withinMaxOperand`, templates
 - `server/llm_generator` — `GenerateProblem`, `ValidateWordProblem`, `PROMPT_QUESTION`, `PROMPT_VALIDATION_WORD`, `PROMPT_VALIDATION_FORM`

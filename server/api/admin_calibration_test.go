@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"garydmenezes.com/mathgame/server/common"
+	"garydmenezes.com/mathgame/server/mathcore"
 )
 
 func seedCalibrationProblems(t *testing.T, api *Api) {
@@ -23,14 +24,14 @@ func seedCalibrationProblems(t *testing.T, api *Api) {
 	}
 	// Two live + one disabled in bucket 7; one live in bucket 12; a tail scorer
 	// in bucket 25; and bucket 6 with two same-bitmap rows + one other.
-	seed(111, "3 + 4", 7.2, 0, "llm_0.3", uint64(ADDITION))
-	seed(222, `5 \times 6`, 7.4, 0, "heuristic_1.0", uint64(MULTIPLICATION))
-	seed(333, "9 - 1", 7.1, 1, "llm_0.1", uint64(SUBTRACTION))
-	seed(444, "8 + 8 + 8", 12.0, 0, "llm_0.3", uint64(ADDITION|CHAINED_OPERATIONS))
-	seed(555, "12x + 7 = 199", 25.2, 0, "llm_0.3", uint64(SINGLE_VARIABLE|MISSING_NUMBER))
-	seed(601, "1 + 2", 6.1, 0, "llm_0.3", uint64(ADDITION))
-	seed(602, "2 + 1", 6.2, 0, "llm_0.3", uint64(ADDITION))
-	seed(603, "9 - 4", 6.3, 0, "llm_0.3", uint64(SUBTRACTION))
+	seed(111, "3 + 4", 7.2, 0, "llm_0.3", uint64(mathcore.ADDITION))
+	seed(222, `5 \times 6`, 7.4, 0, "heuristic_1.0", uint64(mathcore.MULTIPLICATION))
+	seed(333, "9 - 1", 7.1, 1, "llm_0.1", uint64(mathcore.SUBTRACTION))
+	seed(444, "8 + 8 + 8", 12.0, 0, "llm_0.3", uint64(mathcore.ADDITION|mathcore.CHAINED_OPERATIONS))
+	seed(555, "12x + 7 = 199", 25.2, 0, "llm_0.3", uint64(mathcore.SINGLE_VARIABLE|mathcore.MISSING_NUMBER))
+	seed(601, "1 + 2", 6.1, 0, "llm_0.3", uint64(mathcore.ADDITION))
+	seed(602, "2 + 1", 6.2, 0, "llm_0.3", uint64(mathcore.ADDITION))
+	seed(603, "9 - 4", 6.3, 0, "llm_0.3", uint64(mathcore.SUBTRACTION))
 }
 
 // TestComputeCalibrationReport verifies the report computation: buckets span the
@@ -95,8 +96,9 @@ func TestComputeCalibrationReport(t *testing.T) {
 	if mulGroup.LiveCount != 1 || len(mulGroup.Problems) != 1 {
 		t.Fatalf("heuristic_1.0 group: expected 1 live / 1 example, got %d / %d", mulGroup.LiveCount, len(mulGroup.Problems))
 	}
-	if p := mulGroup.Problems[0]; p.Expression != `5 \times 6` || p.Breakdown.OpWeight != weightMul {
-		t.Errorf("heuristic_1.0 example: expr %q opWeight %.2f, want %q / %.2f", p.Expression, p.Breakdown.OpWeight, `5 \times 6`, weightMul)
+	wantOpWeight := mathcore.ComputeDifficultyBreakdown(`5 \times 6`).OpWeight
+	if p := mulGroup.Problems[0]; p.Expression != `5 \times 6` || p.Breakdown.OpWeight != wantOpWeight {
+		t.Errorf("heuristic_1.0 example: expr %q opWeight %.2f, want %q / %.2f", p.Expression, p.Breakdown.OpWeight, `5 \times 6`, wantOpWeight)
 	}
 
 	// Bucket 6, llm_0.3: 3 live but 2 distinct bitmaps → 2 examples.

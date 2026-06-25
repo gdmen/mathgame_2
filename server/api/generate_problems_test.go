@@ -11,6 +11,7 @@ import (
 
 	"garydmenezes.com/mathgame/server/common"
 	"garydmenezes.com/mathgame/server/llm_generator"
+	"garydmenezes.com/mathgame/server/mathcore"
 )
 
 // TestGenerateProblemsBackground_DedupPerUser: 10 concurrent calls for one user run exactly once.
@@ -161,7 +162,7 @@ func TestGenerateProblems_LLM_HappyPath(t *testing.T) {
 
 	settings := &Settings{
 		UserId:            1,
-		ProblemTypeBitmap: uint64(ADDITION),
+		ProblemTypeBitmap: uint64(mathcore.ADDITION),
 		TargetDifficulty:  5,
 	}
 	problem, err := api.generateProblems("[test-llm-happy]", settings, 1)
@@ -188,11 +189,11 @@ func TestGenerateProblems_LLM_HappyPath(t *testing.T) {
 	if persisted.Generator != llm_generator.VERSION {
 		t.Errorf("Generator = %q, want %q", persisted.Generator, llm_generator.VERSION)
 	}
-	if persisted.ProblemTypeBitmap != uint64(ADDITION) {
-		t.Errorf("ProblemTypeBitmap = %d, want %d", persisted.ProblemTypeBitmap, uint64(ADDITION))
+	if persisted.ProblemTypeBitmap != uint64(mathcore.ADDITION) {
+		t.Errorf("ProblemTypeBitmap = %d, want %d", persisted.ProblemTypeBitmap, uint64(mathcore.ADDITION))
 	}
-	if persisted.DifficultyVersion != DifficultyVersion {
-		t.Errorf("DifficultyVersion = %q, want %q", persisted.DifficultyVersion, DifficultyVersion)
+	if persisted.DifficultyVersion != mathcore.DifficultyVersion {
+		t.Errorf("DifficultyVersion = %q, want %q", persisted.DifficultyVersion, mathcore.DifficultyVersion)
 	}
 }
 
@@ -216,7 +217,7 @@ func TestGenerateProblems_LLM_IdCollisionSkipped(t *testing.T) {
 	h.Write([]byte(canned.Expression))
 	existing := &Problem{
 		Id:                h.Sum32(),
-		ProblemTypeBitmap: uint64(ADDITION),
+		ProblemTypeBitmap: uint64(mathcore.ADDITION),
 		Expression:        canned.Expression,
 		Answer:            "1000",
 		Difficulty:        5,
@@ -230,7 +231,7 @@ func TestGenerateProblems_LLM_IdCollisionSkipped(t *testing.T) {
 
 	settings := &Settings{
 		UserId:            1,
-		ProblemTypeBitmap: uint64(ADDITION),
+		ProblemTypeBitmap: uint64(mathcore.ADDITION),
 		TargetDifficulty:  5,
 	}
 	_, err = api.generateProblems("[test-llm-collision]", settings, 1)
@@ -265,7 +266,7 @@ func TestGenerateProblems_LLM_ValidationReject(t *testing.T) {
 
 	settings := &Settings{
 		UserId:            1,
-		ProblemTypeBitmap: uint64(ADDITION),
+		ProblemTypeBitmap: uint64(mathcore.ADDITION),
 		TargetDifficulty:  5,
 	}
 	_, err = api.generateProblems("[test-llm-validate-reject]", settings, 1)
@@ -300,7 +301,7 @@ func TestGenerateProblems_LLM_CalibrationReject(t *testing.T) {
 
 	settings := &Settings{
 		UserId:            1,
-		ProblemTypeBitmap: uint64(ADDITION),
+		ProblemTypeBitmap: uint64(mathcore.ADDITION),
 		TargetDifficulty:  5,
 	}
 	_, err = api.generateProblems("[test-llm-calibration]", settings, 1)
@@ -331,7 +332,7 @@ func TestGenerateProblems_LLM_FallbackToHeuristic(t *testing.T) {
 
 	settings := &Settings{
 		UserId:            1,
-		ProblemTypeBitmap: uint64(ADDITION | WORD), // WORD will be stripped on fallback
+		ProblemTypeBitmap: uint64(mathcore.ADDITION | mathcore.WORD),
 		TargetDifficulty:  5,
 	}
 	problem, err := api.generateProblems("[test-llm-fallback]", settings, 1)
@@ -363,12 +364,12 @@ func TestRunHeuristicGenerator_StampsDifficultyVersion(t *testing.T) {
 		UserId:           1,
 		TargetDifficulty: 5,
 	}
-	problem, count, _ := api.runHeuristicGenerator("[test-difficulty-version]", settings, 1, ADDITION)
+	problem, count, _ := api.runHeuristicGenerator("[test-difficulty-version]", settings, 1, mathcore.ADDITION)
 	if count == 0 || problem == nil {
 		t.Fatalf("expected one heuristic problem, got count=%d problem=%v", count, problem)
 	}
-	if problem.DifficultyVersion != DifficultyVersion {
-		t.Errorf("returned model: DifficultyVersion = %q, want %q", problem.DifficultyVersion, DifficultyVersion)
+	if problem.DifficultyVersion != mathcore.DifficultyVersion {
+		t.Errorf("returned model: DifficultyVersion = %q, want %q", problem.DifficultyVersion, mathcore.DifficultyVersion)
 	}
 
 	// Persisted row should also carry the stamp (catches a regression where
@@ -377,8 +378,8 @@ func TestRunHeuristicGenerator_StampsDifficultyVersion(t *testing.T) {
 	if err != nil || status != 200 {
 		t.Fatalf("re-fetch problem id=%d: status=%d err=%v", problem.Id, status, err)
 	}
-	if persisted.DifficultyVersion != DifficultyVersion {
-		t.Errorf("persisted row: DifficultyVersion = %q, want %q", persisted.DifficultyVersion, DifficultyVersion)
+	if persisted.DifficultyVersion != mathcore.DifficultyVersion {
+		t.Errorf("persisted row: DifficultyVersion = %q, want %q", persisted.DifficultyVersion, mathcore.DifficultyVersion)
 	}
 }
 
@@ -401,18 +402,18 @@ func TestGenerateProblems_WordPath(t *testing.T) {
 
 	settings := &Settings{
 		UserId:            1,
-		ProblemTypeBitmap: uint64(SUBTRACTION | WORD),
+		ProblemTypeBitmap: uint64(mathcore.SUBTRACTION | mathcore.WORD),
 		TargetDifficulty:  6,
 	}
 	problem, err := api.generateProblems("[test-word-path]", settings, 1)
 	if err != nil {
 		t.Fatalf("generateProblems: %v", err)
 	}
-	want := uint64(WORD | SUBTRACTION)
+	want := uint64(mathcore.WORD | mathcore.SUBTRACTION)
 	if problem.ProblemTypeBitmap != want {
 		t.Errorf("bitmap = %d (%v), want %d (parser WORD + validator subtraction)",
 			problem.ProblemTypeBitmap,
-			ProblemTypeToFeatures(ProblemType(problem.ProblemTypeBitmap)), want)
+			mathcore.ProblemTypeToFeatures(mathcore.ProblemType(problem.ProblemTypeBitmap)), want)
 	}
 	if problem.Expression != p.Expression {
 		t.Errorf("word expression mutated: %q", problem.Expression)
@@ -441,7 +442,7 @@ func TestGenerateProblems_WordPath_SymbolicExpression(t *testing.T) {
 
 	settings := &Settings{
 		UserId:            1,
-		ProblemTypeBitmap: uint64(DIVISION | WORD | MEDIUM_NUMBERS | LARGE_NUMBERS | CHAINED_OPERATIONS),
+		ProblemTypeBitmap: uint64(mathcore.DIVISION | mathcore.WORD | mathcore.MEDIUM_NUMBERS | mathcore.LARGE_NUMBERS | mathcore.CHAINED_OPERATIONS),
 		TargetDifficulty:  20,
 	}
 	problem, err := api.generateProblems("[test-word-symbolic]", settings, 1)
@@ -452,14 +453,14 @@ func TestGenerateProblems_WordPath_SymbolicExpression(t *testing.T) {
 	if problem.Expression != p.Expression {
 		t.Errorf("word expression mutated: %q", problem.Expression)
 	}
-	if want := AdmitExpression(p.SymbolicExpression).Expr; problem.SymbolicExpression != want {
+	if want := mathcore.AdmitExpression(p.SymbolicExpression).Expr; problem.SymbolicExpression != want {
 		t.Errorf("symbolic_expression = %q, want %q", problem.SymbolicExpression, want)
 	}
 	// The form's shape bits are folded in alongside the validator's WORD/DIVISION.
-	for _, bit := range []ProblemType{WORD, DIVISION, LARGE_NUMBERS, CHAINED_OPERATIONS} {
+	for _, bit := range []mathcore.ProblemType{mathcore.WORD, mathcore.DIVISION, mathcore.LARGE_NUMBERS, mathcore.CHAINED_OPERATIONS} {
 		if problem.ProblemTypeBitmap&uint64(bit) == 0 {
 			t.Errorf("bitmap %d (%v) missing %v from the symbolic form",
-				problem.ProblemTypeBitmap, ProblemTypeToFeatures(ProblemType(problem.ProblemTypeBitmap)), bit)
+				problem.ProblemTypeBitmap, mathcore.ProblemTypeToFeatures(mathcore.ProblemType(problem.ProblemTypeBitmap)), bit)
 		}
 	}
 	// Scored from the form (~21), not the prose (~12 as addition).
@@ -493,16 +494,16 @@ func TestGenerateProblems_WordProseOnlyFeatures(t *testing.T) {
 			expr:     `\text{Solve for x: 3x + 7 = 22}`,
 			answer:   "5",
 			features: []string{"single_variable", "word"},
-			want:     uint64(SINGLE_VARIABLE | WORD | MEDIUM_NUMBERS), // 22 in prose -> MEDIUM
-			bit:      uint64(SINGLE_VARIABLE),
+			want:     uint64(mathcore.SINGLE_VARIABLE | mathcore.WORD | mathcore.MEDIUM_NUMBERS),
+			bit:      uint64(mathcore.SINGLE_VARIABLE),
 		},
 		{
 			name:     "prose mismatched denominators",
 			expr:     `\text{Tom ate 1/2 of a pizza and Jane ate 1/3 of it. How much did they eat together?}`,
 			answer:   "5/6",
 			features: []string{"fractions", "mismatched_denominators", "addition", "word"},
-			want:     uint64(FRACTIONS | MISMATCHED_DENOMINATORS | ADDITION | WORD),
-			bit:      uint64(MISMATCHED_DENOMINATORS),
+			want:     uint64(mathcore.FRACTIONS | mathcore.MISMATCHED_DENOMINATORS | mathcore.ADDITION | mathcore.WORD),
+			bit:      uint64(mathcore.MISMATCHED_DENOMINATORS),
 		},
 	}
 	for _, tc := range cases {
@@ -525,7 +526,7 @@ func TestGenerateProblems_WordProseOnlyFeatures(t *testing.T) {
 			if problem.ProblemTypeBitmap != tc.want {
 				t.Errorf("bitmap = %d (%v), want %d",
 					problem.ProblemTypeBitmap,
-					ProblemTypeToFeatures(ProblemType(problem.ProblemTypeBitmap)), tc.want)
+					mathcore.ProblemTypeToFeatures(mathcore.ProblemType(problem.ProblemTypeBitmap)), tc.want)
 			}
 
 			// The same problem must NOT reach an envelope missing the bit.
@@ -557,22 +558,22 @@ func TestGenerateProblems_WordMultiStep(t *testing.T) {
 
 	settings := &Settings{
 		UserId:            1,
-		ProblemTypeBitmap: uint64(MULTIPLICATION | SUBTRACTION | CHAINED_OPERATIONS | WORD),
+		ProblemTypeBitmap: uint64(mathcore.MULTIPLICATION | mathcore.SUBTRACTION | mathcore.CHAINED_OPERATIONS | mathcore.WORD),
 		TargetDifficulty:  6,
 	}
 	problem, err := api.generateProblems("[test-word-multistep]", settings, 1)
 	if err != nil {
 		t.Fatalf("generateProblems: %v", err)
 	}
-	want := uint64(MULTIPLICATION | SUBTRACTION | CHAINED_OPERATIONS | WORD)
+	want := uint64(mathcore.MULTIPLICATION | mathcore.SUBTRACTION | mathcore.CHAINED_OPERATIONS | mathcore.WORD)
 	if problem.ProblemTypeBitmap != want {
 		t.Errorf("bitmap = %d (%v), want %d (validator chained_operations must stamp)",
 			problem.ProblemTypeBitmap,
-			ProblemTypeToFeatures(ProblemType(problem.ProblemTypeBitmap)), want)
+			mathcore.ProblemTypeToFeatures(mathcore.ProblemType(problem.ProblemTypeBitmap)), want)
 	}
 
 	// The same problem must NOT reach a multi-step-off envelope.
-	settings.ProblemTypeBitmap = uint64(MULTIPLICATION | SUBTRACTION | WORD)
+	settings.ProblemTypeBitmap = uint64(mathcore.MULTIPLICATION | mathcore.SUBTRACTION | mathcore.WORD)
 	if got, err := api.generateProblems("[test-word-multistep-reject]", settings, 1); err == nil {
 		t.Fatalf("expected envelope reject for multi-step-off user, got %v", got)
 	}
@@ -599,22 +600,22 @@ func TestGenerateProblems_WordMultiStep_ValidatorOmitsChained(t *testing.T) {
 
 	settings := &Settings{
 		UserId:            1,
-		ProblemTypeBitmap: uint64(MULTIPLICATION | SUBTRACTION | CHAINED_OPERATIONS | WORD),
+		ProblemTypeBitmap: uint64(mathcore.MULTIPLICATION | mathcore.SUBTRACTION | mathcore.CHAINED_OPERATIONS | mathcore.WORD),
 		TargetDifficulty:  6,
 	}
 	problem, err := api.generateProblems("[test-word-omits-chained]", settings, 1)
 	if err != nil {
 		t.Fatalf("generateProblems: %v", err)
 	}
-	if problem.ProblemTypeBitmap&uint64(CHAINED_OPERATIONS) == 0 {
+	if problem.ProblemTypeBitmap&uint64(mathcore.CHAINED_OPERATIONS) == 0 {
 		t.Errorf("bitmap = %d (%v): invariant must OR in CHAINED despite validator omitting it",
 			problem.ProblemTypeBitmap,
-			ProblemTypeToFeatures(ProblemType(problem.ProblemTypeBitmap)))
+			mathcore.ProblemTypeToFeatures(mathcore.ProblemType(problem.ProblemTypeBitmap)))
 	}
 
 	// And it must reject for a multi-step-off user, even though the validator
 	// never reported chained.
-	settings.ProblemTypeBitmap = uint64(MULTIPLICATION | SUBTRACTION | WORD)
+	settings.ProblemTypeBitmap = uint64(mathcore.MULTIPLICATION | mathcore.SUBTRACTION | mathcore.WORD)
 	if got, err := api.generateProblems("[test-word-omits-chained-reject]", settings, 1); err == nil {
 		t.Fatalf("expected envelope reject for multi-step-off user, got %v", got)
 	}
@@ -639,7 +640,7 @@ func TestGenerateProblems_WordEnvelopeReject(t *testing.T) {
 
 	settings := &Settings{
 		UserId:            1,
-		ProblemTypeBitmap: uint64(MULTIPLICATION | WORD), // no DECIMALS
+		ProblemTypeBitmap: uint64(mathcore.MULTIPLICATION | mathcore.WORD),
 		TargetDifficulty:  6,
 	}
 	if got, err := api.generateProblems("[test-word-envelope]", settings, 1); err == nil {
@@ -665,7 +666,7 @@ func TestGenerateProblems_RewriteConsistency(t *testing.T) {
 
 	settings := &Settings{
 		UserId:            1,
-		ProblemTypeBitmap: uint64(SUBTRACTION | MISSING_NUMBER),
+		ProblemTypeBitmap: uint64(mathcore.SUBTRACTION | mathcore.MISSING_NUMBER),
 		TargetDifficulty:  6,
 	}
 	problem, err := api.generateProblems("[test-rewrite]", settings, 1)
@@ -678,7 +679,7 @@ func TestGenerateProblems_RewriteConsistency(t *testing.T) {
 	if problem.Explanation != `\text{? is 7 because 12 - 7 = 5}` {
 		t.Errorf("explanation letter not substituted: %q", problem.Explanation)
 	}
-	if problem.ProblemTypeBitmap != uint64(SUBTRACTION|MISSING_NUMBER) {
+	if problem.ProblemTypeBitmap != uint64(mathcore.SUBTRACTION|mathcore.MISSING_NUMBER) {
 		t.Errorf("bitmap = %d", problem.ProblemTypeBitmap)
 	}
 }
@@ -700,7 +701,7 @@ func TestGenerateProblems_PreservesLatexNotation(t *testing.T) {
 
 	settings := &Settings{
 		UserId:            1,
-		ProblemTypeBitmap: uint64(ADDITION | FRACTIONS | MISMATCHED_DENOMINATORS),
+		ProblemTypeBitmap: uint64(mathcore.ADDITION | mathcore.FRACTIONS | mathcore.MISMATCHED_DENOMINATORS),
 		TargetDifficulty:  6,
 	}
 	problem, err := api.generateProblems("[test-latex]", settings, 1)
@@ -710,7 +711,7 @@ func TestGenerateProblems_PreservesLatexNotation(t *testing.T) {
 	if problem.Expression != p.Expression {
 		t.Errorf("stored expression = %q, want original LaTeX preserved", problem.Expression)
 	}
-	want := uint64(ADDITION | FRACTIONS | MISMATCHED_DENOMINATORS)
+	want := uint64(mathcore.ADDITION | mathcore.FRACTIONS | mathcore.MISMATCHED_DENOMINATORS)
 	if problem.ProblemTypeBitmap != want {
 		t.Errorf("bitmap = %d, want %d", problem.ProblemTypeBitmap, want)
 	}
@@ -731,7 +732,7 @@ func TestGenerateProblems_CollisionFunnel(t *testing.T) {
 
 	settings := &Settings{
 		UserId:            1,
-		ProblemTypeBitmap: uint64(ADDITION | MEDIUM_NUMBERS),
+		ProblemTypeBitmap: uint64(mathcore.ADDITION | mathcore.MEDIUM_NUMBERS),
 		TargetDifficulty:  5,
 	}
 	problem, err := api.generateProblems("[test-collision]", settings, 2)
