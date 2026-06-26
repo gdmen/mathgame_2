@@ -77,6 +77,22 @@ func TestRenderFlowsThroughPipeline(t *testing.T) {
 		{BinaryExpr{Op: '+',
 			L: Num{Value: ratF(3, 4), IsDecimal: true},
 			R: Num{Value: ratF(1, 4), IsDecimal: true}}, ratI(1)},
+		// Fraction/decimal operands UNDER '*' and '/': the slash convention (an
+		// unspaced slash is a fraction, a spaced slash is division, and Render
+		// emits operators spaced) keeps these unambiguous — the property the
+		// multiplicative fraction/decimal splits rely on.
+		{BinaryExpr{Op: '*',
+			L: Num{Value: ratF(3, 4), IsFraction: true},
+			R: Num{Value: ratF(5, 6), IsFraction: true}}, ratF(5, 8)},
+		{BinaryExpr{Op: '/',
+			L: Num{Value: ratF(3, 4), IsFraction: true},
+			R: Num{Value: ratF(2, 3), IsFraction: true}}, ratF(9, 8)},
+		{BinaryExpr{Op: '/',
+			L: Num{Value: ratI(6)},
+			R: Num{Value: ratF(3, 4), IsFraction: true}}, ratI(8)},
+		{BinaryExpr{Op: '*',
+			L: Num{Value: ratF(1, 2), IsDecimal: true},
+			R: Num{Value: ratI(3)}}, ratF(3, 2)},
 	}
 	for _, tc := range cases {
 		expr := Render(tc.node)

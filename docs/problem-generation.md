@@ -140,6 +140,16 @@ and the backfill run the same stages:
 envelope ([3.5]) checks (`VerifyAnswerSymbolic`, `EnvelopeViolation`) in
 `mathcore/stamping.go`.
 
+**Slash convention (fraction vs. division).** The lexer disambiguates the two
+meanings of `/` by spacing: an *unspaced* slash is a fraction literal (`3/8`), a
+*spaced* slash is the division operator (`3 / 8`); NORMALIZE folds `\frac{a}{b}`
+into the unspaced form. `mathcore.Render` emits operators spaced and fraction
+literals unspaced, so any rendered expression — including a fraction or decimal
+operand under `*` or `/` (`3/4 / 2/3`, `6 / 3/4`, `0.2 * 3`) — lexes
+unambiguously and evaluates to the value the AST was built around (pinned by
+`TestRenderFlowsThroughPipeline`). The round-trip guarantee is render → lex →
+eval; a full render → parse → AST reconstruction awaits a `Parse` (#228).
+
 Storage keeps the **original notation** (`\frac{1}{2}`, `\times` render
 through KaTeX); normalization is a parsing concern. Only the stage-1.5 `?`
 splice mutates stored text (`Admission.Expr`; `spliceLoneLetterRaw` recovers
