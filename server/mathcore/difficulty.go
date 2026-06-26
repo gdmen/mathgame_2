@@ -461,10 +461,12 @@ func computeBreakdown(scoredExpr string, forceWord bool) DifficultyBreakdown {
 	}
 }
 
-// Compression-curve anchors: raw 0.5 maps to scaled 1.0 and raw 15 maps to
-// scaled 20.0 (chosen to preserve the scale's original 1-20 calibration). Both
-// compressRaw and its inverse RawForDifficulty read these, so a curve retune
-// flows into the heuristic_2.0 aimer automatically (no private copy to drift).
+// Compression-curve anchors: two reference points that fix the log curve's
+// slope — raw 0.5 maps to scaled 1.0, raw 15 maps to scaled 20.0, placing the
+// normal one/two-concept band at ~1-20. The scale itself is open-ended (see the
+// scale comment at the top of this file). Both compressRaw and its inverse
+// RawForDifficulty read these, so a curve retune flows into the heuristic_2.0
+// aimer automatically (no private copy to drift).
 const (
 	rawAnchorLo   = 0.5
 	rawAnchorHi   = 15.0
