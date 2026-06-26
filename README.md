@@ -29,7 +29,7 @@ The block below is the machine-readable registry (parsed by `scripts/docs_check.
 problem-generation  doc=docs/problem-generation.md  type=anchored
   globs: server/mathcore/**, server/api/generation_funnel.go, server/llm_generator/**, server/generator/**
 generator-versions  doc=docs/generator-versions.md  type=anchored
-  globs: server/generator/generate_problem.go, server/llm_generator/generate_problem.go
+  globs: server/generator/heuristic2.go, server/llm_generator/generate_problem.go
 selection  doc=docs/selection.md  type=anchored
   globs: server/api/generate_problems.go, server/api/generator_rank.go, server/api/select_lru.go, server/api/pool_supply.go, server/api/trim_recently_shown.go
 adaptive-difficulty  doc=docs/adaptive-difficulty.md  type=anchored
