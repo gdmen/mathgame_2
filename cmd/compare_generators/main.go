@@ -15,6 +15,11 @@
 // Usage:
 //
 //	./compare_generators -config=conf.json -cells=15 -samples=3
+//	./compare_generators -config=conf.json -mode=matrix
+//
+// -mode=samples (default) is the volume-ranked head-to-head (top -cells).
+// -mode=matrix swaps it for a complete per-bitmap difficulty coverage grid that
+// represents every distinct bitmap in the pool, not just the busiest cells.
 package main
 
 import (
@@ -48,9 +53,10 @@ type cellInfo struct {
 
 func main() {
 	configPath := flag.String("config", "conf.json", "path to config JSON (MySQL creds for the snapshot)")
-	topCells := flag.Int("cells", 15, "how many highest-volume symbolic cells to detail")
-	samples := flag.Int("samples", 3, "example expressions per generator per cell")
+	topCells := flag.Int("cells", 15, "how many highest-volume symbolic cells to detail (samples mode)")
+	samples := flag.Int("samples", 3, "example expressions per generator per cell (samples mode)")
 	seed := flag.Int64("seed", 20260625, "rng seed for fresh heuristic_2.0 generation")
+	mode := flag.String("mode", "samples", `report body: "samples" (volume-ranked head-to-head, top -cells) or "matrix" (complete per-bitmap difficulty coverage grid over every distinct bitmap)`)
 	flag.Parse()
 
 	c, err := common.ReadConfig(*configPath)
@@ -81,10 +87,29 @@ func main() {
 		}
 		symbolic = append(symbolic, ci)
 	}
-	sort.Slice(symbolic, func(i, j int) bool { return symbolic[i].total > symbolic[j].total })
+	// Tiebreak past total so the order — and thus the shared-rng draw sequence
+	// every report section consumes — is fully determined by -seed. readGrid
+	// folds through a map (random iteration order), so without this the output
+	// varies run-to-run despite the fixed seed.
+	sort.Slice(symbolic, func(i, j int) bool {
+		if symbolic[i].total != symbolic[j].total {
+			return symbolic[i].total > symbolic[j].total
+		}
+		if symbolic[i].bitmap != symbolic[j].bitmap {
+			return symbolic[i].bitmap < symbolic[j].bitmap
+		}
+		return symbolic[i].bucket < symbolic[j].bucket
+	})
 
 	reportOffload(symbolic, rng)
-	reportHeadToHead(db, symbolic, *topCells, *samples, rng)
+	switch *mode {
+	case "matrix":
+		reportMatrix(symbolic, rng)
+	case "samples":
+		reportHeadToHead(db, symbolic, *topCells, *samples, rng)
+	default:
+		glog.Fatalf("unknown -mode %q (want \"samples\" or \"matrix\")", *mode)
+	}
 	reportGaps(symbolic, rng)
 }
 
@@ -219,6 +244,101 @@ func reportHeadToHead(db *sql.DB, symbolic []cellInfo, topCells, samples int, rn
 	fmt.Println()
 }
 
+// reportMatrix prints one row per distinct symbolic bitmap (not the volume-
+// ranked top-N), and for each integer difficulty bucket in that bitmap's
+// serving range probes whether heuristic_2.0 lands in-window. Unlike the
+// head-to-head, every distinct feature combination in the pool is represented,
+// however low its volume — the point is coverage at a glance across the whole
+// bit space, not expression naturalness.
+func reportMatrix(symbolic []cellInfo, rng *rand.Rand) {
+	const tries = 12
+
+	// Fold per-(bitmap,bucket) cells into per-bitmap rows, carrying total
+	// volume so rare bitmaps are still visible (and sortable) alongside busy
+	// ones. The serving range comes from the envelope, not the pool, so a
+	// bucket the pool never filled is still probed.
+	type row struct {
+		bitmap uint64
+		vol    int
+	}
+	idx := map[uint64]*row{}
+	for _, ci := range symbolic {
+		r := idx[ci.bitmap]
+		if r == nil {
+			r = &row{bitmap: ci.bitmap}
+			idx[ci.bitmap] = r
+		}
+		r.vol += ci.total
+	}
+	rows := make([]*row, 0, len(idx))
+	for _, r := range idx {
+		rows = append(rows, r)
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].vol != rows[j].vol {
+			return rows[i].vol > rows[j].vol
+		}
+		return rows[i].bitmap < rows[j].bitmap
+	})
+
+	lo := int(mathcore.MinTargetDifficulty)
+	hi := lo
+	for _, r := range rows {
+		if c := int(math.Floor(mathcore.MaxDiffForBitmap(r.bitmap))); c > hi {
+			hi = c
+		}
+	}
+
+	fmt.Println("=== Coverage matrix (heuristic_2.0 in-window hit per bitmap x difficulty) ===")
+	fmt.Println("legend: # in-window   . reachable but out-of-window   x unbuildable   (blank) above serving ceiling")
+	fmt.Printf("%-7s ", "diff")
+	for d := lo; d <= hi; d++ {
+		fmt.Printf("%-2d", d%100)
+	}
+	fmt.Printf("  %-4s %-7s %s\n", "hit", "vol", "features")
+
+	var totHit, totProbed int
+	for _, r := range rows {
+		ceil := int(math.Floor(mathcore.MaxDiffForBitmap(r.bitmap)))
+		var sb []byte
+		hits, probed := 0, 0
+		for d := lo; d <= hi; d++ {
+			if d > ceil {
+				sb = append(sb, ' ', ' ')
+				continue
+			}
+			tgt := targetFor(r.bitmap, d)
+			bestErr, built := math.MaxFloat64, false
+			for i := 0; i < tries; i++ {
+				if _, dd, ok := build(r.bitmap, tgt, rng); ok {
+					built = true
+					if e := math.Abs(dd - tgt); e < bestErr {
+						bestErr = e
+					}
+				}
+			}
+			probed++
+			switch {
+			case !built:
+				sb = append(sb, 'x', ' ')
+			case bestErr <= window:
+				hits++
+				sb = append(sb, '#', ' ')
+			default:
+				sb = append(sb, '.', ' ')
+			}
+		}
+		totHit += hits
+		totProbed += probed
+		feats := mathcore.ProblemTypeToFeatures(mathcore.ProblemType(r.bitmap))
+		fmt.Printf("bm=%-4d %s %3d/%-3d %-7d %v\n", r.bitmap, string(sb), hits, probed, r.vol, feats)
+	}
+	if totProbed > 0 {
+		fmt.Printf("\n%d bitmaps, %d in-serving-range buckets probed, %d in-window (%.1f%%)\n\n",
+			len(rows), totProbed, totHit, 100*float64(totHit)/float64(totProbed))
+	}
+}
+
 // reportGaps lists symbolic cells heuristic_2.0 cannot reach in-window, with an
 // example, so the coarse-concept / floor-ceiling gaps are concrete.
 func reportGaps(symbolic []cellInfo, rng *rand.Rand) {
@@ -250,7 +370,15 @@ func reportGaps(symbolic []cellInfo, rng *rand.Rand) {
 			gaps = append(gaps, gap{ci, bestExpr, bestD})
 		}
 	}
-	sort.Slice(gaps, func(i, j int) bool { return gaps[i].ci.total > gaps[j].ci.total })
+	sort.Slice(gaps, func(i, j int) bool {
+		if gaps[i].ci.total != gaps[j].ci.total {
+			return gaps[i].ci.total > gaps[j].ci.total
+		}
+		if gaps[i].ci.bitmap != gaps[j].ci.bitmap {
+			return gaps[i].ci.bitmap < gaps[j].ci.bitmap
+		}
+		return gaps[i].ci.bucket < gaps[j].ci.bucket
+	})
 	for i, g := range gaps {
 		if i >= 25 {
 			fmt.Printf("... and %d more gap cells\n", len(gaps)-25)
@@ -279,7 +407,8 @@ type ex struct {
 func examples(db *sql.DB, bitmap uint64, bucket int, gen string, limit int) []ex {
 	rows, err := db.Query(
 		`SELECT expression, difficulty FROM problems
-		 WHERE disabled=0 AND problem_type_bitmap=? AND ROUND(difficulty)=? AND generator=? LIMIT ?`,
+		 WHERE disabled=0 AND problem_type_bitmap=? AND ROUND(difficulty)=? AND generator=?
+		 ORDER BY id LIMIT ?`,
 		bitmap, bucket, gen, limit)
 	if err != nil {
 		return nil
