@@ -11,7 +11,7 @@ them.
 and update this doc in the same PR. `make docs-check BASE=origin/master` enforces that this doc is
 touched when its owned files change. The anchor block below is asserted against code constants by
 `server/api/docs_sync_test.go` (`TestDocsSyncSettings`) — the ceiling constants against
-`server/api/difficulty.go`, the error codes against `bitmap_validation.js`. The dependency rules and
+`server/mathcore/difficulty.go`, the error codes against `bitmap_validation.js`. The dependency rules and
 the ceiling formula are a **mirror** of the server-authoritative copies — see Invariants.
 
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
@@ -113,7 +113,7 @@ Parents see an integer **percent (1–100)**, not the raw formula number (`perce
 `shown` within `[MIN, ceiling]`. The raw difficulty numbers are formula internals.
 
 `maxDiffForBitmap` is a line-by-line mirror of the server's `MaxDiffForBitmap`
-(`server/api/difficulty.go`):
+(`server/mathcore/difficulty.go`):
 
 ```
 maxOperand = 12 | 99 (MEDIUM) | 9999 (LARGE)
@@ -180,7 +180,7 @@ completeness:
   `ERROR_GROUPS`, `TargetDifficultySettingsView`, `SettingsView`, `postSettings`.
 - `web/src/bitmap_validation.js` — `validateBitmap`, `maxDiffForBitmap`, `MIN_TARGET_DIFFICULTY`.
 - `web/src/enums.js` — `ProblemTypes` bit constants.
-- `server/api/difficulty.go` — `MaxDiffForBitmap`, `MinTargetDifficulty`, `MaxChainLen`,
+- `server/mathcore/difficulty.go` — `MaxDiffForBitmap`, `MinTargetDifficulty`, `MaxChainLen`,
   `LargeMaxOperand`, `smallMaxOperand`, `mediumMaxOperand` (the authoritative copies).
 - [`docs/problem-generation.md`](problem-generation.md) — bit semantics, difficulty formula, the
   ceiling rationale, the new-bit checklist.
