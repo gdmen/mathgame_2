@@ -243,6 +243,51 @@ func TestBuildProblem_ComposesConcepts(t *testing.T) {
 	}
 }
 
+// TestBuildProblem_ComposesValueConceptUnderMulDiv guards the specific silo the
+// ComposesConcepts test can't see: that test builds from a fully-chained rich
+// envelope, where a fraction can ride an additive term while '*'/'/' stay
+// integer — so it passes even if a value concept never attaches directly to a
+// multiplicative operator. These envelopes have NO additive operator, so the
+// only way to compose is a genuine fraction/decimal operand under '*' or '/'
+// (e.g. "3/8 * 5/3", "0.2 * 3"). A regression to integer-only multiplicative
+// splits drops these to zero.
+func TestBuildProblem_ComposesValueConceptUnderMulDiv(t *testing.T) {
+	rng := rand.New(rand.NewSource(13))
+	cases := []struct {
+		name string
+		bm   mathcore.ProblemType
+	}{
+		{"fraction under multiplication", mathcore.FRACTIONS | mathcore.MULTIPLICATION},
+		{"fraction under division", mathcore.FRACTIONS | mathcore.DIVISION},
+		{"mismatched fractions under multiplication",
+			mathcore.FRACTIONS | mathcore.MISMATCHED_DENOMINATORS | mathcore.MULTIPLICATION},
+		{"decimal under multiplication", mathcore.DECIMALS | mathcore.MULTIPLICATION},
+	}
+	for _, c := range cases {
+		ceil := mathcore.MaxDiffForBitmap(uint64(c.bm))
+		found := 0
+		var ex string
+		for i := 0; i < 3000; i++ {
+			target := 6.0 + rng.Float64()*(ceil-6.0)
+			expr, _, err := BuildProblem(c.bm, target, rng)
+			if err != nil {
+				t.Fatalf("%s: BuildProblem: %v", c.name, err)
+			}
+			if bm := mathcore.ProblemType(mathcore.DetectProblemTypeBitmap(expr)); bm&c.bm == c.bm {
+				found++
+				if ex == "" {
+					ex = expr
+				}
+			}
+		}
+		if found == 0 {
+			t.Errorf("%s: never composed the value concept with the operator — builder siloed", c.name)
+		} else {
+			t.Logf("%s: %d/3000 composed, e.g. %q", c.name, found, ex)
+		}
+	}
+}
+
 func concKey(bm mathcore.ProblemType, bits []mathcore.ProblemType) string {
 	s := ""
 	for _, c := range bits {

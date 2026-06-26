@@ -545,17 +545,17 @@ func splitMul(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
 		}
 		return nil, nil, false
 	}
+	if ctx.fractions || ctx.decimals {
+		if a, b, ok := splitMulFrac(v, ctx); ok {
+			return a, b, true
+		}
+	}
 	if !v.IsInt() || v.Sign() <= 0 {
 		return nil, nil, false
 	}
 	n := v.Num().Int64()
 	small := int64(max(2, min(ctx.maxOperand, 12)))
-	var divs []int64
-	for d := int64(2); d <= small && d <= n; d++ {
-		if n%d == 0 {
-			divs = append(divs, d)
-		}
-	}
+	divs := divisorsInRange(n, small)
 	if len(divs) == 0 {
 		return nil, nil, false
 	}
@@ -569,17 +569,127 @@ func splitDiv(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
 	if v.Sign() <= 0 {
 		return nil, nil, false
 	}
+	if ctx.fractions || ctx.decimals {
+		if a, b, ok := splitDivFrac(v, ctx); ok {
+			return a, b, true
+		}
+	}
+	// Integer dividend path (fraction/decimal handled above): a = v*b must be whole.
 	small := max(2, min(ctx.maxOperand, 12))
 	for tries := 0; tries < 6; tries++ {
 		b := 2 + ctx.rng.Intn(small-1)
 		a := new(big.Rat).Mul(v, big.NewRat(int64(b), 1))
-		// a must be an integer for a clean "a / b" unless a fraction concept can
-		// render it; keep it integer for clean whole-number division.
 		if a.IsInt() && withinMag(a, ctx) {
 			return a, ri(b), true
 		}
 	}
 	return nil, nil, false
+}
+
+// splitMulFrac splits a fractional v into a*b with at least one non-integer
+// operand, so a fraction/decimal composes under multiplication. Because '*' and
+// '/' share precedence left-to-right, "an/ad * bn/bd" parses to exactly
+// (an*bn)/(ad*bd), so any non-integer-operand product renders unambiguously.
+// Answer-first: the operands are factored out of the given v so the tree stays
+// exact; realizeLeaf renders each as a decimal or fraction per the active concept.
+//   - mismatched on:  two fractions with different denominators (3/8 * 5/3)
+//   - mismatched off: a single non-integer operand times an integer (1/6 * 5,
+//     0.2 * 3), which keeps a no-mismatched envelope satisfiable.
+func splitMulFrac(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
+	vn, vd := v.Num().Int64(), v.Denom().Int64()
+	if vd <= 1 || v.Sign() <= 0 {
+		return nil, nil, false // need a fractional product to factor
+	}
+	small := int64(max(2, min(ctx.maxOperand, 12)))
+	if ctx.mismatched {
+		// a = an/vd, b = bn/d2 with an*bn = vn*d2 (so a*b = vn/vd), d2 != vd.
+		for tries := 0; tries < 12; tries++ {
+			d2 := int64(pickDenom(ctx))
+			if d2 == vd {
+				continue
+			}
+			divs := divisorsInRange(vn*d2, small)
+			ctx.rng.Shuffle(len(divs), func(i, j int) { divs[i], divs[j] = divs[j], divs[i] })
+			for _, an := range divs {
+				bn := vn * d2 / an
+				if bn < 1 || bn > small {
+					continue
+				}
+				a := new(big.Rat).SetFrac64(an, vd)
+				b := new(big.Rat).SetFrac64(bn, d2)
+				if okFracPair(a, b, ctx) {
+					return a, b, true
+				}
+			}
+		}
+		return nil, nil, false
+	}
+	// fraction x integer: b divides the numerator so a keeps v's denominator.
+	divs := divisorsInRange(vn, small)
+	ctx.rng.Shuffle(len(divs), func(i, j int) { divs[i], divs[j] = divs[j], divs[i] })
+	for _, b := range divs {
+		a := new(big.Rat).SetFrac64(vn/b, vd)
+		if !a.IsInt() && withinMag(a, ctx) {
+			return a, ri(int(b)), true
+		}
+	}
+	return nil, nil, false
+}
+
+// splitDivFrac splits a fractional v into a/b with a fraction dividend (a = v*b).
+// The render spaces operators ("3/4 / 2") and leaves fraction literals unspaced,
+// and the tokenizer reads a spaced slash as division and an unspaced one as a
+// fraction — so any operand shape parses unambiguously (no parens needed).
+//   - mismatched on:  a, b fractions of different denominators ("5/4 / 2/3")
+//   - mismatched off: a single fraction over an integer ("3/2 / 2").
+func splitDivFrac(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
+	if v.Denom().Int64() <= 1 || v.Sign() <= 0 {
+		return nil, nil, false
+	}
+	small := max(2, min(ctx.maxOperand, 12))
+	if ctx.mismatched {
+		for tries := 0; tries < 16; tries++ {
+			s := pickDenom(ctx)
+			b := new(big.Rat).SetFrac64(int64(1+ctx.rng.Intn(s*small)), int64(s))
+			a := new(big.Rat).Mul(v, b)
+			if okFracPair(a, b, ctx) {
+				return a, b, true
+			}
+		}
+		return nil, nil, false
+	}
+	bs := make([]int, 0, small)
+	for b := 2; b <= small; b++ {
+		bs = append(bs, b)
+	}
+	ctx.rng.Shuffle(len(bs), func(i, j int) { bs[i], bs[j] = bs[j], bs[i] })
+	for _, b := range bs {
+		a := new(big.Rat).Mul(v, big.NewRat(int64(b), 1))
+		if !a.IsInt() && withinMag(a, ctx) {
+			return a, ri(b), true
+		}
+	}
+	return nil, nil, false
+}
+
+// okFracPair reports whether (a, b) are within-magnitude positive fractions with
+// different denominators — the MISMATCHED_DENOMINATORS shape.
+func okFracPair(a, b *big.Rat, ctx buildCtx) bool {
+	if a.Sign() <= 0 || b.Sign() <= 0 || !withinMag(a, ctx) || !withinMag(b, ctx) {
+		return false
+	}
+	return !a.IsInt() && !b.IsInt() && a.Denom().Cmp(b.Denom()) != 0
+}
+
+// divisorsInRange returns the integer divisors of n in [2, hi].
+func divisorsInRange(n, hi int64) []int64 {
+	var out []int64
+	for d := int64(2); d <= hi && d <= n; d++ {
+		if n%d == 0 {
+			out = append(out, d)
+		}
+	}
+	return out
 }
 
 // realizeLeaf renders a value as a leaf in an enabled style: percent (n%),
