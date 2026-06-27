@@ -1,13 +1,14 @@
-// ast.go: a render-only expression AST.
+// ast.go: the expression AST. Render serializes a node to normalized ASCII;
+// Parse (parse.go) is its structural inverse.
 //
 // The heuristic_2.0 builder constructs nodes answer-first (every node's value
 // is known as it is built, so no tree-walking evaluator is needed to know the
 // answer) and renders them to normalized ASCII that flows through the canonical
 // token pipeline (LexExpression / EvalTokens / DetectProblemTypeBitmap /
-// ComputeProblemDifficulty). The token-cursor evaluator stays authoritative;
-// this AST is a construction scaffold for the builder.
+// ComputeProblemDifficulty). The token-cursor evaluator is the authoritative
+// evaluator.
 //
-// Render exists only for builder construction: admission storage keeps the
+// Render output feeds construction and the pipeline; admission storage keeps the
 // original notation in Admission.Expr.
 
 package mathcore

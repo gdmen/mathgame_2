@@ -146,9 +146,13 @@ meanings of `/` by spacing: an *unspaced* slash is a fraction literal (`3/8`), a
 into the unspaced form. `mathcore.Render` emits operators spaced and fraction
 literals unspaced, so any rendered expression — including a fraction or decimal
 operand under `*` or `/` (`3/4 / 2/3`, `6 / 3/4`, `0.2 * 3`) — lexes
-unambiguously and evaluates to the value the AST was built around (pinned by
-`TestRenderFlowsThroughPipeline`). The round-trip guarantee is render → lex →
-eval; a full render → parse → AST reconstruction awaits a `Parse` (#228).
+unambiguously. `Parse` (`mathcore/parse.go`) is the structural inverse of
+`Render`, mirroring the evaluator's grammar: for any canonical expression
+`Render(Parse(s)) == s` and the parsed tree evaluates to `EvalTokens(s)` (the
+tree is recovered up to the associativity of a same-precedence run). `\text{}`
+(WORD) has no AST and is rejected. Pinned by `TestParseRoundTrip*` and
+`TestRenderFlowsThroughPipeline`. Evaluation still flows through the token
+cursor; making the AST the authoritative evaluator is #293.
 
 Storage keeps the **original notation** (`\frac{1}{2}`, `\times` render
 through KaTeX); normalization is a parsing concern. Only the stage-1.5 `?`
