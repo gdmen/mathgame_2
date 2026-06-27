@@ -55,21 +55,21 @@ concern. Users compose their envelope directly.
 
 | Bit | Fires when | Difficulty factor |
 |---|---|---|
-| `ADDITION` `SUBTRACTION` `MULTIPLICATION` `DIVISION` | operator token present | `opWeight` = MAX over present ops (`weightSub`/`weightMul`/`weightDiv`; add is the 1.0 baseline) |
-| `FRACTIONS` | any fraction token (`3/8` unspaced; `\frac{a}{b}` normalizes to it) | `conceptFractions` (same denominators) |
-| `MISMATCHED_DENOMINATORS` | ≥2 fractions, differing denominators; on WORD problems, validator-observed (prose fractions); forces FRACTIONS via the stamp-time invariant | `conceptMismatched`, multiplied ON TOP of `conceptFractions` |
-| `NEGATIVES` | unary-minus number token | `conceptNegatives` |
-| `WORD` | `\text{...}` present | `conceptWord` (stacks with SINGLE_VARIABLE) |
+| `ADDITION` `SUBTRACTION` `MULTIPLICATION` `DIVISION` | operator token present | `opWeight` = MAX over present ops (`WeightSub`/`WeightMul`/`WeightDiv`; add is the 1.0 baseline) |
+| `FRACTIONS` | any fraction token (`3/8` unspaced; `\frac{a}{b}` normalizes to it) | `ConceptFractions` (same denominators) |
+| `MISMATCHED_DENOMINATORS` | ≥2 fractions, differing denominators; on WORD problems, validator-observed (prose fractions); forces FRACTIONS via the stamp-time invariant | `ConceptMismatched`, multiplied ON TOP of `ConceptFractions` |
+| `NEGATIVES` | unary-minus number token | `ConceptNegatives` |
+| `WORD` | `\text{...}` present | `ConceptWord` (stacks with SINGLE_VARIABLE) |
 | `MEDIUM_NUMBERS` | maxMagnitude 13–99 (bracket) | via magnitude |
 | `LARGE_NUMBERS` | maxMagnitude ≥ 100 (bracket — `1 + 999` is LARGE, not MEDIUM) | via magnitude |
-| `CHAINED_OPERATIONS` | numOps ≥ 2 (`=` does not count); on WORD problems, validator-observed (multi-step prose), and OR'd in by the stamp-time invariant whenever ≥2 core-op bits or PEMDAS are set | structure `+structurePerExtraOp` per op beyond the first |
-| `MISSING_NUMBER` | a single `?` outside `\text{}` | structure `+structureMissing` |
-| `DECIMALS` | symbolic decimal token | `conceptDecimals` |
-| `PEMDAS` | the dual-evaluation rule (below) | `conceptPEMDAS` |
-| `SINGLE_VARIABLE` | variable letter with a coefficient (`3x`) or multiple occurrences (`x + x`); on WORD problems, validator-observed (pure-prose algebra) | `conceptVariable` |
-| `PERCENTAGES` | symbolic `n%` token (evaluates as n/100) | `conceptPercent` |
+| `CHAINED_OPERATIONS` | numOps ≥ 2 (`=` does not count); on WORD problems, validator-observed (multi-step prose), and OR'd in by the stamp-time invariant whenever ≥2 core-op bits or PEMDAS are set | structure `+StructurePerExtraOp` per op beyond the first |
+| `MISSING_NUMBER` | a single `?` outside `\text{}` | structure `+StructureMissing` |
+| `DECIMALS` | symbolic decimal token | `ConceptDecimals` |
+| `PEMDAS` | the dual-evaluation rule (below) | `ConceptPEMDAS` |
+| `SINGLE_VARIABLE` | variable letter with a coefficient (`3x`) or multiple occurrences (`x + x`); on WORD problems, validator-observed (pure-prose algebra) | `ConceptVariable` |
+| `PERCENTAGES` | symbolic `n%` token (evaluates as n/100) | `ConceptPercent` |
 
-The factor constants (`concept*`/`weight*`/`structure*`) live in
+The factor constants (`Concept*`/`Weight*`/`Structure*`) live in
 `server/mathcore/difficulty.go`; their numeric values are owned by
 `TestComputeProblemDifficulty_ReferenceValues` (difficulty_test.go), not this
 doc. Magnitude brackets are `SmallMaxOperand` (≤12, default) /
@@ -139,6 +139,26 @@ and the backfill run the same stages:
 `mathcore/expression.go`; `DetectProblemTypeBitmap` and the answer ([3]) and
 envelope ([3.5]) checks (`VerifyAnswerSymbolic`, `EnvelopeViolation`) in
 `mathcore/stamping.go`.
+
+**Slash convention (fraction vs. division).** The lexer disambiguates the two
+meanings of `/` by spacing: an *unspaced* slash is a fraction literal (`3/8`), a
+*spaced* slash is the division operator (`3 / 8`); NORMALIZE folds `\frac{a}{b}`
+into the unspaced form. `mathcore.Render` emits operators spaced and fraction
+literals unspaced, so any rendered expression — including a fraction or decimal
+operand under `*` or `/` (`3/4 / 2/3`, `6 / 3/4`, `0.2 * 3`) — lexes
+unambiguously. `Render` is also **faithful**: it parenthesizes an operand
+whenever infix precedence/associativity would otherwise reparse it
+(`(a + b) * c`, `a - (b - c)`), so `Eval(node) == EvalTokens(Render(node))` for
+every tree (pinned by `TestRenderFaithful`). `Parse` (`mathcore/parse.go`) is the
+structural inverse of
+`Render`, mirroring the evaluator's grammar: for any canonical expression
+`Render(Parse(s)) == s` and the parsed tree evaluates to `EvalTokens(s)` (the
+tree is recovered up to the associativity of a same-precedence run). `\text{}`
+(WORD) has no AST and is rejected. Pinned by `TestParseRoundTrip*` and
+`TestRenderFlowsThroughPipeline`. `EvalTokens` evaluates by parsing the stream
+into this AST (`Parse`) and folding it (`Eval`), so the grammar has a single
+implementation. (`ComputeProblemDifficulty` and `DetectProblemTypeBitmap` still
+read the token stream directly.)
 
 Storage keeps the **original notation** (`\frac{1}{2}`, `\times` render
 through KaTeX); normalization is a parsing concern. Only the stage-1.5 `?`
@@ -287,17 +307,18 @@ are the generation-relevant surface.)
   roots, exponents, ..."). All constraints are simultaneous. Every constraint
   the insert pipeline enforces must also be communicated here, or the
   generator wastes output on shapes that always reject.
-- **Heuristic generator** (server/generator, `heuristic_1.0`): bit-driven
-  `Options` (`MaxOperand` from magnitude bits, `AllowMissing`/`AllowMultiOp`/
-  `MaxChainLen`/`SameDenomOnly` from concept bits → `configFromBitOptions`) +
-  an expression-wide magnitude guard (`withinMaxOperand`; missing-number
-  templates embed computed values, and an out-of-range embedded value would
-  stamp an out-of-envelope magnitude bit). It retries a bounded number of
-  times, then falls back to a simple halved add problem that always passes the
-  guard (`GenerateProblem`). Templates: basic / missing / multi-op (add/sub
-  chains only) / same- and diff-denominator fractions (`templates.go`,
-  `fractions.go`). DECIMALS/PEMDAS/PERCENTAGES/SINGLE_VARIABLE generation is
-  LLM-only for now (#227) — no heuristic template emits them.
+- **Heuristic generator** (server/generator, `heuristic_2.0`): compositional and
+  difficulty-targeting (`BuildProblem(bitmap, target, rng)`). It grows the AST
+  outward from a chosen answer via one recursion — operators are node choices,
+  concepts are operand realizations in the split — so concepts COMPOSE and it
+  covers every non-WORD bit and arbitrary stacks, including DECIMALS / PEMDAS /
+  PERCENTAGES / SINGLE_VARIABLE (previously LLM-only, #227). A knob inverter
+  (`RawForDifficulty` → a magnitude/chain/concept budget, minimal-concept-first,
+  binding the shared difficulty constants) sizes each attempt; generate-and-select
+  over the canonical pipeline keeps the closest in-window survivor and fails
+  closed (closest-achievable, then a deterministic fallback, near the ceiling).
+  Version history and the construction design live in
+  [generator-versions.md](generator-versions.md).
 - **LLM generator** (server/llm_generator, `llm_0.5`): one batched OpenAI call
   (`MAX_QUANTITY = 20`); the `BuildBitConstraints` block is the sole shape
   guidance (`Options.Constraints` is opaque to the package). Emits
@@ -360,7 +381,7 @@ forbidden until deliberately added.
 11. `WEIGHTED_TOPIC_MASK` membership (test: does per-topic difficulty cohere?).
 12. Settings dependency rules + `web/src/bitmap_validation.js` error code if needed.
 13. UI: group placement (verb / noun-kind / noun-size / framing), label, helper text — against `/style-guide`.
-14. Heuristic generator support, or explicit LLM-only deferral (#227-style issue).
+14. Heuristic generator support: a split/leaf realization for the bit in `heuristic_2.0`'s `expand` recursion (`server/generator/heuristic2.go`), or an explicit LLM-only deferral.
 15. Backfill: do legacy rows need re-stamping? (re-run `recompute_problem_type_bitmap`.)
 16. Update THIS DOCUMENT — the doc-sync test fails CI if you skip the anchors.
 
@@ -370,9 +391,9 @@ forbidden until deliberately added.
 - `server/mathcore/expression.go` — `NormalizeExpression`, `LexExpression`, `RewriteLoneVariable`, `CountDistinctUnknowns`, `lexNumber`
 - `server/mathcore/evaluator.go` — `EvalTokens`, `EvalTokensNaiveLTR`, `requiresPEMDAS`, `pemdasProbes`
 - `server/mathcore/stamping.go` — `AdmitExpression`, `DetectProblemTypeBitmap`, `NormalizeProblemBitmap`, `VerifyAnswerSymbolic`, `EnvelopeViolation`
-- `server/mathcore/difficulty.go` — `ComputeProblemDifficulty`, `ComputeDifficultyBreakdownFor`, `computeBreakdown`, `compressRaw`, `MaxDiffForBitmap`, the `concept*`/`weight*`/`structure*` constants, `DifficultyVersion`, `MaxChainLen`, `LargeMaxOperand`, `SmallMaxOperand`, `MediumMaxOperand`
+- `server/mathcore/difficulty.go` — `ComputeProblemDifficulty`, `ComputeDifficultyBreakdownFor`, `computeBreakdown`, `compressRaw`, `MaxDiffForBitmap`, the `Concept*`/`Weight*`/`Structure*` constants, `DifficultyVersion`, `MaxChainLen`, `LargeMaxOperand`, `SmallMaxOperand`, `MediumMaxOperand`
 - `server/mathcore/prompt_guidance.go` — `BuildBitConstraints`, `ValidatorFeatureNames`
 - `server/mathcore/answer_compare.go` — `AnswersEquivalent`
 - `server/api/generation_funnel.go` — `generationFunnel`, `VerifyAnswer`, `RewriteLetterInProse` (api-side admission bookkeeping)
-- `server/generator` — `GenerateProblem`, `configFromBitOptions`, `withinMaxOperand`, templates
+- `server/generator` — `heuristic_2.0`: `BuildProblem`, the knob inverter, the compositional `expand` recursion
 - `server/llm_generator` — `GenerateProblem`, `ValidateWordProblem`, `PROMPT_QUESTION`, `PROMPT_VALIDATION_WORD`, `PROMPT_VALIDATION_FORM`

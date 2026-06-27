@@ -364,3 +364,18 @@ func TestParseProblemFeatures_BitInputs(t *testing.T) {
 		t.Errorf("'=' must not count as an op; ?+5=12 should be numOps=1: %+v", f)
 	}
 }
+
+// TestRawForDifficultyRoundTrip: RawForDifficulty inverts compressRaw across
+// the working difficulty band, so the heuristic_2.0 aimer and the scorer agree.
+func TestRawForDifficultyRoundTrip(t *testing.T) {
+	for d := 1.0; d <= 40.0; d += 0.5 {
+		raw := RawForDifficulty(d)
+		if raw <= 0 {
+			continue // at/below the scale floor the inverse is non-physical
+		}
+		got := compressRaw(raw)
+		if math.Abs(got-d) > 1e-9 {
+			t.Errorf("compressRaw(RawForDifficulty(%.1f)) = %.6f, want %.1f", d, got, d)
+		}
+	}
+}

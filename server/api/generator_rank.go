@@ -12,4 +12,5 @@ var generatorRank = map[string]int{
 	"llm_0.3":       5,
 	"llm_0.4":       6,
 	"llm_0.5":       7,
+	"heuristic_2.0": 8,
 }

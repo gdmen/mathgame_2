@@ -92,8 +92,10 @@ satisfying-set query, buckets candidates by `generatorRank` (generator_rank.go),
 and returns only the **highest-ranked version present**, falling back to older
 versions only when no newer one matches. An unranked/legacy generator string
 ranks 0, below every known version. The rank ordering is a selection-preference
-policy (newest-first); version provenance — what each generator string means — is
-owned by `docs/generator-versions.md`.
+policy (newest-first), with the deterministic `heuristic_2.0` ranked above the
+LLM tiers for the symbolic cells both can fill (#283 — WORD cells are llm-only,
+so the LLM stays top-ranked there). Version provenance — what each generator
+string means — is owned by `docs/generator-versions.md`.
 
 The hard-exclusion list (`prevIds`) is the `recentProblemHistorySize`
 most-recently-shown ids, loaded by `loadRecentProblemIds` (process_events.go)
