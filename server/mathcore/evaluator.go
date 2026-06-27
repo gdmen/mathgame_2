@@ -92,7 +92,8 @@ func EvalTokens(toks []Token, bind Binding) (*big.Rat, error) {
 func Eval(n Node, bind Binding) (*big.Rat, error) {
 	switch t := n.(type) {
 	case Num:
-		return t.Value, nil
+		// Copy: callers must never alias (and risk mutating) a node's Value.
+		return new(big.Rat).Set(t.Value), nil
 	case Missing:
 		if v, ok := bind[bindingKeyMissing]; ok {
 			return v, nil
