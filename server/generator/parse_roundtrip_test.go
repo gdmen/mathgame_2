@@ -44,6 +44,51 @@ func treeEval(n mathcore.Node) (*big.Rat, error) {
 	return nil, errors.New("unevaluable node")
 }
 
+// TestBuilderRendersFaithfully asserts the builder's construction ASTs render
+// faithfully: the tree's own value (treeEval) equals the rendered string's value
+// (EvalTokens). Before Render parenthesized by precedence, ~8.7% diverged (a
+// right-nested -/ subtree rendered without its paren); this guards that at zero.
+func TestBuilderRendersFaithfully(t *testing.T) {
+	rng := rand.New(rand.NewSource(20260627))
+	built, unfaithful := 0, 0
+	var ex string
+	for _, bm := range representativeBitmaps() {
+		ceil := mathcore.MaxDiffForBitmap(uint64(bm))
+		for target := 3.0; target <= ceil; target += 1.0 {
+			for k := 0; k < 6; k++ {
+				ctx := planConfig(bm, mathcore.RawForDifficulty(target), rng)
+				node, unknown, ok := buildOne(ctx)
+				if !ok || unknown != nil {
+					continue // equations carry an unbound ?/var; treeEval can't fold them
+				}
+				treeVal, terr := treeEval(node)
+				if terr != nil {
+					continue
+				}
+				toks, lexErr := mathcore.LexExpression(mathcore.NormalizeExpression(mathcore.Render(node)))
+				if lexErr != nil {
+					continue
+				}
+				strVal, serr := mathcore.EvalTokens(toks, mathcore.Binding{})
+				if serr != nil {
+					continue
+				}
+				built++
+				if treeVal.Cmp(strVal) != 0 {
+					unfaithful++
+					if ex == "" {
+						ex = mathcore.Render(node)
+					}
+				}
+			}
+		}
+	}
+	if unfaithful != 0 {
+		t.Errorf("%d/%d builder ASTs render unfaithfully (e.g. %q)", unfaithful, built, ex)
+	}
+	t.Logf("faithful over %d builder ASTs", built)
+}
+
 // TestParseRoundTripBuilderOutputs is the round-trip property over REAL builder
 // output: across every representative bitmap and integer target, the rendered
 // problem parses back so that Render(Parse(s)) == s, and the parsed tree

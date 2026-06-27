@@ -79,7 +79,10 @@ func (Equation) aNode() {}
 // Render renders a node to normalized ASCII in the form LexExpression accepts:
 // binary operators spaced (`a + b`), fractions unspaced (`3/8`), the division
 // operator spaced (`6 / 2`) so it is never mistaken for a fraction, coefficient
-// variables glued (`3x`), and explicit parens preserved.
+// variables glued (`3x`), and explicit parens preserved. It is faithful: an
+// operand is parenthesized whenever infix precedence/associativity would
+// otherwise reparse it (`(a + b) * c`, `a - (b - c)`), so the rendered string
+// always evaluates to the node's value.
 func Render(n Node) string {
 	var b strings.Builder
 	renderNode(&b, n)
@@ -114,15 +117,59 @@ func renderNode(b *strings.Builder, n Node) {
 				}
 			}
 		}
-		renderNode(b, t.L)
+		renderOperand(b, t.L, t.Op, false)
 		b.WriteByte(' ')
 		b.WriteByte(t.Op)
 		b.WriteByte(' ')
-		renderNode(b, t.R)
+		renderOperand(b, t.R, t.Op, true)
 	default:
 		// Unknown node type: render nothing rather than panic. The builder only
 		// constructs the types above, so this is unreachable in practice.
 	}
+}
+
+// renderOperand renders a binary operand, wrapping it in parens when infix
+// precedence/associativity would otherwise reparse it — the rule that keeps
+// Render faithful. An explicit Paren node is already parenthesized, so it is
+// never double-wrapped (it is not a bare BinaryExpr).
+func renderOperand(b *strings.Builder, child Node, parentOp byte, isRight bool) {
+	if needParen(child, parentOp, isRight) {
+		b.WriteByte('(')
+		renderNode(b, child)
+		b.WriteByte(')')
+		return
+	}
+	renderNode(b, child)
+}
+
+func needParen(child Node, parentOp byte, isRight bool) bool {
+	be, ok := child.(BinaryExpr)
+	if !ok || isCoeffTerm(be) {
+		return false
+	}
+	cl, pl := opLevel(be.Op), opLevel(parentOp)
+	// Lower-precedence child under a higher-precedence op, or the right operand
+	// of the non-associative '-' / '/', would bind wrong without parens.
+	return cl < pl || (cl == pl && isRight && (parentOp == '-' || parentOp == '/'))
+}
+
+// opLevel ranks operator precedence: multiplicative binds tighter than additive.
+func opLevel(op byte) int {
+	if op == '*' || op == '/' {
+		return 1
+	}
+	return 0
+}
+
+// isCoeffTerm reports the coefficient form BinaryExpr{'*', Num, Var{coefficient}}
+// (3x), which renders glued and acts as a single operand.
+func isCoeffTerm(b BinaryExpr) bool {
+	if b.Op != '*' {
+		return false
+	}
+	_, lok := b.L.(Num)
+	r, rok := b.R.(Var)
+	return lok && rok && r.HasCoefficient
 }
 
 func renderNum(n Num) string {

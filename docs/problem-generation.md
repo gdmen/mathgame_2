@@ -146,7 +146,11 @@ meanings of `/` by spacing: an *unspaced* slash is a fraction literal (`3/8`), a
 into the unspaced form. `mathcore.Render` emits operators spaced and fraction
 literals unspaced, so any rendered expression — including a fraction or decimal
 operand under `*` or `/` (`3/4 / 2/3`, `6 / 3/4`, `0.2 * 3`) — lexes
-unambiguously. `Parse` (`mathcore/parse.go`) is the structural inverse of
+unambiguously. `Render` is also **faithful**: it parenthesizes an operand
+whenever infix precedence/associativity would otherwise reparse it
+(`(a + b) * c`, `a - (b - c)`), so `Eval(node) == EvalTokens(Render(node))` for
+every tree (pinned by `TestRenderFaithful`). `Parse` (`mathcore/parse.go`) is the
+structural inverse of
 `Render`, mirroring the evaluator's grammar: for any canonical expression
 `Render(Parse(s)) == s` and the parsed tree evaluates to `EvalTokens(s)` (the
 tree is recovered up to the associativity of a same-precedence run). `\text{}`

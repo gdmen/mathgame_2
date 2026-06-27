@@ -105,15 +105,6 @@ func canon(n Node) Node {
 	return n
 }
 
-func isCoeffTerm(b BinaryExpr) bool {
-	if b.Op != '*' {
-		return false
-	}
-	_, lok := b.L.(Num)
-	r, rok := b.R.(Var)
-	return lok && rok && r.HasCoefficient
-}
-
 // nodeEqual compares two nodes structurally, ignoring Num.Raw (a render hint).
 func nodeEqual(a, b Node) bool {
 	switch x := a.(type) {
@@ -222,23 +213,10 @@ func randomArith(rng *rand.Rand, depth int) Node {
 	return BinaryExpr{Op: op, L: l, R: r}
 }
 
-func opLevel(op byte) int {
-	if op == '*' || op == '/' {
-		return 1
-	}
-	return 0
-}
-
-// parenIfNeeded wraps child in a Paren exactly when infix precedence would
-// otherwise reparse it: a lower-precedence child under a higher one, or the
-// right operand of the non-associative '-' / '/'.
+// parenIfNeeded builds the canonical (explicitly-parenthesized) form so a random
+// tree's structure survives Render -> Parse, using the same rule Render applies.
 func parenIfNeeded(child Node, parentOp byte, isRight bool) Node {
-	be, ok := child.(BinaryExpr)
-	if !ok || isCoeffTerm(be) {
-		return child
-	}
-	cl, pl := opLevel(be.Op), opLevel(parentOp)
-	if cl < pl || (cl == pl && isRight && (parentOp == '-' || parentOp == '/')) {
+	if needParen(child, parentOp, isRight) {
 		return Paren{X: child}
 	}
 	return child
@@ -249,6 +227,54 @@ func TestParseRoundTripRandom(t *testing.T) {
 	for i := 0; i < 20000; i++ {
 		assertRoundTrip(t, randomArith(rng, 1+rng.Intn(5)))
 	}
+}
+
+// randomRaw builds an arbitrary arithmetic AST with NO explicit parens, so its
+// rendered form exercises Render's precedence parenthesization directly.
+func randomRaw(rng *rand.Rand, depth int) Node {
+	if depth <= 0 || rng.Intn(3) == 0 {
+		switch rng.Intn(3) {
+		case 0:
+			return Num{Value: big.NewRat(int64(1+rng.Intn(12)), 1)}
+		case 1:
+			return Num{Value: big.NewRat(int64(1+rng.Intn(11)), int64(2+rng.Intn(10))), IsFraction: true}
+		default:
+			return Num{Value: big.NewRat(int64(-1-rng.Intn(12)), 1)}
+		}
+	}
+	ops := []byte{'+', '-', '*', '/'}
+	return BinaryExpr{Op: ops[rng.Intn(len(ops))], L: randomRaw(rng, depth-1), R: randomRaw(rng, depth-1)}
+}
+
+// TestRenderFaithful is the faithfulness contract: for ANY tree (no pre-inserted
+// parens), the rendered string evaluates to the tree's own value — Render
+// inserts exactly the parens precedence requires.
+func TestRenderFaithful(t *testing.T) {
+	rng := rand.New(rand.NewSource(20260627))
+	checked := 0
+	for i := 0; i < 30000; i++ {
+		node := randomRaw(rng, 1+rng.Intn(5))
+		want, werr := astEval(node)
+		if werr != nil {
+			continue // division by zero in this tree: skip
+		}
+		s := Render(node)
+		toks, lexErr := LexExpression(NormalizeExpression(s))
+		if lexErr != nil {
+			t.Errorf("Render -> %q does not lex: %v", s, lexErr)
+			continue
+		}
+		got, evErr := EvalTokens(toks, Binding{})
+		if evErr != nil {
+			t.Errorf("Render -> %q does not eval: %v", s, evErr)
+			continue
+		}
+		checked++
+		if want.Cmp(got) != 0 {
+			t.Errorf("UNFAITHFUL: %q  treeVal=%s strVal=%s", s, want, got)
+		}
+	}
+	t.Logf("faithful over %d raw trees", checked)
 }
 
 func TestEval(t *testing.T) {
