@@ -59,7 +59,6 @@ func (p *parser) peek() (Token, bool) {
 	return Token{}, false
 }
 
-// equationOrExpr := expr ('=' expr)?
 func (p *parser) equationOrExpr() (Node, error) {
 	lhs, err := p.expr()
 	if err != nil {
@@ -76,7 +75,6 @@ func (p *parser) equationOrExpr() (Node, error) {
 	return lhs, nil
 }
 
-// expr := term (('+'|'-') term)*  — left-associative.
 func (p *parser) expr() (Node, error) {
 	left, err := p.term()
 	if err != nil {
@@ -96,7 +94,6 @@ func (p *parser) expr() (Node, error) {
 	}
 }
 
-// term := factor (('*'|'/') factor)*  — left-associative.
 func (p *parser) term() (Node, error) {
 	left, err := p.factor()
 	if err != nil {
@@ -116,7 +113,6 @@ func (p *parser) term() (Node, error) {
 	}
 }
 
-// factor := '(' expr ')' | operand
 func (p *parser) factor() (Node, error) {
 	t, ok := p.peek()
 	if !ok {
@@ -137,7 +133,6 @@ func (p *parser) factor() (Node, error) {
 	return p.operand()
 }
 
-// operand := NUMBER (coefficient-VARIABLE)? | FRACTION | MISSING | VARIABLE
 func (p *parser) operand() (Node, error) {
 	t, ok := p.peek()
 	if !ok {

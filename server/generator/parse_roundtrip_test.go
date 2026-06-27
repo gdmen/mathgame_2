@@ -48,9 +48,9 @@ func treeEval(n mathcore.Node) (*big.Rat, error) {
 // output: across every representative bitmap and integer target, the rendered
 // problem parses back so that Render(Parse(s)) == s, and the parsed tree
 // evaluates (treeEval) to the same value the token evaluator gives. (Structural
-// equality up to associativity is proven over faithful trees in
-// mathcore/parse_test.go; it is not asserted here because the builder itself
-// emits some render-non-faithful ASTs.)
+// equality up to associativity is covered over faithful trees in
+// mathcore/parse_test.go; here the input is whatever the builder renders, whose
+// trees include render-non-faithful ones.)
 func TestParseRoundTripBuilderOutputs(t *testing.T) {
 	rng := rand.New(rand.NewSource(20260626))
 	checked, valChecked := 0, 0

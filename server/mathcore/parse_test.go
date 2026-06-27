@@ -13,34 +13,25 @@ import (
 //   - idempotent:  Render(Parse(s)) == s
 //   - value-equal: astEval(Parse(s)) == EvalTokens(s)         (Eval(Parse) agrees)
 //   - structural:  canon(Parse(Render(ast))) == canon(ast)    (tree recovered up
-//                  to associativity; canon re-associates a same-precedence chain
-//                  left, the only freedom Render does not encode)
+//                  to associativity — an associative run nests more than one way
+//                  for the same render, and canon picks the left one)
 
 // astEval folds the AST directly (no re-render), so it independently checks that
 // Parse built the right tree rather than a merely render-equivalent one — the
-// shape an AST-backed evaluator would take.
-func astEval(n Node, bind map[byte]*big.Rat) (*big.Rat, error) {
+// shape an AST-backed evaluator would take. Bound to value-only expressions; a
+// free Var or Missing yields an error.
+func astEval(n Node) (*big.Rat, error) {
 	switch t := n.(type) {
 	case Num:
 		return new(big.Rat).Set(t.Value), nil
-	case Missing:
-		if v, ok := bind['?']; ok {
-			return v, nil
-		}
-		return nil, errors.New("unbound ?")
-	case Var:
-		if v, ok := bind[t.Letter]; ok {
-			return v, nil
-		}
-		return nil, errors.New("unbound variable")
 	case Paren:
-		return astEval(t.X, bind)
+		return astEval(t.X)
 	case BinaryExpr:
-		l, err := astEval(t.L, bind)
+		l, err := astEval(t.L)
 		if err != nil {
 			return nil, err
 		}
-		r, err := astEval(t.R, bind)
+		r, err := astEval(t.R)
 		if err != nil {
 			return nil, err
 		}
@@ -63,10 +54,10 @@ func astEval(n Node, bind map[byte]*big.Rat) (*big.Rat, error) {
 	return nil, errors.New("unevaluable node")
 }
 
-// canon re-associates same-precedence chains to the left and drops Num.Raw, the
-// normal form for structural comparison. Render encodes precedence and parens
-// but not the grouping of an associative run ("3 + 4 + 3" could be either
-// nesting), so two trees that render identically must be compared up to it.
+// canon re-associates same-precedence chains to the left and drops Num.Raw — the
+// normal form for structural comparison. An associative run like "3 + 4 + 3"
+// nests more than one way for the same render, so trees are compared up to that
+// grouping.
 func canon(n Node) Node {
 	switch t := n.(type) {
 	case Num:
@@ -165,8 +156,8 @@ func assertRoundTrip(t *testing.T, ast Node) {
 		t.Errorf("structural mismatch for %q:\n  canon(parsed)   = %s\n  canon(original) = %s", s, Render(canon(got)), Render(canon(ast)))
 	}
 	if _, isEq := ast.(Equation); !isEq {
-		want, werr := astEval(ast, nil)
-		have, herr := astEval(got, nil)
+		want, werr := astEval(ast)
+		have, herr := astEval(got)
 		toks, _ := LexExpression(NormalizeExpression(s))
 		tokVal, terr := EvalTokens(toks, Binding{})
 		if werr == nil && herr == nil && terr == nil {
