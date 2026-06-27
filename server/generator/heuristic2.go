@@ -99,13 +99,15 @@ func BuildProblem(bitmap mathcore.ProblemType, target float64, rng *rand.Rand) (
 		if adm.RejectStage != "" {
 			continue
 		}
-		// Answer: the unknown's value for an equation, else the exact value of
-		// the rendered tokens (no hand-tracked value to drift).
+		// Answer: the unknown's value for an equation, else the value of the
+		// constructed tree. Render is faithful, so this equals the rendered
+		// expression's value; VerifyAnswerSymbolic re-checks it against the
+		// rendered tokens below, so a construction slip is still caught.
 		var ansVal *big.Rat
 		if unknown != nil {
 			ansVal = unknown
 		} else {
-			v, err := mathcore.EvalTokens(adm.Tokens, mathcore.Binding{})
+			v, err := mathcore.Eval(node, nil)
 			if err != nil {
 				continue
 			}
@@ -769,8 +771,8 @@ func buildMissingEquation(ctx buildCtx) (mathcore.Node, *big.Rat, bool) {
 	if !ok {
 		return nil, nil, false
 	}
-	total, ok := evalNode(node)
-	if !ok {
+	total, err := mathcore.Eval(node, nil)
+	if err != nil {
 		return nil, nil, false
 	}
 	// The RHS is rendered as a plain Num; a non-integer total would need a
@@ -934,18 +936,6 @@ func formatAnswer(v *big.Rat, decimal bool) string {
 		return mathcore.RatDecimalOrInt(v)
 	}
 	return v.Num().String() + "/" + v.Denom().String()
-}
-
-func evalNode(n mathcore.Node) (*big.Rat, bool) {
-	toks, lexErr := mathcore.LexExpression(mathcore.NormalizeExpression(mathcore.Render(n)))
-	if lexErr != nil {
-		return nil, false
-	}
-	v, err := mathcore.EvalTokens(toks, mathcore.Binding{})
-	if err != nil {
-		return nil, false
-	}
-	return v, true
 }
 
 // ri is a rational from an int (a value); numLit is an AST integer leaf.
