@@ -53,11 +53,11 @@ choices, and concepts are operand realizations chosen in the split (a fraction/d
 negative operand) or at a leaf. Concepts therefore COMPOSE — a single problem can carry a fraction,
 a division, and a decimal at once — with no per-concept template dispatch. A value concept can be a
 direct operand of ANY operator, including `*` and `/` (`3/8 * 5/3`, `0.2 * 3`, `4/5 / 2`): the
-multiplicative splits factor the fraction/decimal operand out of the answer, and the render spaces
-operators while leaving fraction literals unspaced (`3/4 / 2/3`) so the token grammar reads each
-slash unambiguously. Per-node invariants keep candidates clean by construction (the integer-division
-split keeps the dividend an exact multiple `a = v*b`; integers stay integers unless a value concept
-is active; values stay non-negative unless NEGATIVES is on). A knob inverter (`mathcore.RawForDifficulty(target)` → a magnitude/chain/concept budget,
+multiplicative splits factor the fraction/decimal operand out of the answer (the slash convention
+that keeps these unambiguous is in [problem-generation.md](problem-generation.md)). Per-node
+invariants keep candidates clean by construction (the integer-division split keeps the dividend an
+exact multiple `a = v*b`; integers stay integers unless a value concept is active; values stay
+non-negative unless NEGATIVES is on). A knob inverter (`mathcore.RawForDifficulty(target)` → a magnitude/chain/concept budget,
 minimal-concept-first, binding to the shared `mathcore` difficulty constants) sizes each attempt,
 and **generate-and-select** over the canonical pipeline (`AdmitExpression` + `VerifyAnswerSymbolic`
 + `DetectProblemTypeBitmap` + `EnvelopeViolation` + `ComputeProblemDifficulty`) keeps the closest

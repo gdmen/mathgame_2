@@ -587,11 +587,11 @@ func splitDiv(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
 }
 
 // splitMulFrac splits a fractional v into a*b with at least one non-integer
-// operand, so a fraction/decimal composes under multiplication. Because '*' and
-// '/' share precedence left-to-right, "an/ad * bn/bd" parses to exactly
-// (an*bn)/(ad*bd), so any non-integer-operand product renders unambiguously.
-// Answer-first: the operands are factored out of the given v so the tree stays
-// exact; realizeLeaf renders each as a decimal or fraction per the active concept.
+// operand, so a fraction/decimal composes under multiplication. Answer-first:
+// the operands are factored out of the given v so the tree stays exact;
+// realizeLeaf renders each as a decimal or fraction per the active concept (the
+// slash convention that keeps the product unambiguous is in
+// docs/problem-generation.md).
 //   - mismatched on:  two fractions with different denominators (3/8 * 5/3)
 //   - mismatched off: a single non-integer operand times an integer (1/6 * 5,
 //     0.2 * 3), which keeps a no-mismatched envelope satisfiable.
@@ -637,9 +637,8 @@ func splitMulFrac(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
 }
 
 // splitDivFrac splits a fractional v into a/b with a fraction dividend (a = v*b).
-// The render spaces operators ("3/4 / 2") and leaves fraction literals unspaced,
-// and the tokenizer reads a spaced slash as division and an unspaced one as a
-// fraction — so any operand shape parses unambiguously (no parens needed).
+// Any operand shape parses unambiguously (no parens needed) — see the slash
+// convention in docs/problem-generation.md.
 //   - mismatched on:  a, b fractions of different denominators ("5/4 / 2/3")
 //   - mismatched off: a single fraction over an integer ("3/2 / 2").
 func splitDivFrac(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
