@@ -1,10 +1,11 @@
-// parse.go: the structural inverse of Render — token stream -> AST.
+// parse.go: the expression grammar, token stream -> AST.
 //
-// Parse mirrors EvalTokens' grammar exactly (parens, then * and /, then + and
-// -, left-associative within a precedence level), so for any canonical
-// (Render-produced) expression s: Render(Parse(s)) == s, and the parsed tree
-// evaluates to EvalTokens(s). The slash fraction/division convention it relies
-// on is documented in docs/problem-generation.md.
+// Parse is the single implementation of the grammar (parens, then * and /, then
+// + and -, left-associative within a precedence level) and the structural
+// inverse of Render: for any canonical (Render-produced) expression s,
+// Render(Parse(s)) == s. EvalTokens folds the parsed tree (see Eval), so
+// precedence and associativity are defined here only. The slash
+// fraction/division convention is documented in docs/problem-generation.md.
 
 package mathcore
 

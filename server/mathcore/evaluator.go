@@ -1,8 +1,8 @@
 // evaluator.go: exact rational evaluation over lexer tokens.
 //
-// Two evaluators share one token stream:
-//   - EvalTokens: the CORRECT evaluation - recursive descent honoring
-//     parentheses and operator precedence.
+// Two evaluations share one token stream:
+//   - EvalTokens: the CORRECT evaluation - parses the tokens into the AST
+//     (Parse) and folds the tree (Eval), honoring parentheses and precedence.
 //   - EvalTokensNaiveLTR: the NAIVE evaluation - parentheses stripped, a
 //     single strict left-to-right fold.
 //
@@ -71,104 +71,52 @@ func applyOp(op byte, a, b *big.Rat) (*big.Rat, error) {
 	}
 }
 
-// EvalTokens evaluates one expression side (no TokEquals, no TokText)
-// correctly: parens, then * and /, then + and -, left-associative within a
-// precedence level. Grammar:
-//
-//	expr   := term  (('+'|'-') term)*
-//	term   := factor (('*'|'/') factor)*
-//	factor := NUMBER | FRACTION | MISSING | VARIABLE | '(' expr ')'
+// EvalTokens evaluates one expression side by parsing it into the AST (Parse)
+// and folding the tree (Eval). Precedence/associativity live only in Parse, so
+// there is one grammar implementation, not a second recursive descent here.
 func EvalTokens(toks []Token, bind Binding) (*big.Rat, error) {
-	if len(toks) == 0 {
-		return nil, errEvalEmpty
-	}
-	pos := 0
-	v, err := evalExpr(toks, &pos, bind)
+	node, err := ParseTokens(toks)
 	if err != nil {
-		return nil, err
-	}
-	if pos != len(toks) {
+		if err == errParseEmpty {
+			return nil, errEvalEmpty
+		}
 		return nil, errEvalMalformed
 	}
-	return v, nil
+	return Eval(node, bind)
 }
 
-func evalExpr(toks []Token, pos *int, bind Binding) (*big.Rat, error) {
-	left, err := evalTerm(toks, pos, bind)
-	if err != nil {
-		return nil, err
-	}
-	for *pos < len(toks) && toks[*pos].Kind == TokOperator &&
-		(toks[*pos].Op == '+' || toks[*pos].Op == '-') {
-		op := toks[*pos].Op
-		*pos++
-		right, err := evalTerm(toks, pos, bind)
+// Eval folds an AST node to an exact rational, resolving TokMissing/TokVariable
+// unknowns through bind (nil binds nothing, so an unknown errors). A coefficient
+// term is the BinaryExpr{'*', Num, Var} the parser builds, so it folds like any
+// other product. An Equation has no single value and errors.
+func Eval(n Node, bind Binding) (*big.Rat, error) {
+	switch t := n.(type) {
+	case Num:
+		return t.Value, nil
+	case Missing:
+		if v, ok := bind[bindingKeyMissing]; ok {
+			return v, nil
+		}
+		return nil, errEvalUnbound
+	case Var:
+		if v, ok := bind[t.Letter]; ok {
+			return v, nil
+		}
+		return nil, errEvalUnbound
+	case Paren:
+		return Eval(t.X, bind)
+	case BinaryExpr:
+		l, err := Eval(t.L, bind)
 		if err != nil {
 			return nil, err
 		}
-		left, err = applyOp(op, left, right)
+		r, err := Eval(t.R, bind)
 		if err != nil {
 			return nil, err
 		}
+		return applyOp(t.Op, l, r)
 	}
-	return left, nil
-}
-
-func evalTerm(toks []Token, pos *int, bind Binding) (*big.Rat, error) {
-	left, err := evalFactor(toks, pos, bind)
-	if err != nil {
-		return nil, err
-	}
-	for *pos < len(toks) && toks[*pos].Kind == TokOperator &&
-		(toks[*pos].Op == '*' || toks[*pos].Op == '/') {
-		op := toks[*pos].Op
-		*pos++
-		right, err := evalFactor(toks, pos, bind)
-		if err != nil {
-			return nil, err
-		}
-		left, err = applyOp(op, left, right)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return left, nil
-}
-
-func evalFactor(toks []Token, pos *int, bind Binding) (*big.Rat, error) {
-	if *pos >= len(toks) {
-		return nil, errEvalMalformed
-	}
-	t := toks[*pos]
-	if t.Kind == TokParenOpen {
-		*pos++
-		v, err := evalExpr(toks, pos, bind)
-		if err != nil {
-			return nil, err
-		}
-		if *pos >= len(toks) || toks[*pos].Kind != TokParenClose {
-			return nil, errEvalMalformed
-		}
-		*pos++
-		return v, nil
-	}
-	v, err := resolveOperand(t, bind)
-	if err != nil {
-		return nil, err
-	}
-	*pos++
-	// Implicit coefficient multiplication: NUMBER immediately followed by a
-	// coefficient variable (3x) is one operand, value number*variable.
-	if t.Kind == TokNumber && *pos < len(toks) &&
-		toks[*pos].Kind == TokVariable && toks[*pos].HasCoefficient {
-		vv, err := resolveOperand(toks[*pos], bind)
-		if err != nil {
-			return nil, err
-		}
-		*pos++
-		v = new(big.Rat).Mul(v, vv)
-	}
-	return v, nil
+	return nil, errEvalMalformed
 }
 
 // EvalTokensNaiveLTR evaluates one expression side as a naive reader with no

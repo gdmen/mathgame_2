@@ -251,6 +251,37 @@ func TestParseRoundTripRandom(t *testing.T) {
 	}
 }
 
+func TestEval(t *testing.T) {
+	n := func(i int64) Num { return Num{Value: big.NewRat(i, 1)} }
+	eq := func(got *big.Rat, err error, want int64) bool {
+		return err == nil && got != nil && got.Cmp(big.NewRat(want, 1)) == 0
+	}
+
+	// precedence via the parsed tree: (2 + 3) * 4 = 20
+	if v, err := Eval(BinaryExpr{Op: '*', L: Paren{X: BinaryExpr{Op: '+', L: n(2), R: n(3)}}, R: n(4)}, nil); !eq(v, err, 20) {
+		t.Errorf("(2+3)*4 = %v (%v)", v, err)
+	}
+	// coefficient term folds as a product: 3x with x=5 -> 15
+	coeff := BinaryExpr{Op: '*', L: n(3), R: Var{Letter: 'x', HasCoefficient: true}}
+	if v, err := Eval(coeff, Binding{'x': big.NewRat(5, 1)}); !eq(v, err, 15) {
+		t.Errorf("3x[x=5] = %v (%v)", v, err)
+	}
+	// bound missing
+	if v, err := Eval(Missing{}, Binding{bindingKeyMissing: big.NewRat(7, 1)}); !eq(v, err, 7) {
+		t.Errorf("?[?=7] = %v (%v)", v, err)
+	}
+	// error cases: unbound unknown, division by zero, equation (no single value)
+	if _, err := Eval(Var{Letter: 'x'}, nil); err == nil {
+		t.Error("unbound variable should error")
+	}
+	if _, err := Eval(BinaryExpr{Op: '/', L: n(1), R: n(0)}, nil); err == nil {
+		t.Error("division by zero should error")
+	}
+	if _, err := Eval(Equation{LHS: n(1), RHS: n(1)}, nil); err == nil {
+		t.Error("equation should error (no single value)")
+	}
+}
+
 func TestParseRejectsText(t *testing.T) {
 	if _, err := Parse(`5 + \text{apples}`); err == nil {
 		t.Error("Parse accepted a \\text token; WORD problems are not in the AST")

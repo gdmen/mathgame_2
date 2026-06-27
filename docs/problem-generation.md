@@ -151,8 +151,10 @@ unambiguously. `Parse` (`mathcore/parse.go`) is the structural inverse of
 `Render(Parse(s)) == s` and the parsed tree evaluates to `EvalTokens(s)` (the
 tree is recovered up to the associativity of a same-precedence run). `\text{}`
 (WORD) has no AST and is rejected. Pinned by `TestParseRoundTrip*` and
-`TestRenderFlowsThroughPipeline`. Evaluation still flows through the token
-cursor; making the AST the authoritative evaluator is #293.
+`TestRenderFlowsThroughPipeline`. `EvalTokens` evaluates by parsing the stream
+into this AST (`Parse`) and folding it (`Eval`), so the grammar has a single
+implementation. (`ComputeProblemDifficulty` and `DetectProblemTypeBitmap` still
+read the token stream directly.)
 
 Storage keeps the **original notation** (`\frac{1}{2}`, `\times` render
 through KaTeX); normalization is a parsing concern. Only the stage-1.5 `?`

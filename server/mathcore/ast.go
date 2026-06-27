@@ -5,8 +5,8 @@
 // is known as it is built, so no tree-walking evaluator is needed to know the
 // answer) and renders them to normalized ASCII that flows through the canonical
 // token pipeline (LexExpression / EvalTokens / DetectProblemTypeBitmap /
-// ComputeProblemDifficulty). The token-cursor evaluator is the authoritative
-// evaluator.
+// ComputeProblemDifficulty). EvalTokens evaluates by parsing the stream into
+// this AST (Parse) and folding it (Eval).
 //
 // Render output feeds construction and the pipeline; admission storage keeps the
 // original notation in Admission.Expr.
