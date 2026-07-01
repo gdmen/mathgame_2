@@ -3,13 +3,13 @@
 // Part of the problem-generation system - documented in
 // docs/problem-generation.md. Behavior changes here (rules, presets,
 // ceiling constants) REQUIRE updating that doc in the same PR and must stay
-// consistent with the server (server/api/difficulty.go owns the ceiling
+// consistent with the server (server/mathcore/difficulty.go owns the ceiling
 // authoritatively - the server clamps on save; this copy only sizes the UI).
 import { ProblemTypes } from "./enums.js";
 
 const T = ProblemTypes;
 
-// MIN_TARGET_DIFFICULTY mirrors server/api/difficulty.go MinTargetDifficulty:
+// MIN_TARGET_DIFFICULTY mirrors server/mathcore/difficulty.go MinTargetDifficulty:
 // the slider floor (the easiest problems the pool populates score ~3.5).
 const MIN_TARGET_DIFFICULTY = 3;
 
@@ -58,7 +58,7 @@ const validateBitmap = (bitmap) => {
   return { valid: true };
 };
 
-// maxDiffForBitmap mirrors server/api/difficulty.go MaxDiffForBitmap: the
+// maxDiffForBitmap mirrors server/mathcore/difficulty.go MaxDiffForBitmap: the
 // difficulty of the hardest problem the enabled bits can express. Used to
 // size the target-difficulty slider (the slider range IS the envelope).
 // Either/or rule: MISSING_NUMBER and SINGLE_VARIABLE are per-problem

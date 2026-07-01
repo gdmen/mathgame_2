@@ -38,7 +38,10 @@ Both are mounted by `MainView` in `web/src/index.js`.
    "add a video first" gate, where `customGetPlayData` returns Forbidden when the user has no
    enabled video. Empty / invalid bodies are logged and swallowed.
 2. **Render LaTeX.** `problem.expression` is run through `PreprocessExpression` and rendered to an
-   HTML string with KaTeX (`PlayView`, the `renderLatex` effect). A render failure posts a
+   HTML string with KaTeX (`PlayView`, the `renderLatex` effect). `PreprocessExpression` wraps
+   multi-digit numbers in `\text{}`, splits `\text{}` blocks for word-wrap, and escapes a bare `%`
+   to `\%` (KaTeX reads a bare `%` as a comment and would eat the rest of the expression). A render
+   failure posts a
    `bad_problem_system` event and swaps in the server-supplied replacement problem; if the server
    returns no replacement, it reloads `/play`. A corrupt expression self-heals without a visible
    error.

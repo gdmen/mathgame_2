@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -235,9 +236,10 @@ func (a *Api) generateProblemsBackground(logPrefix string, settings *Settings) e
 	return nil
 }
 
-// runHeuristicGenerator generates problems using the heuristic generator.
-// Supports ADDITION, SUBTRACTION, MULTIPLICATION, DIVISION, FRACTIONS, NEGATIVES.
-// WORD problems should be generated via the LLM generator instead.
+// runHeuristicGenerator generates problems using the difficulty-targeting
+// heuristic_2.0 builder. Supports every non-WORD bit and arbitrary stacks of
+// them (the builder aims at the target difficulty within the envelope).
+// WORD problems are generated via the LLM generator instead.
 // Returns the last new problem created, the count of new problems, and the set
 // of unique IDs.
 //
@@ -249,46 +251,16 @@ func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numPro
 	uniqueIds := map[uint32]bool{}
 	newCount := 0
 	var newProblem *Problem
-	operations := []string{}
-	if (mathcore.ADDITION & problemType) > 0 {
-		operations = append(operations, "+")
-	}
-	if (mathcore.SUBTRACTION & problemType) > 0 {
-		operations = append(operations, "-")
-	}
-	if (mathcore.MULTIPLICATION & problemType) > 0 {
-		operations = append(operations, "*")
-	}
-	if (mathcore.DIVISION & problemType) > 0 {
-		operations = append(operations, "/")
-	}
-	if len(operations) == 0 {
+	if problemType&(mathcore.ADDITION|mathcore.SUBTRACTION|mathcore.MULTIPLICATION|mathcore.DIVISION) == 0 {
 		return nil, 0, uniqueIds
 	}
-	// Bit-driven generator config: magnitude bits set the operand
-	// bound, MISSING_NUMBER/CHAINED_OPERATIONS gate the templates, and
-	// MISMATCHED_DENOMINATORS gates unlike-denominator fractions.
-	maxOperand := mathcore.SmallMaxOperand
-	if (mathcore.MEDIUM_NUMBERS & problemType) > 0 {
-		maxOperand = mathcore.MediumMaxOperand
-	}
-	if (mathcore.LARGE_NUMBERS & problemType) > 0 {
-		maxOperand = mathcore.LargeMaxOperand
-	}
-	generatorOpts := &heuristic_generator.Options{
-		Operations:       operations,
-		Fractions:        (mathcore.FRACTIONS & problemType) > 0,
-		Negatives:        (mathcore.NEGATIVES & problemType) > 0,
-		TargetDifficulty: settings.TargetDifficulty,
-		MaxOperand:       maxOperand,
-		AllowMissing:     (mathcore.MISSING_NUMBER & problemType) > 0,
-		AllowMultiOp:     (mathcore.CHAINED_OPERATIONS & problemType) > 0,
-		MaxChainLen:      mathcore.MaxChainLen,
-		SameDenomOnly:    (mathcore.MISMATCHED_DENOMINATORS & problemType) == 0,
-	}
+	// heuristic_2.0 is difficulty-targeting: it takes the envelope bitmap and the
+	// user's target_difficulty directly and aims each candidate at it (the
+	// magnitude bracket, chain length, and concept subset are derived internally).
+	rng := rand.New(rand.NewSource(rand.Int63()))
 	funnel := newGenerationFunnel(numProblems)
 	for i := 0; i < numProblems; i++ {
-		expr, answer, _, err := heuristic_generator.GenerateProblem(generatorOpts)
+		expr, answer, err := heuristic_generator.BuildProblem(problemType, settings.TargetDifficulty, rng)
 		if err != nil {
 			if _, ok := err.(*heuristic_generator.OptionsError); ok {
 				glog.Errorf("%s Failed options validation: %v", logPrefix, err)
@@ -327,13 +299,19 @@ func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numPro
 
 		model := &Problem{}
 		model.Generator = heuristic_generator.VERSION
-		model.Expression = adm.Expr
+		// adm.Expr is the canonical grammar form (unspaced a/b fractions); it is
+		// the machine form (scored, answer-checked, and a word generator's
+		// prose feedstock), stored in symbolic_expression. expression carries the
+		// \frac display skin so a fraction under division renders unambiguously.
+		model.Expression = mathcore.DisplayExpression(adm.Expr)
+		model.SymbolicExpression = adm.Expr
 		model.Answer = answer
 		model.ProblemTypeBitmap = bitmap
 		// Stored difficulty is a function of the problem itself, not the
-		// requester's target - the pool is shared across users. The heuristic
-		// only emits symbolic problems, so there is no symbolic_expression.
-		model.Difficulty = mathcore.ComputeProblemDifficulty(adm.Expr, "")
+		// requester's target - the pool is shared across users. Scored from the
+		// grammar form; the \frac display carries no \text{}, so it is not a
+		// word problem and takes no word bonus.
+		model.Difficulty = mathcore.ComputeProblemDifficulty(model.Expression, model.SymbolicExpression)
 		model.DifficultyVersion = mathcore.DifficultyVersion
 		glog.Infof("%s heuristic problem: %s = %s (computed_diff=%g bitmap=%d)", logPrefix, model.Expression, model.Answer, model.Difficulty, model.ProblemTypeBitmap)
 		h := fnv.New32a()
