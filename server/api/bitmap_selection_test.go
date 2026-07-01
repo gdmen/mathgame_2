@@ -1,6 +1,7 @@
 package api
 
 import (
+	"math/rand"
 	"testing"
 
 	"garydmenezes.com/mathgame/server/common"
@@ -135,18 +136,13 @@ func TestSelection_PrefersNewestGeneratorVersion(t *testing.T) {
 // bit-driven generator never emits multi-operator expressions, and every
 // number respects the magnitude bound, across many samples.
 func TestHeuristicFromBits_ChainedOff(t *testing.T) {
-	opts := &heuristic_generator.Options{
-		Operations:    []string{"+", "-"},
-		MaxOperand:    12,
-		AllowMissing:  true,
-		AllowMultiOp:  false,
-		MaxChainLen:   mathcore.MaxChainLen,
-		SameDenomOnly: true,
-	}
+	bitmap := mathcore.ADDITION | mathcore.SUBTRACTION | mathcore.MISSING_NUMBER
+	rng := rand.New(rand.NewSource(1))
 	for i := 0; i < 200; i++ {
-		expr, answer, _, err := heuristic_generator.GenerateProblem(opts)
+		target := 3.0 + float64(i%6) // span the default-envelope band
+		expr, answer, err := heuristic_generator.BuildProblem(bitmap, target, rng)
 		if err != nil {
-			t.Fatalf("GenerateProblem: %v", err)
+			t.Fatalf("BuildProblem: %v", err)
 		}
 		bd := mathcore.ComputeDifficultyBreakdown(expr)
 		if bd.NumOps >= 2 {
