@@ -15,10 +15,11 @@ func TestNormalizeExpression(t *testing.T) {
 		{`\left(3 + 5\right) * 2`, `(3 + 5) * 2`},
 		{`\frac{1}{2} + \frac{3}{4}`, `1/2 + 3/4`},
 		{`\dfrac{1}{2}`, `1/2`},
-		{`12 − 5`, `12 - 5`}, // unicode minus
-		{`9 × 12`, `9 * 12`}, // unicode multiplication sign
-		{`96 ÷ 8`, `96 / 8`}, // unicode division sign
-		{`3 + 5`, `3 + 5`},   // untouched
+		{`12 − 5`, `12 - 5`},    // unicode minus
+		{`9 × 12`, `9 * 12`},    // unicode multiplication sign
+		{`96 ÷ 8`, `96 / 8`},    // unicode division sign
+		{`70\% + 5`, `70% + 5`}, // escaped percent unescapes to literal %
+		{`3 + 5`, `3 + 5`},      // untouched
 		// Census-driven entries (2026-06 backfill dry run):
 		{`$15 + $5`, `15 + 5`},      // money prefix stripped
 		{`\$200 - 50`, `200 - 50`},  // escaped money prefix
@@ -29,6 +30,34 @@ func TestNormalizeExpression(t *testing.T) {
 	for _, tc := range cases {
 		if got := NormalizeExpression(tc.in); got != tc.want {
 			t.Errorf("Normalize(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+// TestDisplayExpression: unspaced a/b fraction literals fold to \frac{a}{b} and
+// the division obelus folds to \div; non-fraction text is left alone. The
+// display form normalizes to the same canonical grammar as its input (the
+// storage invariant: NormalizeExpression bridges display and grammar).
+func TestDisplayExpression(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{`58/3 ÷ 8`, `\frac{58}{3} \div 8`},           // fraction dividend under division
+		{`5/4 ÷ 2/3`, `\frac{5}{4} \div \frac{2}{3}`}, // fraction ÷ fraction
+		{`3/4 * 5`, `\frac{3}{4} \times 5`},           // multiplication → \times
+		{`6 ÷ 3`, `6 \div 3`},                         // pure division: no fraction literal
+		{`70% ÷ 7`, `70\% \div 7`},                    // percent escaped (KaTeX comment otherwise)
+		{`25% + 10%`, `25\% + 10\%`},                  // every percent escaped
+		{`47 + 28`, `47 + 28`},                        // no fractions: passthrough
+		{`1/2`, `\frac{1}{2}`},
+	}
+	for _, tc := range cases {
+		got := DisplayExpression(tc.in)
+		if got != tc.want {
+			t.Errorf("DisplayExpression(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+		if a, b := NormalizeExpression(got), NormalizeExpression(tc.in); a != b {
+			t.Errorf("invariant broken: NormalizeExpression(display)=%q != NormalizeExpression(grammar)=%q", a, b)
 		}
 	}
 }
