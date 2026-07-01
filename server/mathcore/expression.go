@@ -85,9 +85,15 @@ var normalizeReplacer = strings.NewReplacer(
 	"÷", "/", // unicode division sign
 	`\$`, "", // money prefix (escaped form): $15 means the number 15
 	"$", "",
+	`\%`, "%", // escaped percent (display form) folds back to the literal %
 )
 
 var reFracCmd = regexp.MustCompile(`\\frac\{(\d+)\}\{(\d+)\}`)
+
+// reFracLiteral matches an unspaced a/b fraction literal — the canonical
+// fraction notation. The spaced form (a / b) is the division operator and is
+// left alone, so this is the exact inverse of reFracCmd.
+var reFracLiteral = regexp.MustCompile(`(\d+)/(\d+)`)
 
 // reThousands joins thousands separators (15,000 -> 15000). The trailing
 // group must not be a digit, so 12,3456 (garbage) is left alone; applied in
@@ -114,14 +120,28 @@ func NormalizeExpression(expr string) string {
 	return s
 }
 
+// DisplayExpression converts a canonical (Render-produced) symbolic expression
+// to valid, human-facing KaTeX: unspaced a/b → \frac{a}{b} (stacked fraction),
+// ÷ → \div, * → \times, and a literal % → \% (KaTeX reads a bare % as a comment
+// that eats the rest of the expression). The result is self-contained valid
+// LaTeX; NormalizeExpression folds every one of these back to the grammar form,
+// so it round-trips. This is a presentation skin applied at storage time,
+// intended for symbolic (non-WORD) expressions.
+func DisplayExpression(expr string) string {
+	s := reFracLiteral.ReplaceAllString(expr, `\frac{$1}{$2}`)
+	s = strings.ReplaceAll(s, " ÷ ", ` \div `)
+	s = strings.ReplaceAll(s, " * ", ` \times `)
+	return strings.ReplaceAll(s, "%", `\%`)
+}
+
 func isDigit(c byte) bool  { return c >= '0' && c <= '9' }
 func isLetter(c byte) bool { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') }
 func isSpace(c byte) bool  { return c == ' ' || c == '\t' || c == '\n' || c == '\r' }
 
 // LexExpression tokenizes a normalized expression against the allowlist
-// alphabet. Returns the first unknown token as a LexError. The fraction
-// convention: a/b with NO spaces around the slash is a fraction; a spaced
-// slash is the division operator.
+// alphabet. Returns the first unknown token as a LexError. The slash convention
+// distinguishing a fraction from division is documented in
+// docs/problem-generation.md.
 func LexExpression(expr string) ([]Token, *LexError) {
 	var toks []Token
 	i := 0
