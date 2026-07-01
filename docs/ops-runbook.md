@@ -243,6 +243,7 @@ Every DB tool takes `-config` (default `conf.json`) and connects with the
 | Tool | Flags | Purpose |
 |---|---|---|
 | `diagnose_generation` | `-bitmap`, `-target`, `-epsilon`, `-n`, `-model` | runs the real LLM generator for a fixed envelope+target and reports the computed-difficulty distribution, admission/envelope outcome, in-window count, and WORD `symbolic_expression` validity. Writes nothing; needs a live `openai_api_key` in `conf.json` (reads from CWD). `-model` overrides the generator default for model-tier A/B (#263). |
+| `compare_generators` | `-cells`, `-samples`, `-seed`, `-mode` | informational heuristic_2.0 review (#283): reads the pool from a snapshot and reports LLM-offload + coverage gaps. `-mode=samples` (default) puts fresh heuristic_2.0 output beside stored heuristic_1.0/llm rows in the highest-volume cells; `-mode=matrix` instead prints a complete per-bitmap difficulty-coverage grid over every distinct symbolic bitmap (not just the volume-ranked top). Writes nothing; needs MySQL creds in `conf.json`. NOT a merge gate (the CI B-gate is). |
 | `verify_migrations` | `-before-config`, `-after-config` | one-off consistency check across the video de-dup/remap migrations (a pre-migration DB vs. a migrated one); does not run migrations. |
 | `clean_test_dbs` | `-config` (default `test_conf.json`) | drops `mathgame_test_*` databases; invoked by `make clean`. |
 
@@ -291,6 +292,7 @@ watchdog a quiet no-op. To add a watch, append a
   `cmd/revalidate_word_problems/main.go` — generation backfills (contract in
   `docs/problem-generation.md`).
 - `cmd/diagnose_generation/main.go` — generation diagnostics.
+- `cmd/compare_generators/main.go` — heuristic_2.0 vs heuristic_1.0/llm pool comparison (#283).
 
 ## Extension checklists
 
