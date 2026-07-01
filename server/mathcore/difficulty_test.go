@@ -241,6 +241,28 @@ func TestComputeProblemDifficulty_WordScoredFromSymbolic(t *testing.T) {
 	}
 }
 
+// TestComputeProblemDifficulty_SymbolicWithoutProseIsNotWord: the word bonus
+// keys on \text{} in the expression, not on symbolic_expression being present.
+// A heuristic_2.0 problem stores its grammar in symbolic_expression and a \frac
+// display (no \text{}) in expression, so it is scored from the grammar with no
+// word bonus - identical to scoring the grammar alone.
+func TestComputeProblemDifficulty_SymbolicWithoutProseIsNotWord(t *testing.T) {
+	grammar := "58/3 ÷ 8"
+	display := DisplayExpression(grammar) // \frac{58}{3} \div 8 - carries no \text{}
+
+	grammarOnly := ComputeProblemDifficulty(grammar, "")
+	dual := ComputeProblemDifficulty(display, grammar)
+	if math.Abs(dual-grammarOnly) > 1e-9 {
+		t.Errorf("display+symbolic (%.4f) must match grammar-only (%.4f): a non-prose expression earns no word bonus", dual, grammarOnly)
+	}
+
+	// Contrast: the SAME symbolic under a \text{} expression IS a word problem.
+	word := ComputeProblemDifficulty(`\text{share `+grammar+`}`, grammar)
+	if word <= grammarOnly {
+		t.Errorf("prose expression (%.4f) should exceed the non-word score (%.4f) by the word bonus", word, grammarOnly)
+	}
+}
+
 // TestMaxDiffForBitmap_PerBitCeilings pins the per-bit ceiling-lift table
 // (each row = ADD|SUB baseline plus the named bits).
 func TestMaxDiffForBitmap_PerBitCeilings(t *testing.T) {
@@ -362,5 +384,20 @@ func TestParseProblemFeatures_BitInputs(t *testing.T) {
 	f = parseProblemFeatures("? + 5 = 12")
 	if !f.hasMissing || f.numOps != 1 {
 		t.Errorf("'=' must not count as an op; ?+5=12 should be numOps=1: %+v", f)
+	}
+}
+
+// TestRawForDifficultyRoundTrip: RawForDifficulty inverts compressRaw across
+// the working difficulty band, so the heuristic_2.0 aimer and the scorer agree.
+func TestRawForDifficultyRoundTrip(t *testing.T) {
+	for d := 1.0; d <= 40.0; d += 0.5 {
+		raw := RawForDifficulty(d)
+		if raw <= 0 {
+			continue // at/below the scale floor the inverse is non-physical
+		}
+		got := compressRaw(raw)
+		if math.Abs(got-d) > 1e-9 {
+			t.Errorf("compressRaw(RawForDifficulty(%.1f)) = %.6f, want %.1f", d, got, d)
+		}
 	}
 }

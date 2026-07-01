@@ -75,12 +75,14 @@ var problemTypeValues = map[string]ProblemType{
 	"percentages":             PERCENTAGES,
 }
 
-// Convert a ProblemType Bitmap into an array of string features
+// Convert a ProblemType Bitmap into an array of string features. Bits are
+// emitted in definition (ascending bit) order so the result is deterministic —
+// a map range would shuffle it per call.
 func ProblemTypeToFeatures(pt ProblemType) []string {
 	features := []string{}
-	for k, v := range problemTypeNames {
-		if (k & pt) > 0 {
-			features = append(features, v)
+	for bit := ProblemType(1); bit <= ALL_PROBLEM_TYPES; bit <<= 1 {
+		if pt&bit != 0 {
+			features = append(features, problemTypeNames[bit])
 		}
 	}
 	return features
