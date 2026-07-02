@@ -596,6 +596,18 @@ func MaxDiffForBitmap(bitmap uint64) float64 {
 	return compressRaw(rawBest)
 }
 
+// TargetForBucket is the difficulty a generator is actually asked for in a
+// (bitmap, difficulty-bucket) cell: the bucket, clamped down to the envelope's
+// serving ceiling. Buckets above the ceiling name a band that is empty by
+// construction, so the realistic ask is min(bucket, MaxDiffForBitmap).
+func TargetForBucket(bitmap uint64, bucket int) float64 {
+	ceil := MaxDiffForBitmap(bitmap)
+	if float64(bucket) > ceil {
+		return ceil
+	}
+	return float64(bucket)
+}
+
 func maxInt(a, b int) int {
 	if a > b {
 		return a

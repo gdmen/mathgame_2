@@ -15,6 +15,7 @@ them.
 difficulty_version: 0.3
 max_chain_len: 5
 large_max_operand: 9999
+valid_bitmap_count: 12960
 bits: addition, subtraction, multiplication, division, fractions, negatives, word, medium_numbers, large_numbers, chained_operations, missing_number, mismatched_denominators, decimals, pemdas, single_variable, percentages
 ```
 <!-- END DOC-SYNC ANCHORS -->
@@ -107,10 +108,29 @@ ambiguous/multi-answer); an unknown requires an equation
 (`CountDistinctUnknowns`, `expression.go`; `VerifyAnswerSymbolic`,
 `stamping.go`).
 
-**Settings-level dependency rules** (`web/src/bitmap_validation.js`,
-mirrored nowhere else — API clients bypassing them degrade gracefully):
-at least one core operation; LARGE ⇒ MEDIUM; MISMATCHED ⇒ FRACTIONS;
-PEMDAS ⇒ CHAINED.
+**Settings-level dependency rules** — at least one core operation; LARGE ⇒
+MEDIUM; MISMATCHED ⇒ FRACTIONS; PEMDAS ⇒ CHAINED. This doc is the canonical
+statement; the rules are enforced client-side in `web/src/bitmap_validation.js`
+(the settings UI — API clients bypassing it degrade gracefully) and mirrored,
+WORD excluded, in `server/mathcore/bitmap.go` (`ValidBitmap`) for the servable
+non-WORD envelope space. Keep the two in sync with this doc when the rules
+change.
+
+**The valid non-WORD bitmap space.** `EnumerateValidBitmaps`
+(`server/mathcore/bitmap.go`) materializes every bitmap that passes `ValidBitmap`
+— exactly **12,960** (`valid_bitmap_count` anchor): 15 core-op combos × 3
+(LARGE/MEDIUM brackets) × 3 (MISMATCHED/FRACTIONS) × 3 (PEMDAS/CHAINED) × 2⁵ free
+concept bits. It walks `0..ALL_PROBLEM_TYPES` filtering by `ValidBitmap` (~65k
+pure bit-tests). The admin bitmap × difficulty coverage matrix
+(`server/api/admin_bitmap_matrix.go`) live-generates one heuristic_2.0 example
+per (bitmap, difficulty) cell across this whole space.
+
+The read side of that report folds pool usage back through a **stamped→settings
+normalization**: stamping is bracket-based, so a magnitude ≥ 100 stamps
+LARGE_NUMBERS *alone*, while these settings rules require LARGE ⇒ MEDIUM. Before
+matching a stamped pool row to an enumerated envelope, OR MEDIUM_NUMBERS into any
+stamped bitmap carrying LARGE_NUMBERS (`computeBitmapMatrixReport`). This is the
+only stamped/settings divergence for non-WORD rows.
 
 ## The insert (admission) pipeline
 

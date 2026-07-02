@@ -16,6 +16,7 @@ import { ProgressView } from "./progress.js";
 import { CompanionView } from "./companion.js";
 import { AdminHomeView } from "./admin_home.js";
 import { DifficultyCalibrationView } from "./admin_calibration.js";
+import { BitmapMatrixView } from "./admin_bitmap_matrix.js";
 import { StyleGuideView } from "./style_guide.js";
 
 import "./index.scss";
@@ -124,6 +125,13 @@ const MainView = ({
                 apiUrl={apiUrl}
                 user={user}
               />
+            ) : (
+              <NotFound />
+            )}
+          </Route>
+          <Route exact path="/admin/bitmap-matrix">
+            {isAdmin ? (
+              <BitmapMatrixView token={token} apiUrl={apiUrl} user={user} />
             ) : (
               <NotFound />
             )}

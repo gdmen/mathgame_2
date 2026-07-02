@@ -13,6 +13,7 @@ import (
 
 	"garydmenezes.com/mathgame/server/common"
 	"garydmenezes.com/mathgame/server/common/auth0"
+	"garydmenezes.com/mathgame/server/mathcore"
 )
 
 const (
@@ -66,6 +67,11 @@ type Api struct {
 	gamestateManager *GamestateManager
 	eventManager     *EventManager
 	playlistManager  *PlaylistManager
+
+	// bitmapMatrixBitmaps overrides the bitmap universe the coverage-matrix
+	// recompute walks. nil = the full mathcore.EnumerateValidBitmaps() space;
+	// tests inject a tiny slice so the recompute stays fast.
+	bitmapMatrixBitmaps []mathcore.ProblemType
 }
 
 func NewApi(db *sql.DB, cfg *common.Config) (*Api, error) {
@@ -125,6 +131,10 @@ func (a *Api) GetRouter() *gin.Engine {
 	// TODO: limit allowed origins
 	config.AllowAllOrigins = true
 	config.AllowHeaders = append(config.AllowHeaders, "Authorization")
+	// The bitmap-matrix GET carries its report metadata in response headers (the
+	// body is the raw gzipped report); expose them so cross-origin JS can read
+	// the computing/progress state.
+	config.ExposeHeaders = []string{"X-Has-Report", "X-Computing", "X-Compute-Done", "X-Compute-Total", "X-Computed-At"}
 	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
 	router.Use(cors.New(config))
 
@@ -200,6 +210,9 @@ func (a *Api) GetRouter() *gin.Engine {
 			admin.GET("/whoami", a.adminWhoami)
 			admin.GET("/difficulty-calibration", a.adminDifficultyCalibration)
 			admin.POST("/difficulty-calibration/recompute", a.adminRecomputeCalibration)
+			admin.GET("/bitmap-matrix", a.adminBitmapMatrix)
+			admin.POST("/bitmap-matrix/recompute", a.adminRecomputeBitmapMatrix)
+			admin.GET("/bitmap-matrix/cell", a.adminBitmapMatrixCell)
 		}
 	}
 	return router

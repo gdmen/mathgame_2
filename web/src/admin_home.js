@@ -10,6 +10,11 @@ const tools = [
     desc: "Sample the live pool per difficulty bucket to calibrate ComputeProblemDifficulty.",
   },
   {
+    path: "/admin/bitmap-matrix",
+    label: "Bitmap × difficulty matrix",
+    desc: "Live heuristic_2.0 example per (bitmap, difficulty) cell across the whole valid bitmap space, with a pool-usage heatmap.",
+  },
+  {
     path: "/admin/style-guide",
     label: "Style guide",
     desc: "Design tokens and component patterns.",
