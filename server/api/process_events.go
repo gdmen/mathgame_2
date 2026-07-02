@@ -199,8 +199,6 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		if !mathcore.AnswersEquivalent(event.Value, problem.Answer) {
 			msg := fmt.Sprintf("Incorrect answer: {%s}, expected: {%s}", event.Value, problem.Answer)
 			glog.Infof("%s %s", logPrefix, msg)
-			// Track incorrect attempt per topic
-			a.recordTopicAttempt(logPrefix, user.Id, problem.ProblemTypeBitmap, false, settings.TargetDifficulty)
 			// Add to spaced repetition review queue
 			a.addToReviewQueue(logPrefix, user.Id, gamestate.ProblemId)
 		} else { // Answer was correct
@@ -208,8 +206,6 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 				EventType: SOLVED_PROBLEM,
 				Value:     strconv.FormatUint(uint64(gamestate.ProblemId), 10),
 			})
-			// Track correct attempt per topic
-			a.recordTopicAttempt(logPrefix, user.Id, problem.ProblemTypeBitmap, true, settings.TargetDifficulty)
 			// Advance spaced repetition if this was a review problem
 			a.advanceReviewQueue(logPrefix, user.Id, gamestate.ProblemId)
 			// Update counts
@@ -346,14 +342,6 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 			}
 		}
 		glog.Infof("%s modified difficulty & num problems: %v, %v", logPrefix, settings.TargetDifficulty, gamestate.Target)
-
-		// Adjust per-topic difficulties based on accuracy
-		topicStats, tsErr := a.getTopicStats(user.Id)
-		if tsErr != nil {
-			glog.Errorf("%s getTopicStats: %v", logPrefix, tsErr)
-		} else {
-			a.adjustTopicDifficulty(logPrefix, user.Id, topicStats)
-		}
 
 		// Reset solved progress
 		gamestate.Solved = 0

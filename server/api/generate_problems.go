@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
-	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -68,9 +67,7 @@ func formatUintsForSQLIn[T ~uint32 | ~uint64](vals []T) string {
 // backfill census flags such rows for review; this clause keeps them out of
 // selection regardless.
 //
-// An enabled bit means that feature MAY be served, never that it MUST be:
-// pool-supply weighting in chooseWeightedTopic keeps rare topics in
-// rotation by lottery weight, not by force.
+// An enabled bit means that feature MAY be served, never that it MUST be.
 func (a *Api) getSatisfyingProblemIds(logPrefix string, settings *Settings, prevIds *[]uint32) (*[]uint32, error) {
 	diffLowerBound := settings.TargetDifficulty - problemSelectionEpsilon
 	diffUpperBound := settings.TargetDifficulty + problemSelectionEpsilon
@@ -134,40 +131,6 @@ func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings
 		glog.Infof("%s spaced rep problem=%d unavailable: %s %v", logPrefix, dueReviewID, msg, err)
 	}
 
-	// Try topic-weighted selection first
-	topicStats, tsErr := a.getTopicStats(settings.UserId)
-	if tsErr != nil {
-		glog.Errorf("%s getTopicStats: %v (falling back to default selection)", logPrefix, tsErr)
-		topicStats = nil
-	}
-
-	if topicStats != nil && len(topicStats) > 0 {
-		targetTopic, topicDiff := chooseWeightedTopic(topicStats, settings.ProblemTypeBitmap, settings.TargetDifficulty, rand.Intn, a.poolCountsByBit(logPrefix))
-		if targetTopic != 0 {
-			glog.Infof("%s topic-weighted selection: topic=%d difficulty=%.2f", logPrefix, targetTopic, topicDiff)
-			// Build a topic-specific settings to query with the topic's difficulty
-			topicSettings := *settings
-			topicSettings.TargetDifficulty = topicDiff
-			// Only include permutations that contain the target topic
-			topicSettings.ProblemTypeBitmap = settings.ProblemTypeBitmap // keep all enabled, filter below
-			pids, err := a.getSatisfyingProblemIdsForTopic(logPrefix, &topicSettings, prevIds, targetTopic)
-			// Topic-specific pool too small, trigger background generation
-			if err == nil && len(*pids) < minSelectionPool {
-				glog.Infof("%s topic pool small (%d), generating more", logPrefix, len(*pids))
-				a.generateProblemsBackground(logPrefix, &topicSettings)
-			}
-			if err == nil && len(*pids) > 0 {
-				pid := a.pickWithRecencyBias(logPrefix, settings.UserId, *pids)
-				p, status, msg, err := a.problemManager.Get(pid)
-				if err == nil && status == http.StatusOK {
-					return p, nil
-				}
-				glog.Infof("%s topic-weighted fetch failed (id=%d): %s : %v", logPrefix, pid, msg, err)
-			}
-		}
-	}
-
-	// Fall back to default (non-topic-weighted) selection
 	pids, err := a.getSatisfyingProblemIds(logPrefix, settings, prevIds)
 	if err != nil {
 		return nil, err
@@ -207,24 +170,6 @@ func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings
 	// couldn't produce one). Block on a synchronous LLM call.
 	glog.Infof("%s pool empty and no heuristic-eligible types; blocking on LLM", logPrefix)
 	return a.generateProblem(logPrefix, settings)
-}
-
-// getSatisfyingProblemIdsForTopic is like getSatisfyingProblemIds but only
-// returns problems whose bitmap contains the target topic: the same
-// bitwise-subset clause plus (problem_type_bitmap & targetTopic) != 0.
-func (a *Api) getSatisfyingProblemIdsForTopic(logPrefix string, settings *Settings, prevIds *[]uint32, targetTopic uint64) (*[]uint32, error) {
-	diffLowerBound := settings.TargetDifficulty - problemSelectionEpsilon
-	diffUpperBound := settings.TargetDifficulty + problemSelectionEpsilon
-	clause := fmt.Sprintf("(problem_type_bitmap & ~%d) = 0 AND problem_type_bitmap != 0 AND (problem_type_bitmap & %d) != 0 AND difficulty >= %g AND difficulty <= %g AND disabled=0",
-		settings.ProblemTypeBitmap,
-		targetTopic,
-		diffLowerBound,
-		diffUpperBound,
-	)
-	if len(*prevIds) > 0 {
-		clause = fmt.Sprintf("id NOT IN (%s) AND ", formatUintsForSQLIn(*prevIds)) + clause
-	}
-	return a.newestVersionTier(logPrefix, clause)
 }
 
 func (a *Api) generateProblem(logPrefix string, settings *Settings) (*Problem, error) {

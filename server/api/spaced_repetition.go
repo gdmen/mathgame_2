@@ -83,7 +83,7 @@ func (a *Api) advanceReviewQueue(logPrefix string, userID uint32, problemID uint
 //   - not disabled.
 //
 // Returns 0 if no due reviews match. Caller (selectProblem) then falls
-// through to the normal topic-weighted / default selection path.
+// through to the default selection path.
 func (a *Api) getDueReviewProblem(logPrefix string, settings *Settings) uint32 {
 	diffUpperBound := settings.TargetDifficulty + problemSelectionEpsilon
 
@@ -91,7 +91,7 @@ func (a *Api) getDueReviewProblem(logPrefix string, settings *Settings) uint32 {
 	// JOINs review_queue (small, per-user) against the indexed problems
 	// table by primary key; the filters drop rows that no longer fit the
 	// user's current topic/difficulty settings. The subset clause matches
-	// the Stage 1/2 selection SQL (see getSatisfyingProblemIds).
+	// the default selection SQL (see getSatisfyingProblemIds).
 	sql := `
 		SELECT rq.problem_id
 		FROM review_queue rq

@@ -23,10 +23,6 @@ func TestProblemTypeBitInventory(t *testing.T) {
 	if all != ALL_PROBLEM_TYPES {
 		t.Errorf("ALL_PROBLEM_TYPES = %d, OR of named bits = %d", ALL_PROBLEM_TYPES, all)
 	}
-	// WEIGHTED_TOPIC_MASK is exactly the non-magnitude bits.
-	if WEIGHTED_TOPIC_MASK != ALL_PROBLEM_TYPES&^(MEDIUM_NUMBERS|LARGE_NUMBERS) {
-		t.Errorf("WEIGHTED_TOPIC_MASK = %d, want all bits except magnitude", WEIGHTED_TOPIC_MASK)
-	}
 }
 
 func TestProblemTypeToFeaturesRoundTrip(t *testing.T) {

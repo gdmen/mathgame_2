@@ -35,17 +35,6 @@ const (
 // ALL_PROBLEM_TYPES is every defined bit; values outside it are invalid.
 const ALL_PROBLEM_TYPES ProblemType = (PERCENTAGES << 1) - 1
 
-// WEIGHTED_TOPIC_MASK gates which bits participate in weighted topic
-// selection and per-topic stats (chooseWeightedTopic, recordTopicAttempt,
-// initTopicStats). A bit belongs iff per-topic difficulty coheres for it:
-// "slightly more of this, but easier" must be meaningful. Magnitude bits are
-// excluded because magnitude IS difficulty - "weak at LARGE_NUMBERS -> serve
-// large numbers, easier" fights itself; size progression is
-// target_difficulty's job. Deliberately decoupled from UI groupings.
-const WEIGHTED_TOPIC_MASK ProblemType = ADDITION | SUBTRACTION | MULTIPLICATION | DIVISION |
-	FRACTIONS | NEGATIVES | WORD | CHAINED_OPERATIONS | MISSING_NUMBER |
-	MISMATCHED_DENOMINATORS | DECIMALS | PEMDAS | SINGLE_VARIABLE | PERCENTAGES
-
 // Map to associate ProblemType values with string names
 var problemTypeNames = map[ProblemType]string{
 	ADDITION:                "addition",

@@ -257,23 +257,12 @@ envelope populates (mirrored as `MIN_TARGET_DIFFICULTY` in
 
 ## Selection
 
-- Bitwise-subset SQL in `getSatisfyingProblemIds`,
-  `getSatisfyingProblemIdsForTopic` (+ `(bitmap & topic) != 0`), and
-  `getDueReviewProblem`. Zero-bitmap rows are excluded defensively (a zero
-  bitmap is a subset of everything).
+- Bitwise-subset SQL in `getSatisfyingProblemIds` and `getDueReviewProblem`.
+  Zero-bitmap rows are excluded defensively (a zero bitmap is a subset of
+  everything).
 - Index: `(disabled, difficulty, problem_type_bitmap)` — the trailing bitmap
   column makes the subset filter covering (plans in the comment block of
   `migrations/39.sql`).
-- **`WEIGHTED_TOPIC_MASK`** (`problem_type.go`) = all bits except MEDIUM/LARGE_NUMBERS.
-  Gates `chooseWeightedTopic`, `recordTopicAttempt`, `initTopicStats`: a bit is
-  a practice topic iff per-topic difficulty coheres for it; magnitude IS
-  difficulty, so "weak at LARGE_NUMBERS → serve large numbers, easier"
-  fights itself. Size progression is target_difficulty's job.
-- **Pool-supply weighting** (server/api/pool_supply.go): thin-pool topics
-  get extra lottery weight (cached per-bit counts), so hard-to-generate bits
-  stay in rotation by weight, not by force. Both lottery signals — per-kid
-  skill (demand, topic_stats.go) and pool supply — act at serving time; a
-  picked-but-thin topic also triggers background generation.
 
 (Selection internals are owned by [selection.md](selection.md); the rows above
 are the generation-relevant surface.)
@@ -357,16 +346,15 @@ forbidden until deliberately added.
 8. Difficulty factor + reference values in `TestComputeProblemDifficulty_ReferenceValues` + **DifficultyVersion bump** + recompute on deploy.
 9. Reachability rules: per-problem exclusivity with existing bits? → prompt clause + insert reject + ceiling either/or entry (all three sites, always together).
 10. `BuildBitConstraints` MAY/MUST-NOT pair.
-11. `WEIGHTED_TOPIC_MASK` membership (test: does per-topic difficulty cohere?).
-12. Settings dependency rules + `web/src/bitmap_validation.js` error code if needed.
-13. UI: group placement (verb / noun-kind / noun-size / framing), label, helper text — against `/style-guide`.
-14. Heuristic generator support, or explicit LLM-only deferral (#227-style issue).
-15. Backfill: do legacy rows need re-stamping? (re-run `recompute_problem_type_bitmap`.)
-16. Update THIS DOCUMENT — the doc-sync test fails CI if you skip the anchors.
+11. Settings dependency rules + `web/src/bitmap_validation.js` error code if needed.
+12. UI: group placement (verb / noun-kind / noun-size / framing), label, helper text — against `/style-guide`.
+13. Heuristic generator support, or explicit LLM-only deferral (#227-style issue).
+14. Backfill: do legacy rows need re-stamping? (re-run `recompute_problem_type_bitmap`.)
+15. Update THIS DOCUMENT — the doc-sync test fails CI if you skip the anchors.
 
 ## Related files
 
-- `server/mathcore/problem_type.go` — `ProblemType` bits, `problemTypeNames`, `ALL_PROBLEM_TYPES`, `WEIGHTED_TOPIC_MASK`
+- `server/mathcore/problem_type.go` — `ProblemType` bits, `problemTypeNames`, `ALL_PROBLEM_TYPES`
 - `server/mathcore/expression.go` — `NormalizeExpression`, `LexExpression`, `RewriteLoneVariable`, `CountDistinctUnknowns`, `lexNumber`
 - `server/mathcore/evaluator.go` — `EvalTokens`, `EvalTokensNaiveLTR`, `requiresPEMDAS`, `pemdasProbes`
 - `server/mathcore/stamping.go` — `AdmitExpression`, `DetectProblemTypeBitmap`, `NormalizeProblemBitmap`, `VerifyAnswerSymbolic`, `EnvelopeViolation`

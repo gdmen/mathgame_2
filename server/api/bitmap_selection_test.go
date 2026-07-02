@@ -63,22 +63,6 @@ func TestBitwiseSubsetSelection_Semantics(t *testing.T) {
 				s.id, s.bitmap, got[s.id], isSubset)
 		}
 	}
-
-	// Topic-filtered variant: only rows containing SUBTRACTION.
-	pids, err = api.getSatisfyingProblemIdsForTopic("[test-subset-topic]", settings, &prevIds, uint64(mathcore.SUBTRACTION))
-	if err != nil {
-		t.Fatalf("getSatisfyingProblemIdsForTopic: %v", err)
-	}
-	got = map[uint32]bool{}
-	for _, id := range *pids {
-		got[id] = true
-	}
-	for _, s := range seed {
-		want := s.bitmap != 0 && s.bitmap&^enabled == 0 && s.bitmap&uint64(mathcore.SUBTRACTION) != 0
-		if got[s.id] != want {
-			t.Errorf("topic filter id=%d bitmap=%d: served=%v, want %v", s.id, s.bitmap, got[s.id], want)
-		}
-	}
 }
 
 // TestSelection_PrefersNewestGeneratorVersion: getSatisfyingProblemIds returns
@@ -147,59 +131,6 @@ func TestSelection_PrefersNewestGeneratorVersion(t *testing.T) {
 	assertTier("[fallback3]", []uint32{7006, 7004, 7005, 7003}, 7001, 7002)
 }
 
-// TestWeightedTopicMaskGates: all three gate sites exclude magnitude bits.
-func TestWeightedTopicMaskGates(t *testing.T) {
-	// Gate 1: chooseWeightedTopic - magnitude-only bitmap yields no candidates.
-	topic, _ := chooseWeightedTopic(map[uint64]*TopicStat{},
-		uint64(mathcore.MEDIUM_NUMBERS|mathcore.LARGE_NUMBERS), 5.0, func(max int) int { return 0 }, nil)
-	if topic != 0 {
-		t.Errorf("magnitude-only bitmap chose topic %d, want 0", topic)
-	}
-	// Mixed bitmap never picks a magnitude bit.
-	for i := 0; i < 50; i++ {
-		i := i
-		topic, _ := chooseWeightedTopic(map[uint64]*TopicStat{},
-			uint64(mathcore.ADDITION|mathcore.MEDIUM_NUMBERS), 5.0, func(max int) int { return i % max }, nil)
-		if topic == uint64(mathcore.MEDIUM_NUMBERS) {
-			t.Fatal("chooseWeightedTopic picked a magnitude bit")
-		}
-	}
-
-	// Gates 2+3: recordTopicAttempt / initTopicStats never write magnitude rows.
-	c, err := common.ReadConfig("../../test_conf.json")
-	if err != nil {
-		t.Fatalf("read config: %v", err)
-	}
-	api, _, cleanup := setupTestAPI(t, c)
-	defer cleanup()
-
-	api.recordTopicAttempt("[test-mask]", 1, uint64(mathcore.ADDITION|mathcore.MEDIUM_NUMBERS), true, 5.0)
-	stats, err := api.getTopicStats(1)
-	if err != nil {
-		t.Fatalf("getTopicStats: %v", err)
-	}
-	if _, ok := stats[uint64(mathcore.MEDIUM_NUMBERS)]; ok {
-		t.Error("recordTopicAttempt wrote a magnitude-bit stats row")
-	}
-	if ts, ok := stats[uint64(mathcore.ADDITION)]; !ok || ts.Attempts != 1 {
-		t.Errorf("recordTopicAttempt should write exactly the ADDITION row: %+v", stats)
-	}
-
-	if err := api.initTopicStats(2, uint64(mathcore.ADDITION|mathcore.LARGE_NUMBERS|mathcore.MEDIUM_NUMBERS), 5.0); err != nil {
-		t.Fatalf("initTopicStats: %v", err)
-	}
-	stats, err = api.getTopicStats(2)
-	if err != nil {
-		t.Fatalf("getTopicStats: %v", err)
-	}
-	if len(stats) != 1 {
-		t.Errorf("initTopicStats seeded %d rows, want 1 (ADDITION only): %+v", len(stats), stats)
-	}
-	if _, ok := stats[uint64(mathcore.ADDITION)]; !ok {
-		t.Error("initTopicStats missing the ADDITION row")
-	}
-}
-
 // TestHeuristicFromBits_ChainedOff: with CHAINED_OPERATIONS disabled, the
 // bit-driven generator never emits multi-operator expressions, and every
 // number respects the magnitude bound, across many samples.
@@ -231,24 +162,5 @@ func TestHeuristicFromBits_ChainedOff(t *testing.T) {
 		if err := mathcore.VerifyAnswerSymbolic(toks, answer); err != nil {
 			t.Fatalf("heuristic answer fails evaluator: %q = %q (%v)", expr, answer, err)
 		}
-	}
-}
-
-// TestThinPoolBoost: thin pools boost, average pools don't, cap holds.
-func TestThinPoolBoost(t *testing.T) {
-	if b := thinPoolBoost(100, 100); b != 1.0 {
-		t.Errorf("average pool boost = %v, want 1.0", b)
-	}
-	if b := thinPoolBoost(200, 100); b != 1.0 {
-		t.Errorf("rich pool boost = %v, want 1.0", b)
-	}
-	if b := thinPoolBoost(50, 100); b != 2.0 {
-		t.Errorf("half pool boost = %v, want 2.0", b)
-	}
-	if b := thinPoolBoost(1, 100); b != thinPoolBoostMax {
-		t.Errorf("thin pool boost = %v, want cap %v", b, thinPoolBoostMax)
-	}
-	if b := thinPoolBoost(0, 100); b != thinPoolBoostMax {
-		t.Errorf("empty pool boost = %v, want cap %v", b, thinPoolBoostMax)
 	}
 }
