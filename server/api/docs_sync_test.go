@@ -131,7 +131,7 @@ func TestDocsSyncGeneratorVersions(t *testing.T) {
 }
 
 // TestDocsSyncSelection pins docs/selection.md to the selection-window
-// constants and the weighted-topic mask.
+// constants.
 func TestDocsSyncSelection(t *testing.T) {
 	const doc = "../../docs/selection.md"
 	anchors := readDocAnchors(t, doc)
@@ -139,12 +139,6 @@ func TestDocsSyncSelection(t *testing.T) {
 	assertIntAnchor(t, doc, "recency_window", anchors["recency_window"], recencyWindow)
 	assertFloatAnchor(t, doc, "lru_top_frac", anchors["lru_top_frac"], lruTopFrac)
 	assertFloatAnchor(t, doc, "selection_epsilon", anchors["selection_epsilon"], problemSelectionEpsilon)
-	assertFloatAnchor(t, doc, "thin_pool_boost_max", anchors["thin_pool_boost_max"], thinPoolBoostMax)
-
-	// The mask gates which bits participate in weighted topic selection;
-	// adding a bit to (or removing one from) WEIGHTED_TOPIC_MASK forces a doc touch.
-	want := mathcore.ProblemTypeToFeatures(mathcore.WEIGHTED_TOPIC_MASK)
-	assertSetAnchor(t, doc, "weighted_topic_mask", anchors["weighted_topic_mask"], want)
 }
 
 // TestDocsSyncAdaptiveDifficulty pins docs/adaptive-difficulty.md to the

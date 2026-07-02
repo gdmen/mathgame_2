@@ -14,12 +14,12 @@ EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 -- 2. Create the composite index that lets `getSatisfyingProblemIds`
--- and `getSatisfyingProblemIdsForTopic` narrow with TWO index columns
+-- narrow with TWO index columns
 -- (equality seek on disabled + range scan on difficulty) before
 -- applying the remaining filters via Index Condition Pushdown.
 -- Leading with disabled=0 lands in the 60% subtree, then the ±30%
 -- difficulty window further cuts to ~3.6% of that. Without this
--- index, every Stage 1/2 hit scans the entire problems table
+-- index, every selection query scans the entire problems table
 -- (observed at 3.5s in prod with 316K rows).
 -- Note: the column-existence guard below protects against schemas
 -- where grade_level never exists. In practice migrations 30/33 re-add the

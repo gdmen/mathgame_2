@@ -14,7 +14,7 @@ drift undocumented.
 
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
-latest_migration: 43
+latest_migration: 44
 model_tables: users, problems, playlists, videos, settings, gamestates, events
 ```
 <!-- END DOC-SYNC ANCHORS -->
@@ -101,7 +101,6 @@ migrations, read by the cmd tools / serving paths named):
 | `schema_migrations` | runner (`createSchemaMigrationsTable`) | the migration runner — records applied versions |
 | `statistics_cache_meta`, `statistics_totals`, `statistics_monthly`, `statistics_hardest_aggregates` | 16 | `cmd/update_statistics_cache`, statistics handler |
 | `compress_events_meta` | 28 | `cmd/compress_events` |
-| `topic_stats` | 29 | `topic_stats.go` per-topic difficulty (`docs/selection.md`) |
 | `review_queue` | 31 | spaced-review selection (`getDueReviewProblem`) |
 | `recently_shown_problems` | 36 | `process_events.go` exclude + `select_lru.go` staleness sort |
 | `calibration_report` | 42 | admin difficulty-calibration cache (single row `id=1`) |
@@ -226,7 +225,7 @@ shape) are what keep both DBs converging. `cmd/compress_events` and
 - `server/api/*_model.generated.go` — generated tables/CRUD (do not edit).
 - `server/api/init.go` `NewApi`, `CREATE_TABLES_SQL` — fresh-DB table creation + join tables.
 - `server/api/migrate.go` `RunMigrations`, `splitStatements` — the runner.
-- `server/api/migrations/<N>.sql` — the diff history (latest: 43).
+- `server/api/migrations/<N>.sql` — the diff history (latest: 44).
 - `server/api/docs_sync_test.go` `TestDocsSyncSchema` — anchor enforcement.
 - README "mysql" section — charset/collation + DB-creation runbook.
 
