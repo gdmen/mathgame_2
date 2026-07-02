@@ -6,8 +6,8 @@ description: The standard new-feature workflow for mathgame_2 — explore→rese
 # Feature workflow
 
 The repeatable loop for a new feature. Stages are deliberately gstack-free in
-the spine; reach for optional helpers (`/spec`, `/investigate`,
-`/plan-eng-review`) only when they pay off.
+the spine; reach for optional helpers (`/spec`, `/investigate`) only when they
+pay off.
 
 ## 1. Plan (explore → research → design)
 
