@@ -1,0 +1,213 @@
+@import "styles.scss";
+
+.bm-page {
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0 $base-space;
+
+  h1 {
+    margin-bottom: 0.25em;
+  }
+
+  .bm-hint {
+    color: $color-inactive;
+    font-size: 0.9em;
+    margin-bottom: $base-space;
+
+    code {
+      color: $font-color;
+    }
+  }
+
+  .bm-error {
+    color: $color-error;
+  }
+
+  .bm-muted {
+    color: $color-inactive;
+  }
+
+  .bm-control {
+    display: flex;
+    align-items: center;
+    gap: $base-space;
+    margin-bottom: $base-space;
+    font-size: 0.9em;
+
+    button {
+      margin-left: auto;
+      background-color: $color-one-contrast;
+      color: white;
+      font-weight: 400;
+      transition-duration: 0.1s;
+
+      &:active {
+        transform: scale(0.95);
+      }
+
+      &:disabled {
+        background-color: $color-inactive;
+        cursor: default;
+      }
+    }
+  }
+
+  // The grid is corner / sticky header / sticky row-labels / scrolling body,
+  // laid out as a 2×2 CSS grid. react-window's FixedSizeGrid has no native
+  // sticky rows/columns, so the header and row-label strips are clipped
+  // containers whose inner track is translated in lockstep with the body's
+  // scroll offset (admin_bitmap_matrix.js onScroll).
+  .bm-grid-wrap {
+    width: 100%;
+  }
+
+  .bm-grid {
+    display: grid;
+    border: 1px solid $color-chip-border;
+    overflow: hidden;
+  }
+
+  .bm-corner {
+    display: flex;
+    align-items: center;
+    padding: 0 0.5em;
+    font-size: 0.75em;
+    font-weight: 600;
+    background: $color-card-tint-a;
+    border-right: 1px solid $color-chip-border;
+    border-bottom: 1px solid $color-chip-border;
+  }
+
+  .bm-header-clip {
+    overflow: hidden;
+    background: $color-card-tint-a;
+    border-bottom: 1px solid $color-chip-border;
+  }
+
+  .bm-header {
+    display: flex;
+    will-change: transform;
+  }
+
+  .bm-colhead {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8em;
+    font-weight: 600;
+    border-right: 1px solid $color-chip-border;
+  }
+
+  .bm-rowlabels-clip {
+    overflow: hidden;
+    border-right: 1px solid $color-chip-border;
+  }
+
+  .bm-rowlabels {
+    will-change: transform;
+  }
+
+  .bm-rowhead {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0.2em 0.4em;
+    font-size: 0.72em;
+    background: $color-card-tint-b;
+    border-bottom: 1px solid $color-chip-border;
+    overflow: hidden;
+
+    .bm-rowbits {
+      font-weight: 600;
+      line-height: 1.15;
+      word-break: break-word;
+    }
+
+    .bm-rowmeta {
+      color: $color-inactive;
+      margin-top: 0.15em;
+    }
+  }
+
+  .bm-cell {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15em;
+    padding: 0.15em;
+    border-right: 1px solid rgba(0, 0, 0, 0.06);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    font-size: 0.9em;
+  }
+
+  .bm-cell-blank {
+    background: repeating-linear-gradient(
+      45deg,
+      #fbfbfb,
+      #fbfbfb 4px,
+      #f4f4f4 4px,
+      #f4f4f4 8px
+    );
+  }
+
+  .bm-cell-over {
+    background: #e4e4e4;
+    color: $color-inactive;
+    font-size: 0.75em;
+  }
+
+  .bm-math {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 0.85em;
+  }
+
+  .bm-unbuildable {
+    color: $color-error;
+    font-weight: 700;
+  }
+
+  // Off-target: the generator couldn't build near this cell's difficulty, so
+  // the shown example is the closest it managed. A dashed amber inset marks it
+  // apart from on-target examples.
+  .bm-cell-off {
+    box-shadow: inset 0 0 0 2px #e69500;
+  }
+
+  .bm-off {
+    color: #b36b00;
+    font-weight: 600;
+  }
+
+  .bm-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+    font-size: 0.62rem;
+    color: rgba(0, 0, 0, 0.6);
+
+    .bm-poolcount {
+      color: rgba(0, 0, 0, 0.45);
+    }
+
+    .bm-reroll {
+      padding: 0 0.25em;
+      min-height: 0;
+      line-height: 1.3;
+      font-size: 0.85em;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid $color-chip-border;
+      border-radius: $base-radius;
+      cursor: pointer;
+
+      &:active {
+        transform: scale(0.9);
+      }
+    }
+  }
+}

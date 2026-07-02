@@ -104,36 +104,16 @@ func (a *Api) adminDifficultyCalibration(c *gin.Context) {
 // adminRecomputeCalibration rebuilds the report in the background and stores it,
 // returning immediately. A second request while one is running is a no-op.
 func (a *Api) adminRecomputeCalibration(c *gin.Context) {
-	logPrefix := common.GetLogPrefix(c)
-	if !calibrationComputing.CompareAndSwap(false, true) {
-		c.JSON(http.StatusOK, gin.H{"computing": true})
-		return
-	}
-	go func() {
-		defer calibrationComputing.Store(false)
-		defer func() {
-			if r := recover(); r != nil {
-				glog.Errorf("%s calibration recompute panicked: %v", logPrefix, r)
+	startBackgroundReport(a.DB, &calibrationComputing, common.GetLogPrefix(c), "calibration",
+		"INSERT INTO calibration_report (id, report, computed_at) VALUES (1, ?, NOW()) "+
+			"ON DUPLICATE KEY UPDATE report = VALUES(report), computed_at = VALUES(computed_at)",
+		func() ([]byte, error) {
+			report, err := a.computeCalibrationReport()
+			if err != nil {
+				return nil, err
 			}
-		}()
-		report, err := a.computeCalibrationReport()
-		if err != nil {
-			glog.Errorf("%s calibration recompute: %v", logPrefix, err)
-			return
-		}
-		blob, err := json.Marshal(report)
-		if err != nil {
-			glog.Errorf("%s calibration marshal: %v", logPrefix, err)
-			return
-		}
-		if _, err := a.DB.Exec(
-			"INSERT INTO calibration_report (id, report, computed_at) VALUES (1, ?, NOW()) "+
-				"ON DUPLICATE KEY UPDATE report = VALUES(report), computed_at = VALUES(computed_at)",
-			string(blob),
-		); err != nil {
-			glog.Errorf("%s calibration cache write: %v", logPrefix, err)
-		}
-	}()
+			return json.Marshal(report)
+		})
 	c.JSON(http.StatusOK, gin.H{"computing": true})
 }
 

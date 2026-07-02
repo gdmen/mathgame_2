@@ -401,3 +401,18 @@ func TestRawForDifficultyRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+// TestTargetForBucket: the cell target is the bucket until it exceeds the
+// bitmap's serving ceiling, then it clamps to the ceiling.
+func TestTargetForBucket(t *testing.T) {
+	bm := uint64(ADDITION | MEDIUM_NUMBERS)
+	ceil := MaxDiffForBitmap(bm)
+	// A bucket within the envelope is returned as-is.
+	if got := TargetForBucket(bm, 5); got != 5.0 {
+		t.Errorf("TargetForBucket(bucket=5) = %v, want 5", got)
+	}
+	// A bucket above the ceiling clamps down to the ceiling.
+	if got := TargetForBucket(bm, int(ceil)+50); got != ceil {
+		t.Errorf("TargetForBucket(above ceiling) = %v, want %v", got, ceil)
+	}
+}

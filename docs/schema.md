@@ -14,7 +14,7 @@ drift undocumented.
 
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
-latest_migration: 44
+latest_migration: 45
 model_tables: users, problems, playlists, videos, settings, gamestates, events
 ```
 <!-- END DOC-SYNC ANCHORS -->
@@ -104,6 +104,7 @@ migrations, read by the cmd tools / serving paths named):
 | `review_queue` | 31 | spaced-review selection (`getDueReviewProblem`) |
 | `recently_shown_problems` | 36 | `process_events.go` exclude + `select_lru.go` staleness sort |
 | `calibration_report` | 42 | admin difficulty-calibration cache (single row `id=1`) |
+| `bitmap_matrix_report` | 45 | admin bitmap × difficulty coverage-matrix cache (single row `id=1`, gzipped blob) |
 
 ## The migration runner
 

@@ -111,6 +111,10 @@ func TestDocsSync(t *testing.T) {
 	// Anchor 3: the shared shape constants (generator mapping + ceiling).
 	assertIntAnchor(t, doc, "max_chain_len", anchors["max_chain_len"], mathcore.MaxChainLen)
 	assertIntAnchor(t, doc, "large_max_operand", anchors["large_max_operand"], mathcore.LargeMaxOperand)
+
+	// Anchor 4: the size of the valid non-WORD bitmap space — a forcing function
+	// against drift in the settings dependency rules the enumerator mirrors.
+	assertIntAnchor(t, doc, "valid_bitmap_count", anchors["valid_bitmap_count"], len(mathcore.EnumerateValidBitmaps()))
 }
 
 // TestDocsSyncGeneratorVersions pins docs/generator-versions.md to the live

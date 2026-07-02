@@ -1,21 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
-import parse from "html-react-parser";
-import katex from "katex";
-import "katex/dist/katex.min.css";
 
-import { PreprocessExpression } from "./problem.js";
+import {
+  renderMath,
+  useAuthHeaders,
+  usePollWhileComputing,
+} from "./admin_common.js";
 import "./admin_calibration.scss";
-
-// Render a stored expression to math the same way the play page does, so the
-// calibration view matches what kids actually see. Falls back to raw text if
-// KaTeX can't parse it.
-const renderMath = (expr) => {
-  try {
-    return parse(katex.renderToString(PreprocessExpression(expr)));
-  } catch (e) {
-    return <code>{expr}</code>;
-  }
-};
 
 const fmt = (n) => (n == null ? "—" : Number(n).toFixed(2));
 
@@ -88,14 +78,7 @@ const DifficultyCalibrationView = ({ token, apiUrl, user }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const authHeaders = useCallback(
-    () => ({
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + token,
-    }),
-    [token]
-  );
+  const authHeaders = useAuthHeaders(token);
 
   const fetchReport = useCallback(async () => {
     if (!token || !apiUrl || !user) {
@@ -124,13 +107,7 @@ const DifficultyCalibrationView = ({ token, apiUrl, user }) => {
   }, [fetchReport]);
 
   // While a rebuild is running, poll so the report appears when it lands.
-  useEffect(() => {
-    if (!resp || !resp.computing) {
-      return;
-    }
-    const t = setInterval(fetchReport, 3000);
-    return () => clearInterval(t);
-  }, [resp, fetchReport]);
+  usePollWhileComputing(resp && resp.computing, fetchReport);
 
   const recompute = async () => {
     try {
