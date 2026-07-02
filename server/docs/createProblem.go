@@ -1,7 +1,6 @@
 package docs
 
 import "garydmenezes.com/mathgame/server/api"
-import "garydmenezes.com/mathgame/server/generator"
 
 /*
 swagger:route POST /problems problems createProblem
@@ -16,7 +15,7 @@ responses:
 //swagger:parameters createProblem
 type createProblemParameters struct {
 	//in:body
-	Body generator.Options
+	Body api.Problem
 }
 
 //swagger:response createProblemResp

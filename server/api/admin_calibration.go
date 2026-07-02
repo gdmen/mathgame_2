@@ -2,7 +2,7 @@
 //
 // computeCalibrationReport samples real problems per difficulty bucket with the
 // ComputeProblemDifficulty factor breakdown, so the formula constants
-// (server/api/difficulty.go) can be eyeballed against the prod pool. It scans
+// (server/mathcore/difficulty.go) can be eyeballed against the prod pool. It scans
 // the whole pool, so the result is cached in the calibration_report table: the
 // GET endpoint reads the cache, and the POST recompute endpoint rebuilds it in
 // the background. Registered under /api/v1/admin behind RequireAdmin.

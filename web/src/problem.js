@@ -6,6 +6,9 @@ import "./problem.scss";
 import { ProblemTypes } from "./enums.js";
 
 const PreprocessExpression = (expression) => {
+  // KaTeX reads a bare % as a line comment and eats the rest of the math
+  // ("70% \div 7" would render as just "70"), so escape any literal percent.
+  expression = expression.replace(/(?<!\\)%/g, "\\%");
   // Split each \text{...} block at internal whitespace into per-word
   // \text{} blocks so word-wrap can happen between words.
   expression = expression.replace(/\\text\{[^\}]+\}/g, (match) =>
