@@ -25,3 +25,8 @@ new migrations cannot land undocumented. Create or refresh a doc with the `docum
 - **Build through the Makefile, and check staged files before committing.** A bare
   `go build ./cmd/X/` without `-o` followed by `git add -A` sweeps a stray binary into the commit;
   use the Makefile targets and scan `git status` for build artifacts first.
+- **Close issues from the commit message.** When a commit resolves a tracked issue, include a
+  `Fixes #NNN` (or `Closes #NNN`) line so merging to `master` auto-closes it; a bare `(#NNN)` only
+  links and won't close. In a multi-commit PR, put the keyword on the commit that actually resolves
+  each issue. (Issue refs belong in commit messages / PR descriptions — never in code comments, per
+  the comments rule above.)
