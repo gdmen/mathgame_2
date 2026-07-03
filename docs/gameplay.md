@@ -59,7 +59,7 @@ it never mutates anything: `getGamestate` → `/gamestates/:student_id`, `getPro
 an adult-only affordance), `getVideo` → `/videos/:video_id`, `getEvents` →
 `/events/:student_id/3000` (filtered to the current problem — see Attempt reconstruction). A
 `RefresherSingleton` re-polls gamestate and events on a fixed interval while the tab is focused;
-access is PIN-gated by `RequirePin`.
+access is PIN-gated by `RequirePin(user.pin)` (see [accounts.md](accounts.md)).
 
 ## Event types reported from the client
 

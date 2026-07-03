@@ -607,7 +607,7 @@ const VideosSettingsView = ({
 const SettingsView = ({ token, apiUrl, user, settings }) => {
   const [videosRefreshKey, setVideosRefreshKey] = useState(0);
   const [bitmap, setBitmap] = useState(settings.problem_type_bitmap);
-  if (!RequirePin(user.id)) {
+  if (!RequirePin(user.pin)) {
     return <div className="content-loading"></div>;
   }
   return (

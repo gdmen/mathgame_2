@@ -16,7 +16,7 @@ const RequirePin = function (correctPin) {
   let sessionPin = GetSessionPin();
   let valid = false;
   if (sessionPin !== null) {
-    valid = sessionPin !== correctPin;
+    valid = sessionPin === correctPin;
   }
   if (!valid) {
     ClearSessionPin();
