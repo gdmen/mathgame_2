@@ -299,10 +299,10 @@ func parseProblemFeaturesFallback(expr string) problemFeatures {
 	// space-delimited; unspaced ops here stay uncounted).
 	f.hasSub = strings.Contains(expr, " - ")
 	f.hasMul = strings.Contains(expr, " * ")
-	f.hasDiv = strings.Contains(expr, " / ")
+	f.hasDiv = strings.Contains(expr, " ÷ ")
 	f.hasAdd = strings.Contains(expr, " + ")
 	f.numOps = strings.Count(expr, " + ") + strings.Count(expr, " - ") +
-		strings.Count(expr, " * ") + strings.Count(expr, " / ")
+		strings.Count(expr, " * ") + strings.Count(expr, " ÷ ")
 
 	trimmed := strings.TrimSpace(expr)
 	if strings.HasPrefix(trimmed, "-") || strings.Contains(expr, "(-") {
@@ -456,7 +456,7 @@ func computeBreakdown(scoredExpr string, forceWord bool) DifficultyBreakdown {
 		Concept:      concept,
 		Structure:    structure,
 		Raw:          raw,
-		Scaled:       compressRaw(raw),
+		Scaled:       CompressRaw(raw),
 		MaxMagnitude: f.maxMagnitude,
 		NumOps:       f.numOps,
 		HasMissing:   f.hasMissing,
@@ -467,7 +467,7 @@ func computeBreakdown(scoredExpr string, forceWord bool) DifficultyBreakdown {
 // Compression-curve anchors: two reference points that fix the log curve's
 // slope — raw 0.5 maps to scaled 1.0, raw 15 maps to scaled 20.0, placing the
 // normal one/two-concept band at ~1-20. The scale itself is open-ended (see the
-// scale comment at the top of this file). Both compressRaw and its inverse
+// scale comment at the top of this file). Both CompressRaw and its inverse
 // RawForDifficulty read these, so a curve retune flows into the heuristic_2.0
 // aimer automatically (no private copy to drift).
 const (
@@ -478,12 +478,13 @@ const (
 	scaleFloor    = 1.0
 )
 
-// compressRaw maps a raw composite onto the difficulty scale with a log
+// CompressRaw maps a raw composite onto the difficulty scale with a log
 // curve. The two anchor pairs define the curve's slope, NOT a range, and the
 // curve continues past the upper anchor (no clamp). The floor at 1.0 is the
 // only cutoff: degenerate expressions (0 + 0) must not score below the scale
-// minimum.
-func compressRaw(raw float64) float64 {
+// minimum. Exported as the inverse pair of RawForDifficulty for the heuristic's
+// raw-targeted entry point (`BuildProblemRaw`).
+func CompressRaw(raw float64) float64 {
 	num := math.Log(raw+1) - math.Log(rawAnchorLo+1)
 	den := math.Log(rawAnchorHi+1) - math.Log(rawAnchorLo+1)
 	scaled := scaleAnchorLo + (scaleAnchorHi-scaleAnchorLo)*num/den
@@ -493,7 +494,7 @@ func compressRaw(raw float64) float64 {
 	return scaled
 }
 
-// RawForDifficulty inverts compressRaw: the raw composite that scores to the
+// RawForDifficulty inverts CompressRaw: the raw composite that scores to the
 // given scaled difficulty. The heuristic_2.0 knob inverter aims its
 // magnitude*opWeight*concept*structure product at RawForDifficulty(target).
 // (Inverse of the unclamped branch; targets at or below the floor map to <=0.)
@@ -593,7 +594,7 @@ func MaxDiffForBitmap(bitmap uint64) float64 {
 			rawBest = r
 		}
 	}
-	return compressRaw(rawBest)
+	return CompressRaw(rawBest)
 }
 
 // TargetForBucket is the difficulty a generator is actually asked for in a

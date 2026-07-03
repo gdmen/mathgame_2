@@ -14,7 +14,8 @@ func TestDetectProblemTypeBitmap_Mapping(t *testing.T) {
 		{"3 + 5", uint64(ADDITION)},
 		{"12 - 5", uint64(SUBTRACTION)},
 		{"9 * 12", uint64(MULTIPLICATION)},
-		{"42 / 6", uint64(DIVISION | MEDIUM_NUMBERS)},
+		{"42 ÷ 6", uint64(DIVISION | MEDIUM_NUMBERS)},
+		{"6 / 8", uint64(FRACTIONS)}, // spaced slash = fraction, not division
 		{"47 + 28", uint64(ADDITION | MEDIUM_NUMBERS)},
 		{"1 + 999", uint64(ADDITION | LARGE_NUMBERS)}, // bracket, not cumulative
 		{"13 + 13 + 13", uint64(ADDITION | MEDIUM_NUMBERS | CHAINED_OPERATIONS)},
@@ -102,7 +103,7 @@ func TestVerifyAnswerSymbolic(t *testing.T) {
 		{"12 - 5 = 7", "7", true},  // equation, no unknown: sides + answer agree
 		{"12 - 5 = 8", "8", false}, // sides disagree
 		{"12 - ?", "5", false},     // unknown without an equation
-		{"6 / 0", "0", false},      // division by zero
+		{"6 ÷ 0", "0", false},      // division by zero
 	}
 	for _, tc := range cases {
 		toks, lexErr := LexExpression(NormalizeExpression(tc.expr))

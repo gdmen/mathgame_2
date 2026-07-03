@@ -29,10 +29,10 @@ func TestEvalTokens_Correct(t *testing.T) {
 		{"1/2 + 1/4", big.NewRat(3, 4)},
 		{"0.75 + 0.25", big.NewRat(1, 1)},
 		{"25% * 80", big.NewRat(20, 1)},
-		{"42 / 6", big.NewRat(7, 1)},
+		{"42 ÷ 6", big.NewRat(7, 1)}, // obelus division
 		{"-4 * -3 + 2", big.NewRat(14, 1)},
 		{"3 - -5", big.NewRat(8, 1)}, // unary minus after a binary operator
-		{"6 / 4", big.NewRat(3, 2)},  // exact rational, no float loss
+		{"6 / 4", big.NewRat(3, 2)},  // spaced slash lexes as a fraction (exact rational)
 	}
 	for _, tc := range cases {
 		got, err := EvalTokens(mustLex(t, tc.expr), nil)
@@ -85,7 +85,7 @@ func TestRequiresPEMDAS(t *testing.T) {
 		{"13 + 13 + 13", false},    // same-precedence chain
 		{"3 + 5", false},           // single op cannot disagree with itself
 		{"-4 * -3 + 2", false},     // mul first in both orders
-		{"6 / (2 - 2) + 1", false}, // CORRECT errors (div0): rejected elsewhere, no fire
+		{"6 ÷ (2 - 2) + 1", false}, // CORRECT errors (div0): rejected elsewhere, no fire
 		// Unknowns are bound to probes; structural disagreement fires.
 		{"5 + ? * 3", true},
 		{"? * 3 + 5", false},

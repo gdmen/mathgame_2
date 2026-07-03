@@ -78,8 +78,8 @@ func (Equation) aNode() {}
 
 // Render renders a node to normalized ASCII in the form LexExpression accepts:
 // binary operators spaced (`a + b`), fractions unspaced (`3/8`), the division
-// operator spaced (`6 / 2`) so it is never mistaken for a fraction, coefficient
-// variables glued (`3x`), and explicit parens preserved. It is faithful: an
+// operator as the obelus (`6 ÷ 2`) so it is never mistaken for a fraction,
+// coefficient variables glued (`3x`), and explicit parens preserved. It is faithful: an
 // operand is parenthesized whenever infix precedence/associativity would
 // otherwise reparse it (`(a + b) * c`, `a - (b - c)`), so the rendered string
 // always evaluates to the node's value.
