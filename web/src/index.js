@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import ReactDOM from "react-dom";
-import { BrowserRouter, Route, Switch } from "react-router-dom";
+import { BrowserRouter, Redirect, Route, Switch } from "react-router-dom";
 
 import { Auth0Provider } from "@auth0/auth0-react";
 import { useAuth0 } from "@auth0/auth0-react";
@@ -34,6 +34,11 @@ const NotFound = () => {
     </div>
   );
 };
+
+// Protected routes render nothing for an unauthenticated visitor, leaving a
+// blank screen; send them to the landing page (which offers Login/Signup).
+const RequireAuth = ({ isAuthenticated, children }) =>
+  isAuthenticated ? children : <Redirect to="/" />;
 
 const MainView = ({
   token,
@@ -69,7 +74,8 @@ const MainView = ({
       />
     );
   } else {
-    // TODO: in the following switch, if not auth'd, redirect to landing page
+    // MainView has already short-circuited to content-loading while isLoading,
+    // so within this Switch a false isAuthenticated means genuinely logged out.
     return (
       <main>
         <Switch>
@@ -82,10 +88,12 @@ const MainView = ({
             />
           </Route>
           <Route exact path="/pin/:redirect_pathname">
-            {!isLoading && isAuthenticated && <PinView user={user} />}
+            <RequireAuth isAuthenticated={isAuthenticated}>
+              <PinView user={user} />
+            </RequireAuth>
           </Route>
           <Route exact path="/play">
-            {!isLoading && isAuthenticated && (
+            <RequireAuth isAuthenticated={isAuthenticated}>
               <PlayView
                 token={token}
                 apiUrl={apiUrl}
@@ -93,27 +101,27 @@ const MainView = ({
                 postEvent={postEvent}
                 interval={conf.event_reporting_interval}
               />
-            )}
+            </RequireAuth>
           </Route>
           <Route exact path="/settings">
-            {!isLoading && isAuthenticated && (
+            <RequireAuth isAuthenticated={isAuthenticated}>
               <SettingsView
                 token={token}
                 apiUrl={apiUrl}
                 user={user}
                 settings={settings}
               />
-            )}
+            </RequireAuth>
           </Route>
           <Route exact path="/progress">
-            {!isLoading && isAuthenticated && (
+            <RequireAuth isAuthenticated={isAuthenticated}>
               <ProgressView token={token} apiUrl={apiUrl} user={user} />
-            )}
+            </RequireAuth>
           </Route>
           <Route exact path="/companion/:student_id">
-            {!isLoading && isAuthenticated && (
+            <RequireAuth isAuthenticated={isAuthenticated}>
               <CompanionView token={token} apiUrl={apiUrl} user={user} />
-            )}
+            </RequireAuth>
           </Route>
           <Route exact path="/admin">
             {isAdmin ? <AdminHomeView /> : <NotFound />}
