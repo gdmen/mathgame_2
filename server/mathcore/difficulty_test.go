@@ -26,7 +26,7 @@ func TestComputeProblemDifficulty_ReferenceValues(t *testing.T) {
 		{"1/2 + 1/2", 5.27},                   // same-denom fractions x2.0
 		{"11/12 - 5/12", 9.09},                // same-denom at 2-digit magnitude
 		{"2/3 + 3/4", 8.87},                   // mismatched: 2.0 x 1.5 = net 3.0
-		{"96 / 8", 13.81},                     // division
+		{"96 ÷ 8", 13.81},                     // division
 		{"0.75 + 0.25", 11.22},                // decimals: digit-magnitude 75, x2.0
 		{"1.5 + 2.5", 9.69},                   // decimals: digit-magnitude 25
 		{"x + x = 10", 14.14},                 // multi-occurrence letter = SINGLE_VARIABLE
@@ -73,7 +73,7 @@ func TestComputeProblemDifficulty_AnchorTable(t *testing.T) {
 		{"two-digit add", "23 + 47", 5, 8, "two-digit add"},
 		{"missing addend", "? + 5 = 12", 4, 7, "missing addend"},
 		{"single-digit mul", "7 * 8", 6, 10, "multiplication facts"},
-		{"simple division", "42 / 6", 10, 14, "division (bigger dividend)"},
+		{"simple division", "42 ÷ 6", 10, 14, "division (bigger dividend)"},
 		{"same-denom fraction", "1/2 + 1/2", 4, 7, "same-denom fraction (v0.2: x2.0)"},
 		{"multi-digit mul", "342 * 7", 11, 16, "multi-digit mul"},
 		{"same-denom mixed", "3/8 + 2/8", 5, 9, "same-denom fraction (v0.2: x2.0)"},
@@ -176,7 +176,7 @@ func TestComputeProblemDifficulty_Bounds(t *testing.T) {
 // scale is open-ended (bounded ~62 by construction); the floor at 1.0 stays.
 func TestComputeProblemDifficulty_OpenScale(t *testing.T) {
 	// A multi-concept stack exceeds 20 - the truth the old clamp hid.
-	monster := "(25% * x - 3/4 + 5/8) / 0.8 - 99.99 = -1234"
+	monster := "(25% * x - 3/4 + 5/8) ÷ 0.8 - 99.99 = -1234"
 	d := ComputeProblemDifficulty(monster, "")
 	if d <= 20 {
 		t.Errorf("six-concept monster scored %.1f, want > 20 (clamp should be gone)", d)
@@ -227,8 +227,8 @@ func TestComputeProblemDifficulty_WordScoredFromSymbolic(t *testing.T) {
 	prose := `\text{There are 9999 beads shared equally among 11 jars; how many per jar?}`
 
 	proseOnly := ComputeProblemDifficulty(prose, "") // division invisible -> opWeight 1.0
-	symbolic := ComputeProblemDifficulty("9999 / 11", "")
-	withForm := ComputeProblemDifficulty(prose, "9999 / 11")
+	symbolic := ComputeProblemDifficulty("9999 ÷ 11", "")
+	withForm := ComputeProblemDifficulty(prose, "9999 ÷ 11")
 
 	if withForm <= proseOnly+3 {
 		t.Errorf("scored from symbolic_expression (%.2f) should far exceed scored-from-prose (%.2f)", withForm, proseOnly)
@@ -387,7 +387,7 @@ func TestParseProblemFeatures_BitInputs(t *testing.T) {
 	}
 }
 
-// TestRawForDifficultyRoundTrip: RawForDifficulty inverts compressRaw across
+// TestRawForDifficultyRoundTrip: RawForDifficulty inverts CompressRaw across
 // the working difficulty band, so the heuristic_2.0 aimer and the scorer agree.
 func TestRawForDifficultyRoundTrip(t *testing.T) {
 	for d := 1.0; d <= 40.0; d += 0.5 {
@@ -395,9 +395,9 @@ func TestRawForDifficultyRoundTrip(t *testing.T) {
 		if raw <= 0 {
 			continue // at/below the scale floor the inverse is non-physical
 		}
-		got := compressRaw(raw)
+		got := CompressRaw(raw)
 		if math.Abs(got-d) > 1e-9 {
-			t.Errorf("compressRaw(RawForDifficulty(%.1f)) = %.6f, want %.1f", d, got, d)
+			t.Errorf("CompressRaw(RawForDifficulty(%.1f)) = %.6f, want %.1f", d, got, d)
 		}
 	}
 }

@@ -11,13 +11,13 @@ func TestNormalizeExpression(t *testing.T) {
 	}{
 		{`3 \times 4`, `3 * 4`},
 		{`3 \cdot 4`, `3 * 4`},
-		{`8 \div 2`, `8 / 2`},
+		{`8 \div 2`, `8 ÷ 2`},
 		{`\left(3 + 5\right) * 2`, `(3 + 5) * 2`},
 		{`\frac{1}{2} + \frac{3}{4}`, `1/2 + 3/4`},
 		{`\dfrac{1}{2}`, `1/2`},
 		{`12 − 5`, `12 - 5`},    // unicode minus
 		{`9 × 12`, `9 * 12`},    // unicode multiplication sign
-		{`96 ÷ 8`, `96 / 8`},    // unicode division sign
+		{`96 ÷ 8`, `96 ÷ 8`},    // obelus is the canonical division form
 		{`70\% + 5`, `70% + 5`}, // escaped percent unescapes to literal %
 		{`3 + 5`, `3 + 5`},      // untouched
 		// Census-driven entries (2026-06 backfill dry run):
@@ -75,7 +75,8 @@ func TestLexExpression_Accepts(t *testing.T) {
 		{"-12 - 5", 3},     // unary minus number, op, number
 		{"(-3) + 5", 5},    // ( -3 ) + 5
 		{"1/2 + 3/4", 3},   // fraction op fraction
-		{"42 / 6", 3},      // spaced slash = division
+		{"42 ÷ 6", 3},      // obelus = division
+		{"42 / 6", 1},      // spaced slash = fraction (spacing-agnostic)
 		{"0.75 + 0.25", 3}, // decimals
 		{"25% * 80", 3},    // percent number
 		{"? + 5 = 12", 5},  // missing, op, number, equals, number
@@ -94,6 +95,31 @@ func TestLexExpression_Accepts(t *testing.T) {
 		}
 		if len(toks) != tc.want {
 			t.Errorf("Lex(%q) = %d tokens, want %d (%v)", tc.expr, len(toks), tc.want, toks)
+		}
+	}
+}
+
+// TestLexExpression_SpacedFractionCanonical: a spaced slash lexes as a fraction
+// whose Raw is the canonical unspaced form, so `2 / 3` and `2/3` render and hash
+// alike (and DisplayExpression's \frac fold still fires).
+func TestLexExpression_SpacedFractionCanonical(t *testing.T) {
+	cases := []struct {
+		in, wantRaw string
+	}{
+		{"2/3", "2/3"},
+		{"2 / 3", "2/3"},
+		{"-2 / 3", "-2/3"},
+	}
+	for _, tc := range cases {
+		toks, err := LexExpression(NormalizeExpression(tc.in))
+		if err != nil {
+			t.Fatalf("lex(%q): %v", tc.in, err)
+		}
+		if len(toks) != 1 || toks[0].Kind != TokFraction {
+			t.Fatalf("lex(%q): want one fraction token, got %v", tc.in, toks)
+		}
+		if toks[0].Raw != tc.wantRaw {
+			t.Errorf("lex(%q) fraction Raw = %q, want %q", tc.in, toks[0].Raw, tc.wantRaw)
 		}
 	}
 }

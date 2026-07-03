@@ -75,14 +75,13 @@ func (e *LexError) Error() string {
 var normalizeReplacer = strings.NewReplacer(
 	`\times`, "*",
 	`\cdot`, "*",
-	`\div`, "/",
+	`\div`, "÷", // LaTeX division folds to the obelus; a bare / is a fraction
 	`\left(`, "(",
 	`\right)`, ")",
 	`\dfrac`, `\frac`,
 	`\tfrac`, `\frac`,
 	"−", "-", // unicode minus
 	"×", "*", // unicode multiplication sign
-	"÷", "/", // unicode division sign
 	`\$`, "", // money prefix (escaped form): $15 means the number 15
 	"$", "",
 	`\%`, "%", // escaped percent (display form) folds back to the literal %
@@ -90,9 +89,9 @@ var normalizeReplacer = strings.NewReplacer(
 
 var reFracCmd = regexp.MustCompile(`\\frac\{(\d+)\}\{(\d+)\}`)
 
-// reFracLiteral matches an unspaced a/b fraction literal — the canonical
-// fraction notation. The spaced form (a / b) is the division operator and is
-// left alone, so this is the exact inverse of reFracCmd.
+// reFracLiteral matches an a/b fraction literal — the canonical fraction
+// notation, the exact inverse of reFracCmd. A bare slash is always a fraction
+// (division is the obelus ÷), so no spacing distinction is needed.
 var reFracLiteral = regexp.MustCompile(`(\d+)/(\d+)`)
 
 // reThousands joins thousands separators (15,000 -> 15000). The trailing
@@ -139,8 +138,8 @@ func isLetter(c byte) bool { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 
 func isSpace(c byte) bool  { return c == ' ' || c == '\t' || c == '\n' || c == '\r' }
 
 // LexExpression tokenizes a normalized expression against the allowlist
-// alphabet. Returns the first unknown token as a LexError. The slash convention
-// distinguishing a fraction from division is documented in
+// alphabet. Returns the first unknown token as a LexError. Division is the
+// obelus ÷ and a bare / is always a fraction; the convention is documented in
 // docs/problem-generation.md.
 func LexExpression(expr string) ([]Token, *LexError) {
 	var toks []Token
@@ -202,12 +201,14 @@ func LexExpression(expr string) ([]Token, *LexError) {
 			i++
 			prevMeaning = 2
 
-		case c == '/':
-			// A slash reached here was not consumed as part of a fraction, so
-			// it is the division operator (the spaced-slash convention).
-			toks = append(toks, Token{Kind: TokOperator, Pos: i, Raw: "/", Op: '/'})
-			i++
+		case strings.HasPrefix(expr[i:], "÷"):
+			// The obelus is the sole division notation; the AST op stays '/'.
+			toks = append(toks, Token{Kind: TokOperator, Pos: i, Raw: "÷", Op: '/'})
+			i += len("÷")
 			prevMeaning = 2
+
+		// A bare '/' is a fraction, consumed inside lexNumber (spacing-agnostic).
+		// One that reaches here is not between two integers, so it is invalid.
 
 		case c == '-':
 			// Unary minus only in operand position and directly attached to a
@@ -301,26 +302,47 @@ func lexNumber(expr string, i *int, start int, negative bool) (Token, *LexError)
 	raw := expr[start:*i]
 	numStr := expr[intStart:*i]
 
-	// Unspaced fraction: digits '/' digits with no whitespace.
-	if !isDecimal && *i < n && expr[*i] == '/' && *i+1 < n && isDigit(expr[*i+1]) {
-		*i++
-		denStart := *i
-		for *i < n && isDigit(expr[*i]) {
-			*i++
+	// Fraction literal: <int> / <int>, spacing-agnostic. Division is the obelus
+	// ÷, so a bare slash between two integers is unambiguously a fraction; the
+	// integer just read is the numerator. Skip optional whitespace on either
+	// side of the slash.
+	if !isDecimal {
+		intEnd := *i
+		j := *i
+		for j < n && isSpace(expr[j]) {
+			j++
 		}
-		numV := new(big.Rat)
-		if _, ok := numV.SetString(expr[intStart:denStart-1] + "/" + expr[denStart:*i]); !ok {
-			return Token{}, &LexError{Pos: start, Snippet: snippet(expr, start)}
+		if j < n && expr[j] == '/' {
+			j++
+			for j < n && isSpace(expr[j]) {
+				j++
+			}
+			if j < n && isDigit(expr[j]) {
+				denStart := j
+				for j < n && isDigit(expr[j]) {
+					j++
+				}
+				*i = j
+				nStr, dStr := expr[intStart:intEnd], expr[denStart:j]
+				numV := new(big.Rat)
+				if _, ok := numV.SetString(nStr + "/" + dStr); !ok {
+					return Token{}, &LexError{Pos: start, Snippet: snippet(expr, start)}
+				}
+				var num, den big.Int
+				num.SetString(nStr, 10)
+				den.SetString(dStr, 10)
+				// Raw is the canonical unspaced form, NOT the source slice: a
+				// spaced input (`2 / 3`) must render and hash the same as `2/3`.
+				raw := nStr + "/" + dStr
+				if negative {
+					numV.Neg(numV)
+					num.Neg(&num)
+					raw = "-" + raw
+				}
+				return Token{Kind: TokFraction, Pos: start, Raw: raw,
+					Value: numV, Num: num.Int64(), Den: den.Int64(), IsNegative: negative}, nil
+			}
 		}
-		var num, den big.Int
-		num.SetString(expr[intStart:denStart-1], 10)
-		den.SetString(expr[denStart:*i], 10)
-		if negative {
-			numV.Neg(numV)
-			num.Neg(&num)
-		}
-		return Token{Kind: TokFraction, Pos: start, Raw: expr[start:*i],
-			Value: numV, Num: num.Int64(), Den: den.Int64(), IsNegative: negative}, nil
 	}
 
 	isPercent := false
