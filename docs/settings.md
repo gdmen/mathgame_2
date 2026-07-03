@@ -37,7 +37,8 @@ The settings screen exposes the two user controls described in problem-generatio
 
 Settings persist via `POST /settings/{user_id}` (`postSettings`). The bitmap is POSTed only on a
 valid commit (`commit` — the `v.valid` branch); the difficulty / work-percentage sliders POST on
-mouseup/blur. The whole screen is PIN-gated (`SettingsView` via `RequirePin`).
+mouseup/blur. The whole screen is PIN-gated (`SettingsView` calls `RequirePin(user.pin)`; see
+[accounts.md](accounts.md)).
 
 ## Problem-type taxonomy
 

@@ -208,7 +208,7 @@ const CompanionView = ({ token, apiUrl, user }) => {
     getEvents();
   }, [getEvents]);
 
-  if (!RequirePin(user.id)) {
+  if (!RequirePin(user.pin)) {
     return <div className="content-loading"></div>;
   }
 

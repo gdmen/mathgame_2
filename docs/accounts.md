@@ -76,14 +76,14 @@ keeps a kid from wandering into adult surfaces.
 | Export | Contract |
 |---|---|
 | `SetSessionPin` / `GetSessionPin` / `ClearSessionPin` | read/write/clear the `sessionStorage` entry |
-| `RequirePin(correctPin)` | route guard: redirects to `/pin/<encoded current path>` unless the session PIN is considered valid; returns whether access is allowed (see Gotchas — its check is buggy) |
+| `RequirePin(correctPin)` | route guard: redirects to `/pin/<encoded current path>` unless the session PIN equals `correctPin`; returns whether access is allowed |
 | `PinView` | four-digit entry component (`react-pin-input`), used in setup (`isSetup`) and at the `/pin/:redirect_pathname` gate route |
 
 Two-stage gate for a protected surface: a guarded view (`/settings`, `/companion/:student_id`)
 calls `RequirePin`, which on a missing/invalid session PIN redirects to the `/pin/...` route; that
 route renders `PinView` in gate mode, which validates length ≥ 4 and `pin === user.pin`, stores the
-session PIN, and redirects back to the originally requested path. `PinView`'s gate-mode check is
-the correct one; `RequirePin`'s is not (Gotchas).
+session PIN, and redirects back to the originally requested path. Both checks compare the entered
+PIN against `user.pin` by equality.
 
 ### Setup wizard (`setup.js`)
 
@@ -122,13 +122,10 @@ struct includes a `role` field.
   `user.pin`, which the client already holds (returned in the pageload payload). It exists to stop
   a *kid* from tapping into settings, not to authorize anything. All real authorization is the
   Auth0 JWT + role.
-- **`RequirePin` is buggy and it guards real surfaces.** `RequirePin` deems a present session PIN
-  valid when it does *not* equal the argument (the inverted comparison), and both its callers pass
-  `user.id` rather than a PIN (`settings.js` and `companion.js`, `RequirePin(user.id)`). Net
-  effect: any 4-digit session PIN that isn't the stringified user id passes the guard on
-  `/settings` and `/companion/:student_id` (#274). The earlier doc claimed `PinView` guards
-  `/settings`; in fact `RequirePin` is the first-stage guard there, and the correct `PinView`
-  gate-mode check only runs if `RequirePin` actually redirects to `/pin/...`.
+- **`RequirePin` is the first-stage guard, not `PinView`.** On `/settings` and
+  `/companion/:student_id`, `RequirePin(user.pin)` runs first and redirects to `/pin/...` unless the
+  session PIN already equals `user.pin`; the `PinView` gate-mode check only runs after that redirect.
+  Both compare against `user.pin` by equality (#274).
 - **`ClearSessionPin` fires on several routes.** Rendering the 404 page, the home view, or the
   play view clears the session PIN (`index.js`, `home.js`, `play.js`), so leaving a protected area
   drops the gate.
