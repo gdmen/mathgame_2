@@ -351,8 +351,8 @@ are the generation-relevant surface.)
   carry it, so their hardest buckets stay just below the formula ceiling.
   Version history and the construction design live in
   [generator-versions.md](generator-versions.md).
-- **LLM generator** (server/llm_generator, `llm_0.5`): one batched OpenAI call
-  (`MAX_QUANTITY = 20`); the `BuildBitConstraints` block is the sole shape
+- **LLM generator** (server/llm_generator, `llm_0.5`): one batched OpenAI
+  chat-completions call (`MAX_QUANTITY = 20`); the `BuildBitConstraints` block is the sole shape
   guidance (`Options.Constraints` is opaque to the package). Emits
   `symbolic_expression` for word problems (`generate_problem.go` prompt). Model
   defaults are owned by [generator-versions.md](generator-versions.md).

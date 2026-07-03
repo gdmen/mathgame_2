@@ -21,7 +21,6 @@ import (
 
 const (
 	VERSION         = "llm_0.5"
-	OPENAI_URL      = "https://api.openai.com/v1/completions"
 	PROMPT_QUESTION = `
 Generate math questions in the format of this example:
 {
