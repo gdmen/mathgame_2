@@ -122,7 +122,7 @@ func (a *Api) computeBitmapMatrixReport(bitmaps []mathcore.ProblemType) (BitmapM
 	rowHiPool := map[uint64]int{} // highest counted bucket per bitmap
 	rows, err := a.DB.Query(
 		"SELECT problem_type_bitmap, CAST(ROUND(difficulty) AS SIGNED) AS bucket, COUNT(*) " +
-			"FROM problems WHERE disabled = 0 GROUP BY problem_type_bitmap, bucket")
+			"FROM problems WHERE status = 'active' GROUP BY problem_type_bitmap, bucket")
 	if err != nil {
 		return BitmapMatrixData{}, err
 	}

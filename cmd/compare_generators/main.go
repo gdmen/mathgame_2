@@ -116,7 +116,7 @@ func main() {
 // readGrid runs the issue's grouping query and folds it into per-cell counts.
 func readGrid(db *sql.DB) []cellInfo {
 	rows, err := db.Query(`SELECT problem_type_bitmap, ROUND(difficulty) AS db, generator, COUNT(*)
-		FROM problems WHERE disabled = 0 GROUP BY problem_type_bitmap, db, generator`)
+		FROM problems WHERE status = 'active' GROUP BY problem_type_bitmap, db, generator`)
 	if err != nil {
 		glog.Fatalf("grid query: %v", err)
 	}
@@ -407,7 +407,7 @@ type ex struct {
 func examples(db *sql.DB, bitmap uint64, bucket int, gen string, limit int) []ex {
 	rows, err := db.Query(
 		`SELECT expression, difficulty FROM problems
-		 WHERE disabled=0 AND problem_type_bitmap=? AND ROUND(difficulty)=? AND generator=?
+		 WHERE status='active' AND problem_type_bitmap=? AND ROUND(difficulty)=? AND generator=?
 		 ORDER BY id LIMIT ?`,
 		bitmap, bucket, gen, limit)
 	if err != nil {

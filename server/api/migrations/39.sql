@@ -12,9 +12,13 @@
 -- old 4-column composite is replaced rather than kept.
 
 -- 1. Create the new covering index first (create-then-drop keeps a usable
--- index on the table at every point during the migration).
+-- index on the table at every point during the migration). The column-existence
+-- guard protects fresh bootstraps: migration 46 replaced disabled with a status
+-- ENUM, so the generated problems table no longer has disabled and this index
+-- (superseded by idx_problems_status_diff_bitmap in 46) must not be built there.
 SET @sql = (SELECT IF(
-  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'problems' AND INDEX_NAME = 'idx_problems_disabled_diff_bitmap') = 0,
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'problems' AND INDEX_NAME = 'idx_problems_disabled_diff_bitmap') = 0
+  AND (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'problems' AND COLUMN_NAME = 'disabled') > 0,
   'CREATE INDEX idx_problems_disabled_diff_bitmap ON problems (disabled, difficulty, problem_type_bitmap)',
   'SELECT 1'
 ));

@@ -63,7 +63,7 @@ first that yields a servable problem:
 
 ```
 [0] SPACED-REP   getDueReviewProblem: earliest due review_queue row still
-                 matching the envelope + difficulty UPPER bound + not disabled.
+                 matching the envelope + difficulty UPPER bound + status active.
                  (spaced_repetition.go) Serve it directly if still available.
 [1] DEFAULT      getSatisfyingProblemIds over the whole envelope; recency-bias
                  pick. Pool < minSelectionPool -> background generation.
@@ -98,9 +98,14 @@ subset filter cheap.
 | `getSatisfyingProblemIds` | — (whole envelope) | generate_problems.go |
 | `getDueReviewProblem` | JOIN `review_queue`; difficulty upper bound only | spaced_repetition.go |
 
-Index `idx_problems_disabled_diff_bitmap` on `(disabled, difficulty,
-problem_type_bitmap)` — the trailing bitmap column makes the subset filter
-covering (plans and timing in `migrations/39.sql`).
+Only `status = 'active'` rows are servable; `deprecated`/`reported`/`incorrect`
+are excluded (see `docs/schema.md` for the state semantics).
+
+Index `idx_problems_status_diff_bitmap` on `(status, difficulty,
+problem_type_bitmap)` — equality seek on `status='active'`, then the difficulty
+range, with the trailing bitmap column making the subset filter covering. It
+replaced the byte-identical `(disabled, …)` index in `migrations/46.sql` (plans
+and timing in `migrations/39.sql`).
 
 ## The recency bias (`pickWithRecencyBias`)
 

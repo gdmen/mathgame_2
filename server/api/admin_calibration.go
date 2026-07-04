@@ -47,11 +47,11 @@ type CalibrationGenGroup struct {
 }
 
 type CalibrationBucket struct {
-	Label         string                `json:"label"`
-	LiveCount     int                   `json:"live_count"`
-	DisabledCount int                   `json:"disabled_count"`
-	Generators    []CalibrationGenGroup `json:"generators"`
-	DominantBits  []NameCount           `json:"dominant_bits"`
+	Label          string                `json:"label"`
+	LiveCount      int                   `json:"live_count"`
+	NotServedCount int                   `json:"not_served_count"`
+	Generators     []CalibrationGenGroup `json:"generators"`
+	DominantBits   []NameCount           `json:"dominant_bits"`
 }
 
 type CalibrationData struct {
@@ -121,23 +121,25 @@ func (a *Api) adminRecomputeCalibration(c *gin.Context) {
 // bucket and generator version, one example of each distinct problem-type
 // bitmap, with that generator's live count and each example's factor breakdown.
 func (a *Api) computeCalibrationReport() (CalibrationData, error) {
-	// Pass 1: live/disabled counts and per-generator live counts per bucket.
+	// Pass 1: live vs not-served counts and per-generator live counts per bucket.
+	// Anything whose status is not 'active' (deprecated/reported/incorrect) folds
+	// into the single not-served tally the report exposes as not_served_count.
 	type aggBucket struct {
-		live, disabled int
-		liveByGen      map[string]int
+		live, notServed int
+		liveByGen       map[string]int
 	}
 	agg := map[int]*aggBucket{}
 	maxBucket := 0
 	rows, err := a.DB.Query(
-		"SELECT " + calibBucketExpr + " AS bucket, disabled, generator, COUNT(*) " +
-			"FROM problems GROUP BY bucket, disabled, generator")
+		"SELECT " + calibBucketExpr + " AS bucket, status, generator, COUNT(*) " +
+			"FROM problems GROUP BY bucket, status, generator")
 	if err != nil {
 		return CalibrationData{}, err
 	}
 	for rows.Next() {
-		var bucket, disabled, count int
-		var generator string
-		if rows.Scan(&bucket, &disabled, &generator, &count) != nil {
+		var bucket, count int
+		var status, generator string
+		if rows.Scan(&bucket, &status, &generator, &count) != nil {
 			continue
 		}
 		b := agg[bucket]
@@ -145,11 +147,11 @@ func (a *Api) computeCalibrationReport() (CalibrationData, error) {
 			b = &aggBucket{liveByGen: map[string]int{}}
 			agg[bucket] = b
 		}
-		if disabled == 0 {
+		if status == StatusActive {
 			b.live += count
 			b.liveByGen[generator] += count
 		} else {
-			b.disabled += count
+			b.notServed += count
 		}
 		if bucket > maxBucket {
 			maxBucket = bucket
@@ -170,7 +172,7 @@ func (a *Api) computeCalibrationReport() (CalibrationData, error) {
 			"SELECT id, bucket, generator FROM (" +
 			"SELECT id, " + calibBucketExpr + " AS bucket, generator, " +
 			"ROW_NUMBER() OVER (PARTITION BY " + calibBucketExpr + ", generator, problem_type_bitmap ORDER BY id) AS rn " +
-			"FROM problems WHERE disabled = 0) t WHERE rn = 1) " +
+			"FROM problems WHERE status = 'active') t WHERE rn = 1) " +
 			"SELECT r.bucket, r.generator, p.expression, p.symbolic_expression, p.difficulty, p.problem_type_bitmap " +
 			"FROM ranked r JOIN problems p ON p.id = r.id " +
 			"ORDER BY r.bucket, r.generator")
@@ -209,7 +211,7 @@ func (a *Api) computeCalibrationReport() (CalibrationData, error) {
 		}
 		if b := agg[k]; b != nil {
 			bucket.LiveCount = b.live
-			bucket.DisabledCount = b.disabled
+			bucket.NotServedCount = b.notServed
 			gens := make([]string, 0, len(b.liveByGen))
 			for g := range b.liveByGen {
 				gens = append(gens, g)

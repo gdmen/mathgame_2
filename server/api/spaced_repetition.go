@@ -80,7 +80,7 @@ func (a *Api) advanceReviewQueue(logPrefix string, userID uint32, problemID uint
 //     surfacing as a review),
 //   - difficulty <= target_difficulty + problemSelectionEpsilon — no
 //     lower bound, since a now-easy review is still a meaningful retest,
-//   - not disabled.
+//   - status is 'active' (not deprecated/reported/incorrect).
 //
 // Returns 0 if no due reviews match. Caller (selectProblem) then falls
 // through to the default selection path.
@@ -98,7 +98,7 @@ func (a *Api) getDueReviewProblem(logPrefix string, settings *Settings) uint32 {
 		JOIN problems p ON p.id = rq.problem_id
 		WHERE rq.user_id = ?
 		  AND rq.next_review_at <= NOW()
-		  AND p.disabled = 0
+		  AND p.status = 'active'
 		  AND (p.problem_type_bitmap & ~?) = 0
 		  AND p.problem_type_bitmap != 0
 		  AND p.difficulty <= ?

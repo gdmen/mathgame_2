@@ -14,28 +14,28 @@ import (
 
 func seedCalibrationProblems(t *testing.T, api *Api) {
 	t.Helper()
-	seed := func(id int, expr string, diff float64, disabled int, gen string, bitmap uint64) {
+	seed := func(id int, expr string, diff float64, status string, gen string, bitmap uint64) {
 		_, err := api.DB.Exec(
-			"INSERT INTO problems (id, problem_type_bitmap, expression, answer, explanation, symbolic_expression, difficulty, disabled, generator, difficulty_version) VALUES (?,?,?,?,?,?,?,?,?,?)",
-			id, bitmap, expr, "7", "", "", diff, disabled, gen, "0.2")
+			"INSERT INTO problems (id, problem_type_bitmap, expression, answer, explanation, symbolic_expression, difficulty, status, generator, difficulty_version) VALUES (?,?,?,?,?,?,?,?,?,?)",
+			id, bitmap, expr, "7", "", "", diff, status, gen, "0.2")
 		if err != nil {
 			t.Fatalf("seed problem %d: %v", id, err)
 		}
 	}
-	// Two live + one disabled in bucket 7; one live in bucket 12; a tail scorer
+	// Two live + one not-served in bucket 7; one live in bucket 12; a tail scorer
 	// in bucket 25; and bucket 6 with two same-bitmap rows + one other.
-	seed(111, "3 + 4", 7.2, 0, "llm_0.3", uint64(mathcore.ADDITION))
-	seed(222, `5 \times 6`, 7.4, 0, "heuristic_1.0", uint64(mathcore.MULTIPLICATION))
-	seed(333, "9 - 1", 7.1, 1, "llm_0.1", uint64(mathcore.SUBTRACTION))
-	seed(444, "8 + 8 + 8", 12.0, 0, "llm_0.3", uint64(mathcore.ADDITION|mathcore.CHAINED_OPERATIONS))
-	seed(555, "12x + 7 = 199", 25.2, 0, "llm_0.3", uint64(mathcore.SINGLE_VARIABLE|mathcore.MISSING_NUMBER))
-	seed(601, "1 + 2", 6.1, 0, "llm_0.3", uint64(mathcore.ADDITION))
-	seed(602, "2 + 1", 6.2, 0, "llm_0.3", uint64(mathcore.ADDITION))
-	seed(603, "9 - 4", 6.3, 0, "llm_0.3", uint64(mathcore.SUBTRACTION))
+	seed(111, "3 + 4", 7.2, StatusActive, "llm_0.3", uint64(mathcore.ADDITION))
+	seed(222, `5 \times 6`, 7.4, StatusActive, "heuristic_1.0", uint64(mathcore.MULTIPLICATION))
+	seed(333, "9 - 1", 7.1, StatusDeprecated, "llm_0.1", uint64(mathcore.SUBTRACTION))
+	seed(444, "8 + 8 + 8", 12.0, StatusActive, "llm_0.3", uint64(mathcore.ADDITION|mathcore.CHAINED_OPERATIONS))
+	seed(555, "12x + 7 = 199", 25.2, StatusActive, "llm_0.3", uint64(mathcore.SINGLE_VARIABLE|mathcore.MISSING_NUMBER))
+	seed(601, "1 + 2", 6.1, StatusActive, "llm_0.3", uint64(mathcore.ADDITION))
+	seed(602, "2 + 1", 6.2, StatusActive, "llm_0.3", uint64(mathcore.ADDITION))
+	seed(603, "9 - 4", 6.3, StatusActive, "llm_0.3", uint64(mathcore.SUBTRACTION))
 }
 
 // TestComputeCalibrationReport verifies the report computation: buckets span the
-// max difficulty, disabled rows count separately, and each generator group
+// max difficulty, not-served rows count separately, and each generator group
 // shows one example per distinct problem-type bitmap with its factor breakdown.
 func TestComputeCalibrationReport(t *testing.T) {
 	c, err := common.ReadConfig("../../test_conf.json")
@@ -70,13 +70,13 @@ func TestComputeCalibrationReport(t *testing.T) {
 		t.Errorf("bucket 25: expected 1 live, got %d", b25.LiveCount)
 	}
 
-	// Bucket 7: two live (3+4, 5*6), one disabled (9-1); two generator groups.
+	// Bucket 7: two live (3+4, 5*6), one not-served (9-1); two generator groups.
 	b7 := findBucket("7")
 	if b7 == nil {
 		t.Fatalf("bucket 7 not found")
 	}
-	if b7.LiveCount != 2 || b7.DisabledCount != 1 {
-		t.Errorf("bucket 7 counts: expected 2 live / 1 disabled, got %d / %d", b7.LiveCount, b7.DisabledCount)
+	if b7.LiveCount != 2 || b7.NotServedCount != 1 {
+		t.Errorf("bucket 7 counts: expected 2 live / 1 not-served, got %d / %d", b7.LiveCount, b7.NotServedCount)
 	}
 	if len(b7.Generators) != 2 {
 		t.Fatalf("bucket 7: expected 2 generator groups, got %d", len(b7.Generators))
@@ -189,7 +189,7 @@ func TestCalibrationCacheEndpoints(t *testing.T) {
 			b7 = &got.Report.Buckets[i]
 		}
 	}
-	if b7 == nil || b7.LiveCount != 2 || b7.DisabledCount != 1 {
+	if b7 == nil || b7.LiveCount != 2 || b7.NotServedCount != 1 {
 		t.Errorf("bucket 7 from cached report wrong: %+v", b7)
 	}
 

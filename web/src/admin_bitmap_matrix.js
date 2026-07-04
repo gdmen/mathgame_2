@@ -288,12 +288,12 @@ const BitmapMatrixView = ({ token, apiUrl, user }) => {
         including cells the pool has never populated. Cell background heatmaps
         current pool usage — green = well-covered, red = zero — counted by exact
         bitmap match after the LARGE⇒MEDIUM normalization (
-        <code>disabled=0</code> only; WORD rows out of scope). Greyed cells are
-        above the bitmap's serving ceiling (not targetable). An amber outline (
-        <span className="bm-off">d≠</span>) marks an off-target cell: the
-        envelope couldn't reach that difficulty, so the example is the closest
-        the generator managed. ↻ regenerates a cell live without touching the
-        cache. The report is cached; rebuild with Recompute.
+        <code>status=active</code> only; WORD rows out of scope). Greyed cells
+        are above the bitmap's serving ceiling (not targetable). An amber
+        outline (<span className="bm-off">d≠</span>) marks an off-target cell:
+        the envelope couldn't reach that difficulty, so the example is the
+        closest the generator managed. ↻ regenerates a cell live without
+        touching the cache. The report is cached; rebuild with Recompute.
       </p>
 
       <div className="bm-control">

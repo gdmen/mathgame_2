@@ -14,7 +14,7 @@ drift undocumented.
 
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
-latest_migration: 45
+latest_migration: 46
 model_tables: users, problems, playlists, videos, settings, gamestates, events
 ```
 <!-- END DOC-SYNC ANCHORS -->
@@ -77,7 +77,7 @@ Modelled tables (defined by `models.json`, full field list there):
 | Table | Model | Key | Purpose |
 |---|---|---|---|
 | `users` | `user` | `auth0_id` (PK), `id` (auto, unique) | account; `role` defaults `'student'` (migration 41) |
-| `problems` | `problem` | `id` | the generated problem pool; bitmap, expression, answer, difficulty, `symbolic_expression` (migration 43), `generator`, `difficulty_version` (migration 38) — see `docs/problem-generation.md` |
+| `problems` | `problem` | `id` | the generated problem pool; bitmap, expression, answer, difficulty, `symbolic_expression` (migration 43), `generator`, `difficulty_version` (migration 38), `status` ENUM (migration 46, replaced the old `disabled` boolean) — see `docs/problem-generation.md` |
 | `settings` | `settings` | `user_id` | per-user envelope: `problem_type_bitmap`, `target_difficulty`, `target_work_percentage` |
 | `gamestates` | `gamestate` | `user_id` | current served problem/video + solved/target counters |
 | `events` | `event` | `id` (auto) | append-only event log; `event_type` + `value` |
@@ -188,6 +188,17 @@ shape) are what keep both DBs converging. `cmd/compress_events` and
   migrations 18/22/27 are no-ops on it (the `IF NOT EXISTS` / column-count
   guards). This is invariant 3 in action — do the same for any
   add-then-remove column.
+- **Removing a column that earlier migrations reference needs retro-guards.**
+  Dropping `problems.disabled` from `models.json` (migration 46 swaps in a
+  `status` ENUM) also removed it from the generated `CreateProblemTableSQL`, so
+  a fresh DB never has the column. But migrations 32/35/37/39 — which run on
+  fresh bootstraps, after the generated CREATE — still referenced `disabled` in
+  an `UPDATE`/`CREATE INDEX`. Each was retro-fitted with an
+  `INFORMATION_SCHEMA` column-existence guard so it no-ops on a schema that
+  never had the column (the same `grade_level` treatment migration 37 already
+  used). Editing shipped migrations is safe here because the runner records
+  only the *version* (no body checksum), so deployed DBs never re-run them —
+  only fresh bootstraps re-execute, where the guards make them no-ops.
 - **Migration 16 is not idempotent.** Its four `statistics_*` tables use
   bare `CREATE TABLE`, not `CREATE TABLE IF NOT EXISTS`. It survives only
   because the runner records it after a full success and never re-runs it —
@@ -226,7 +237,7 @@ shape) are what keep both DBs converging. `cmd/compress_events` and
 - `server/api/*_model.generated.go` — generated tables/CRUD (do not edit).
 - `server/api/init.go` `NewApi`, `CREATE_TABLES_SQL` — fresh-DB table creation + join tables.
 - `server/api/migrate.go` `RunMigrations`, `splitStatements` — the runner.
-- `server/api/migrations/<N>.sql` — the diff history (latest: 44).
+- `server/api/migrations/<N>.sql` — the diff history (latest: 46).
 - `server/api/docs_sync_test.go` `TestDocsSyncSchema` — anchor enforcement.
 - README "mysql" section — charset/collation + DB-creation runbook.
 

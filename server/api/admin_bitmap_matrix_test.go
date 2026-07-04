@@ -26,26 +26,26 @@ var matrixTestBitmaps = []mathcore.ProblemType{
 
 func seedMatrixProblems(t *testing.T, api *Api) {
 	t.Helper()
-	seed := func(id int, expr string, diff float64, disabled int, bitmap uint64) {
+	seed := func(id int, expr string, diff float64, status string, bitmap uint64) {
 		_, err := api.DB.Exec(
-			"INSERT INTO problems (id, problem_type_bitmap, expression, answer, explanation, symbolic_expression, difficulty, disabled, generator, difficulty_version) VALUES (?,?,?,?,?,?,?,?,?,?)",
-			id, bitmap, expr, "7", "", "", diff, disabled, "heuristic_2.0", "0.3")
+			"INSERT INTO problems (id, problem_type_bitmap, expression, answer, explanation, symbolic_expression, difficulty, status, generator, difficulty_version) VALUES (?,?,?,?,?,?,?,?,?,?)",
+			id, bitmap, expr, "7", "", "", diff, status, "heuristic_2.0", "0.3")
 		if err != nil {
 			t.Fatalf("seed problem %d: %v", id, err)
 		}
 	}
 	// A targetable ADDITION cell at bucket 3.
-	seed(1, "3 + 4", 3.4, 0, uint64(mathcore.ADDITION))
-	// A disabled ADDITION row in the same cell — must NOT be counted.
-	seed(2, "2 + 5", 3.4, 1, uint64(mathcore.ADDITION))
+	seed(1, "3 + 4", 3.4, StatusActive, uint64(mathcore.ADDITION))
+	// A non-active ADDITION row in the same cell — must NOT be counted.
+	seed(2, "2 + 5", 3.4, StatusReported, uint64(mathcore.ADDITION))
 	// An ADDITION row far above its ceiling (~4) at bucket 30 — over-ceiling.
-	seed(3, "1 + 2", 30.0, 0, uint64(mathcore.ADDITION))
+	seed(3, "1 + 2", 30.0, StatusActive, uint64(mathcore.ADDITION))
 	// A LARGE-without-MEDIUM stamp: the divergent bracket. Normalization ORs
 	// MEDIUM in, folding it into the ADDITION|MEDIUM|LARGE envelope at bucket 6.
-	seed(4, "100 + 200", 6.0, 0, uint64(mathcore.ADDITION|mathcore.LARGE_NUMBERS))
+	seed(4, "100 + 200", 6.0, StatusActive, uint64(mathcore.ADDITION|mathcore.LARGE_NUMBERS))
 }
 
-// TestComputeBitmapMatrixReport verifies pool counting (disabled excluded), the
+// TestComputeBitmapMatrixReport verifies pool counting (non-active excluded), the
 // difficulty axis, targetable vs over-ceiling cells, and the LARGE⇒MEDIUM
 // normalization that folds divergent stamps into the settings envelope.
 func TestComputeBitmapMatrixReport(t *testing.T) {
@@ -98,13 +98,13 @@ func TestComputeBitmapMatrixReport(t *testing.T) {
 		return nil
 	}
 
-	// ADDITION bucket 3: one live row (disabled excluded), targetable → example.
+	// ADDITION bucket 3: one live row (non-active excluded), targetable → example.
 	add3 := cellFor(uint64(mathcore.ADDITION), 3)
 	if add3 == nil {
 		t.Fatal("ADDITION bucket 3 cell missing")
 	}
 	if add3.Pool != 1 {
-		t.Errorf("ADDITION bucket 3 pool = %d, want 1 (disabled row excluded)", add3.Pool)
+		t.Errorf("ADDITION bucket 3 pool = %d, want 1 (non-active row excluded)", add3.Pool)
 	}
 	if add3.Ex == "" || add3.Over {
 		t.Errorf("ADDITION bucket 3 should be a targetable example, got %+v", *add3)

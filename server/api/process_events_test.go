@@ -247,7 +247,6 @@ func TestProcessEvents_AnsweredProblem_EquivalentAnswer_Accepted(t *testing.T) {
 		Answer:            "1/2",
 		Explanation:       "half",
 		Difficulty:        3,
-		Disabled:          false,
 		Generator:         "test",
 	}
 	if _, _, err := api.problemManager.Create(prob); err != nil {
@@ -283,7 +282,6 @@ func TestProcessEvents_AnsweredProblem_EquivalentAnswer_Accepted(t *testing.T) {
 		Answer:            "3/2",
 		Explanation:       "one and a half",
 		Difficulty:        3,
-		Disabled:          false,
 		Generator:         "test",
 	}
 	if _, _, err := api.problemManager.Create(prob2); err != nil {

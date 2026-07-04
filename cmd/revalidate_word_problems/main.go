@@ -142,7 +142,7 @@ func main() {
 
 	query := fmt.Sprintf(
 		`SELECT id, expression, answer, explanation, problem_type_bitmap FROM problems
-		 WHERE disabled = 0 AND (problem_type_bitmap & %d) <> 0 AND id >= ? ORDER BY id`,
+		 WHERE status = 'active' AND (problem_type_bitmap & %d) <> 0 AND id >= ? ORDER BY id`,
 		uint64(mathcore.WORD))
 	if *limit > 0 {
 		query = fmt.Sprintf("%s LIMIT %d", query, *limit)

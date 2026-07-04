@@ -72,7 +72,7 @@ func formatUintsForSQLIn[T ~uint32 | ~uint64](vals []T) string {
 func (a *Api) getSatisfyingProblemIds(logPrefix string, settings *Settings, prevIds *[]uint32) (*[]uint32, error) {
 	diffLowerBound := settings.TargetDifficulty - problemSelectionEpsilon
 	diffUpperBound := settings.TargetDifficulty + problemSelectionEpsilon
-	clause := fmt.Sprintf("(problem_type_bitmap & ~%d) = 0 AND problem_type_bitmap != 0 AND difficulty >= %g AND difficulty <= %g AND disabled=0",
+	clause := fmt.Sprintf("(problem_type_bitmap & ~%d) = 0 AND problem_type_bitmap != 0 AND difficulty >= %g AND difficulty <= %g AND status='active'",
 		settings.ProblemTypeBitmap,
 		diffLowerBound,
 		diffUpperBound,
@@ -125,7 +125,7 @@ func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings
 	dueReviewID := a.getDueReviewProblem(logPrefix, settings)
 	if dueReviewID != 0 {
 		p, status, msg, err := a.problemManager.Get(dueReviewID)
-		if err == nil && status == http.StatusOK && !p.Disabled {
+		if err == nil && status == http.StatusOK && p.Status == StatusActive {
 			glog.Infof("%s serving spaced rep review problem=%d", logPrefix, dueReviewID)
 			return p, nil
 		}

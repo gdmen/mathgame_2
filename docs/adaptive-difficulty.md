@@ -89,10 +89,23 @@ A wrong answer schedules a review; correct answers advance it through `spacedRep
 
 `getDueReviewProblem` is consulted at the start of `selectProblem` — a due review preempts normal
 selection. It gates the queued problem against *current* settings so a now-disabled topic stops
-surfacing: due now, not disabled, nonzero bitmap that is a subset of the enabled bitmap, and
+surfacing: due now, `status = 'active'`, nonzero bitmap that is a subset of the enabled bitmap, and
 difficulty within `target_difficulty + problemSelectionEpsilon`. **No lower difficulty bound** — a
 now-easy review is still a meaningful retest. The subset clause matches the default selection SQL
 (docs/selection.md, `getSatisfyingProblemIds`).
+
+## Reported problems (`bad_problem_system` / `bad_problem_user`)
+
+Both bad-problem events (`processEvent`) mark the offending problem
+`status = 'reported'` — a KaTeX render failure (`bad_problem_system`) and an
+adult report (`bad_problem_user`) are both *unvalidated* claims, so they land in
+the same state and neither serves nor is confirmed wrong. The write is a targeted
+`UPDATE problems SET status = ? WHERE id = ?` rather than the manager's full-row
+`Update`, so it can't clobber a concurrent field write. The problem id comes from
+the event value (`parseBadProblemID`), falling back to `gamestate.ProblemId`; a
+new problem is re-selected only when the reported one is the current problem. Only
+a later admin review (a follow-up) promotes `reported` to `incorrect` or back to
+`active`. State semantics are owned by `docs/schema.md`.
 
 ## Invariants
 

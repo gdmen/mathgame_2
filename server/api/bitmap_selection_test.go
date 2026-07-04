@@ -37,8 +37,8 @@ func TestBitwiseSubsetSelection_Semantics(t *testing.T) {
 	}
 	for _, s := range seed {
 		if _, err := api.DB.Exec(
-			`INSERT INTO problems (id, problem_type_bitmap, expression, symbolic_expression, answer, difficulty, disabled, generator, difficulty_version)
-			 VALUES (?, ?, 'seed', '', '1', 5, 0, 'test', '0.2')`,
+			`INSERT INTO problems (id, problem_type_bitmap, expression, symbolic_expression, answer, difficulty, status, generator, difficulty_version)
+			 VALUES (?, ?, 'seed', '', '1', 5, 'active', 'test', '0.2')`,
 			s.id, s.bitmap,
 		); err != nil {
 			t.Fatalf("seed %d: %v", s.id, err)
@@ -92,8 +92,8 @@ func TestSelection_PrefersNewestGeneratorVersion(t *testing.T) {
 	}
 	for _, s := range seed {
 		if _, err := api.DB.Exec(
-			`INSERT INTO problems (id, problem_type_bitmap, expression, symbolic_expression, answer, difficulty, disabled, generator, difficulty_version)
-			 VALUES (?, ?, 'seed', '', '1', 5, 0, ?, '0.2')`,
+			`INSERT INTO problems (id, problem_type_bitmap, expression, symbolic_expression, answer, difficulty, status, generator, difficulty_version)
+			 VALUES (?, ?, 'seed', '', '1', 5, 'active', ?, '0.2')`,
 			s.id, uint64(mathcore.ADDITION), s.gen,
 		); err != nil {
 			t.Fatalf("seed %d: %v", s.id, err)

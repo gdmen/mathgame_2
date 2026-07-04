@@ -170,7 +170,7 @@ const DifficultyCalibrationView = ({ token, apiUrl, user }) => {
               <tr>
                 <th>Bucket</th>
                 <th>Live</th>
-                <th>Disabled</th>
+                <th>Not served</th>
                 <th>Examples</th>
                 <th>Generator mix</th>
                 <th>Dominant bits</th>
@@ -183,7 +183,7 @@ const DifficultyCalibrationView = ({ token, apiUrl, user }) => {
                     <a href={"#bucket-" + b.label}>{b.label}</a>
                   </td>
                   <td>{b.live_count}</td>
-                  <td>{b.disabled_count}</td>
+                  <td>{b.not_served_count}</td>
                   <td>{sampledCount(b.generators)}</td>
                   <td>{generatorMix(b.generators)}</td>
                   <td>{nameCounts(b.dominant_bits)}</td>
@@ -201,7 +201,7 @@ const DifficultyCalibrationView = ({ token, apiUrl, user }) => {
               <h2>
                 Difficulty {b.label}{" "}
                 <span className="calib-muted">
-                  ({b.live_count} live, {b.disabled_count} disabled)
+                  ({b.live_count} live, {b.not_served_count} not served)
                 </span>
               </h2>
               {(!b.generators || b.generators.length === 0) && (

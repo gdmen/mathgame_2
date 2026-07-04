@@ -41,9 +41,17 @@ permanent (see [problem-generation.md](problem-generation.md)).
 
 | Version | What it is |
 |---------|-----------|
-| `heuristic_0.0` | Original hand-written generator — and, like `heuristic_2.0`, **compositional and difficulty-targeting**: it built expressions toward a requested difficulty rather than emitting fixed template shapes. Add/sub/mul only (wired up for add/sub at low difficulty), no fractions; output wrapped single numbers in parens (`(3)+(5)-(2)`). Problems remain in the DB for history. |
+| `heuristic_0.0` | Original hand-written generator — and, like `heuristic_2.0`, **compositional and difficulty-targeting**: it built expressions toward a requested difficulty rather than emitting fixed template shapes. Add/sub/mul only (wired up for add/sub at low difficulty), no fractions; output wrapped single numbers in parens (`(3)+(5)-(2)`). Problems remain in the DB for history but are `status = 'deprecated'` (see the note below). |
 | `heuristic_1.0` | Template-enumeration rewrite. Four operations (`+ - * /`); fixed template shapes (basic binary, missing-number, multi-term chains, same/different-denominator fractions). Did NOT target difficulty — it emitted a shape and let the formula score whatever fell out, and DECIMALS/PEMDAS/PERCENTAGES/SINGLE_VARIABLE were LLM-only (#227). Problems remain in the DB and serve normally. |
 | `heuristic_2.0` (current) | Compositional, difficulty-targeting rewrite (#283) that RE-introduces the targeting `heuristic_0.0` had and `heuristic_1.0` dropped. Takes the envelope bitmap + the user's `target_difficulty` and aims each candidate at it; covers EVERY non-WORD bit and arbitrary STACKS of them (the previously-LLM-only DECIMALS/PEMDAS/PERCENTAGES/SINGLE_VARIABLE included). Builds answer-first on the `mathcore` render-only AST; see below. |
+
+### Deprecated generator rows
+
+Migration 46 marked every `heuristic_0.0`, `llm_0.0`, `llm_0.1`, and `llm_0.2`
+row `status = 'deprecated'`: valid when generated but predating the current
+generators, so no longer served (still counted in metrics — they were legitimate
+when answered). `heuristic_1.0` and later LLM versions (`llm_0.3`+) are untouched
+and serve normally. State semantics are owned by `docs/schema.md`.
 
 ### `heuristic_2.0` — compositional answer-first difficulty targeting
 

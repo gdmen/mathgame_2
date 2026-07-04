@@ -318,9 +318,9 @@ envelope populates (mirrored as `MIN_TARGET_DIFFICULTY` in
 - Bitwise-subset SQL in `getSatisfyingProblemIds` and `getDueReviewProblem`.
   Zero-bitmap rows are excluded defensively (a zero bitmap is a subset of
   everything).
-- Index: `(disabled, difficulty, problem_type_bitmap)` — the trailing bitmap
+- Index: `(status, difficulty, problem_type_bitmap)` — the trailing bitmap
   column makes the subset filter covering (plans in the comment block of
-  `migrations/39.sql`).
+  `migrations/39.sql`; the `disabled`→`status` column swap is `migrations/46.sql`).
 
 (Selection internals are owned by [selection.md](selection.md); the rows above
 are the generation-relevant surface.)
