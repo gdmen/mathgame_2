@@ -2,14 +2,13 @@ package api
 
 import (
 	"errors"
-	"hash/fnv"
-	"net/http"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"garydmenezes.com/mathgame/server/common"
+	heuristic_generator "garydmenezes.com/mathgame/server/generator"
 	"garydmenezes.com/mathgame/server/llm_generator"
 	"garydmenezes.com/mathgame/server/mathcore"
 )
@@ -107,50 +106,56 @@ func TestGenerateProblemsBackground_DedupIsPerUser(t *testing.T) {
 	}
 }
 
-// llmTestProblem returns a canned LLM problem with sensible defaults for
-// happy-path tests. Callers can mutate any field they care about.
-func llmTestProblem() llm_generator.Problem {
-	return llm_generator.Problem{
-		Features:    []string{"addition"},
-		Expression:  "12 + 7",
-		Answer:      "19",
-		Explanation: "12 + 7 = 19",
-		Difficulty:  5,
-	}
-}
-
-// withCannedLLM swaps llmGenerateProblemFn + llmValidateProblemFn for the
-// duration of the test. Validation defaults to accept (echoes the problem's
-// own features); pass validateErr to simulate a WORD-validator rejection.
-// Note: the validator seam is only consulted for WORD problems - symbolic
-// canned problems are answer-checked by the in-process evaluator, so their
-// Answer fields must actually be correct.
-func withCannedLLM(t *testing.T, problems []llm_generator.Problem, genErr error, validateErr error) {
+// withEchoNarrator swaps the narration + validation seams for the duration of a
+// test. The narrator wraps each heuristic-built skeleton's symbolic expression
+// in trivial prose (a valid WORD problem), copying the skeleton's authoritative
+// SymbolicExpression + Answer exactly as the real NarrateProblems does - so the
+// math stays the heuristic's and only the prose is faked. Validation accepts
+// (echoing the problem's features) unless validateErr is set; narrateErr
+// simulates an OpenAI failure.
+func withEchoNarrator(t *testing.T, narrateErr, validateErr error) {
 	t.Helper()
-	originalGen := llmGenerateProblemFn
+	originalNarrate := llmNarrateProblemFn
 	originalValidate := llmValidateProblemFn
-	llmGenerateProblemFn = func(opts *llm_generator.Options) ([]llm_generator.Problem, error) {
-		if genErr != nil {
-			return nil, genErr
+	llmNarrateProblemFn = func(skeletons []llm_generator.Skeleton) ([]llm_generator.Problem, error) {
+		if narrateErr != nil {
+			return nil, narrateErr
 		}
-		return problems, nil
+		out := make([]llm_generator.Problem, 0, len(skeletons))
+		for _, s := range skeletons {
+			out = append(out, llm_generator.Problem{
+				Expression:         `\text{A word problem posing ` + s.SymbolicExpression + `.}`,
+				SymbolicExpression: s.SymbolicExpression,
+				Answer:             s.Answer,
+				Explanation:        `\text{That is the computation.}`,
+			})
+		}
+		return out, nil
 	}
-	llmValidateProblemFn = func(p *llm_generator.Problem, constraints string, featureNames []string) ([]string, error) {
-		if validateErr != nil {
-			return nil, validateErr
-		}
-		return p.Features, nil
+	llmValidateProblemFn = func(p *llm_generator.Problem) error {
+		return validateErr
 	}
 	t.Cleanup(func() {
-		llmGenerateProblemFn = originalGen
+		llmNarrateProblemFn = originalNarrate
 		llmValidateProblemFn = originalValidate
 	})
 }
 
-// TestGenerateProblems_LLM_HappyPath: a valid LLM problem flows through to
-// a DB row with the right fields. Locks in the wire shape so any drift
-// (e.g. dropped field on insert) shows up here.
-func TestGenerateProblems_LLM_HappyPath(t *testing.T) {
+// countByGenerator returns how many problems carry the given generator string.
+func countByGenerator(t *testing.T, api *Api, generator string) int {
+	t.Helper()
+	var n int
+	if err := api.DB.QueryRow(`SELECT COUNT(*) FROM problems WHERE generator = ?`, generator).Scan(&n); err != nil {
+		t.Fatalf("count generator=%s: %v", generator, err)
+	}
+	return n
+}
+
+// TestGenerateProblems_NonWord_NotBatched: generateProblems is WORD-only - a
+// pure non-WORD envelope batches nothing (non-WORD is generated live on the
+// request path; runHeuristicGenerator itself is covered by
+// TestRunHeuristicGenerator_StampsDifficultyVersion).
+func TestGenerateProblems_NonWord_NotBatched(t *testing.T) {
 	c, err := common.ReadConfig("../../test_conf.json")
 	if err != nil {
 		t.Fatalf("read config: %v", err)
@@ -158,49 +163,75 @@ func TestGenerateProblems_LLM_HappyPath(t *testing.T) {
 	api, _, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 
-	withCannedLLM(t, []llm_generator.Problem{llmTestProblem()}, nil, nil)
+	settings := &Settings{
+		UserId:            1,
+		ProblemTypeBitmap: uint64(mathcore.ADDITION | mathcore.MEDIUM_NUMBERS),
+		TargetDifficulty:  6,
+	}
+	if got, err := api.generateProblems("[test-nonword]", settings, 5); err == nil {
+		t.Fatalf("expected no batch generation for a non-WORD envelope, got %v", got)
+	}
+	if n := countByGenerator(t, api, heuristic_generator.VERSION); n != 0 {
+		t.Errorf("non-WORD envelope batched %d heuristic rows, want 0 (non-WORD is live)", n)
+	}
+}
+
+// TestGenerateProblems_Word_HappyPath: a WORD envelope builds a scored skeleton,
+// narrates it, and stores an llm_0.6 row whose stored math is the skeleton's
+// (SymbolicExpression answers correctly) and whose difficulty carries the word
+// concept on top of the skeleton.
+func TestGenerateProblems_Word_HappyPath(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+
+	withEchoNarrator(t, nil, nil)
 
 	settings := &Settings{
 		UserId:            1,
-		ProblemTypeBitmap: uint64(mathcore.ADDITION),
-		TargetDifficulty:  5,
+		ProblemTypeBitmap: uint64(mathcore.SUBTRACTION | mathcore.MEDIUM_NUMBERS | mathcore.WORD),
+		TargetDifficulty:  8,
 	}
-	problem, err := api.generateProblems("[test-llm-happy]", settings, 1)
+	// generateProblems returns the word problem when one is produced (word runs
+	// after the non-word heuristic and overwrites the return value).
+	problem, err := api.generateProblems("[test-word-happy]", settings, 3)
 	if err != nil {
 		t.Fatalf("generateProblems: %v", err)
 	}
-	if problem == nil {
-		t.Fatalf("expected a problem, got nil")
+	if problem.Generator != llm_generator.VERSION {
+		t.Fatalf("Generator = %q, want %q (a narrated word problem)", problem.Generator, llm_generator.VERSION)
 	}
-
-	persisted, status, _, err := api.problemManager.Get(problem.Id)
-	if err != nil || status != http.StatusOK {
-		t.Fatalf("re-fetch id=%d: status=%d err=%v", problem.Id, status, err)
+	if problem.ProblemTypeBitmap&uint64(mathcore.WORD) == 0 {
+		t.Errorf("bitmap %d missing WORD", problem.ProblemTypeBitmap)
 	}
-	if persisted.Expression != "12 + 7" {
-		t.Errorf("Expression = %q, want %q", persisted.Expression, "12 + 7")
+	if problem.ProblemTypeBitmap&^settings.ProblemTypeBitmap != 0 {
+		t.Errorf("bitmap %d not a subset of envelope %d", problem.ProblemTypeBitmap, settings.ProblemTypeBitmap)
 	}
-	if persisted.Answer != "19" {
-		t.Errorf("Answer = %q, want %q", persisted.Answer, "19")
+	if problem.SymbolicExpression == "" {
+		t.Fatalf("word problem stored no symbolic_expression")
 	}
-	if persisted.Explanation != "12 + 7 = 19" {
-		t.Errorf("Explanation = %q, want %q", persisted.Explanation, "12 + 7 = 19")
+	if err := VerifyAnswer(problem.SymbolicExpression, problem.Answer); err != nil {
+		t.Errorf("stored skeleton %q does not answer %q: %v", problem.SymbolicExpression, problem.Answer, err)
 	}
-	if persisted.Generator != llm_generator.VERSION {
-		t.Errorf("Generator = %q, want %q", persisted.Generator, llm_generator.VERSION)
+	// Difficulty is scored from the skeleton with the word concept applied, so it
+	// exceeds the bare skeleton's score.
+	skeletonOnly := mathcore.ComputeProblemDifficulty(problem.SymbolicExpression, "")
+	if problem.Difficulty <= skeletonOnly {
+		t.Errorf("word difficulty %.2f should exceed the bare skeleton %.2f (word bonus)",
+			problem.Difficulty, skeletonOnly)
 	}
-	if persisted.ProblemTypeBitmap != uint64(mathcore.ADDITION) {
-		t.Errorf("ProblemTypeBitmap = %d, want %d", persisted.ProblemTypeBitmap, uint64(mathcore.ADDITION))
-	}
-	if persisted.DifficultyVersion != mathcore.DifficultyVersion {
-		t.Errorf("DifficultyVersion = %q, want %q", persisted.DifficultyVersion, mathcore.DifficultyVersion)
+	if problem.DifficultyVersion != mathcore.DifficultyVersion {
+		t.Errorf("DifficultyVersion = %q, want %q", problem.DifficultyVersion, mathcore.DifficultyVersion)
 	}
 }
 
-// TestGenerateProblems_LLM_IdCollisionSkipped: when the LLM returns a problem
-// whose expression hashes to an already-occupied id, the loop must skip it
-// (status != 404 from problemManager.Get) instead of overwriting.
-func TestGenerateProblems_LLM_IdCollisionSkipped(t *testing.T) {
+// TestGenerateProblems_Word_ValidatorReject: a narration the secondary-model
+// validator rejects is never stored, and (generateProblems being WORD-only)
+// nothing else is produced, so it returns an error.
+func TestGenerateProblems_Word_ValidatorReject(t *testing.T) {
 	c, err := common.ReadConfig("../../test_conf.json")
 	if err != nil {
 		t.Fatalf("read config: %v", err)
@@ -208,51 +239,25 @@ func TestGenerateProblems_LLM_IdCollisionSkipped(t *testing.T) {
 	api, _, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 
-	canned := llmTestProblem()
-	canned.Expression = "999 + 1"
-
-	// Pre-seed a row with the same fnv32a(expression) so the next attempt
-	// collides and gets dropped.
-	h := fnv.New32a()
-	h.Write([]byte(canned.Expression))
-	existing := &Problem{
-		Id:                h.Sum32(),
-		ProblemTypeBitmap: uint64(mathcore.ADDITION),
-		Expression:        canned.Expression,
-		Answer:            "1000",
-		Difficulty:        5,
-		Generator:         "test-seed",
-	}
-	if status, msg, err := api.problemManager.Create(existing); err != nil || status != http.StatusCreated {
-		t.Fatalf("pre-seed: status=%d msg=%s err=%v", status, msg, err)
-	}
-
-	withCannedLLM(t, []llm_generator.Problem{canned}, nil, nil)
+	withEchoNarrator(t, nil, errors.New("validator says no"))
 
 	settings := &Settings{
 		UserId:            1,
-		ProblemTypeBitmap: uint64(mathcore.ADDITION),
-		TargetDifficulty:  5,
+		ProblemTypeBitmap: uint64(mathcore.SUBTRACTION | mathcore.WORD),
+		TargetDifficulty:  6,
 	}
-	_, err = api.generateProblems("[test-llm-collision]", settings, 1)
-	// All canned problems collided, so no new problem produced -> error.
-	if err == nil {
-		t.Fatalf("expected error when all candidates collide, got nil")
+	if got, err := api.generateProblems("[test-word-validate-reject]", settings, 3); err == nil {
+		t.Fatalf("expected an error when the sole narration is rejected, got %v", got)
 	}
-
-	// Seeded row should still carry its original Answer (not overwritten).
-	persisted, status, _, err := api.problemManager.Get(existing.Id)
-	if err != nil || status != http.StatusOK {
-		t.Fatalf("re-fetch seeded id=%d: status=%d err=%v", existing.Id, status, err)
-	}
-	if persisted.Answer != "1000" {
-		t.Errorf("collision overwrote seeded row; Answer = %q, want %q", persisted.Answer, "1000")
+	if n := countByGenerator(t, api, llm_generator.VERSION); n != 0 {
+		t.Errorf("validator-rejected narration was stored: %d %s rows", n, llm_generator.VERSION)
 	}
 }
 
-// TestGenerateProblems_LLM_ValidationReject: a problem that fails
-// llmValidateProblemFn must not be persisted.
-func TestGenerateProblems_LLM_ValidationReject(t *testing.T) {
+// TestGenerateProblems_Word_NarrationFails: an OpenAI failure yields no WORD
+// problem and no error-swallowing fallback (non-WORD is a selectProblem concern,
+// not generateProblems'), so generateProblems returns an error.
+func TestGenerateProblems_Word_NarrationFails(t *testing.T) {
 	c, err := common.ReadConfig("../../test_conf.json")
 	if err != nil {
 		t.Fatalf("read config: %v", err)
@@ -260,91 +265,81 @@ func TestGenerateProblems_LLM_ValidationReject(t *testing.T) {
 	api, _, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 
-	canned := llmTestProblem()
-	canned.Expression = "8 + 4"
-	withCannedLLM(t, []llm_generator.Problem{canned}, nil, errors.New("rejected by test"))
-
-	settings := &Settings{
-		UserId:            1,
-		ProblemTypeBitmap: uint64(mathcore.ADDITION),
-		TargetDifficulty:  5,
-	}
-	_, err = api.generateProblems("[test-llm-validate-reject]", settings, 1)
-	if err == nil {
-		t.Fatalf("expected error when sole candidate fails validation, got nil")
-	}
-
-	// Row should not exist in the DB.
-	h := fnv.New32a()
-	h.Write([]byte(canned.Expression))
-	_, status, _, _ := api.problemManager.Get(h.Sum32())
-	if status != http.StatusNotFound {
-		t.Errorf("rejected problem was persisted; Get status = %d, want %d", status, http.StatusNotFound)
-	}
-}
-
-// TestGenerateProblems_LLM_CalibrationReject: a problem whose self-reported
-// difficulty diverges too far from target (ratio < 0.5 or > 2.0) must be
-// dropped.
-func TestGenerateProblems_LLM_CalibrationReject(t *testing.T) {
-	c, err := common.ReadConfig("../../test_conf.json")
-	if err != nil {
-		t.Fatalf("read config: %v", err)
-	}
-	api, _, cleanup := setupTestAPI(t, c)
-	defer cleanup()
-
-	canned := llmTestProblem()
-	canned.Expression = "100 + 200"
-	canned.Difficulty = 1 // target is 5, ratio 0.2 -> reject
-	withCannedLLM(t, []llm_generator.Problem{canned}, nil, nil)
-
-	settings := &Settings{
-		UserId:            1,
-		ProblemTypeBitmap: uint64(mathcore.ADDITION),
-		TargetDifficulty:  5,
-	}
-	_, err = api.generateProblems("[test-llm-calibration]", settings, 1)
-	if err == nil {
-		t.Fatalf("expected error when sole candidate fails calibration, got nil")
-	}
-
-	h := fnv.New32a()
-	h.Write([]byte(canned.Expression))
-	_, status, _, _ := api.problemManager.Get(h.Sum32())
-	if status != http.StatusNotFound {
-		t.Errorf("calibration-rejected problem was persisted; Get status = %d, want %d", status, http.StatusNotFound)
-	}
-}
-
-// TestGenerateProblems_LLM_FallbackToHeuristic: when llmGenerateProblemFn
-// returns an error, the path falls back to the heuristic generator (with
-// WORD stripped) and produces a heuristic-generated problem instead.
-func TestGenerateProblems_LLM_FallbackToHeuristic(t *testing.T) {
-	c, err := common.ReadConfig("../../test_conf.json")
-	if err != nil {
-		t.Fatalf("read config: %v", err)
-	}
-	api, _, cleanup := setupTestAPI(t, c)
-	defer cleanup()
-
-	withCannedLLM(t, nil, errors.New("OpenAI is on fire"), nil)
+	withEchoNarrator(t, errors.New("OpenAI is on fire"), nil)
 
 	settings := &Settings{
 		UserId:            1,
 		ProblemTypeBitmap: uint64(mathcore.ADDITION | mathcore.WORD),
+		TargetDifficulty:  6,
+	}
+	if got, err := api.generateProblems("[test-word-narration-fail]", settings, 3); err == nil {
+		t.Fatalf("expected an error when narration fails, got %v", got)
+	}
+	if n := countByGenerator(t, api, llm_generator.VERSION); n != 0 {
+		t.Errorf("narration failed but %d word rows landed", n)
+	}
+}
+
+// TestGenerateProblems_WordOnly_NoCoreOp_Errors: a WORD-only bitmap has no
+// non-WORD envelope to build a skeleton from, so nothing is generated (the
+// settings rules forbid this bitmap; the generator degrades gracefully).
+func TestGenerateProblems_WordOnly_NoCoreOp_Errors(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+
+	settings := &Settings{
+		UserId:            1,
+		ProblemTypeBitmap: uint64(mathcore.WORD),
+		TargetDifficulty:  6,
+	}
+	if got, err := api.generateProblems("[test-word-only]", settings, 3); err == nil {
+		t.Fatalf("expected no problem for a WORD-only bitmap, got %v", got)
+	}
+}
+
+// TestGenerateProblems_Word_CollisionDedup: two identical narrations hash to the
+// same id; the second hits the collision stage so exactly one word row lands.
+func TestGenerateProblems_Word_CollisionDedup(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+
+	originalNarrate := llmNarrateProblemFn
+	originalValidate := llmValidateProblemFn
+	defer func() {
+		llmNarrateProblemFn = originalNarrate
+		llmValidateProblemFn = originalValidate
+	}()
+	fixed := llm_generator.Problem{
+		Expression:         `\text{A word problem posing 9 - 4.}`,
+		SymbolicExpression: "9 - 4",
+		Answer:             "5",
+		Explanation:        `\text{because 9 - 4 = 5}`,
+	}
+	llmNarrateProblemFn = func(skeletons []llm_generator.Skeleton) ([]llm_generator.Problem, error) {
+		return []llm_generator.Problem{fixed, fixed}, nil
+	}
+	llmValidateProblemFn = func(p *llm_generator.Problem) error {
+		return nil
+	}
+
+	settings := &Settings{
+		UserId:            1,
+		ProblemTypeBitmap: uint64(mathcore.SUBTRACTION | mathcore.WORD),
 		TargetDifficulty:  5,
 	}
-	problem, err := api.generateProblems("[test-llm-fallback]", settings, 1)
-	if err != nil {
-		t.Fatalf("expected fallback to produce a problem, got error: %v", err)
+	if _, err := api.generateProblems("[test-word-collision]", settings, 2); err != nil {
+		t.Fatalf("generateProblems: %v", err)
 	}
-	if problem == nil {
-		t.Fatalf("fallback produced nil problem")
-	}
-	// Heuristic generator stamps its own version into Generator.
-	if problem.Generator == llm_generator.VERSION {
-		t.Errorf("fallback path produced an LLM-tagged problem; Generator = %q", problem.Generator)
+	if n := countByGenerator(t, api, llm_generator.VERSION); n != 1 {
+		t.Errorf("duplicate narrations produced %d word rows, want 1", n)
 	}
 }
 
@@ -364,9 +359,9 @@ func TestRunHeuristicGenerator_StampsDifficultyVersion(t *testing.T) {
 		UserId:           1,
 		TargetDifficulty: 5,
 	}
-	problem, count, _ := api.runHeuristicGenerator("[test-difficulty-version]", settings, 1, mathcore.ADDITION)
-	if count == 0 || problem == nil {
-		t.Fatalf("expected one heuristic problem, got count=%d problem=%v", count, problem)
+	problem := api.runHeuristicGenerator("[test-difficulty-version]", settings, 1, mathcore.ADDITION)
+	if problem == nil {
+		t.Fatalf("expected one heuristic problem, got nil")
 	}
 	if problem.DifficultyVersion != mathcore.DifficultyVersion {
 		t.Errorf("returned model: DifficultyVersion = %q, want %q", problem.DifficultyVersion, mathcore.DifficultyVersion)
@@ -380,370 +375,5 @@ func TestRunHeuristicGenerator_StampsDifficultyVersion(t *testing.T) {
 	}
 	if persisted.DifficultyVersion != mathcore.DifficultyVersion {
 		t.Errorf("persisted row: DifficultyVersion = %q, want %q", persisted.DifficultyVersion, mathcore.DifficultyVersion)
-	}
-}
-
-// TestGenerateProblems_WordPath: a WORD problem flows through the validator
-// seam; validator-extracted topic features stamp the bitmap on top of the
-// parser's shape bits.
-func TestGenerateProblems_WordPath(t *testing.T) {
-	c, err := common.ReadConfig("../../test_conf.json")
-	if err != nil {
-		t.Fatalf("read config: %v", err)
-	}
-	api, _, cleanup := setupTestAPI(t, c)
-	defer cleanup()
-
-	p := llmTestProblem()
-	p.Expression = `\text{Mia has 12 stickers. She gives away 5. How many are left?}`
-	p.Answer = "7"
-	p.Features = []string{"subtraction", "word"}
-	withCannedLLM(t, []llm_generator.Problem{p}, nil, nil)
-
-	settings := &Settings{
-		UserId:            1,
-		ProblemTypeBitmap: uint64(mathcore.SUBTRACTION | mathcore.WORD),
-		TargetDifficulty:  6,
-	}
-	problem, err := api.generateProblems("[test-word-path]", settings, 1)
-	if err != nil {
-		t.Fatalf("generateProblems: %v", err)
-	}
-	want := uint64(mathcore.WORD | mathcore.SUBTRACTION)
-	if problem.ProblemTypeBitmap != want {
-		t.Errorf("bitmap = %d (%v), want %d (parser WORD + validator subtraction)",
-			problem.ProblemTypeBitmap,
-			mathcore.ProblemTypeToFeatures(mathcore.ProblemType(problem.ProblemTypeBitmap)), want)
-	}
-	if problem.Expression != p.Expression {
-		t.Errorf("word expression mutated: %q", problem.Expression)
-	}
-}
-
-// TestGenerateProblems_WordPath_SymbolicExpression: a word problem's
-// symbolic_expression is validated and stored, its computation-shape bits are
-// folded into the bitmap, and its difficulty is scored from the form (division
-// on large, chained operands) rather than the prose (which would score as a
-// small addition).
-func TestGenerateProblems_WordPath_SymbolicExpression(t *testing.T) {
-	c, err := common.ReadConfig("../../test_conf.json")
-	if err != nil {
-		t.Fatalf("read config: %v", err)
-	}
-	api, _, cleanup := setupTestAPI(t, c)
-	defer cleanup()
-
-	p := llmTestProblem()
-	p.Expression = `\text{There are 9999 beads shared equally among 3 jars, then each jar is split among 3 friends. How many beads per friend?}`
-	p.SymbolicExpression = "9999 / 3 / 3"
-	p.Answer = "1111"
-	p.Features = []string{"division", "word"}
-	withCannedLLM(t, []llm_generator.Problem{p}, nil, nil)
-
-	settings := &Settings{
-		UserId:            1,
-		ProblemTypeBitmap: uint64(mathcore.DIVISION | mathcore.WORD | mathcore.MEDIUM_NUMBERS | mathcore.LARGE_NUMBERS | mathcore.CHAINED_OPERATIONS),
-		TargetDifficulty:  20,
-	}
-	problem, err := api.generateProblems("[test-word-symbolic]", settings, 1)
-	if err != nil {
-		t.Fatalf("generateProblems: %v", err)
-	}
-
-	if problem.Expression != p.Expression {
-		t.Errorf("word expression mutated: %q", problem.Expression)
-	}
-	if want := mathcore.AdmitExpression(p.SymbolicExpression).Expr; problem.SymbolicExpression != want {
-		t.Errorf("symbolic_expression = %q, want %q", problem.SymbolicExpression, want)
-	}
-	// The form's shape bits are folded in alongside the validator's WORD/DIVISION.
-	for _, bit := range []mathcore.ProblemType{mathcore.WORD, mathcore.DIVISION, mathcore.LARGE_NUMBERS, mathcore.CHAINED_OPERATIONS} {
-		if problem.ProblemTypeBitmap&uint64(bit) == 0 {
-			t.Errorf("bitmap %d (%v) missing %v from the symbolic form",
-				problem.ProblemTypeBitmap, mathcore.ProblemTypeToFeatures(mathcore.ProblemType(problem.ProblemTypeBitmap)), bit)
-		}
-	}
-	// Scored from the form (~21), not the prose (~12 as addition).
-	if problem.Difficulty < 18 {
-		t.Errorf("difficulty = %.2f, want >=18 (scored from the symbolic form)", problem.Difficulty)
-	}
-}
-
-// TestGenerateProblems_WordProseOnlyFeatures: features expressed entirely in
-// prose are invisible to the parser; the validator's reports stamp the bits
-// so the corresponding toggles govern word problems at serve time. Each case
-// also proves the envelope rejects the problem for a user missing the bit.
-func TestGenerateProblems_WordProseOnlyFeatures(t *testing.T) {
-	c, err := common.ReadConfig("../../test_conf.json")
-	if err != nil {
-		t.Fatalf("read config: %v", err)
-	}
-	api, _, cleanup := setupTestAPI(t, c)
-	defer cleanup()
-
-	cases := []struct {
-		name     string
-		expr     string
-		answer   string
-		features []string
-		want     uint64 // full expected bitmap incl. parser shape bits
-		bit      uint64 // the prose-only bit under test
-	}{
-		{
-			name:     "pure-prose algebra",
-			expr:     `\text{Solve for x: 3x + 7 = 22}`,
-			answer:   "5",
-			features: []string{"single_variable", "word"},
-			want:     uint64(mathcore.SINGLE_VARIABLE | mathcore.WORD | mathcore.MEDIUM_NUMBERS),
-			bit:      uint64(mathcore.SINGLE_VARIABLE),
-		},
-		{
-			name:     "prose mismatched denominators",
-			expr:     `\text{Tom ate 1/2 of a pizza and Jane ate 1/3 of it. How much did they eat together?}`,
-			answer:   "5/6",
-			features: []string{"fractions", "mismatched_denominators", "addition", "word"},
-			want:     uint64(mathcore.FRACTIONS | mathcore.MISMATCHED_DENOMINATORS | mathcore.ADDITION | mathcore.WORD),
-			bit:      uint64(mathcore.MISMATCHED_DENOMINATORS),
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			p := llmTestProblem()
-			p.Expression = tc.expr
-			p.Answer = tc.answer
-			p.Features = tc.features
-			withCannedLLM(t, []llm_generator.Problem{p}, nil, nil)
-
-			settings := &Settings{
-				UserId:            1,
-				ProblemTypeBitmap: tc.want,
-				TargetDifficulty:  6,
-			}
-			problem, err := api.generateProblems("[test-prose-feature]", settings, 1)
-			if err != nil {
-				t.Fatalf("generateProblems: %v", err)
-			}
-			if problem.ProblemTypeBitmap != tc.want {
-				t.Errorf("bitmap = %d (%v), want %d",
-					problem.ProblemTypeBitmap,
-					mathcore.ProblemTypeToFeatures(mathcore.ProblemType(problem.ProblemTypeBitmap)), tc.want)
-			}
-
-			// The same problem must NOT reach an envelope missing the bit.
-			settings.ProblemTypeBitmap = tc.want &^ tc.bit
-			if got, err := api.generateProblems("[test-prose-feature-reject]", settings, 1); err == nil {
-				t.Fatalf("expected envelope reject without bit %d, got %v", tc.bit, got)
-			}
-		})
-	}
-}
-
-// TestGenerateProblems_WordMultiStep: the validator reports
-// chained_operations on multi-step prose (the parser cannot count
-// operations inside \text{}), so the CHAINED bit stamps and the multi-step
-// toggle governs word problems at serve time too.
-func TestGenerateProblems_WordMultiStep(t *testing.T) {
-	c, err := common.ReadConfig("../../test_conf.json")
-	if err != nil {
-		t.Fatalf("read config: %v", err)
-	}
-	api, _, cleanup := setupTestAPI(t, c)
-	defer cleanup()
-
-	p := llmTestProblem()
-	p.Expression = `\text{A garden has 5 rows of 12 plants. If 3 plants die, how many are left?}`
-	p.Answer = "57"
-	p.Features = []string{"multiplication", "subtraction", "chained_operations", "word"}
-	withCannedLLM(t, []llm_generator.Problem{p}, nil, nil)
-
-	settings := &Settings{
-		UserId:            1,
-		ProblemTypeBitmap: uint64(mathcore.MULTIPLICATION | mathcore.SUBTRACTION | mathcore.CHAINED_OPERATIONS | mathcore.WORD),
-		TargetDifficulty:  6,
-	}
-	problem, err := api.generateProblems("[test-word-multistep]", settings, 1)
-	if err != nil {
-		t.Fatalf("generateProblems: %v", err)
-	}
-	want := uint64(mathcore.MULTIPLICATION | mathcore.SUBTRACTION | mathcore.CHAINED_OPERATIONS | mathcore.WORD)
-	if problem.ProblemTypeBitmap != want {
-		t.Errorf("bitmap = %d (%v), want %d (validator chained_operations must stamp)",
-			problem.ProblemTypeBitmap,
-			mathcore.ProblemTypeToFeatures(mathcore.ProblemType(problem.ProblemTypeBitmap)), want)
-	}
-
-	// The same problem must NOT reach a multi-step-off envelope.
-	settings.ProblemTypeBitmap = uint64(mathcore.MULTIPLICATION | mathcore.SUBTRACTION | mathcore.WORD)
-	if got, err := api.generateProblems("[test-word-multistep-reject]", settings, 1); err == nil {
-		t.Fatalf("expected envelope reject for multi-step-off user, got %v", got)
-	}
-}
-
-// TestGenerateProblems_WordMultiStep_ValidatorOmitsChained: the bug #246
-// guards. The validator reports two core ops but OMITS chained_operations
-// (its independent-checkbox failure mode); the stamp-time invariant must OR
-// it in, so the row both stamps correctly and rejects for a multi-step-off
-// user - even though the LLM never said "chained".
-func TestGenerateProblems_WordMultiStep_ValidatorOmitsChained(t *testing.T) {
-	c, err := common.ReadConfig("../../test_conf.json")
-	if err != nil {
-		t.Fatalf("read config: %v", err)
-	}
-	api, _, cleanup := setupTestAPI(t, c)
-	defer cleanup()
-
-	p := llmTestProblem()
-	p.Expression = `\text{A garden has 5 rows of 12 plants. If 3 plants die, how many are left?}`
-	p.Answer = "57"
-	p.Features = []string{"multiplication", "subtraction", "word"} // NOTE: no chained
-	withCannedLLM(t, []llm_generator.Problem{p}, nil, nil)
-
-	settings := &Settings{
-		UserId:            1,
-		ProblemTypeBitmap: uint64(mathcore.MULTIPLICATION | mathcore.SUBTRACTION | mathcore.CHAINED_OPERATIONS | mathcore.WORD),
-		TargetDifficulty:  6,
-	}
-	problem, err := api.generateProblems("[test-word-omits-chained]", settings, 1)
-	if err != nil {
-		t.Fatalf("generateProblems: %v", err)
-	}
-	if problem.ProblemTypeBitmap&uint64(mathcore.CHAINED_OPERATIONS) == 0 {
-		t.Errorf("bitmap = %d (%v): invariant must OR in CHAINED despite validator omitting it",
-			problem.ProblemTypeBitmap,
-			mathcore.ProblemTypeToFeatures(mathcore.ProblemType(problem.ProblemTypeBitmap)))
-	}
-
-	// And it must reject for a multi-step-off user, even though the validator
-	// never reported chained.
-	settings.ProblemTypeBitmap = uint64(mathcore.MULTIPLICATION | mathcore.SUBTRACTION | mathcore.WORD)
-	if got, err := api.generateProblems("[test-word-omits-chained-reject]", settings, 1); err == nil {
-		t.Fatalf("expected envelope reject for multi-step-off user, got %v", got)
-	}
-}
-
-// TestGenerateProblems_WordEnvelopeReject: validator-reported features
-// outside the user's envelope reject the problem (the final subset check
-// covers validator-stamped bits too).
-func TestGenerateProblems_WordEnvelopeReject(t *testing.T) {
-	c, err := common.ReadConfig("../../test_conf.json")
-	if err != nil {
-		t.Fatalf("read config: %v", err)
-	}
-	api, _, cleanup := setupTestAPI(t, c)
-	defer cleanup()
-
-	p := llmTestProblem()
-	p.Expression = `\text{A sale takes 0.5 off the price of 8 dollars. What do you pay?}`
-	p.Answer = "4"
-	p.Features = []string{"decimals", "multiplication", "word"}
-	withCannedLLM(t, []llm_generator.Problem{p}, nil, nil)
-
-	settings := &Settings{
-		UserId:            1,
-		ProblemTypeBitmap: uint64(mathcore.MULTIPLICATION | mathcore.WORD),
-		TargetDifficulty:  6,
-	}
-	if got, err := api.generateProblems("[test-word-envelope]", settings, 1); err == nil {
-		t.Fatalf("expected envelope reject, got problem %v", got)
-	}
-}
-
-// TestGenerateProblems_RewriteConsistency: a lone bare letter is rewritten to
-// '?' in the stored expression AND in the explanation prose.
-func TestGenerateProblems_RewriteConsistency(t *testing.T) {
-	c, err := common.ReadConfig("../../test_conf.json")
-	if err != nil {
-		t.Fatalf("read config: %v", err)
-	}
-	api, _, cleanup := setupTestAPI(t, c)
-	defer cleanup()
-
-	p := llmTestProblem()
-	p.Expression = "12 - x = 5"
-	p.Answer = "7"
-	p.Explanation = `\text{x is 7 because 12 - 7 = 5}`
-	withCannedLLM(t, []llm_generator.Problem{p}, nil, nil)
-
-	settings := &Settings{
-		UserId:            1,
-		ProblemTypeBitmap: uint64(mathcore.SUBTRACTION | mathcore.MISSING_NUMBER),
-		TargetDifficulty:  6,
-	}
-	problem, err := api.generateProblems("[test-rewrite]", settings, 1)
-	if err != nil {
-		t.Fatalf("generateProblems: %v", err)
-	}
-	if problem.Expression != "12 - ? = 5" {
-		t.Errorf("expression = %q, want rewritten form", problem.Expression)
-	}
-	if problem.Explanation != `\text{? is 7 because 12 - 7 = 5}` {
-		t.Errorf("explanation letter not substituted: %q", problem.Explanation)
-	}
-	if problem.ProblemTypeBitmap != uint64(mathcore.SUBTRACTION|mathcore.MISSING_NUMBER) {
-		t.Errorf("bitmap = %d", problem.ProblemTypeBitmap)
-	}
-}
-
-// TestGenerateProblems_PreservesLatexNotation: storage keeps the original
-// notation (KaTeX renders it); normalization is parsing-only.
-func TestGenerateProblems_PreservesLatexNotation(t *testing.T) {
-	c, err := common.ReadConfig("../../test_conf.json")
-	if err != nil {
-		t.Fatalf("read config: %v", err)
-	}
-	api, _, cleanup := setupTestAPI(t, c)
-	defer cleanup()
-
-	p := llmTestProblem()
-	p.Expression = `\frac{1}{2} + \frac{1}{4}`
-	p.Answer = "3/4"
-	withCannedLLM(t, []llm_generator.Problem{p}, nil, nil)
-
-	settings := &Settings{
-		UserId:            1,
-		ProblemTypeBitmap: uint64(mathcore.ADDITION | mathcore.FRACTIONS | mathcore.MISMATCHED_DENOMINATORS),
-		TargetDifficulty:  6,
-	}
-	problem, err := api.generateProblems("[test-latex]", settings, 1)
-	if err != nil {
-		t.Fatalf("generateProblems: %v", err)
-	}
-	if problem.Expression != p.Expression {
-		t.Errorf("stored expression = %q, want original LaTeX preserved", problem.Expression)
-	}
-	want := uint64(mathcore.ADDITION | mathcore.FRACTIONS | mathcore.MISMATCHED_DENOMINATORS)
-	if problem.ProblemTypeBitmap != want {
-		t.Errorf("bitmap = %d, want %d", problem.ProblemTypeBitmap, want)
-	}
-}
-
-// TestGenerateProblems_CollisionFunnel: a duplicate expression in the same
-// batch hits the collision stage; exactly one row lands.
-func TestGenerateProblems_CollisionFunnel(t *testing.T) {
-	c, err := common.ReadConfig("../../test_conf.json")
-	if err != nil {
-		t.Fatalf("read config: %v", err)
-	}
-	api, _, cleanup := setupTestAPI(t, c)
-	defer cleanup()
-
-	p := llmTestProblem() // "12 + 7" = "19"
-	withCannedLLM(t, []llm_generator.Problem{p, p}, nil, nil)
-
-	settings := &Settings{
-		UserId:            1,
-		ProblemTypeBitmap: uint64(mathcore.ADDITION | mathcore.MEDIUM_NUMBERS),
-		TargetDifficulty:  5,
-	}
-	problem, err := api.generateProblems("[test-collision]", settings, 2)
-	if err != nil {
-		t.Fatalf("generateProblems: %v", err)
-	}
-	var n int
-	if err := api.DB.QueryRow(`SELECT COUNT(*) FROM problems WHERE id = ?`, problem.Id).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	if n != 1 {
-		t.Errorf("duplicate batch produced %d rows, want 1", n)
 	}
 }

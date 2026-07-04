@@ -40,8 +40,7 @@ build-cmds: build-api
 	$(GOBUILD) -o ./bin/recompute_problem_type_bitmap ./cmd/recompute_problem_type_bitmap/
 	$(GOBUILD) -o ./bin/trim_recently_shown_problems ./cmd/trim_recently_shown_problems/
 	$(GOBUILD) -o ./bin/maintenance_server ./cmd/maintenance_server/
-	$(GOBUILD) -o ./bin/revalidate_word_problems ./cmd/revalidate_word_problems/
-	$(GOBUILD) -o ./bin/diagnose_generation ./cmd/diagnose_generation/
+	$(GOBUILD) -o ./bin/migrate_division_notation ./cmd/migrate_division_notation/
 
 # Canonical formatters — the single source of truth for the gofmt -s / prettier
 # invocations, called by build-api / build-web and by the format-on-edit hook

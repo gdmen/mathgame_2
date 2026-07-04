@@ -14,7 +14,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
 
 	heuristic_generator "garydmenezes.com/mathgame/server/generator"
@@ -120,7 +119,25 @@ func (a *Api) newestVersionTier(logPrefix string, whereClause string) (*[]uint32
 	return &ids, nil
 }
 
-func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings, prevIds *[]uint32) (*Problem, error) {
+// pickPooledProblem picks one id from pids (recency-biased) and fetches it,
+// the shared pooled-pick for selectProblem's default and recency-relaxed
+// stages. Returns nil on an empty pool or a fetch error — the error is logged,
+// never written to the response, so the caller can fall through to its next
+// stage rather than failing the request.
+func (a *Api) pickPooledProblem(logPrefix string, settings *Settings, pids []uint32) *Problem {
+	if len(pids) == 0 {
+		return nil
+	}
+	pid := a.pickWithRecencyBias(logPrefix, settings.UserId, pids)
+	p, status, msg, err := a.problemManager.Get(pid)
+	if err != nil || status != http.StatusOK {
+		glog.Infof("%s unexpected (recoverable) error fetching problem (id=%d): %s : %v", logPrefix, pid, msg, err)
+		return nil
+	}
+	return p
+}
+
+func (a *Api) selectProblem(logPrefix string, settings *Settings, prevIds *[]uint32) (*Problem, error) {
 	// Check spaced repetition review queue first
 	dueReviewID := a.getDueReviewProblem(logPrefix, settings)
 	if dueReviewID != 0 {
@@ -137,39 +154,46 @@ func (a *Api) selectProblem(logPrefix string, c *gin.Context, settings *Settings
 		return nil, err
 	}
 
-	if len(*pids) < minSelectionPool {
-		glog.Infof("%s generating new problems because there are only %d problems", logPrefix, len(*pids))
+	// Background generation is WORD-only (the expensive LLM narration); kick it
+	// off only when WORD is enabled. Non-WORD problems are cheap and generated
+	// live below, so they need no background batch.
+	if len(*pids) < minSelectionPool && settings.ProblemTypeBitmap&uint64(mathcore.WORD) != 0 {
+		glog.Infof("%s generating new WORD problems because there are only %d matching", logPrefix, len(*pids))
 		a.generateProblemsBackground(logPrefix, settings)
 	}
 
-	if len(*pids) > 0 {
-		pid := a.pickWithRecencyBias(logPrefix, settings.UserId, *pids)
-		p, status, msg, err := a.problemManager.Get(pid)
-		if HandleMngrResp(logPrefix, c, status, msg, err, p) != nil {
-			glog.Infof("%s unexpected (recoverable) error fetching problem (id=%d): %s : %s", logPrefix, pid, msg, err)
-		} else {
-			return p, nil
-		}
+	if p := a.pickPooledProblem(logPrefix, settings, *pids); p != nil {
+		return p, nil
 	}
 
-	// Pool is empty. The LLM backfill was already kicked off above via
-	// generateProblemsBackground; we don't want the user waiting on an
-	// OpenAI request here. Serve a heuristic-generated problem synchronously
-	// so they see something immediately. The LLM backfill fills the pool for
-	// subsequent requests.
+	// No servable pooled problem. Generate a non-WORD problem live with the
+	// in-process heuristic (cheap, no OpenAI) — this is both the immediate answer
+	// and how non-WORD problems enter the pool (they get no background batch). For
+	// a WORD envelope the background narration kicked off above fills the word
+	// pool for subsequent requests; a heuristic non-WORD problem is served now as
+	// the low-latency stopgap.
 	inputProblemType := mathcore.ProblemType(settings.ProblemTypeBitmap)
 	heuristicType := inputProblemType &^ mathcore.WORD
 	if heuristicType != 0 {
-		glog.Infof("%s pool empty; serving heuristic problem while LLM backfills", logPrefix)
-		p, _, _ := a.runHeuristicGenerator(logPrefix, settings, 3, heuristicType)
-		if p != nil {
+		glog.Infof("%s no pooled problem; generating a heuristic one live", logPrefix)
+		if p := a.runHeuristicGenerator(logPrefix, settings, 3, heuristicType); p != nil {
 			return p, nil
+		}
+		// The heuristic minted nothing new: the difficulty band is saturated, so
+		// every candidate collided with an existing row that the recency
+		// exclusion had masked from the pooled pick above. Relax recency and
+		// re-serve a pooled problem — a brief repeat beats failing the request.
+		noRecency := []uint32{}
+		if pids, err := a.getSatisfyingProblemIds(logPrefix, settings, &noRecency); err == nil {
+			if p := a.pickPooledProblem(logPrefix, settings, *pids); p != nil {
+				return p, nil
+			}
 		}
 	}
 
-	// Last resort: the user's enabled types are WORD-only (or the heuristic
-	// couldn't produce one). Block on a synchronous LLM call.
-	glog.Infof("%s pool empty and no heuristic-eligible types; blocking on LLM", logPrefix)
+	// Last resort: the envelope is WORD-only (no non-WORD skeleton to build), or
+	// the heuristic produced nothing. Block on a synchronous WORD generation.
+	glog.Infof("%s no heuristic-eligible types; blocking on WORD generation", logPrefix)
 	return a.generateProblem(logPrefix, settings)
 }
 
@@ -201,12 +225,12 @@ var backgroundGenFn = func(a *Api, logPrefix string, settings *Settings, numProb
 	a.generateProblems(logPrefix, settings, numProblems)
 }
 
-// llmGenerateProblemFn and llmValidateProblemFn are seams for the LLM
-// problem-generation and validation calls. Production points them at
-// llm_generator.GenerateProblem / ValidateWordProblem; tests override them
-// to return canned problems and validation outcomes without hitting OpenAI.
+// llmNarrateProblemFn and llmValidateProblemFn are seams for the LLM narration
+// and validation calls. Production points them at llm_generator.NarrateProblems
+// / ValidateWordProblem; tests override them to return canned prose and
+// validation outcomes without hitting OpenAI.
 var (
-	llmGenerateProblemFn = llm_generator.GenerateProblem
+	llmNarrateProblemFn  = llm_generator.NarrateProblems
 	llmValidateProblemFn = llm_generator.ValidateWordProblem
 )
 
@@ -240,19 +264,16 @@ func (a *Api) generateProblemsBackground(logPrefix string, settings *Settings) e
 // heuristic_2.0 builder. Supports every non-WORD bit and arbitrary stacks of
 // them (the builder aims at the target difficulty within the envelope).
 // WORD problems are generated via the LLM generator instead.
-// Returns the last new problem created, the count of new problems, and the set
-// of unique IDs.
+// Returns the last new problem created (nil if none).
 //
 // Does NOT take a gin.Context: this function may run in a background goroutine
 // after the originating request has returned. Writing to a stale/reused context
 // from a background path corrupts unrelated in-flight requests. Errors are
 // logged via glog; callers decide how to handle a nil return.
-func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numProblems int, problemType mathcore.ProblemType) (*Problem, int, map[uint32]bool) {
-	uniqueIds := map[uint32]bool{}
-	newCount := 0
+func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numProblems int, problemType mathcore.ProblemType) *Problem {
 	var newProblem *Problem
 	if problemType&(mathcore.ADDITION|mathcore.SUBTRACTION|mathcore.MULTIPLICATION|mathcore.DIVISION) == 0 {
-		return nil, 0, uniqueIds
+		return nil
 	}
 	// heuristic_2.0 is difficulty-targeting: it takes the envelope bitmap and the
 	// user's target_difficulty directly and aims each candidate at it (the
@@ -264,7 +285,7 @@ func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numPro
 		if err != nil {
 			if _, ok := err.(*heuristic_generator.OptionsError); ok {
 				glog.Errorf("%s Failed options validation: %v", logPrefix, err)
-				return nil, newCount, uniqueIds
+				return nil
 			}
 			glog.Errorf("%s Couldn't generate problem: %v", logPrefix, err)
 			continue
@@ -314,210 +335,188 @@ func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numPro
 		model.Difficulty = mathcore.ComputeProblemDifficulty(model.Expression, model.SymbolicExpression)
 		model.DifficultyVersion = mathcore.DifficultyVersion
 		glog.Infof("%s heuristic problem: %s = %s (computed_diff=%g bitmap=%d)", logPrefix, model.Expression, model.Answer, model.Difficulty, model.ProblemTypeBitmap)
-		h := fnv.New32a()
-		h.Write([]byte(model.Expression))
-		model.Id = h.Sum32()
-		_, getStatus, _, _ := a.problemManager.Get(model.Id)
-		if getStatus != http.StatusNotFound {
-			funnel.reject(rejectCollision)
+		if !a.storeGeneratedProblem(logPrefix, "heuristic", model, funnel) {
 			continue
 		}
-		uniqueIds[model.Id] = true
-		status, msg, err := a.problemManager.Create(model)
-		if err != nil {
-			funnel.reject(rejectCreate)
-			glog.Errorf("%s could not create heuristic problem (%d: %s): %v", logPrefix, status, msg, err)
-			continue
-		}
-		funnel.inserted++
-		newCount++
 		newProblem = model
 	}
 	glog.Infof("%s heuristic %s", logPrefix, funnel)
-	return newProblem, newCount, uniqueIds
+	return newProblem
 }
 
-// generateProblems is the core generation routine used by both the sync
-// request path and the background goroutine. It does NOT take a gin.Context:
-// in the background path we must not share a context with the originating
-// request (gin pools contexts and they get reused by later requests, so
-// writes to a stale context corrupt unrelated in-flight responses).
+// storeGeneratedProblem hashes the model's expression into its id, rejects a
+// hash collision with an existing row, and inserts it — the shared tail of both
+// generators. Updates the funnel and returns true iff the row was created.
+func (a *Api) storeGeneratedProblem(logPrefix, kind string, model *Problem, funnel *generationFunnel) bool {
+	h := fnv.New32a()
+	h.Write([]byte(model.Expression))
+	model.Id = h.Sum32()
+	if _, status, _, _ := a.problemManager.Get(model.Id); status != http.StatusNotFound {
+		funnel.reject(rejectCollision)
+		return false
+	}
+	if status, msg, err := a.problemManager.Create(model); err != nil {
+		funnel.reject(rejectCreate)
+		glog.Errorf("%s could not create %s problem (%d: %s): %v", logPrefix, kind, status, msg, err)
+		return false
+	}
+	funnel.inserted++
+	return true
+}
+
+// generateProblems is the batched generation routine for the background refill
+// (and the WORD-only synchronous last resort). It generates WORD problems ONLY:
+// the LLM narration is the expensive part worth pre-generating into the shared
+// pool. Non-WORD problems are cheap (the in-process heuristic) and generated live
+// on the request path (selectProblem), so they are never batched here. It does
+// NOT take a gin.Context: in the background path we must not share a context with
+// the originating request (gin pools contexts and they get reused by later
+// requests, so writes to a stale context corrupt unrelated in-flight responses).
 // Errors are logged via glog; callers decide how to handle a nil return.
 func (a *Api) generateProblems(logPrefix string, settings *Settings, numProblems int) (*Problem, error) {
-	var model *Problem
-	var newProblem *Problem
 	if settings.ProblemTypeBitmap == 0 {
 		return nil, errors.New("settings.ProblemTypeBitmap is empty. Cannot generate problems.")
 	}
-	uniqueIds := map[uint32]bool{}
-	newCount := 0
 	inputProblemType := mathcore.ProblemType(settings.ProblemTypeBitmap)
-	// Try the LLM generator first. It produces richer content (word problems,
-	// varied phrasings) and should be the primary
-	// source for every problem type it can handle. The heuristic generator is
-	// a deterministic, offline fallback for when OpenAI is unreachable or
-	// returns no valid problems.
-	{
-		constraints := mathcore.BuildBitConstraints(inputProblemType)
-		generatorOpts := &llm_generator.Options{
-			Features:         mathcore.ProblemTypeToFeatures(inputProblemType),
-			TargetDifficulty: settings.TargetDifficulty,
-			NumProblems:      numProblems, // we still return just one problem, but this lets us reduce the number of OpenAI calls we need to make
-			Constraints:      constraints,
-		}
-		var err error
-		var generatorProblems []llm_generator.Problem
-		generatorProblems, err = llmGenerateProblemFn(generatorOpts)
+	nonWordType := inputProblemType &^ mathcore.WORD
+
+	// WORD only. A skeleton needs a non-WORD envelope to build from; the settings
+	// UI's core-op rule makes WORD imply nonWordType != 0. A WORD-only envelope
+	// from an API client that bypasses that rule yields nothing (a real word
+	// problem stamps a core-op bit its envelope lacks and is rejected anyway).
+	if inputProblemType&mathcore.WORD == 0 || nonWordType == 0 {
+		return nil, errors.New("generateProblems: nothing to batch (WORD-only; non-WORD is generated live)")
+	}
+	if p := a.runWordGenerator(logPrefix, settings, numProblems, nonWordType); p != nil {
+		return p, nil
+	}
+	return nil, errors.New("Failed to produce any valid new WORD problem.")
+}
+
+// runWordGenerator builds scored heuristic skeletons, has the LLM narrate each
+// into prose, validates the narration against its skeleton (answer + form, via
+// a secondary model), and stores the survivors — the inversion of the old
+// "author a word problem, then reverse-engineer its symbolic form" flow.
+// Difficulty is skeleton x the word concept by construction. nonWordType is the
+// envelope with WORD stripped: the skeleton source.
+//
+// Does NOT take a gin.Context: it may run in a background goroutine. Errors are
+// logged via glog; a nil return means no word problem was produced.
+func (a *Api) runWordGenerator(logPrefix string, settings *Settings, numProblems int, nonWordType mathcore.ProblemType) *Problem {
+	// Aim the skeleton so the narrated word problem lands near the target: the
+	// word concept multiplies raw difficulty by ConceptWord, so build at the
+	// target raw budget divided by that factor.
+	rawTarget := mathcore.RawForDifficulty(settings.TargetDifficulty) / mathcore.ConceptWord
+	envelopeFeatures := mathcore.ProblemTypeToFeatures(nonWordType)
+
+	rng := rand.New(rand.NewSource(rand.Int63()))
+	var skeletons []llm_generator.Skeleton
+	for i := 0; i < numProblems; i++ {
+		expr, answer, err := heuristic_generator.BuildProblemRaw(nonWordType, rawTarget, rng)
 		if err != nil {
-			// Fall back to heuristic when OpenAI fails. Strip WORD since the
-			// heuristic doesn't produce word problems, and fall back on the
-			// remaining arithmetic types.
-			heuristicType := inputProblemType &^ mathcore.WORD
-			if heuristicType != 0 {
-				glog.Infof("%s OpenAI failed (%v), falling back to heuristic generator", logPrefix, err)
-				newProblem, newCount, uniqueIds = a.runHeuristicGenerator(logPrefix, settings, numProblems, heuristicType)
-			} else {
-				msg := "Couldn't generate problems"
-				glog.Errorf("%s %s: %v", logPrefix, msg, err)
-				return nil, err
-			}
-		} else {
-			funnel := newGenerationFunnel(numProblems)
-			funnel.returned = len(generatorProblems)
-			for _, p := range generatorProblems {
-				glog.Infof("%s generated problem: %v", logPrefix, p)
-
-				// Admission pipeline: normalize -> lex -> rewrite ->
-				// detect -> unknown rules. The LLM's self-reported features
-				// are NOT trusted for stamping.
-				adm := mathcore.AdmitExpression(p.Expression)
-				if adm.RejectStage != "" {
-					funnel.reject(adm.RejectStage)
-					glog.Infof("%s LLM reject [%s]: %s (%q)", logPrefix, adm.RejectStage, adm.RejectWhy, p.Expression)
-					continue
-				}
-				bitmap := adm.Bitmap
-
-				// symbolicExpr is the bare computation a WORD problem asks for,
-				// set from the validated symbolic_expression below; empty for
-				// symbolic problems, whose Expression is already the computation.
-				symbolicExpr := ""
-
-				// Local-first validation: symbolic problems are verified by
-				// the exact evaluator with zero LLM calls; WORD problems get
-				// one validator round-trip that checks the answer, judges
-				// envelope compliance against the same constraints the
-				// generator saw, and extracts topic features for stamping.
-				if bitmap&uint64(mathcore.WORD) == 0 {
-					if err := mathcore.VerifyAnswerSymbolic(adm.Tokens, p.Answer); err != nil {
-						funnel.reject(rejectAnswer)
-						glog.Infof("%s LLM answer reject: %v (%q = %q)", logPrefix, err, adm.Expr, p.Answer)
-						continue
-					}
-				} else {
-					features, err := llmValidateProblemFn(&p, constraints, mathcore.ValidatorFeatureNames)
-					if err != nil {
-						funnel.reject(rejectValidator)
-						glog.Infof("%s LLM validator reject: %v", logPrefix, err)
-						continue
-					}
-					// Validator-extracted topic bits stamp the WORD problem;
-					// parser-derived shape bits (magnitude, chained, word)
-					// are already in the bitmap.
-					bitmap |= uint64(mathcore.FeaturesToProblemType(features))
-
-					// The symbolic_expression is the bare computation the word
-					// problem asks for; its difficulty is scored from this. Trust
-					// it only after it lexes and evaluates to the stated answer.
-					if p.SymbolicExpression != "" {
-						admSym := mathcore.AdmitExpression(p.SymbolicExpression)
-						if admSym.RejectStage != "" {
-							funnel.reject(admSym.RejectStage)
-							glog.Infof("%s LLM symbolic_expression reject [%s]: %q", logPrefix, admSym.RejectStage, p.SymbolicExpression)
-							continue
-						}
-						if err := mathcore.VerifyAnswerSymbolic(admSym.Tokens, p.Answer); err != nil {
-							funnel.reject(rejectAnswer)
-							glog.Infof("%s LLM symbolic_expression answer reject: %v (%q = %q)", logPrefix, err, admSym.Expr, p.Answer)
-							continue
-						}
-						symbolicExpr = admSym.Expr
-						// The form reveals the true computation shape (operations,
-						// magnitude, chaining) the prose hides. Stamp those bits so
-						// the bitmap matches the difficulty scored from the form, and
-						// the envelope check rejects a form the user can't have.
-						bitmap |= admSym.Bitmap
-					} else {
-						glog.Warningf("%s LLM word problem missing symbolic_expression; scoring from prose (under-rated): %q", logPrefix, adm.Expr)
-					}
-				}
-
-				// Enforce structural invariants before the envelope check, so
-				// a multi-step problem the validator under-reported is both
-				// stamped correctly AND correctly rejected for a user who
-				// can't have it (#246).
-				bitmap = mathcore.NormalizeProblemBitmap(bitmap)
-
-				// Envelope: every stamped bit must be enabled for this user.
-				if v := mathcore.EnvelopeViolation(bitmap, settings.ProblemTypeBitmap); v != "" {
-					funnel.reject(rejectEnvelope)
-					glog.Infof("%s LLM envelope reject [%s]: %q", logPrefix, v, adm.Expr)
-					continue
-				}
-
-				// Convert to an api.Problem. The (possibly rewritten)
-				// canonical expression is what gets stored and hashed.
-				model = &Problem{}
-				model.Generator = llm_generator.VERSION
-				model.ProblemTypeBitmap = bitmap
-				model.Expression = adm.Expr
-				model.SymbolicExpression = symbolicExpr
-				model.Answer = p.Answer
-				// Keep the explanation consistent with a stage-1.5 rewrite:
-				// the kid must not see the letter the expression no longer has.
-				model.Explanation = RewriteLetterInProse(p.Explanation, adm.RewroteLetter)
-				// Computed difficulty only; LLM self-report is debug logging. A
-				// word problem is scored from its symbolic_expression.
-				model.Difficulty = mathcore.ComputeProblemDifficulty(adm.Expr, symbolicExpr)
-				model.DifficultyVersion = mathcore.DifficultyVersion
-				glog.Infof("%s LLM problem: %s computed_diff=%g bitmap=%d (LLM raw=%g)", logPrefix, model.Expression, model.Difficulty, model.ProblemTypeBitmap, p.Difficulty)
-
-				// Use expression hash as model.Id
-				h := fnv.New32a()
-				h.Write([]byte(model.Expression))
-				model.Id = h.Sum32()
-
-				// Check for collisions
-				_, status, _, err := a.problemManager.Get(model.Id)
-				// There is certainly no collision iff we receive a 404
-				if status != http.StatusNotFound {
-					funnel.reject(rejectCollision)
-					model = nil
-					continue
-				}
-				uniqueIds[model.Id] = true
-
-				// Write to database
-				status, msg, err := a.problemManager.Create(model)
-				if err != nil {
-					funnel.reject(rejectCreate)
-					glog.Errorf("%s could not create LLM problem (%d: %s): %v", logPrefix, status, msg, err)
-					model = nil
-					continue
-				}
-				funnel.inserted++
-				newCount += 1
-				newProblem = model
-			}
-			glog.Infof("%s LLM %s", logPrefix, funnel)
+			glog.Errorf("%s word skeleton build failed: %v", logPrefix, err)
+			continue
 		}
+		adm := mathcore.AdmitExpression(expr)
+		if adm.RejectStage != "" {
+			glog.Infof("%s word skeleton reject [%s]: %q", logPrefix, adm.RejectStage, expr)
+			continue
+		}
+		if err := mathcore.VerifyAnswerSymbolic(adm.Tokens, answer); err != nil {
+			glog.Errorf("%s word skeleton answer reject: %v (%q = %q)", logPrefix, err, expr, answer)
+			continue
+		}
+		skeletons = append(skeletons, llm_generator.Skeleton{
+			SymbolicExpression: adm.Expr,
+			Answer:             answer,
+			Features:           envelopeFeatures,
+		})
+	}
+	if len(skeletons) == 0 {
+		return nil
 	}
 
-	glog.Infof("%s generator numProblems requested: %d vs unique problems generated: %d and new problems generated: %d", logPrefix, numProblems, len(uniqueIds), newCount)
-
-	// Just return the last problem added
-	if newProblem == nil {
-		return nil, errors.New("Failed to produce any valid new problem.")
+	narrated, err := llmNarrateProblemFn(skeletons)
+	if err != nil {
+		glog.Errorf("%s word narration failed: %v", logPrefix, err)
+		return nil
 	}
-	return newProblem, nil
+
+	funnel := newGenerationFunnel(numProblems)
+	funnel.returned = len(narrated)
+	var newProblem *Problem
+	for i := range narrated {
+		p := narrated[i]
+		glog.Infof("%s narrated problem: %v", logPrefix, p)
+
+		// Admit the prose for its canonical stored form and to confirm word-ness
+		// (the WORD bit below); its bits do NOT feed the stamp - the skeleton does.
+		adm := mathcore.AdmitExpression(p.Expression)
+		if adm.RejectStage != "" {
+			funnel.reject(adm.RejectStage)
+			glog.Infof("%s narration reject [%s]: %q", logPrefix, adm.RejectStage, p.Expression)
+			continue
+		}
+		if adm.Bitmap&uint64(mathcore.WORD) == 0 {
+			// The narrator returned bare symbolic text, not a story.
+			funnel.reject(rejectValidator)
+			glog.Infof("%s narration is not a word problem: %q", logPrefix, p.Expression)
+			continue
+		}
+
+		// Secondary-model validation: solve the prose (its answer must match the
+		// skeleton's) and confirm the prose poses the skeleton (form check).
+		if err := llmValidateProblemFn(&p); err != nil {
+			funnel.reject(rejectValidator)
+			glog.Infof("%s narration validator reject: %v", logPrefix, err)
+			continue
+		}
+
+		// The skeleton owns the math: re-admit it for its canonical form and
+		// shape bits, and confirm it still answers correctly.
+		admSym := mathcore.AdmitExpression(p.SymbolicExpression)
+		if admSym.RejectStage != "" {
+			funnel.reject(admSym.RejectStage)
+			glog.Infof("%s word skeleton reject [%s]: %q", logPrefix, admSym.RejectStage, p.SymbolicExpression)
+			continue
+		}
+		if err := mathcore.VerifyAnswerSymbolic(admSym.Tokens, p.Answer); err != nil {
+			funnel.reject(rejectAnswer)
+			glog.Errorf("%s word skeleton answer reject: %v (%q = %q)", logPrefix, err, p.SymbolicExpression, p.Answer)
+			continue
+		}
+
+		// Stamp from the SKELETON, not the prose: WORD plus the skeleton's own
+		// shape bits. The prose supplies word-ness and its canonical stored form
+		// only - admitting it for bits would re-derive magnitude from incidental
+		// story numerals (a "200 seats" story stamping LARGE_NUMBERS onto a small
+		// skeleton), which then trips the envelope check and drops a valid
+		// narration. The skeleton is the source of truth for the math and the bits.
+		bitmap := mathcore.NormalizeProblemBitmap(uint64(mathcore.WORD) | admSym.Bitmap)
+		if v := mathcore.EnvelopeViolation(bitmap, settings.ProblemTypeBitmap); v != "" {
+			funnel.reject(rejectEnvelope)
+			glog.Infof("%s narration envelope reject [%s]: %q", logPrefix, v, p.Expression)
+			continue
+		}
+
+		model := &Problem{}
+		model.Generator = llm_generator.VERSION
+		model.ProblemTypeBitmap = bitmap
+		model.Expression = adm.Expr
+		model.SymbolicExpression = admSym.Expr
+		model.Answer = p.Answer
+		model.Explanation = RewriteLetterInProse(p.Explanation, adm.RewroteLetter)
+		// Scored from the skeleton with the word concept applied (the prose
+		// carries the \text{} that fires the word bonus): skeleton x word.
+		model.Difficulty = mathcore.ComputeProblemDifficulty(adm.Expr, admSym.Expr)
+		model.DifficultyVersion = mathcore.DifficultyVersion
+		glog.Infof("%s word problem: %s (symbolic=%q computed_diff=%g bitmap=%d)", logPrefix, model.Expression, model.SymbolicExpression, model.Difficulty, model.ProblemTypeBitmap)
+
+		if !a.storeGeneratedProblem(logPrefix, "word", model, funnel) {
+			continue
+		}
+		newProblem = model
+	}
+	glog.Infof("%s word %s", logPrefix, funnel)
+	return newProblem
 }

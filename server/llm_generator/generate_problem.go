@@ -9,8 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"slices"
-	"sort"
 	"strings"
 
 	"github.com/golang/glog"
@@ -20,114 +18,170 @@ import (
 )
 
 const (
-	VERSION         = "llm_0.5"
-	PROMPT_QUESTION = `
-Generate math questions in the format of this example:
-{
-  "features": ["addition", "multiplication"]
-  "expression": "3 + 2 * 3",
-  "answer": "9",
-  "explanation": "\\text{Following the order of operations (PEMDAS/BODMAS), you first perform the multiplication: }2×3=6\\text{ Then add }3+6=9",
-  "difficulty": 8.3,
-}
-or this example:
-{
-  "features": ["addition", "multiplication", "word"]
-  "expression": "\\text{If a car travels at a speed of }60\\text{ miles per hour for }2\\text{ hours, how far does it travel?}"
-  "symbolic_expression": "60 * 2",
-  "answer": "120",
-  "explanation": "\\text{The distance traveled is calculated by multiplying the speed by the time: }60\\text{ miles/hour }* 2\\text{ hours }= 120\\text{ miles.}",
-  "difficulty": 15
-}
-where "question" is the math question in LaTeX math mode e.g. it might use \\text{} tags as shown, "answer" is the correct answer with no other text, "explanation" is the explanation for the correct answer in LaTeX math mode e.g. it might use \\text{} tags as shown, and "features" are the allowed features that were actually used in this problem. In word problems, write the ENTIRE problem as prose inside \\text{...}. Do NOT append the arithmetic the student must perform or its result - a problem like 'There are 3 bags with 6 apples each. How many apples?' must NOT include '3 * 6' or '3 * 6 = 18'; the student derives that. Write symbolic math outside \\text{} ONLY when the problem statement itself is an expression to manipulate, e.g. \\text{Solve for }x: 3x + 7 = 22. If NOT a word problem, do not use any LaTeX. For example, fractions should be returned as e.g. 1/2 in this case. If it IS a word problem, fractions can be returned as e.g. \frac{1}{2}.
-For word problems, also include "symbolic_expression": the exact computation the problem asks for - the same operations and numbers the student would actually use (e.g. "60 * 2", "9999 / 3 / 3"), with NO \\text and no prose. It only gauges difficulty and is never shown. Omit it for non-word problems, whose "expression" is already symbolic.
-Return the answers to fractional expressions as fractions, not decimals.
-The "answer" should NEVER be in LaTeX format. It should be purely numeric, possibly including mathematical symbols like / and -.
-Return these problems as a valid JSON list with no additional text.
-Do not wrap the JSON in markdown or any other JSON markers.
+	VERSION = "llm_0.6"
+	// PROMPT_NARRATE turns scored symbolic skeletons into prose. The heuristic
+	// owns the math and the difficulty; the model only dresses each skeleton in
+	// a story that poses that exact computation - it invents no numbers and
+	// changes no operation, so the stored difficulty (skeleton x word concept)
+	// holds by construction. The skeleton list is appended as JSON.
+	PROMPT_NARRATE = `You are given math computations, each with its numeric answer. For EACH one, write a short, self-contained word problem (a real-world story) whose solution requires EXACTLY that computation - the same numbers and the same operation(s) - and whose answer is exactly the given answer.
+Rules:
+- Do NOT introduce new numbers, and do NOT change, add, or drop operations. Use precisely the numbers and operations shown.
+- Write the ENTIRE problem as prose inside \text{...}. Do NOT append the arithmetic the student must perform or its result: a problem posing "3 * 6" must NOT contain "3 * 6" or "= 18"; the student derives that.
+- Use symbolic math outside \text{} ONLY when the computation itself is an equation to manipulate, e.g. \text{Solve for }x: 3x + 7 = 22.
+- Division is the obelus (e.g. "60 ÷ 2"); fractions look like 3/8 or \frac{3}{8}. Return answers exactly as given.
+Example input: [{"symbolic_expression": "60 ÷ 2", "answer": "30"}]
+Example output: [{"symbolic_expression": "60 ÷ 2", "expression": "\\text{A 60-centimeter ribbon is cut into 2 equal pieces. How long is each piece?}", "explanation": "\\text{Divide the total length by the number of pieces: }60 \\div 2 = 30\\text{ centimeters.}"}]
+Return a JSON list with one object per input, each {"symbolic_expression": ..., "expression": ..., "explanation": ...}. Echo "symbolic_expression" back EXACTLY as given (verbatim) so each narration can be matched to its computation. The "explanation" explains the solution and MAY show the arithmetic and result. Return ONLY the JSON list, no markdown.
+Problems to narrate:
 `
-	PROMPT_QUANTITY = "Produce %d unique %sproblems in this format."
-	// MAX_QUANTITY caps problems per OpenAI call.
+	// MAX_QUANTITY caps skeletons narrated per OpenAI call.
 	MAX_QUANTITY = 20
 )
 
-func GenerateProblem(opts *Options) ([]Problem, error) {
-	opts.NumProblems = common.Min(opts.NumProblems, MAX_QUANTITY)
+// Skeleton is a scored symbolic problem for the narrator to dress in prose.
+// SymbolicExpression is the canonical grammar form (division as ÷); Answer is
+// its exact answer, both authoritative and copied verbatim onto the result.
+// Features only seeds a topic-variety hint for the prompt; it is not stored.
+type Skeleton struct {
+	SymbolicExpression string
+	Answer             string
+	Features           []string
+}
+
+// NarrateProblems asks the model to write a word problem for each skeleton and
+// returns one Problem per successfully narrated skeleton. Narrations are matched
+// back to skeletons by the echoed symbolic_expression (see pairNarrations), not
+// by position, so a dropped or reordered narration costs only its own item. The
+// math is the skeleton's (SymbolicExpression + Answer copied verbatim); only the
+// prose Expression and Explanation come from the model. The api side answer- and
+// form-validates each narration against its skeleton before storing.
+func NarrateProblems(skeletons []Skeleton) ([]Problem, error) {
+	if len(skeletons) == 0 {
+		return nil, nil
+	}
+	if len(skeletons) > MAX_QUANTITY {
+		skeletons = skeletons[:MAX_QUANTITY]
+	}
 
 	c, err := common.ReadConfig("conf.json")
 	if err != nil {
 		// Return an error rather than fataling - the caller (generate_problems.go)
-		// is expected to fall back to the heuristic generator when we fail.
-		return []Problem{}, fmt.Errorf("read config: %w", err)
+		// falls back to non-word generation when narration is unavailable.
+		return nil, fmt.Errorf("read config: %w", err)
 	}
 	if err := c.Validate(); err != nil {
-		return []Problem{}, fmt.Errorf("validate config: %w", err)
+		return nil, fmt.Errorf("validate config: %w", err)
 	}
 
-	sort.Strings(opts.Features)
-
-	// Request question(s). The May/MustNot constraint block (built by the
-	// api side from the user's settings bitmap) is the sole source of shape
-	// guidance.
-	var ptype string
-	ptype = "problems that are NOT word-"
-	for _, x := range opts.Features {
-		if x == "word" {
-			ptype = ""
+	type narrateInput struct {
+		SymbolicExpression string `json:"symbolic_expression"`
+		Answer             string `json:"answer"`
+	}
+	inputs := make([]narrateInput, len(skeletons))
+	for i, s := range skeletons {
+		inputs[i] = narrateInput{s.SymbolicExpression, s.Answer}
+	}
+	inputJSON, err := json.Marshal(inputs)
+	if err != nil {
+		return nil, fmt.Errorf("marshal skeletons: %w", err)
+	}
+	prompt := PROMPT_NARRATE + string(inputJSON)
+	// One topic-variety hint per batch, from the first skeleton that has one.
+	for _, s := range skeletons {
+		if h := firstTopicHint(s.Features); h != "" {
+			prompt += h
 			break
 		}
 	}
-	prompt := PROMPT_QUESTION + "\n" + fmt.Sprintf(PROMPT_QUANTITY, opts.NumProblems, ptype)
-	if opts.Constraints != "" {
-		prompt += "\n" + opts.Constraints
-	}
-	// Add topic-specific variety hint
-	for _, feature := range opts.Features {
-		hint := TopicPromptHint(feature, rand.Intn)
-		if hint != "" {
-			prompt += hint
-			break // One hint per generation batch is enough
-		}
-	}
-	glog.Infof("OpenAI question prompt: %s\n", prompt)
-
-	model := openai.GPT5Nano
-	if opts.Model != "" {
-		model = opts.Model
-	}
+	glog.Infof("OpenAI narrate prompt: %s\n", prompt)
 
 	client := openai.NewClient(c.OpenAiApiKey)
 	resp, err := chatCompletionWithRetry(
 		context.Background(),
 		client,
 		openai.ChatCompletionRequest{
-			Model: model,
+			Model: openai.GPT5Nano,
 			Messages: []openai.ChatCompletionMessage{
-				{
-					Role:    openai.ChatMessageRoleUser,
-					Content: prompt,
-				},
+				{Role: openai.ChatMessageRoleUser, Content: prompt},
 			},
 		},
 	)
-
 	if err != nil {
-		glog.Errorf("OpenAI error after retries: %v\n", err)
-		return []Problem{}, err
+		glog.Errorf("OpenAI narrate error after retries: %v\n", err)
+		return nil, err
+	}
+	if len(resp.Choices) == 0 {
+		return nil, fmt.Errorf("OpenAI returned no choices")
 	}
 
-	var problems []Problem
-	err = json.Unmarshal([]byte(resp.Choices[0].Message.Content), &problems)
-	if err != nil {
-		glog.Errorf("OpenAI content error: %v | %s\n", err, resp.Choices[0].Message.Content)
-		return []Problem{}, err
+	var narrated []narratedItem
+	if err := json.Unmarshal([]byte(resp.Choices[0].Message.Content), &narrated); err != nil {
+		glog.Errorf("OpenAI narrate content error: %v | %s\n", err, resp.Choices[0].Message.Content)
+		return nil, err
 	}
-	// Make sure word problems are labeled as such
-	for i := range problems {
-		p := &problems[i]
-		if !slices.Contains(p.Features, "word") && strings.ContainsAny(p.Expression, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") {
-			p.Features = append(p.Features, "word")
+	return pairNarrations(skeletons, narrated), nil
+}
+
+// narratedItem is one object from the narrator's JSON list: the echoed
+// symbolic_expression (used only to match the narration back to its skeleton)
+// plus the prose the model wrote.
+type narratedItem struct {
+	SymbolicExpression string `json:"symbolic_expression"`
+	Expression         string `json:"expression"`
+	Explanation        string `json:"explanation"`
+}
+
+// pairNarrations matches each narration to its skeleton by the
+// symbolic_expression the model echoes back, NOT by list position. The model
+// occasionally drops or reorders an item; with positional zipping a single drop
+// shifts every skeleton after it out of alignment, so the validator rejects the
+// whole tail and yield collapses. Matching by echoed symbolic costs only the
+// dropped item. First unused skeleton wins when a symbolic repeats in the batch;
+// a narration whose echoed symbolic matches no remaining skeleton is dropped
+// (the model altered the computation). The prose's math and bits still come from
+// the matched skeleton, and the api-side validator remains the fidelity backstop.
+func pairNarrations(skeletons []Skeleton, narrated []narratedItem) []Problem {
+	bySymbolic := make(map[string][]int, len(skeletons))
+	for i, s := range skeletons {
+		bySymbolic[s.SymbolicExpression] = append(bySymbolic[s.SymbolicExpression], i)
+	}
+	used := make([]bool, len(skeletons))
+
+	var out []Problem
+	for _, n := range narrated {
+		if strings.TrimSpace(n.Expression) == "" {
+			continue
+		}
+		picked := -1
+		for _, i := range bySymbolic[strings.TrimSpace(n.SymbolicExpression)] {
+			if !used[i] {
+				picked = i
+				break
+			}
+		}
+		if picked < 0 {
+			glog.Infof("narrate: no skeleton for echoed symbolic %q; dropping", n.SymbolicExpression)
+			continue
+		}
+		used[picked] = true
+		s := skeletons[picked]
+		out = append(out, Problem{
+			Expression:         n.Expression,
+			SymbolicExpression: s.SymbolicExpression,
+			Answer:             s.Answer,
+			Explanation:        n.Explanation,
+		})
+	}
+	return out
+}
+
+// firstTopicHint returns a variety hint for the first feature that has one.
+func firstTopicHint(features []string) string {
+	for _, f := range features {
+		if h := TopicPromptHint(f, rand.Intn); h != "" {
+			return h
 		}
 	}
-	return problems, nil
+	return ""
 }

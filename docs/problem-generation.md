@@ -87,10 +87,9 @@ SINGLE_VARIABLE). One deliberate split: magnitude/decimal/percent scanning
 for *difficulty* and for the magnitude *shape bits* DOES read prose numerals
 (`parseProblemFeatures`'s `TokText` branch + `reProseNumber`, `difficulty.go`)
 — a word problem about 47 apples is a MEDIUM_NUMBERS problem; concept-bit
-detection never does — WORD problems' topic bits come from the validator.
-Legacy WORD rows carry preserved self-reported topic bits until re-stamped by
-`cmd/revalidate_word_problems`, which replaces them with validator-observed
-features.
+detection never does — WORD problems' topic bits come from the symbolic
+skeleton (`symbolic_expression`) they were narrated from, parsed in-code, not
+from the prose.
 
 **The lone-letter rewrite (stage 1.5).** A bare letter occurring exactly
 once with no coefficient (`12 - x = 5`) carries no algebraic load and is
@@ -161,15 +160,14 @@ envelope ([3.5]) checks (`VerifyAnswerSymbolic`, `EnvelopeViolation`) in
 `mathcore/stamping.go`.
 
 **Division vs. fraction notation.** A bare `/` is always a *fraction* literal
-(`3/8`); division renders as the **obelus** `÷` (`6 ÷ 2`). NORMALIZE folds
-`\frac{a}{b}`→`a/b` and `÷`/`\div`→the division operator before lex/eval/
-detection, so the whole pipeline sees one form. `mathcore.Render` emits `÷` for
-division and unspaced `a/b` for fractions, so any rendered expression — a
-fraction under division included (`58/3 ÷ 8`, `3/4 ÷ 2/3`) — is unambiguous
-without relying on spacing. For backward compatibility the lexer *also* still
-reads a **spaced** slash as division (`6 / 3`) — the pre-obelus convention used
-by `llm_0.5` and existing rows; that alias is slated for removal once those are
-migrated to `÷`. `Render` is also **faithful**: it parenthesizes an operand
+(`3/8`, spacing-agnostic — `6 / 8` is the fraction six-eighths, not division);
+division is the **obelus** `÷` (`6 ÷ 2`). NORMALIZE folds `\frac{a}{b}`→`a/b`
+and `\div`→`÷` before lex/eval/detection, and the lexer reads `÷` as the
+division operator (its AST op stays `/`), so the whole pipeline sees one form.
+`mathcore.Render` emits `÷` for division and unspaced `a/b` for fractions, so
+any rendered expression — a fraction under division included (`58/3 ÷ 8`,
+`3/4 ÷ 2/3`) — is unambiguous without relying on spacing. `Render` is also
+**faithful**: it parenthesizes an operand
 whenever infix precedence/associativity would otherwise reparse it
 (`(a + b) * c`, `a - (b - c)`), so `Eval(node) == EvalTokens(Render(node))` for
 every tree (pinned by `TestRenderFaithful`). `Parse` (`mathcore/parse.go`) is the
@@ -200,9 +198,10 @@ bridges them — it folds both to the same form — so
 **Stamp-time structural invariant.** `NormalizeProblemBitmap`
 (`mathcore/stamping.go`) OR's in implied bits at every final stamp site: ≥2 distinct core ops or PEMDAS
 ⇒ CHAINED_OPERATIONS; MISMATCHED ⇒ FRACTIONS. It only ever NARROWS the
-serving audience. It exists because the WORD validator reports topic features
-as independent items and can omit an implied one; the parser path co-sets them
-from the token stream and never needs it.
+serving audience. Both stamp sites now feed it parser output — the symbolic
+path and the WORD skeleton co-set implied bits from the token stream already —
+so it is a defensive no-op applied uniformly, not a correction the WORD path
+relies on.
 
 Every drop is counted in a per-call funnel line:
 `funnel: requested= returned= lexer= unknown_rules= collision= answer= envelope= validator= create= inserted=`
@@ -216,15 +215,15 @@ The deterministic tool is authoritative wherever it can operate:
 | Problem class | Answer check | Envelope | Topic bits | LLM calls |
 |---|---|---|---|---|
 | Symbolic (incl. `?`/variable equations, fractions, decimals, `%`) | exact `big.Rat` evaluator | bit-subset check | parser | **zero** |
-| WORD (prose) | LLM validator + in-code form eval | LLM validator (same constraints as the generator) | validator's features line + form bits | one |
+| WORD (prose) | LLM validator (must match skeleton) + in-code skeleton eval | bit-subset check (skeleton bits) | parser (from the `symbolic_expression` skeleton) | one |
 
-A WORD problem also carries a `symbolic_expression` (the bare computation it
-asks for; see the Difficulty formula section). It is checked in-code to lex and
-evaluate to the answer, its detected bits are folded into the stamp, and the
-validator's line 4 confirms it uses the operations the problem actually requires
-(`FORM_MISMATCH` on a NO) — catching a form that hits the answer with the wrong
-computation, which the exact evaluator alone cannot. Difficulty is scored from
-the form.
+A WORD problem also carries a `symbolic_expression` (the skeleton it was
+narrated from; see the Difficulty formula section). It is checked in-code to lex
+and evaluate to the answer, and it — NOT the prose — is what stamps the WORD
+problem's bits (WORD OR'd onto the skeleton's parsed bits). The validator's
+line 2 confirms the prose poses that skeleton (`FORM_MISMATCH` on a NO) —
+catching prose that hits the answer with the wrong computation, which the exact
+evaluator alone cannot. Difficulty is scored from the skeleton.
 
 Disagreement = reject, not auto-correct. The answer check, the PEMDAS
 dual-eval, and bit detection share one evaluator over one token stream
@@ -276,16 +275,16 @@ running `recompute_problem_difficulty` on deploy.
 **Word problems (v0.3):** a word problem's `expression` is prose inside
 `\text{...}`, so its operators are invisible to the token-level
 `opWeight`/`structure` (the prose rule). It instead carries a
-`symbolic_expression` — the bare computation it asks for (e.g. `9999 / 3 / 3`)
+`symbolic_expression` — the bare computation it asks for (e.g. `9999 ÷ 3 ÷ 3`)
 — and difficulty is scored from THAT. So a division word problem scores like
 its symbolic twin plus the word bonus, not as addition. The word bonus is keyed
 on word-ness, not on `symbolic_expression` being present:
 `ComputeDifficultyBreakdownFor` scores the `symbolic_expression` when it is set
 but applies `forceWord` iff the `expression` carries a `\text{}` block. A word
-problem's `symbolic_expression` is never shown to the student: the generator
-emits it and the WORD validator checks it lexes and evaluates to the answer
-before storing it. A legacy word problem with no `symbolic_expression` falls
-back to scoring its prose (`llm_0.5`; see
+problem's `symbolic_expression` is never shown to the student: for `llm_0.6` it
+IS the heuristic skeleton the prose was narrated from (scored before narration),
+and the WORD validator confirms the prose poses it. A legacy word problem with no
+`symbolic_expression` falls back to scoring its prose (`llm_0.5` and earlier; see
 [generator-versions.md](generator-versions.md)).
 
 `symbolic_expression` is not word-only. `heuristic_2.0` stores its canonical
@@ -327,13 +326,6 @@ are the generation-relevant surface.)
 
 ## Generation
 
-- **Prompt** (`mathcore.BuildBitConstraints`, `server/mathcore/prompt_guidance.go`):
-  per-bit MAY/MUST NOT pairs, a 3-state magnitude clause, a 2-state chain
-  clause, the unknown rules whenever MISSING/SINGLE_VARIABLE is enabled, and
-  the closed-world clause ("use ONLY what is explicitly allowed — no square
-  roots, exponents, ..."). All constraints are simultaneous. Every constraint
-  the insert pipeline enforces must also be communicated here, or the
-  generator wastes output on shapes that always reject.
 - **Heuristic generator** (server/generator, `heuristic_2.0`): compositional and
   difficulty-targeting (`BuildProblem(bitmap, target, rng)`). It grows the AST
   outward from a chosen answer via one recursion — operators are node choices,
@@ -350,21 +342,25 @@ are the generation-relevant surface.)
   `58/3`. Pure-additive and mismatched two-fraction cells have no integer to
   carry it, so their hardest buckets stay just below the formula ceiling.
   Version history and the construction design live in
-  [generator-versions.md](generator-versions.md).
-- **LLM generator** (server/llm_generator, `llm_0.5`): one batched OpenAI
-  chat-completions call (`MAX_QUANTITY = 20`); the `BuildBitConstraints` block is the sole shape
-  guidance (`Options.Constraints` is opaque to the package). Emits
-  `symbolic_expression` for word problems (`generate_problem.go` prompt). Model
-  defaults are owned by [generator-versions.md](generator-versions.md).
-- **WORD validator** (`llm_generator.ValidateWordProblem`): one LLM
-  round-trip, 3 lines (4 when a `symbolic_expression` was sent) —
-  answer (authoritative for prose math) / envelope YES-NO (judged against
-  the same constraints the generator saw; `ErrEnvelopeMismatch`) / observed
-  features (closed name list, stamps the WORD problem's topic bits —
-  generator self-report is never trusted) / form-match YES-NO,
-  appended only when a `symbolic_expression` is present (`PROMPT_VALIDATION_FORM`):
-  does the form use the operations and numbers the problem actually requires?
-  (`ErrFormMismatch` on a NO).
+  [generator-versions.md](generator-versions.md). It is the sole source for
+  non-WORD problems AND the **skeleton source** for WORD problems (below).
+- **WORD generation** (`server/api/generate_problems.go` `runWordGenerator`,
+  generator `llm_0.6`): the heuristic builds a scored symbolic **skeleton** aimed
+  at `CompressRaw(RawForDifficulty(target) / ConceptWord)` — the lower target that
+  lands the narrated word problem near `target` once the word concept multiplies
+  it back up — then the LLM (`llm_generator.NarrateProblems`, one batched call,
+  `MAX_QUANTITY = 20`) is asked ONLY to dress each skeleton in prose that poses
+  that exact computation: no new numbers, no changed operation. Stored:
+  `expression` = the prose, `symbolic_expression` = the skeleton, `answer` = the
+  skeleton's answer; difficulty is skeleton × word by construction. The heuristic
+  owns the math; the LLM never authors it.
+- **WORD validator** (`llm_generator.ValidateWordProblem`): one LLM round-trip
+  on the stronger model (GPT5, the independent check on the cheaper narrator),
+  2 lines — the answer (must equal the skeleton's) and a form YES-NO: does the
+  prose pose the skeleton's computation, its operations and numbers?
+  (`ErrFormMismatch` on a NO). It fails closed. The skeleton owns the math AND
+  the bits, so the validator no longer judges envelope compliance or reports
+  features — those come from parsing the `symbolic_expression` in-code.
 
 ## Backfill tools and deployment
 
@@ -387,16 +383,10 @@ When a change requires these steps, record them at the bottom of the commit
 message so they reach the PR and the deploy window — see `docs/ops-runbook.md`
 → "When a generation/difficulty change is part of the deploy".
 
-`revalidate_word_problems` (optional, costs one LLM call per WORD row):
-re-stamps WORD rows' topic bits from the validator's observed features,
-replacing preserved legacy self-report. Bitmap-only writes; answer
-mismatches and constraint NOs are reported and left unchanged. Run any
-time after the bitmap backfill; `-dry-run`/`-limit` to sample first.
-
 ## The new-bit checklist
 
-Every future bit (EXPONENTS is the first consumer) walks these touchpoints. The blocked-by-default design (closed-world prompt +
-lexer allowlist) protects the system between additions — a new concept is
+Every future bit (EXPONENTS is the first consumer) walks these touchpoints. The blocked-by-default design (the
+lexer allowlist + admission-pipeline rejects) protects the system between additions — a new concept is
 forbidden until deliberately added.
 
 1. Constant in `server/mathcore/problem_type.go` + `problemTypeNames` entry — feature-named, not subject-named.
@@ -407,13 +397,12 @@ forbidden until deliberately added.
 6. `DetectProblemTypeBitmap` mapping line.
 7. Validation-tier decision: extend the evaluator? per-bit deterministic verifier? or WORD-class LLM validation?
 8. Difficulty factor + reference values in `TestComputeProblemDifficulty_ReferenceValues` + **DifficultyVersion bump** + recompute on deploy.
-9. Reachability rules: per-problem exclusivity with existing bits? → prompt clause + insert reject + ceiling either/or entry (all three sites, always together).
-10. `BuildBitConstraints` MAY/MUST-NOT pair.
-11. Settings dependency rules + `web/src/bitmap_validation.js` error code if needed.
-12. UI: group placement (verb / noun-kind / noun-size / framing), label, helper text — against `/style-guide`.
-13. Heuristic generator support: a split/leaf realization for the bit in `heuristic_2.0`'s `expand` recursion (`server/generator/heuristic2.go`), or an explicit LLM-only deferral.
-14. Backfill: do legacy rows need re-stamping? (re-run `recompute_problem_type_bitmap`.)
-15. Update THIS DOCUMENT — the doc-sync test fails CI if you skip the anchors.
+9. Reachability rules: per-problem exclusivity with existing bits? → insert reject + ceiling either/or entry (both sites, always together).
+10. Settings dependency rules + `web/src/bitmap_validation.js` error code if needed.
+11. UI: group placement (verb / noun-kind / noun-size / framing), label, helper text — against `/style-guide`.
+12. Heuristic generator support: a split/leaf realization for the bit in `heuristic_2.0`'s `expand` recursion (`server/generator/heuristic2.go`), or an explicit LLM-only deferral.
+13. Backfill: do legacy rows need re-stamping? (re-run `recompute_problem_type_bitmap`.)
+14. Update THIS DOCUMENT — the doc-sync test fails CI if you skip the anchors.
 
 ## Related files
 
@@ -422,8 +411,7 @@ forbidden until deliberately added.
 - `server/mathcore/evaluator.go` — `EvalTokens`, `EvalTokensNaiveLTR`, `requiresPEMDAS`, `pemdasProbes`
 - `server/mathcore/stamping.go` — `AdmitExpression`, `DetectProblemTypeBitmap`, `NormalizeProblemBitmap`, `VerifyAnswerSymbolic`, `EnvelopeViolation`
 - `server/mathcore/difficulty.go` — `ComputeProblemDifficulty`, `ComputeDifficultyBreakdownFor`, `computeBreakdown`, `compressRaw`, `MaxDiffForBitmap`, the `Concept*`/`Weight*`/`Structure*` constants, `DifficultyVersion`, `MaxChainLen`, `LargeMaxOperand`, `SmallMaxOperand`, `MediumMaxOperand`
-- `server/mathcore/prompt_guidance.go` — `BuildBitConstraints`, `ValidatorFeatureNames`
 - `server/mathcore/answer_compare.go` — `AnswersEquivalent`
 - `server/api/generation_funnel.go` — `generationFunnel`, `VerifyAnswer`, `RewriteLetterInProse` (api-side admission bookkeeping)
 - `server/generator` — `heuristic_2.0`: `BuildProblem`, the knob inverter, the compositional `expand` recursion
-- `server/llm_generator` — `GenerateProblem`, `ValidateWordProblem`, `PROMPT_QUESTION`, `PROMPT_VALIDATION_WORD`, `PROMPT_VALIDATION_FORM`
+- `server/llm_generator` — `NarrateProblems`, `PROMPT_NARRATE`, `Skeleton`, `TopicPromptHint`, `ValidateWordProblem`, `PROMPT_VALIDATION_WORD`

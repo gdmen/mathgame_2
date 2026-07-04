@@ -10,10 +10,9 @@
 // Semantics:
 //   - SET, not OR: the detected bitmap REPLACES the stored one, so re-runs
 //     are stable and legacy false-positive bits don't survive forever.
-//   - WORD rows keep their existing legacy topic bits (the 7 original
-//     self-reported bits) OR'd onto the detected shape bits: the parser
-//     can't see topics inside prose. cmd/revalidate_word_problems re-stamps
-//     WORD topic bits from the LLM validator when better data is wanted.
+//   - WORD rows keep their existing topic bits OR'd onto the detected shape
+//     bits: the parser can't see topics inside prose (llm_0.6 stamps them
+//     from the symbolic skeleton at generation time).
 //   - Lone-letter rewrite: a single bare variable becomes '?'
 //     (12 - x = 5 -> 12 - ? = 5) in the expression - the first time this
 //     tool mutates expression text. The same standalone-letter substitution

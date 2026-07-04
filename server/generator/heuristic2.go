@@ -85,10 +85,20 @@ type buildCtx struct {
 // stores that as symbolic_expression and derives the \frac display for
 // expression (mathcore.DisplayExpression); the heuristic emits no WORD problems.
 func BuildProblem(bitmap mathcore.ProblemType, target float64, rng *rand.Rand) (string, string, error) {
+	return BuildProblemRaw(bitmap, mathcore.RawForDifficulty(target), rng)
+}
+
+// BuildProblemRaw is BuildProblem aimed at a RAW difficulty budget rather than a
+// scaled target. The WORD flow uses it to build a skeleton at
+// RawForDifficulty(target)/ConceptWord — the lower budget that lands the narrated
+// word problem near target once the word concept multiplies it back — with no
+// scaled->raw->scaled round-trip through the log curve.
+func BuildProblemRaw(bitmap mathcore.ProblemType, rawTarget float64, rng *rand.Rand) (string, string, error) {
 	if coreOpsMask(bitmap) == 0 {
 		return "", "", &OptionsError{s: "no core operation enabled in bitmap"}
 	}
-	rawTarget := mathcore.RawForDifficulty(target)
+	// Scaled target for the closest-survivor metric below; planConfig aims in raw.
+	target := mathcore.CompressRaw(rawTarget)
 
 	var bestExpr, bestAns string
 	bestErr := math.MaxFloat64
@@ -664,8 +674,8 @@ func splitMulFrac(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
 // splitDivFrac splits a fractional v into a/b with a fraction dividend (a = v*b).
 // Any operand shape parses unambiguously (no parens needed) — see the slash
 // convention in docs/problem-generation.md.
-//   - mismatched on:  a, b fractions of different denominators ("5/4 / 2/3")
-//   - mismatched off: a single fraction over an integer ("3/2 / 2").
+//   - mismatched on:  a, b fractions of different denominators ("5/4 ÷ 2/3")
+//   - mismatched off: a single fraction over an integer ("3/2 ÷ 2").
 func splitDivFrac(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
 	if v.Denom().Int64() <= 1 || v.Sign() <= 0 {
 		return nil, nil, false

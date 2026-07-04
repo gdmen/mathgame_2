@@ -78,17 +78,19 @@ func TestSelection_PrefersNewestGeneratorVersion(t *testing.T) {
 	api, _, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 
-	// Same envelope (ADDITION) + difficulty 5, three llm versions.
+	// Same envelope (ADDITION) + difficulty 5. Synthetic rows across the two
+	// ranked generators plus a retired version that now ranks 0 — the fixtures
+	// exercise newestVersionTier's rank bucketing, not the real generators
+	// (in production llm_0.6 emits only WORD, heuristic_2.0 only non-WORD).
 	seed := []struct {
 		id  uint32
 		gen string
 	}{
-		{7001, "llm_0.1"},
-		{7002, "llm_0.1"},
-		{7003, "llm_0.2"},
-		{7004, "llm_0.4"},
-		{7005, "llm_0.4"},
-		{7006, "llm_0.5"},
+		{7001, "llm_0.5"},       // retired → unranked (rank 0)
+		{7002, "llm_0.5"},       // retired → unranked (rank 0)
+		{7003, "heuristic_2.0"}, // rank 1
+		{7004, "heuristic_2.0"}, // rank 1
+		{7005, "llm_0.6"},       // rank 2 (newest)
 	}
 	for _, s := range seed {
 		if _, err := api.DB.Exec(
@@ -122,14 +124,12 @@ func TestSelection_PrefersNewestGeneratorVersion(t *testing.T) {
 		}
 	}
 
-	// Newest tier only: the single llm_0.5 row (outranks llm_0.4).
-	assertTier("[newest]", nil, 7006)
-	// Exclude llm_0.5: falls back to the llm_0.4 tier.
-	assertTier("[fallback]", []uint32{7006}, 7004, 7005)
-	// Exclude llm_0.5 and llm_0.4: falls back to the next-highest (llm_0.2).
-	assertTier("[fallback2]", []uint32{7006, 7004, 7005}, 7003)
-	// Exclude through llm_0.2: falls back to the llm_0.1 tier.
-	assertTier("[fallback3]", []uint32{7006, 7004, 7005, 7003}, 7001, 7002)
+	// Newest tier only: the single llm_0.6 row (rank 2, outranks heuristic_2.0).
+	assertTier("[newest]", nil, 7005)
+	// Exclude llm_0.6: falls back to the heuristic_2.0 tier (rank 1).
+	assertTier("[fallback]", []uint32{7005}, 7003, 7004)
+	// Exclude both ranked versions: falls back to the rank-0 retired rows.
+	assertTier("[fallback2]", []uint32{7005, 7003, 7004}, 7001, 7002)
 }
 
 // TestHeuristicFromBits_ChainedOff: with CHAINED_OPERATIONS disabled, the

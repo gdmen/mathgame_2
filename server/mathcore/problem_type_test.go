@@ -2,22 +2,17 @@ package mathcore
 
 import (
 	"reflect"
-	"sort"
 	"testing"
 )
 
 // TestProblemTypeBitInventory pins the bit layout: 16 bits, every bit named,
-// every name mapped back, masks consistent.
+// masks consistent.
 func TestProblemTypeBitInventory(t *testing.T) {
-	if len(problemTypeNames) != 16 || len(problemTypeValues) != 16 {
-		t.Fatalf("bit inventory: %d names, %d values, want 16 each",
-			len(problemTypeNames), len(problemTypeValues))
+	if len(problemTypeNames) != 16 {
+		t.Fatalf("bit inventory: %d names, want 16", len(problemTypeNames))
 	}
 	var all ProblemType
-	for pt, name := range problemTypeNames {
-		if problemTypeValues[name] != pt {
-			t.Errorf("name map mismatch: %s -> %d, want %d", name, problemTypeValues[name], pt)
-		}
+	for pt := range problemTypeNames {
 		all |= pt
 	}
 	if all != ALL_PROBLEM_TYPES {
@@ -25,24 +20,17 @@ func TestProblemTypeBitInventory(t *testing.T) {
 	}
 }
 
-func TestProblemTypeToFeaturesRoundTrip(t *testing.T) {
-	names := []string{"addition", "subtraction", "multiplication", "division", "fractions", "negatives", "word"}
-	for _, name := range names {
-		pt := FeaturesToProblemType([]string{name})
-		features := ProblemTypeToFeatures(pt)
+func TestProblemTypeToFeatures(t *testing.T) {
+	// Each single bit maps to its own name.
+	for bit, name := range problemTypeNames {
+		features := ProblemTypeToFeatures(bit)
 		if len(features) != 1 || features[0] != name {
-			t.Errorf("roundtrip %q: got features %v", name, features)
+			t.Errorf("%q: got features %v", name, features)
 		}
 	}
-	// Multiple features
-	pt := FeaturesToProblemType([]string{"addition", "subtraction"})
-	features := ProblemTypeToFeatures(pt)
-	sort.Strings(features)
+	// A stack of bits emits every name, in ascending-bit (definition) order.
+	features := ProblemTypeToFeatures(ADDITION | SUBTRACTION)
 	if !reflect.DeepEqual(features, []string{"addition", "subtraction"}) {
-		t.Errorf("multi roundtrip: got %v", features)
-	}
-	pt2 := FeaturesToProblemType(features)
-	if pt != pt2 {
-		t.Errorf("roundtrip pt mismatch: %d vs %d", pt, pt2)
+		t.Errorf("multi: got %v, want [addition subtraction]", features)
 	}
 }

@@ -19,7 +19,7 @@ don't re-derive them here.
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
 heuristic_version: heuristic_2.0
-llm_version: llm_0.5
+llm_version: llm_0.6
 ```
 <!-- END DOC-SYNC ANCHORS -->
 
@@ -34,24 +34,29 @@ permanent (see [problem-generation.md](problem-generation.md)).
 
 | Generator | Package | Current version | Nature |
 |-----------|---------|-----------------|--------|
-| Heuristic | `server/generator` | `heuristic_2.0` (`VERSION`) | Deterministic in-process Go; no API, no cost, fast. Difficulty-targeting, compositional. Default for non-word generation. |
-| LLM | `server/llm_generator` | `llm_0.5` (`VERSION`) | Calls OpenAI; richer/varied, especially word problems. Slower, costs per problem, batched up to `MAX_QUANTITY` per call. |
+| Heuristic | `server/generator` | `heuristic_2.0` (`VERSION`) | Deterministic in-process Go; no API, no cost, fast. Difficulty-targeting, compositional. Owns the math for EVERY problem — the sole source for non-word, and the skeleton source for word. |
+| LLM | `server/llm_generator` | `llm_0.6` (`VERSION`) | Calls OpenAI to NARRATE a heuristic skeleton into a word problem (`llm_0.6`); no longer authors math. Slower, costs per problem, batched up to `MAX_QUANTITY` per call. |
 
 ## Heuristic versions
 
 | Version | What it is |
 |---------|-----------|
 | `heuristic_0.0` | Original hand-written generator — and, like `heuristic_2.0`, **compositional and difficulty-targeting**: it built expressions toward a requested difficulty rather than emitting fixed template shapes. Add/sub/mul only (wired up for add/sub at low difficulty), no fractions; output wrapped single numbers in parens (`(3)+(5)-(2)`). Problems remain in the DB for history but are `status = 'deprecated'` (see the note below). |
-| `heuristic_1.0` | Template-enumeration rewrite. Four operations (`+ - * /`); fixed template shapes (basic binary, missing-number, multi-term chains, same/different-denominator fractions). Did NOT target difficulty — it emitted a shape and let the formula score whatever fell out, and DECIMALS/PEMDAS/PERCENTAGES/SINGLE_VARIABLE were LLM-only (#227). Problems remain in the DB and serve normally. |
+| `heuristic_1.0` | Template-enumeration rewrite. Four operations (`+ - * /`); fixed template shapes (basic binary, missing-number, multi-term chains, same/different-denominator fractions). Did NOT target difficulty — it emitted a shape and let the formula score whatever fell out, and DECIMALS/PEMDAS/PERCENTAGES/SINGLE_VARIABLE were LLM-only (#227). Problems remain in the DB for history but are `status = 'deprecated'` (see the note below). |
 | `heuristic_2.0` (current) | Compositional, difficulty-targeting rewrite (#283) that RE-introduces the targeting `heuristic_0.0` had and `heuristic_1.0` dropped. Takes the envelope bitmap + the user's `target_difficulty` and aims each candidate at it; covers EVERY non-WORD bit and arbitrary STACKS of them (the previously-LLM-only DECIMALS/PEMDAS/PERCENTAGES/SINGLE_VARIABLE included). Builds answer-first on the `mathcore` render-only AST; see below. |
 
 ### Deprecated generator rows
 
 Migration 46 marked every `heuristic_0.0`, `llm_0.0`, `llm_0.1`, and `llm_0.2`
-row `status = 'deprecated'`: valid when generated but predating the current
-generators, so no longer served (still counted in metrics — they were legitimate
-when answered). `heuristic_1.0` and later LLM versions (`llm_0.3`+) are untouched
-and serve normally. State semantics are owned by `docs/schema.md`.
+row `status = 'deprecated'`, and migration 47 extended the cutover to every
+remaining pre-current version — `heuristic_1.0`, `llm_0.3`, `llm_0.4`, and
+`llm_0.5`. Only `heuristic_2.0` and `llm_0.6` are still served; everything older
+is deprecated: valid when generated but predating the current generators, so no
+longer served (still counted in metrics — they were legitimate when answered).
+Selection enforces this two ways — deprecated rows are filtered out by
+`status = 'active'`, and the retired versions are dropped from `generatorRank`
+(`generator_rank.go`), so a stray still-`active` legacy row ranks 0. State
+semantics are owned by `docs/schema.md`.
 
 ### `heuristic_2.0` — compositional answer-first difficulty targeting
 
@@ -83,7 +88,8 @@ read after an additive operator) and gated by the canonical `requiresPEMDAS` via
 | `llm_0.2` | Curriculum alignment (WS2): grade-level Common Core context + few-shot examples from `curriculum.json`; validation also checks grade appropriateness; topic variety hints; rejects problems whose self-reported difficulty diverges >100% from target. |
 | `llm_0.3` | Bitmap constraint block: the api-built MAY / MUST NOT block (`api.BuildBitConstraints`) becomes the sole shape guidance; curriculum context, few-shot examples, and "age in years" framing removed (`curriculum.json` deleted). Self-report no longer trusted — features stamped by the detector, difficulty by `ComputeProblemDifficulty`. Validation local-first: symbolic problems answer-checked in-code, word problems get one validator round-trip. Storage preserves original notation. |
 | `llm_0.4` | Prompt-only (#249): tells the model to write the ENTIRE word problem as prose and never append the arithmetic or its result, using symbolic math outside `\text{}` only when the statement itself is an expression to manipulate. Fixed ~84% of `llm_0.3` word problems leaking the computation. No code path changed. |
-| `llm_0.5` (current) | `symbolic_expression` for word problems (#266) — see below. |
+| `llm_0.5` | `symbolic_expression` for word problems (#266) — see below. |
+| `llm_0.6` (current) | Skeleton narration — retires free-authoring. The heuristic builds a scored symbolic skeleton and the LLM only dresses it in prose. Also the obelus cutover (division prompt/notation). See below. |
 
 ### `llm_0.5` — symbolic_expression for word problems
 
@@ -98,6 +104,30 @@ must lex and evaluate to the answer in-code, and the WORD validator's form line
 division word problem scores like its symbolic twin plus the word bonus. Non-word problems leave it
 empty (their `expression` is already symbolic). This version carries a `DifficultyVersion` bump and
 a `recompute_problem_difficulty` run on deploy (see [problem-generation.md](problem-generation.md)).
+
+### `llm_0.6` — skeleton narration (deterministic math, LLM narrates)
+
+Inverts `llm_0.5`'s WORD flow. `llm_0.5` had the LLM AUTHOR a word problem, then reverse-engineered
+a `symbolic_expression` to score it — difficulty known only after the fact. `llm_0.6` retires that
+free-authoring path entirely: the heuristic builds a **scored symbolic skeleton** first (aimed at
+`target / word-concept` so the narrated result lands near the requested difficulty), and the LLM is
+asked ONLY to dress that skeleton in prose — no new numbers, no changed operation. Storage:
+`expression` = the prose, `symbolic_expression` = the heuristic skeleton (already scored), `answer` =
+the skeleton's answer. Difficulty is `ComputeProblemDifficulty(prose, skeleton)` — skeleton × the
+word concept **by construction**, not measured after. Validation is a stronger-model round-trip on
+two lines (`PROMPT_VALIDATION_WORD`): the prose must solve to the skeleton's answer and pose the
+skeleton's computation (form YES/NO, `ErrFormMismatch`); it **fails closed** → the narration is
+dropped. The skeleton owns the bits too — the WORD problem's `problem_type_bitmap` is `WORD` OR'd
+onto the skeleton's parsed bits, never re-derived from the prose (whose incidental story numerals
+would mis-stamp magnitude). Non-word problems are now generated entirely by the heuristic (zero LLM).
+The orchestration lives in
+`server/api/generate_problems.go` (`runWordGenerator`); the difficulty formula is unchanged, so **no
+`DifficultyVersion` bump**.
+
+`llm_0.6` also lands the **obelus cutover**: division is written `÷` everywhere (a bare `/` is a
+fraction), so the narrator prompt and validator form use `÷`, and a one-time
+`cmd/migrate_division_notation` rewrites legacy spaced-slash rows. Purely notational — no
+`recompute_*`. The notation rule is owned by [problem-generation.md](problem-generation.md).
 
 ## Invariants
 
@@ -116,14 +146,14 @@ a `recompute_problem_difficulty` run on deploy (see [problem-generation.md](prob
 
 ## Gotchas
 
-- **Models are not part of the version string.** LLM generation defaults to `openai.GPT5Nano`
-  (`GenerateProblem`), overridable per request via `Options.Model` (used by
-  `cmd/diagnose_generation` for model-tier A/B). The WORD validator uses `openai.GPT5`
-  (`ValidateWordProblem`), with a cheaper-model override (`ValidateWordProblemWithModel`). Swapping
-  the model does **not** bump `VERSION`, so the same `llm_0.5` string can cover problems generated
-  by different models.
-- **The LLM tags missed word problems after the fact** — `GenerateProblem` adds the `word` feature
-  to any returned problem whose expression contains letters even if the model omitted it.
+- **Models are not part of the version string.** Narration uses `openai.GPT5Nano`
+  (`NarrateProblems`); the WORD validator uses the stronger `openai.GPT5`
+  (`ValidateWordProblem`) as an independent check on the cheaper narrator. Swapping either model does
+  **not** bump `VERSION`, so the same `llm_0.6` string can cover problems generated by different
+  models.
+- **The narrator never owns the math.** `SymbolicExpression` and `Answer` on a stored word problem
+  are the heuristic skeleton's, copied verbatim; only the prose `expression` and `explanation` come
+  from the model. A narration that fails the answer/form validation is dropped, never corrected.
 
 ## Adding a new version
 
@@ -141,9 +171,11 @@ above; (3) update the matching anchor (`heuristic_version` / `llm_version`) or
 
 - `server/generator/heuristic2.go` — heuristic `VERSION`, `BuildProblem`, the knob inverter
   (`planConfig`/`chooseConcepts`), the compositional `expand` recursion, and the value splits.
-- `server/llm_generator/generate_problem.go` — LLM `VERSION`, `PROMPT_QUESTION`, `MAX_QUANTITY`,
-  default model.
-- `server/llm_generator/validate_problem.go` — `ValidateWordProblem`, `PROMPT_VALIDATION_FORM`,
+- `server/llm_generator/generate_problem.go` — LLM `VERSION`, `PROMPT_NARRATE`, `NarrateProblems`,
+  `Skeleton`, `MAX_QUANTITY`, default model.
+- `server/api/generate_problems.go` — `runWordGenerator` (skeleton → narrate → validate → store),
+  `runHeuristicGenerator` (non-word).
+- `server/llm_generator/validate_problem.go` — `ValidateWordProblem`, `PROMPT_VALIDATION_WORD`,
   `ErrFormMismatch`, validation model.
 - `server/api/docs_sync_test.go` — `TestDocsSyncGeneratorVersions` (anchor gate).
 - [problem-generation.md](problem-generation.md) — difficulty formula, scale, `DifficultyVersion`,
