@@ -66,21 +66,38 @@ first that yields a servable problem:
                  matching the envelope + difficulty UPPER bound + status active.
                  (spaced_repetition.go) Serve it directly if still available.
 [1] DEFAULT      getSatisfyingProblemIds over the whole envelope; recency-bias
-                 pick. Pool < minSelectionPool -> background generation.
-[2] HEURISTIC    pool empty: synchronously run the heuristic generator over the
-                 non-WORD bits (envelope &^ WORD) so the user sees something now.
-[3] LLM BLOCK    WORD-only envelope (or heuristic produced nothing): block on a
-                 synchronous LLM generate call.
+                 pick. Pool < minSelectionPool AND WORD enabled -> background WORD
+                 generation (the expensive narration; non-WORD needs no batch).
+[2] HEURISTIC    no servable pooled problem: generate a non-WORD problem live via
+                 the in-process heuristic (envelope &^ WORD) — the immediate answer
+                 AND how non-WORD problems enter the pool (they get no batch).
+[2b] RELAX       the heuristic minted nothing new (every candidate collided with an
+                 existing row): the difficulty band is saturated and the recency
+                 exclusion had masked those rows in stage 1. Re-run getSatisfying-
+                 ProblemIds with an empty prevIds and recency-bias pick — a brief
+                 repeat beats failing the request.
+[3] BLOCK        no non-WORD skeleton to build (a WORD-only envelope): block on a
+                 synchronous WORD generateProblems call. WORD-only is invalid per
+                 the settings rules and yields nothing.
 ```
+
+`selectProblem` is pure with respect to the HTTP response: every stage returns a
+problem or an error and **never writes to the request context**. The caller
+(`processEvent` / the custom handlers) owns response writing, so a recoverable
+pooled-fetch error just drops through to the next stage instead of half-writing a
+response.
 
 Stage 1 prefers newer generators: `newestVersionTier` runs the
 satisfying-set query, buckets candidates by `generatorRank` (generator_rank.go),
 and returns only the **highest-ranked version present**, falling back to older
-versions only when no newer one matches. An unranked/legacy generator string
-ranks 0, below every known version. The rank ordering is a selection-preference
-policy (newest-first), with the deterministic `heuristic_2.0` ranked above the
-LLM tiers for the symbolic cells both can fill (#283 — WORD cells are llm-only,
-so the LLM stays top-ranked there). Version provenance — what each generator
+versions only when no newer one matches. Only the two current generators are
+ranked — `llm_0.6` (WORD narration) top, then the deterministic `heuristic_2.0`;
+every older version is retired (`status = 'deprecated'`, migration 47) and
+dropped from the satisfying set before ranking ever runs. An unranked/legacy
+generator string ranks 0, below every ranked version, so a stray still-`active`
+legacy row is preferred last. Since `llm_0.6` produces only WORD problems and the
+heuristic produces only non-WORD, they never compete in a cell — a WORD cell
+draws `llm_0.6`, a symbolic cell `heuristic_2.0`. Version provenance — what each generator
 string means — is owned by `docs/generator-versions.md`.
 
 The hard-exclusion list (`prevIds`) is the `recentProblemHistorySize`
@@ -149,9 +166,10 @@ the recency sort.
   selection path that omits either is a leak.
 - **Stored difficulty is per-problem, not per-request.** The pool is shared; the
   difficulty window is applied at query time, never baked into a row.
-- **Background generation never blocks the happy path.** Stage 1 only *kicks
-  off* generation on a thin pool; only stages 2–3 (empty pool) generate inline,
-  and stage 2 prefers the synchronous heuristic over an LLM round-trip.
+- **Background generation is WORD-only and never blocks the happy path.** Stage 1
+  only *kicks off* narration on a thin pool when WORD is enabled (the LLM path
+  worth pre-generating); non-WORD is generated inline by the cheap heuristic
+  (stage 2). Only stages 2–3 (no servable pooled problem) generate synchronously.
 - **Single-flight background generation per user.** `generateProblemsBackground`
   dedups concurrent runs per user via `backgroundGenLocks` (a `sync.Map` of
   mutexes); losers log and skip. Without it the 500ms working-on-problem ticker

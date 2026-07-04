@@ -5,15 +5,17 @@ import (
 	"fmt"
 )
 
+// Problem is the narrator's output: prose plus the skeleton's authoritative
+// SymbolicExpression + Answer, handed to the api side to answer/form-validate
+// and store. It is never request-bound, so it carries no struct tags; the api
+// computes and stores difficulty, so this struct holds none.
 type Problem struct {
-	Features           []string `json:"features" form:"features"`
-	Expression         string   `json:"expression" form:"expression"`
-	SymbolicExpression string   `json:"symbolic_expression" form:"symbolic_expression"`
-	Answer             string   `json:"answer" form:"answer"`
-	Explanation        string   `json:"explanation" form:"explanation"`
-	Difficulty         float64  `json:"difficulty" form:"difficulty"`
+	Expression         string
+	SymbolicExpression string
+	Answer             string
+	Explanation        string
 }
 
 func (opts Problem) String() string {
-	return fmt.Sprintf("Features: %v, Expression: %v, SymbolicExpression: %v, Answer: %v, Explanation: %v, Difficulty: %v", opts.Features, opts.Expression, opts.SymbolicExpression, opts.Answer, opts.Explanation, opts.Difficulty)
+	return fmt.Sprintf("Expression: %v, SymbolicExpression: %v, Answer: %v, Explanation: %v", opts.Expression, opts.SymbolicExpression, opts.Answer, opts.Explanation)
 }

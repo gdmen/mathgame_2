@@ -395,7 +395,7 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		// the request still serves a problem - matching the upsert path's
 		// best-effort posture.
 		problemIds := loadRecentProblemIds(logPrefix, a.DB, user.Id)
-		problem, err := a.selectProblem(logPrefix, c, settings, &problemIds)
+		problem, err := a.selectProblem(logPrefix, settings, &problemIds)
 		if err != nil {
 			return err
 		}

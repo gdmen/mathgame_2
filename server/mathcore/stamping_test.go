@@ -129,61 +129,6 @@ func TestEnvelopeViolation(t *testing.T) {
 	}
 }
 
-// TestBuildBitConstraints: the May/MustNot prompt block contains every
-// required clause, and a minimal bitmap forbids everything else.
-func TestBuildBitConstraints(t *testing.T) {
-	full := BuildBitConstraints(ALL_PROBLEM_TYPES)
-	for _, want := range []string{
-		"MAY use addition", "MAY include fractions", "MAY pose word problems",
-		"MAY use a single variable letter",
-		"any size up to 9999",
-		"MAY chain 2 or more operators (at most 5)",
-		"at most ONE unknown",
-		"Use ONLY the operations and concepts explicitly allowed",
-		"simultaneous",
-	} {
-		if !strings.Contains(full, want) {
-			t.Errorf("full constraints missing %q\n%s", want, full)
-		}
-	}
-
-	addOnly := BuildBitConstraints(ADDITION)
-	for _, want := range []string{
-		"MAY use addition",
-		"MUST NOT use subtraction", "MUST NOT use multiplication", "MUST NOT use division",
-		"MUST NOT include any fractions", "MUST NOT use decimal numbers",
-		"MUST NOT use percentages", "MUST NOT use negative numbers",
-		"MUST NOT include any prose", "MUST NOT use ? blanks",
-		"MUST NOT use variable letters",
-		"MUST be between 1 and 12",
-		"MUST have exactly one operator",
-	} {
-		if !strings.Contains(addOnly, want) {
-			t.Errorf("ADDITION-only constraints missing %q\n%s", want, addOnly)
-		}
-	}
-	// No MAYs beyond addition; no unknown-rules clause when no unknown bits.
-	if strings.Count(addOnly, "- MAY ") != 1 {
-		t.Errorf("ADDITION-only should have exactly one MAY clause:\n%s", addOnly)
-	}
-	if strings.Contains(addOnly, "at most ONE unknown") {
-		t.Errorf("unknown rules emitted without MISSING/SINGLE_VARIABLE:\n%s", addOnly)
-	}
-	// MISMATCHED MustNot only appears when FRACTIONS is enabled.
-	fracSame := BuildBitConstraints(ADDITION | FRACTIONS)
-	if !strings.Contains(fracSame, "MUST share one denominator") {
-		t.Errorf("FRACTIONS without MISMATCHED should pin same-denominator:\n%s", fracSame)
-	}
-	if strings.Contains(addOnly, "denominator") {
-		t.Errorf("no-FRACTIONS constraints should not mention denominators:\n%s", addOnly)
-	}
-	// 3-state magnitude: MEDIUM only.
-	med := BuildBitConstraints(ADDITION | MEDIUM_NUMBERS)
-	if !strings.Contains(med, "MUST NOT exceed 99") {
-		t.Errorf("MEDIUM-only magnitude clause wrong:\n%s", med)
-	}
-}
-
 // TestNormalizeProblemBitmap: structural invariants that the WORD validator
 // (independent feature checkboxes) can violate. Each ORs in an implied bit;
 // the operation only narrows a problem's audience, never widens it.

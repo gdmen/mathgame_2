@@ -132,5 +132,7 @@ a later admin review (a follow-up) promotes `reported` to `incorrect` or back to
 - `server/mathcore/difficulty.go` — `MinTargetDifficulty`; `MaxDiffForBitmap` (the ceiling) and the
   formula are owned by problem-generation.md. (The formula kernel now lives in the shared
   `server/mathcore` package; `process_events.go` imports it.)
-- `server/api/generate_problems.go` — `selectProblem` (caller), `problemSelectionEpsilon`.
+- `server/api/generate_problems.go` — `selectProblem` (called without a `gin.Context`:
+  selection returns a problem or an error and never writes the response; `processEvent`
+  writes it), `problemSelectionEpsilon`.
 - `web/src/bitmap_validation.js` — `MIN_TARGET_DIFFICULTY` slider mirror.

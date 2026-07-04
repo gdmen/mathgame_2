@@ -29,7 +29,7 @@ func TestGenerationFunnel_NoSilentDrops(t *testing.T) {
 // that evaluates to the answer passes; a wrong answer or an unlexable form
 // fails.
 func TestVerifyAnswer(t *testing.T) {
-	if err := VerifyAnswer("9999 / 3 / 3", "1111"); err != nil {
+	if err := VerifyAnswer("9999 ÷ 3 ÷ 3", "1111"); err != nil {
 		t.Errorf("valid form rejected: %v", err)
 	}
 	if err := VerifyAnswer("60 * 2", "120"); err != nil {

@@ -9,8 +9,7 @@
 // which cells it cannot reach in-window (the documented coarse-concept /
 // floor-ceiling gaps).
 //
-// Read-only. Mirrors cmd/diagnose_generation's shape; needs a config with
-// MySQL creds pointing at the snapshot.
+// Read-only; needs a config with MySQL creds pointing at the snapshot.
 //
 // Usage:
 //

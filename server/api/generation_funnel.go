@@ -71,7 +71,7 @@ func RewriteLetterInProse(s string, letter byte) string {
 
 // VerifyAnswer admits expr and checks it evaluates to answer - the exported
 // form of the generation path's symbolic answer check, for tools that validate
-// a candidate computation (e.g. cmd/diagnose_generation).
+// a candidate computation.
 func VerifyAnswer(expr, answer string) error {
 	adm := mathcore.AdmitExpression(expr)
 	if adm.RejectStage != "" {

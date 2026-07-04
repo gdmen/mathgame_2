@@ -259,7 +259,7 @@ func (a *Api) helpGetPlayData(logPrefix string, c *gin.Context, gamestate *Games
 		if HandleMngrResp(logPrefix, c, status, msg, err, settings) != nil {
 			return
 		}
-		problem, err = a.selectProblem(logPrefix, c, settings, &[]uint32{})
+		problem, err = a.selectProblem(logPrefix, settings, &[]uint32{})
 		if err != nil {
 			glog.Errorf("%s selectProblem: %v", logPrefix, err)
 			c.JSON(http.StatusInternalServerError, common.GetError("Could not select problem"))
@@ -538,7 +538,7 @@ func (a *Api) customCreateOrUpdateUser(c *gin.Context) {
 		}
 		glog.Infof("%s Settings: %v", logPrefix, settings)
 		// Select a new problem
-		problem, err := a.selectProblem(logPrefix, c, settings, &([]uint32{0}))
+		problem, err := a.selectProblem(logPrefix, settings, &([]uint32{0}))
 		if err != nil {
 			glog.Errorf("%s Error: %v", logPrefix, err)
 			return

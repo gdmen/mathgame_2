@@ -55,26 +55,6 @@ var problemTypeNames = map[ProblemType]string{
 	PERCENTAGES:             "percentages",
 }
 
-// Map to associate string names with ProblemType values
-var problemTypeValues = map[string]ProblemType{
-	"addition":                ADDITION,
-	"subtraction":             SUBTRACTION,
-	"multiplication":          MULTIPLICATION,
-	"division":                DIVISION,
-	"fractions":               FRACTIONS,
-	"negatives":               NEGATIVES,
-	"word":                    WORD,
-	"medium_numbers":          MEDIUM_NUMBERS,
-	"large_numbers":           LARGE_NUMBERS,
-	"chained_operations":      CHAINED_OPERATIONS,
-	"missing_number":          MISSING_NUMBER,
-	"mismatched_denominators": MISMATCHED_DENOMINATORS,
-	"decimals":                DECIMALS,
-	"pemdas":                  PEMDAS,
-	"single_variable":         SINGLE_VARIABLE,
-	"percentages":             PERCENTAGES,
-}
-
 // Convert a ProblemType Bitmap into an array of string features. Bits are
 // emitted in definition (ascending bit) order so the result is deterministic —
 // a map range would shuffle it per call.
@@ -86,13 +66,4 @@ func ProblemTypeToFeatures(pt ProblemType) []string {
 		}
 	}
 	return features
-}
-
-// Convert an array of string features into a ProblemType Bitmap
-func FeaturesToProblemType(features []string) ProblemType {
-	pt := ProblemType(0)
-	for _, v := range features {
-		pt |= problemTypeValues[v]
-	}
-	return pt
 }
