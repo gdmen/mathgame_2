@@ -77,9 +77,10 @@
           "sql": "FLOAT NOT NULL"
         },
         {
-          "name": "Disabled",
-          "type": "bool",
-          "sql": "TINYINT NOT NULL DEFAULT 0"
+          "name": "Status",
+          "type": "string",
+          "_note": "Problem lifecycle state (see docs/schema.md and the api.Status* constants). DEFAULT 'active' is intentionally present so codegen drops it from the INSERT column list — generator paths get 'active' for free, same pattern as DifficultyVersion. Migration 46 adds this column, backfills it from the old `disabled` boolean's provenance, and drops `disabled`.",
+          "sql": "ENUM('active','deprecated','reported','incorrect') NOT NULL DEFAULT 'active'"
         },
         {
           "name": "Generator",

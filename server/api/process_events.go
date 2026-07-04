@@ -355,7 +355,9 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		gamestate.VideoId = videoId
 		changed_gamestate = true
 	} else if event.EventType == BAD_PROBLEM_SYSTEM || event.EventType == BAD_PROBLEM_USER {
-		// Disable the reported problem, falling back to gamestate.ProblemId.
+		// Mark the reported problem as an unvalidated bad claim, falling back to
+		// gamestate.ProblemId. Both auto-flags land in the same 'reported' state;
+		// only a later admin review promotes to 'incorrect' or back to 'active'.
 		badID := parseBadProblemID(event.Value)
 		if badID == 0 {
 			badID = gamestate.ProblemId
@@ -364,13 +366,15 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		if HandleMngrResp(logPrefix, c, status, msg, err, problem) != nil {
 			return err
 		}
-		glog.Infof("%s Disabling problem: %v", logPrefix, problem)
-		problem.Disabled = true
-		status, msg, err = a.problemManager.Update(problem)
-		if HandleMngrResp(logPrefix, c, status, msg, err, problem) != nil {
+		glog.Infof("%s Marking problem reported: %v", logPrefix, problem)
+		// Targeted single-column write, not problemManager.Update: the manager's
+		// full-row UPDATE would clobber a concurrent field write on the same row.
+		if _, err = a.DB.Exec("UPDATE problems SET status=? WHERE id=?", StatusReported, badID); err != nil {
+			glog.Errorf("%s marking problem %d reported: %v", logPrefix, badID, err)
+			c.JSON(http.StatusInternalServerError, common.GetError("Couldn't update problem status"))
 			return err
 		}
-		// Only re-select if the disabled problem is the current one.
+		// Only re-select if the reported problem is the current one.
 		if badID == gamestate.ProblemId {
 			select_new_problem = true
 		}
