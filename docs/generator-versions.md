@@ -19,7 +19,7 @@ don't re-derive them here.
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
 heuristic_version: heuristic_2.0
-llm_version: llm_0.6
+llm_version: llm_0.7
 ```
 <!-- END DOC-SYNC ANCHORS -->
 
@@ -35,7 +35,7 @@ permanent (see [problem-generation.md](problem-generation.md)).
 | Generator | Package | Current version | Nature |
 |-----------|---------|-----------------|--------|
 | Heuristic | `server/generator` | `heuristic_2.0` (`VERSION`) | Deterministic in-process Go; no API, no cost, fast. Difficulty-targeting, compositional. Owns the math for EVERY problem — the sole source for non-word, and the skeleton source for word. |
-| LLM | `server/llm_generator` | `llm_0.6` (`VERSION`) | Calls OpenAI to NARRATE a heuristic skeleton into a word problem (`llm_0.6`); no longer authors math. Slower, costs per problem, batched up to `MAX_QUANTITY` per call. |
+| LLM | `server/llm_generator` | `llm_0.7` (`VERSION`) | Calls OpenAI to NARRATE a heuristic skeleton into a word problem (`llm_0.6`+); no longer authors math. Slower, costs per problem, batched up to `MAX_QUANTITY` per call. |
 
 ## Heuristic versions
 
@@ -89,7 +89,8 @@ read after an additive operator) and gated by the canonical `requiresPEMDAS` via
 | `llm_0.3` | Bitmap constraint block: the api-built MAY / MUST NOT block (`api.BuildBitConstraints`) becomes the sole shape guidance; curriculum context, few-shot examples, and "age in years" framing removed (`curriculum.json` deleted). Self-report no longer trusted — features stamped by the detector, difficulty by `ComputeProblemDifficulty`. Validation local-first: symbolic problems answer-checked in-code, word problems get one validator round-trip. Storage preserves original notation. |
 | `llm_0.4` | Prompt-only (#249): tells the model to write the ENTIRE word problem as prose and never append the arithmetic or its result, using symbolic math outside `\text{}` only when the statement itself is an expression to manipulate. Fixed ~84% of `llm_0.3` word problems leaking the computation. No code path changed. |
 | `llm_0.5` | `symbolic_expression` for word problems (#266) — see below. |
-| `llm_0.6` (current) | Skeleton narration — retires free-authoring. The heuristic builds a scored symbolic skeleton and the LLM only dresses it in prose. Also the obelus cutover (division prompt/notation). See below. |
+| `llm_0.6` | Skeleton narration — retires free-authoring. The heuristic builds a scored symbolic skeleton and the LLM only dresses it in prose. Also the obelus cutover (division prompt/notation). See below. |
+| `llm_0.7` (current) | Word narratability policy on the skeleton source — see below. |
 
 ### `llm_0.5` — symbolic_expression for word problems
 
@@ -128,6 +129,20 @@ The orchestration lives in
 fraction), so the narrator prompt and validator form use `÷`, and a one-time
 `cmd/migrate_division_notation` rewrites legacy spaced-slash rows. Purely notational — no
 `recompute_*`. The notation rule is owned by [problem-generation.md](problem-generation.md).
+
+### `llm_0.7` — word narratability policy
+
+Same narrate-a-skeleton flow as `llm_0.6`; what changes is the SKELETON SOURCE. High-difficulty
+`llm_0.6` skeletons could be deeply-nested chains with no faithful natural-language story — the
+validator's form check rejected the narrations (fail closed), leaving high-difficulty WORD bands
+empty while the ceiling advertised them. `llm_0.7` skeletons come from
+`generator.BuildWordSkeletonRaw`: chains capped at `mathcore.MaxWordChainLen` and the envelope
+PEMDAS-stripped (a story dictates its own operation order; word scoring suppresses the PEMDAS
+multiplier, so a PEMDAS skeleton wasted its budget on a factor the word problem never earned). The
+stamp uses `mathcore.WordFormBitmap` (skeleton bits minus PEMDAS, plus WORD). The prompts are
+unchanged. Ships with the formula v0.4 bump (word PEMDAS suppression, the word ceiling branch, the
+band floor) — the policy, the score, and the ceiling land together; see
+[problem-generation.md](problem-generation.md) for the recompute deploy steps.
 
 ## Invariants
 

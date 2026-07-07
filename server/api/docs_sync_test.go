@@ -108,8 +108,10 @@ func TestDocsSync(t *testing.T) {
 	wantBits := mathcore.ProblemTypeToFeatures(mathcore.ALL_PROBLEM_TYPES)
 	assertSetAnchor(t, doc, "bits", anchors["bits"], wantBits)
 
-	// Anchor 3: the shared shape constants (generator mapping + ceiling).
+	// Anchor 3: the shared shape constants (generator mapping + ceiling/floor).
 	assertIntAnchor(t, doc, "max_chain_len", anchors["max_chain_len"], mathcore.MaxChainLen)
+	assertIntAnchor(t, doc, "max_word_chain_len", anchors["max_word_chain_len"], mathcore.MaxWordChainLen)
+	assertIntAnchor(t, doc, "min_constructible_operand", anchors["min_constructible_operand"], mathcore.MinConstructibleOperand)
 	assertIntAnchor(t, doc, "large_max_operand", anchors["large_max_operand"], mathcore.LargeMaxOperand)
 
 	// Anchor 4: the size of the valid non-WORD bitmap space — a forcing function
@@ -246,9 +248,11 @@ func TestDocsSyncSettings(t *testing.T) {
 
 	assertFloatAnchor(t, doc, "min_target_difficulty", anchors["min_target_difficulty"], mathcore.MinTargetDifficulty)
 	assertIntAnchor(t, doc, "ceiling_max_chain_len", anchors["ceiling_max_chain_len"], mathcore.MaxChainLen)
+	assertIntAnchor(t, doc, "ceiling_max_word_chain_len", anchors["ceiling_max_word_chain_len"], mathcore.MaxWordChainLen)
 	assertIntAnchor(t, doc, "ceiling_large_max_operand", anchors["ceiling_large_max_operand"], mathcore.LargeMaxOperand)
 	assertIntAnchor(t, doc, "ceiling_small_max_operand", anchors["ceiling_small_max_operand"], mathcore.SmallMaxOperand)
 	assertIntAnchor(t, doc, "ceiling_medium_max_operand", anchors["ceiling_medium_max_operand"], mathcore.MediumMaxOperand)
+	assertIntAnchor(t, doc, "floor_min_constructible_operand", anchors["floor_min_constructible_operand"], mathcore.MinConstructibleOperand)
 
 	// The validation error codes are defined client-side in bitmap_validation.js;
 	// assert each documented code appears there.

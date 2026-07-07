@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	VERSION = "llm_0.6"
+	VERSION = "llm_0.7"
 	// PROMPT_NARRATE turns scored symbolic skeletons into prose. The heuristic
 	// owns the math and the difficulty; the model only dresses each skeleton in
 	// a story that poses that exact computation - it invents no numbers and

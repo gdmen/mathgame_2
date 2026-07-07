@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-// The difficulty scale (formula v0.3):
+// The difficulty scale (see DifficultyVersion for the formula version):
 //
 // Open-ended, floored at 1.0, NO upper clamp. Inputs are bounded by
 // construction (MaxChainLen, LargeMaxOperand, the fixed multiplier set), so
@@ -39,7 +39,7 @@ import (
 // any new feature in parseProblemFeatures, any change to the compression
 // curve). 0.x while the scale is still in active calibration; 1.0 once
 // stable. Minor bumps for tuning, major bumps for structural rewrites.
-const DifficultyVersion = "0.3"
+const DifficultyVersion = "0.4"
 
 // Shared shape constants - used by BOTH the generators' option mapping and
 // MaxDiffForBitmap so the ceiling and what generation can actually produce
@@ -52,6 +52,11 @@ const (
 	// LargeMaxOperand is the maximum operand when LARGE_NUMBERS is enabled
 	// (digit-magnitude for decimals shares the bound).
 	LargeMaxOperand = 9999
+	// MaxWordChainLen is the operator-count cap for WORD-problem skeletons:
+	// word generation builds within it and MaxDiffForBitmap's word branch
+	// prices it, so the advertised word ceiling stays reachable (the word
+	// rules in docs/problem-generation.md own the narratability rationale).
+	MaxWordChainLen = 3
 )
 
 // Magnitude bracket boundaries (maxMagnitude; digit-based for decimals).
@@ -69,7 +74,7 @@ const (
 // (web/src/bitmap_validation.js MIN_TARGET_DIFFICULTY).
 const MinTargetDifficulty = 3.0
 
-// Formula v0.3 factor constants, combined as
+// Formula factor constants, combined as
 // magnitude * opWeight * concept * structure (see ComputeProblemDifficulty).
 const (
 	// Op weights: opWeight is the MAX over the operators present
@@ -316,7 +321,7 @@ func parseProblemFeaturesFallback(expr string) problemFeatures {
 // DifficultyVersion machinery depends on this: rows stamped
 // with the current version are skipped by recompute without re-evaluation.
 //
-// Formula v0.3 (canonical spec in docs/problem-generation.md):
+// Formula (canonical spec in docs/problem-generation.md):
 //
 //	magnitude = log10(maxMagnitude+1) + 0.3   (digit-based for decimals)
 //	opWeight  = max over present ops: add 1.0 | sub 1.1 | mul 2.2 | div 2.8
@@ -361,7 +366,7 @@ type ConceptFactor struct {
 // ComputeProblemDifficulty combines. It exists for inspection (the admin
 // difficulty-calibration page) and does NOT affect scoring:
 // ComputeProblemDifficulty returns Scaled, computed by exactly the formula
-// below. Keep this output-identical to the documented v0.3 formula - any change
+// below. Keep this output-identical to the documented formula - any change
 // to Scaled requires a DifficultyVersion bump (see docs/problem-generation.md).
 type DifficultyBreakdown struct {
 	Magnitude    float64         `json:"magnitude"`
@@ -396,17 +401,17 @@ func computeBreakdown(scoredExpr string, forceWord bool) DifficultyBreakdown {
 		f.isWord = true
 	}
 
-	magnitude := math.Log10(f.maxMagnitude+1) + 0.3
+	magnitude := magnitudeTerm(f.maxMagnitude)
 
 	opWeight := 1.0
 	if f.hasSub {
-		opWeight = math.Max(opWeight, WeightSub)
+		opWeight = max(opWeight, WeightSub)
 	}
 	if f.hasMul {
-		opWeight = math.Max(opWeight, WeightMul)
+		opWeight = max(opWeight, WeightMul)
 	}
 	if f.hasDiv {
-		opWeight = math.Max(opWeight, WeightDiv)
+		opWeight = max(opWeight, WeightDiv)
 	}
 
 	concept := 1.0
@@ -431,7 +436,10 @@ func computeBreakdown(scoredExpr string, forceWord bool) DifficultyBreakdown {
 		concept *= ConceptWord
 		concepts = append(concepts, ConceptFactor{"word", ConceptWord})
 	}
-	if f.requiresPEMDAS {
+	// Word problems never earn the PEMDAS multiplier; the serving bitmap
+	// drops the bit in lockstep (WordFormBitmap; the word rules in
+	// docs/problem-generation.md own the why).
+	if f.requiresPEMDAS && !f.isWord {
 		concept *= ConceptPEMDAS
 		concepts = append(concepts, ConceptFactor{"pemdas", ConceptPEMDAS})
 	}
@@ -444,7 +452,7 @@ func computeBreakdown(scoredExpr string, forceWord bool) DifficultyBreakdown {
 		concepts = append(concepts, ConceptFactor{"percent", ConceptPercent})
 	}
 
-	structure := 1.0 + StructurePerExtraOp*float64(maxInt(0, f.numOps-1))
+	structure := 1.0 + StructurePerExtraOp*float64(max(0, f.numOps-1))
 	if f.hasMissing {
 		structure += StructureMissing
 	}
@@ -521,12 +529,18 @@ func RawForDifficulty(scaled float64) float64 {
 //
 // Either/or ceiling rule: when two features can't appear in the same problem,
 // compute the ceiling both ways and use the higher - never multiply both in.
-// MISSING_NUMBER and SINGLE_VARIABLE are per-problem mutually exclusive (at
-// most one distinct unknown per problem), so the variable branch (x5.0
-// concept, no +0.2 structure) and the missing branch (+0.2 structure, no
-// x5.0) are computed separately. Multiplying both in would claim a ceiling
-// no constructible problem reaches - recreating the empty-band drift this
-// function exists to prevent.
+// Multiplying exclusive features together would claim a ceiling no
+// constructible problem reaches - recreating the empty-band drift this
+// function exists to prevent. Two exclusivities apply:
+//   - MISSING_NUMBER and SINGLE_VARIABLE are per-problem mutually exclusive
+//     (at most one distinct unknown per problem), so the variable branch
+//     (x5.0 concept, no +0.2 structure) and the missing branch (+0.2
+//     structure, no x5.0) are computed separately.
+//   - Word and non-word problems price differently: the word branch earns
+//     ConceptWord but caps chain length at MaxWordChainLen and never earns
+//     ConceptPEMDAS (word scoring suppresses it), while the non-word branch
+//     keeps the full chain and PEMDAS with no word concept. The ceiling is
+//     the higher of the two reachable bands.
 func MaxDiffForBitmap(bitmap uint64) float64 {
 	pt := ProblemType(bitmap)
 
@@ -537,22 +551,18 @@ func MaxDiffForBitmap(bitmap uint64) float64 {
 	if pt&LARGE_NUMBERS != 0 {
 		maxOperand = float64(LargeMaxOperand)
 	}
-	magnitude := math.Log10(maxOperand+1) + 0.3
+	magnitude := magnitudeTerm(maxOperand)
 
 	opWeight := 1.0
-	if pt&SUBTRACTION != 0 {
-		opWeight = math.Max(opWeight, WeightSub)
-	}
-	if pt&MULTIPLICATION != 0 {
-		opWeight = math.Max(opWeight, WeightMul)
-	}
-	if pt&DIVISION != 0 {
-		opWeight = math.Max(opWeight, WeightDiv)
+	for _, op := range coreOpWeights {
+		if pt&op.bit != 0 {
+			opWeight = max(opWeight, op.weight)
+		}
 	}
 
-	// Concept multipliers common to both either/or branches. A plain
-	// product: sub-feature bits (MISMATCHED) stack their increment on their
-	// parent's factor.
+	// Concept multipliers common to every branch. A plain product:
+	// sub-feature bits (MISMATCHED) stack their increment on their parent's
+	// factor.
 	concept := 1.0
 	if pt&FRACTIONS != 0 {
 		concept *= ConceptFractions
@@ -563,12 +573,6 @@ func MaxDiffForBitmap(bitmap uint64) float64 {
 	if pt&NEGATIVES != 0 {
 		concept *= ConceptNegatives
 	}
-	if pt&WORD != 0 {
-		concept *= ConceptWord
-	}
-	if pt&PEMDAS != 0 {
-		concept *= ConceptPEMDAS
-	}
 	if pt&DECIMALS != 0 {
 		concept *= ConceptDecimals
 	}
@@ -576,25 +580,118 @@ func MaxDiffForBitmap(bitmap uint64) float64 {
 		concept *= ConceptPercent
 	}
 
+	// branchBest folds the MISSING/SINGLE_VARIABLE either-or for one
+	// word-ness branch.
+	branchBest := func(concept, structure float64) float64 {
+		best := magnitude * opWeight * concept * structure
+		if pt&SINGLE_VARIABLE != 0 {
+			if r := magnitude * opWeight * concept * ConceptVariable * structure; r > best {
+				best = r
+			}
+		}
+		if pt&MISSING_NUMBER != 0 {
+			if r := magnitude * opWeight * concept * (structure + StructureMissing); r > best {
+				best = r
+			}
+		}
+		return best
+	}
+
+	nonWordConcept := concept
+	if pt&PEMDAS != 0 {
+		nonWordConcept *= ConceptPEMDAS
+	}
 	structure := 1.0
 	if pt&CHAINED_OPERATIONS != 0 {
 		structure = 1.0 + StructurePerExtraOp*float64(MaxChainLen-1)
 	}
+	rawBest := branchBest(nonWordConcept, structure)
 
-	// Either/or branches over the reachable problem space.
-	rawNeither := magnitude * opWeight * concept * structure
-	rawBest := rawNeither
-	if pt&SINGLE_VARIABLE != 0 {
-		if r := magnitude * opWeight * concept * ConceptVariable * structure; r > rawBest {
-			rawBest = r
+	if pt&WORD != 0 {
+		wordStructure := 1.0
+		if pt&CHAINED_OPERATIONS != 0 {
+			wordStructure = 1.0 + StructurePerExtraOp*float64(MaxWordChainLen-1)
 		}
-	}
-	if pt&MISSING_NUMBER != 0 {
-		if r := magnitude * opWeight * concept * (structure + StructureMissing); r > rawBest {
+		if r := branchBest(concept*ConceptWord, wordStructure); r > rawBest {
 			rawBest = r
 		}
 	}
 	return CompressRaw(rawBest)
+}
+
+// magnitudeTerm is the magnitude factor of the formula. One definition for
+// the score, the ceiling, and the floor: a curve retune cannot move one and
+// miss the others.
+func magnitudeTerm(maxMagnitude float64) float64 {
+	return math.Log10(maxMagnitude+1) + 0.3
+}
+
+// coreOpWeights maps each core-op bit to its formula weight (ADDITION is the
+// 1.0 baseline). The ceiling folds it with max, the floor with min, so a new
+// core op cannot be priced into one bound and forgotten in the other.
+var coreOpWeights = []struct {
+	bit    ProblemType
+	weight float64
+}{
+	{SUBTRACTION, WeightSub},
+	{MULTIPLICATION, WeightMul},
+	{DIVISION, WeightDiv},
+}
+
+// MinConstructibleOperand is the largest operand in the EASIEST problem the
+// generators emit for any single operation (e.g. division bottoms out at
+// "2 ÷ 1", multiplication at "2 × 2" - never a degenerate 1-operand form).
+// Not a formula constant: a calibrated observation of the generator's
+// smallest output, feeding MinDiffForBitmap's magnitude term.
+const MinConstructibleOperand = 2
+
+// MinDiffForBitmap returns the difficulty floor for a settings bitmap: the
+// difficulty of the EASIEST problem that can be constructed under the enabled
+// bits. Symmetric twin of MaxDiffForBitmap, for the same reason in the other
+// direction: without a floor, target_difficulty can sit below the easiest
+// problem a high-weight envelope builds (division-only bottoms out at ~7),
+// aiming the selection window at a band that is empty by construction -
+// every serve then falls through to the synchronous fallback forever.
+//
+// Every non-op bit is permissive (MAY, not MUST), so the easiest problem uses
+// no concept and no structure: the floor is the MINIMUM enabled op-weight at
+// the smallest constructible magnitude.
+func MinDiffForBitmap(bitmap uint64) float64 {
+	pt := ProblemType(bitmap)
+
+	opWeight := math.Inf(1)
+	if pt&ADDITION != 0 {
+		opWeight = 1.0
+	}
+	for _, op := range coreOpWeights {
+		if pt&op.bit != 0 {
+			opWeight = min(opWeight, op.weight)
+		}
+	}
+	if math.IsInf(opWeight, 1) {
+		opWeight = 1.0 // no core op: invalid envelope, degrade to the add baseline
+	}
+	return CompressRaw(magnitudeTerm(MinConstructibleOperand) * opWeight)
+}
+
+// TargetDifficultyRange returns the [lo, hi] band target_difficulty may
+// occupy for an envelope: lo = max(MinTargetDifficulty, MinDiffForBitmap),
+// hi = MaxDiffForBitmap. The single source of truth for every clamp and
+// validation site (the adjuster, SET_TARGET_DIFFICULTY, the settings-save
+// clamp, and the UI slider mirror).
+func TargetDifficultyRange(bitmap uint64) (lo, hi float64) {
+	lo = max(MinTargetDifficulty, MinDiffForBitmap(bitmap))
+	hi = MaxDiffForBitmap(bitmap)
+	if lo > hi {
+		lo = hi // degenerate envelope: collapse to the ceiling, never invert
+	}
+	return lo, hi
+}
+
+// ClampTargetDifficulty clamps target into TargetDifficultyRange(bitmap).
+func ClampTargetDifficulty(bitmap uint64, target float64) float64 {
+	lo, hi := TargetDifficultyRange(bitmap)
+	return min(max(target, lo), hi)
 }
 
 // TargetForBucket is the difficulty a generator is actually asked for in a
@@ -607,11 +704,4 @@ func TargetForBucket(bitmap uint64, bucket int) float64 {
 		return ceil
 	}
 	return float64(bucket)
-}
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

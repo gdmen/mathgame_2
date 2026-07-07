@@ -401,3 +401,37 @@ func concKey(bm mathcore.ProblemType, bits []mathcore.ProblemType) string {
 	}
 	return s
 }
+
+// TestBuildWordSkeletonRaw: word skeletons obey the narratability policy -
+// operator count capped at mathcore.MaxWordChainLen and no PEMDAS-firing
+// shape (a story dictates its own operation order), even when the envelope
+// enables CHAINED and PEMDAS. Sampled across raw budgets up to the envelope
+// ceiling.
+func TestBuildWordSkeletonRaw(t *testing.T) {
+	rng := rand.New(rand.NewSource(20260705))
+	env := mathcore.ADDITION | mathcore.SUBTRACTION | mathcore.MULTIPLICATION |
+		mathcore.DIVISION | mathcore.NEGATIVES | mathcore.MEDIUM_NUMBERS |
+		mathcore.CHAINED_OPERATIONS | mathcore.PEMDAS
+
+	for i := 0; i < 200; i++ {
+		rawTarget := 0.5 + rng.Float64()*mathcore.RawForDifficulty(mathcore.MaxDiffForBitmap(uint64(env)))
+		expr, ans, err := BuildWordSkeletonRaw(env, rawTarget, rng)
+		if err != nil {
+			t.Fatalf("BuildWordSkeletonRaw error: %v", err)
+		}
+		adm := mathcore.AdmitExpression(expr)
+		if adm.RejectStage != "" {
+			t.Fatalf("skeleton rejected (%s): %q", adm.RejectStage, expr)
+		}
+		if mathcore.VerifyAnswerSymbolic(adm.Tokens, ans) != nil {
+			t.Fatalf("skeleton answer wrong: %q = %q", expr, ans)
+		}
+		if adm.Bitmap&uint64(mathcore.PEMDAS) != 0 {
+			t.Errorf("skeleton fires PEMDAS: %q", expr)
+		}
+		// The formula's own operator count - the definition the ceiling prices.
+		if ops := mathcore.ComputeDifficultyBreakdownFor(adm.Expr, "").NumOps; ops > mathcore.MaxWordChainLen {
+			t.Errorf("skeleton chain %d exceeds MaxWordChainLen %d: %q", ops, mathcore.MaxWordChainLen, expr)
+		}
+	}
+}

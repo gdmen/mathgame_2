@@ -61,6 +61,14 @@ test: build-api test-api
 test-api: server/api
 	$(GOTEST) ./$^
 
+# Regenerate the Go<->JS difficulty-band parity fixtures
+# (web/src/difficulty_band_fixtures.json). Run after any change to the
+# difficulty ceiling/floor formulas; TestDifficultyBandFixturesSync fails
+# until the fixtures match the Go formula, and the JS mirror test consumes
+# the same file.
+gen-difficulty-fixtures:
+	$(GOCMD) run ./cmd/gen_difficulty_fixtures
+
 # Registry-driven documentation checks (see scripts/docs_check.py and the
 # Project Areas registry in README.md). No args = integrity only; pass
 # BASE=<ref> (e.g. origin/master) to also enforce that an area's doc is

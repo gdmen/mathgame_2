@@ -56,7 +56,7 @@ func TestBuilderRendersFaithfully(t *testing.T) {
 		ceil := mathcore.MaxDiffForBitmap(uint64(bm))
 		for target := 3.0; target <= ceil; target += 1.0 {
 			for k := 0; k < 6; k++ {
-				ctx := planConfig(bm, mathcore.RawForDifficulty(target), rng)
+				ctx := planConfig(bm, mathcore.RawForDifficulty(target), mathcore.MaxChainLen, rng)
 				node, unknown, ok := buildOne(ctx)
 				if !ok || unknown != nil {
 					continue // equations carry an unbound ?/var; treeEval can't fold them

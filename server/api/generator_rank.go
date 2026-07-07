@@ -9,4 +9,5 @@ package api
 var generatorRank = map[string]int{
 	"heuristic_2.0": 1,
 	"llm_0.6":       2,
+	"llm_0.7":       3,
 }

@@ -12,8 +12,10 @@ them.
 
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
-difficulty_version: 0.3
+difficulty_version: 0.4
 max_chain_len: 5
+max_word_chain_len: 3
+min_constructible_operand: 2
 large_max_operand: 9999
 valid_bitmap_count: 12960
 bits: addition, subtraction, multiplication, division, fractions, negatives, word, medium_numbers, large_numbers, chained_operations, missing_number, mismatched_denominators, decimals, pemdas, single_variable, percentages
@@ -66,7 +68,7 @@ concern. Users compose their envelope directly.
 | `CHAINED_OPERATIONS` | numOps ≥ 2 (`=` does not count); on WORD problems, validator-observed (multi-step prose), and OR'd in by the stamp-time invariant whenever ≥2 core-op bits or PEMDAS are set | structure `+StructurePerExtraOp` per op beyond the first |
 | `MISSING_NUMBER` | a single `?` outside `\text{}` | structure `+StructureMissing` |
 | `DECIMALS` | symbolic decimal token | `ConceptDecimals` |
-| `PEMDAS` | the dual-evaluation rule (below) | `ConceptPEMDAS` |
+| `PEMDAS` | the dual-evaluation rule (below); never on WORD problems (suppressed in scoring AND dropped from the stamp — see "Word problems") | `ConceptPEMDAS` |
 | `SINGLE_VARIABLE` | variable letter with a coefficient (`3x`) or multiple occurrences (`x + x`); on WORD problems, validator-observed (pure-prose algebra) | `ConceptVariable` |
 | `PERCENTAGES` | symbolic `n%` token (evaluates as n/100) | `ConceptPercent` |
 
@@ -147,6 +149,13 @@ and the backfill run the same stages:
                   continues a word ("14 b\text{ooks") is broken prose ->
                   reject, never a variable (it would corrupt as "?ooks").
 [1.5] REWRITE     lone bare variable -> ? (also applied to the explanation)
+[1.6] REDUCE      labeled direct computation collapses to the bare form:
+                  an unknown ALONE on one side of '=' with no unknown on the
+                  other ("? = 100 - 25", "100 - 25 = ?") is an answer label,
+                  not a solve-for-the-blank -> stored as "100 - 25", no
+                  MISSING_NUMBER stamp, no missing structure bump. A genuine
+                  operand unknown ("? + 10 = 30") is kept. Symbolic-only
+                  (prose-carrying expressions pass through).
 [2]   DETECT      DetectProblemTypeBitmap from the parsed features
 [2.5] REJECT      unknown rules (>1 distinct unknown, multi-?)
 [3]   VALIDATE    local-first (below)
@@ -240,7 +249,7 @@ as disagreement; a correct-side error is malformed and never fires. Unknowns
 are bound to fixed rational probes (`pemdasProbes`) — the formula stays a pure
 function of the expression because the recompute fast-path depends on that.
 
-## Difficulty formula (v0.3) and ceiling
+## Difficulty formula (v0.4) and ceiling
 
 `ComputeProblemDifficulty(expression, symbolic_expression)`
 (server/mathcore/difficulty.go); the version string is `DifficultyVersion`
@@ -250,7 +259,9 @@ function of the expression because the recompute fast-path depends on that.
 ```
 magnitude = log10(maxMagnitude + 1) + 0.3      (digit-based for decimals)
 opWeight  = max over present ops (table above)
-concept   = product of enabled concept multipliers (table above)
+concept   = product of enabled concept multipliers (table above);
+            PEMDAS is SUPPRESSED on word problems (v0.4 - a story solver
+            takes operation order from the narrative, not from notation)
 structure = 1 + 0.15*(numOps - 1), +0.2 if missing-number
 raw       = magnitude * opWeight * concept * structure
 scaled    = 1 + 19 * (ln(raw+1) - ln(1.5)) / (ln(16) - ln(1.5))
@@ -272,7 +283,7 @@ calibration page without affecting scoring.
 Changing the formula in ANY way requires bumping `DifficultyVersion` and
 running `recompute_problem_difficulty` on deploy.
 
-**Word problems (v0.3):** a word problem's `expression` is prose inside
+**Word problems (v0.4):** a word problem's `expression` is prose inside
 `\text{...}`, so its operators are invisible to the token-level
 `opWeight`/`structure` (the prose rule). It instead carries a
 `symbolic_expression` — the bare computation it asks for (e.g. `9999 ÷ 3 ÷ 3`)
@@ -281,11 +292,30 @@ its symbolic twin plus the word bonus, not as addition. The word bonus is keyed
 on word-ness, not on `symbolic_expression` being present:
 `ComputeDifficultyBreakdownFor` scores the `symbolic_expression` when it is set
 but applies `forceWord` iff the `expression` carries a `\text{}` block. A word
-problem's `symbolic_expression` is never shown to the student: for `llm_0.6` it
-IS the heuristic skeleton the prose was narrated from (scored before narration),
-and the WORD validator confirms the prose poses it. A legacy word problem with no
-`symbolic_expression` falls back to scoring its prose (`llm_0.5` and earlier; see
+problem's `symbolic_expression` is never shown to the student: for skeleton
+narration (`llm_0.6`+) it IS the heuristic skeleton the prose was narrated from
+(scored before narration), and the WORD validator confirms the prose poses it.
+A legacy word problem with no `symbolic_expression` falls back to scoring its
+prose (`llm_0.5` and earlier; see
 [generator-versions.md](generator-versions.md)).
+
+Two v0.4 word rules keep scoring, stamping, and generation aligned:
+
+- **PEMDAS never applies to a word problem.** Operator-precedence parsing is
+  a written-notation skill; a story solver takes the operation order from the
+  narrative. Scoring suppresses `ConceptPEMDAS` when the word concept applies
+  (`computeBreakdown`), the stamp drops the PEMDAS bit from the skeleton's
+  bits (`WordFormBitmap`, stamping.go — used by the insert path AND the
+  restamp tool, so serving-eligibility matches the score), and word skeletons
+  are built from a PEMDAS-stripped envelope so no budget is wasted on a
+  multiplier the word problem never earns.
+- **Word skeleton chains cap at `MaxWordChainLen` (3 operators).** Deeply
+  nested chains have no faithful natural-language story — the WORD
+  validator's form check rejects the narration attempts (fail closed) — so
+  word problems have a NARRATABLE ceiling below the symbolic one. The
+  heuristic's word entry point (`BuildWordSkeletonRaw`) enforces the cap and
+  `MaxDiffForBitmap`'s word branch prices it (below), keeping the advertised
+  ceiling inside the narratable band. Non-word chains keep `MaxChainLen`.
 
 `symbolic_expression` is not word-only. `heuristic_2.0` stores its canonical
 grammar form (`58/3 ÷ 8`) there and puts a display skin (`\frac`, `\div`) in
@@ -298,16 +328,43 @@ the enabled bits can express. WHY IT EXISTS: adaptive difficulty ratchets
 `target_difficulty` upward on success; without the ceiling the target drifts
 above anything the envelope can produce — into a band that is empty BY
 CONSTRUCTION — and selection's ±1.5 window never matches again (permanent
-fallback churn). Wired at: the `process_events.go` adjuster, the
-SET_TARGET_DIFFICULTY validation, the settings-PUT clamp, and the UI slider
-max (`web/src/bitmap_validation.js` mirrors it for display only — the server
-is authoritative). **Either/or rule:** MISSING_NUMBER and SINGLE_VARIABLE are
-per-problem mutually exclusive, so the ceiling computes both branches and
-takes the higher — multiplying both in would claim an unreachable ceiling and
-recreate the exact drift the ceiling prevents.
+fallback churn). **Either/or rules** — when two features can't appear in the
+same problem, the ceiling computes each branch and takes the higher, never
+multiplying exclusives together (that would claim an unreachable ceiling and
+recreate the exact drift the ceiling prevents):
+
+- MISSING_NUMBER and SINGLE_VARIABLE are per-problem mutually exclusive (the
+  unknown rules).
+- Word and non-word bands price differently (v0.4): the word branch earns
+  `ConceptWord` but caps chain structure at `MaxWordChainLen` and never earns
+  `ConceptPEMDAS`; the non-word branch keeps the full `MaxChainLen` chain and
+  PEMDAS with no word concept.
+
+**The floor, `MinDiffForBitmap`** — the symmetric twin (v0.4): the difficulty
+of the EASIEST problem the enabled bits can construct. A high-weight envelope
+(division-only ≈ 7, multiplication-only ≈ 5.7) bottoms out well above the
+global `MinTargetDifficulty`; a target below the floor aims the window at a
+band that is empty by construction in the other direction (every serve falls
+to the synchronous fallback, and pool inserts never land in-window). Every
+non-op bit is permissive (MAY, not MUST), so the floor is the minimum enabled
+op-weight at the smallest constructible magnitude
+(`MinConstructibleOperand = 2`, a calibrated observation of the generators'
+easiest output — `2 ÷ 1`, `2 × 2` — not a formula constant).
+
+**`TargetDifficultyRange` / `ClampTargetDifficulty`** are the single source
+of truth for the band `target_difficulty` may occupy:
+`[max(MinTargetDifficulty, MinDiffForBitmap), MaxDiffForBitmap]`. Wired at:
+the `process_events.go` adjuster (step bounds AND the defensive out-of-band
+repair clamp at entry), the SET_TARGET_DIFFICULTY validation, the
+settings-PUT clamp, and the UI slider range (`web/src/bitmap_validation.js`
+mirrors the band for display only — the server is authoritative; the
+Go↔JS lockstep is pinned by the generated
+`web/src/difficulty_band_fixtures.json`, see
+[settings.md](settings.md)).
 
 Shared shape constants (generator mapping AND ceiling, lockstep, pinned by the
-anchors): `MaxChainLen`, `LargeMaxOperand` (difficulty.go). `MinTargetDifficulty`
+anchors): `MaxChainLen`, `MaxWordChainLen`, `MinConstructibleOperand`,
+`LargeMaxOperand` (difficulty.go). `MinTargetDifficulty`
 floors the selectable target so it never aims below the band the default
 envelope populates (mirrored as `MIN_TARGET_DIFFICULTY` in
 `web/src/bitmap_validation.js`).
@@ -345,14 +402,18 @@ are the generation-relevant surface.)
   [generator-versions.md](generator-versions.md). It is the sole source for
   non-WORD problems AND the **skeleton source** for WORD problems (below).
 - **WORD generation** (`server/api/generate_problems.go` `runWordGenerator`,
-  generator `llm_0.6`): the heuristic builds a scored symbolic **skeleton** aimed
-  at `CompressRaw(RawForDifficulty(target) / ConceptWord)` — the lower target that
+  generator `llm_0.7`): the heuristic builds a scored symbolic **skeleton**
+  (`BuildWordSkeletonRaw`) aimed
+  at `RawForDifficulty(target) / ConceptWord` — the lower budget that
   lands the narrated word problem near `target` once the word concept multiplies
-  it back up — then the LLM (`llm_generator.NarrateProblems`, one batched call,
+  it back up — under the word narratability policy (chains capped at
+  `MaxWordChainLen`, PEMDAS-stripped envelope; see "Word problems" above) —
+  then the LLM (`llm_generator.NarrateProblems`, one batched call,
   `MAX_QUANTITY = 20`) is asked ONLY to dress each skeleton in prose that poses
   that exact computation: no new numbers, no changed operation. Stored:
   `expression` = the prose, `symbolic_expression` = the skeleton, `answer` = the
-  skeleton's answer; difficulty is skeleton × word by construction. The heuristic
+  skeleton's answer, bits = `WordFormBitmap(skeleton bits)`; difficulty is
+  skeleton × word by construction. The heuristic
   owns the math; the LLM never authors it.
 - **WORD validator** (`llm_generator.ValidateWordProblem`): one LLM round-trip
   on the stronger model (GPT5, the independent check on the cheaper narrator),
@@ -369,11 +430,16 @@ Single server, single DB. Deploy order matters:
 1. Stop the server; deploy the new binary (not serving).
 2. Migrations run on startup — but run the backfills BEFORE starting:
 3. `recompute_problem_type_bitmap` — restamps every row via the admission
-   pipeline. SET semantics (re-runnable). WORD rows keep their legacy topic
-   bits OR'd in. Lone-letter rows get the `?` splice in expression +
-   explanation (+ answer), listed for spot-checking. Reports: lexer token
-   census (out-of-alphabet rows), zero-bitmap review list, unknown-rule
-   review list. Run with `-dry-run` first and read the census.
+   pipeline. SET semantics (re-runnable). WORD rows with a
+   `symbolic_expression` restamp from the SKELETON via `WordFormBitmap`
+   (identical to the insert path), and the admitted skeleton is written back
+   to `symbolic_expression` so the difficulty tool scores the same text the
+   bits were stamped from (a labeled-unknown skeleton collapses in both
+   places); skeleton-less legacy WORD rows keep their legacy topic bits OR'd
+   in. Lone-letter rows get the `?` splice in expression + explanation
+   (+ answer), listed for spot-checking. Reports: lexer token census
+   (out-of-alphabet rows), zero-bitmap review list, unknown-rule review list,
+   skeleton-reject review list. Run with `-dry-run` first and read the census.
 4. `recompute_problem_difficulty` — restamps difficulty (the version bump
    forces every row). MUST run after the bitmap tool (the rewrite mutates
    expressions).
@@ -409,8 +475,8 @@ forbidden until deliberately added.
 - `server/mathcore/problem_type.go` — `ProblemType` bits, `problemTypeNames`, `ALL_PROBLEM_TYPES`
 - `server/mathcore/expression.go` — `NormalizeExpression`, `LexExpression`, `RewriteLoneVariable`, `CountDistinctUnknowns`, `lexNumber`
 - `server/mathcore/evaluator.go` — `EvalTokens`, `EvalTokensNaiveLTR`, `requiresPEMDAS`, `pemdasProbes`
-- `server/mathcore/stamping.go` — `AdmitExpression`, `DetectProblemTypeBitmap`, `NormalizeProblemBitmap`, `VerifyAnswerSymbolic`, `EnvelopeViolation`
-- `server/mathcore/difficulty.go` — `ComputeProblemDifficulty`, `ComputeDifficultyBreakdownFor`, `computeBreakdown`, `compressRaw`, `MaxDiffForBitmap`, the `Concept*`/`Weight*`/`Structure*` constants, `DifficultyVersion`, `MaxChainLen`, `LargeMaxOperand`, `SmallMaxOperand`, `MediumMaxOperand`
+- `server/mathcore/stamping.go` — `AdmitExpression`, `reduceLabeledUnknown`, `DetectProblemTypeBitmap`, `NormalizeProblemBitmap`, `WordFormBitmap`, `VerifyAnswerSymbolic`, `EnvelopeViolation`
+- `server/mathcore/difficulty.go` — `ComputeProblemDifficulty`, `ComputeDifficultyBreakdownFor`, `computeBreakdown`, `compressRaw`, `MaxDiffForBitmap`, `MinDiffForBitmap`, `TargetDifficultyRange`, `ClampTargetDifficulty`, the `Concept*`/`Weight*`/`Structure*` constants, `DifficultyVersion`, `MaxChainLen`, `MaxWordChainLen`, `MinConstructibleOperand`, `LargeMaxOperand`, `SmallMaxOperand`, `MediumMaxOperand`
 - `server/mathcore/answer_compare.go` — `AnswersEquivalent`
 - `server/api/generation_funnel.go` — `generationFunnel`, `VerifyAnswer`, `RewriteLetterInProse` (api-side admission bookkeeping)
 - `server/generator` — `heuristic_2.0`: `BuildProblem`, the knob inverter, the compositional `expand` recursion

@@ -89,11 +89,23 @@ func BuildProblem(bitmap mathcore.ProblemType, target float64, rng *rand.Rand) (
 }
 
 // BuildProblemRaw is BuildProblem aimed at a RAW difficulty budget rather than a
-// scaled target. The WORD flow uses it to build a skeleton at
-// RawForDifficulty(target)/ConceptWord — the lower budget that lands the narrated
-// word problem near target once the word concept multiplies it back — with no
-// scaled->raw->scaled round-trip through the log curve.
+// scaled target, with no scaled->raw->scaled round-trip through the log curve.
 func BuildProblemRaw(bitmap mathcore.ProblemType, rawTarget float64, rng *rand.Rand) (string, string, error) {
+	return buildRaw(bitmap, rawTarget, mathcore.MaxChainLen, rng)
+}
+
+// BuildWordSkeletonRaw builds a WORD-problem skeleton at a raw budget
+// (RawForDifficulty(target)/ConceptWord — the lower budget that lands the
+// narrated word problem near target once the word concept multiplies it back).
+// Word skeletons build within the word rules of docs/problem-generation.md:
+// chains capped at mathcore.MaxWordChainLen, no PEMDAS shapes (word scoring
+// suppresses the multiplier, so a PEMDAS skeleton would waste its budget on
+// a factor the word problem never earns).
+func BuildWordSkeletonRaw(bitmap mathcore.ProblemType, rawTarget float64, rng *rand.Rand) (string, string, error) {
+	return buildRaw(bitmap&^mathcore.PEMDAS, rawTarget, mathcore.MaxWordChainLen, rng)
+}
+
+func buildRaw(bitmap mathcore.ProblemType, rawTarget float64, chainCap int, rng *rand.Rand) (string, string, error) {
 	if coreOpsMask(bitmap) == 0 {
 		return "", "", &OptionsError{s: "no core operation enabled in bitmap"}
 	}
@@ -104,7 +116,7 @@ func BuildProblemRaw(bitmap mathcore.ProblemType, rawTarget float64, rng *rand.R
 	bestErr := math.MaxFloat64
 
 	for attempt := 0; attempt < buildAttempts; attempt++ {
-		ctx := planConfig(bitmap, rawTarget, rng)
+		ctx := planConfig(bitmap, rawTarget, chainCap, rng)
 		node, unknown, ok := buildOne(ctx)
 		if !ok {
 			continue
@@ -112,6 +124,16 @@ func BuildProblemRaw(bitmap mathcore.ProblemType, rawTarget float64, rng *rand.R
 		expr := mathcore.Render(node)
 		adm := mathcore.AdmitExpression(expr)
 		if adm.RejectStage != "" {
+			continue
+		}
+		// Hard chain cap: ctx.depth is a growth budget, not an operator count -
+		// splits can emit more operators than depth. The ceiling formula prices
+		// structure at exactly chainCap operators, so a candidate beyond it
+		// would score above the envelope's advertised ceiling. NumOps comes
+		// from the same breakdown that scores the candidate below, so the cap
+		// and the score can never disagree about what counts as an operator.
+		bd := mathcore.ComputeDifficultyBreakdownFor(adm.Expr, "")
+		if bd.NumOps > chainCap {
 			continue
 		}
 		// Answer: the unknown's value for an equation, else the value of the
@@ -147,8 +169,7 @@ func BuildProblemRaw(bitmap mathcore.ProblemType, rawTarget float64, rng *rand.R
 		if mathcore.EnvelopeViolation(bm, uint64(bitmap)) != "" {
 			continue
 		}
-		d := mathcore.ComputeProblemDifficulty(adm.Expr, "")
-		if e := math.Abs(d - target); e < bestErr {
+		if e := math.Abs(bd.Scaled - target); e < bestErr {
 			bestErr, bestExpr, bestAns = e, adm.Expr, ans
 			if e <= targetWindow {
 				return adm.Expr, ans, nil
@@ -169,7 +190,7 @@ func BuildProblemRaw(bitmap mathcore.ProblemType, rawTarget float64, rng *rand.R
 // and chain can supply. The randomized magnitude assumption spreads attempts
 // across the magnitude/concept tradeoff so generate-and-select can keep the
 // closest. Binds to the shared mathcore constants — no private copies.
-func planConfig(bitmap mathcore.ProblemType, rawTarget float64, rng *rand.Rand) buildCtx {
+func planConfig(bitmap mathcore.ProblemType, rawTarget float64, chainCap int, rng *rand.Rand) buildCtx {
 	ctx := buildCtx{bitmap: bitmap, rng: rng, rawTarget: rawTarget, maxOperand: bracketCap(bitmap)}
 
 	// Op weight available in this envelope (the hardest core op).
@@ -184,12 +205,13 @@ func planConfig(bitmap mathcore.ProblemType, rawTarget float64, rng *rand.Rand) 
 		opW = math.Max(opW, mathcore.WeightDiv)
 	}
 
-	// Structure budget: a chain length (operator count) up to the ceiling's
-	// MaxChainLen when CHAINED is enabled, biased shorter for magnitude-capable
-	// envelopes so big operands carry difficulty rather than long chains.
+	// Structure budget: a chain length (operator count) up to the caller's
+	// chainCap (the ceiling's MaxChainLen; MaxWordChainLen for word skeletons)
+	// when CHAINED is enabled, biased shorter for magnitude-capable envelopes
+	// so big operands carry difficulty rather than long chains.
 	maxChain := 1
 	if bitmap&mathcore.CHAINED_OPERATIONS != 0 {
-		maxChain = mathcore.MaxChainLen
+		maxChain = chainCap
 	}
 	depth := 1 + rng.Intn(maxChain)
 	if bitmap&(mathcore.MEDIUM_NUMBERS|mathcore.LARGE_NUMBERS) != 0 && rng.Intn(2) == 0 {
