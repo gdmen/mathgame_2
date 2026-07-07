@@ -10,9 +10,13 @@
 // Semantics:
 //   - SET, not OR: the detected bitmap REPLACES the stored one, so re-runs
 //     are stable and legacy false-positive bits don't survive forever.
-//   - WORD rows keep their existing topic bits OR'd onto the detected shape
-//     bits: the parser can't see topics inside prose (llm_0.6 stamps them
-//     from the symbolic skeleton at generation time).
+//   - WORD rows with a symbolic_expression restamp from the SKELETON via
+//     WordFormBitmap - identical to the insert path, so a recompute can never
+//     diverge from what generation would stamp today (skeleton-derived bits
+//     like CHAINED/MISSING survive; PEMDAS is dropped in lockstep with word
+//     scoring). WORD rows without a skeleton (pre-skeleton legacy) keep their
+//     existing topic bits OR'd onto the detected shape bits: the parser can't
+//     see topics inside prose.
 //   - Lone-letter rewrite: a single bare variable becomes '?'
 //     (12 - x = 5 -> 12 - ? = 5) in the expression - the first time this
 //     tool mutates expression text. The same standalone-letter substitution
@@ -71,7 +75,7 @@ func main() {
 	}
 	defer db.Close()
 
-	query := `SELECT id, expression, answer, explanation, problem_type_bitmap FROM problems ORDER BY id`
+	query := `SELECT id, expression, COALESCE(symbolic_expression, ''), answer, explanation, problem_type_bitmap FROM problems ORDER BY id`
 	if *limit > 0 {
 		query = fmt.Sprintf("%s LIMIT %d", query, *limit)
 	}
@@ -83,6 +87,7 @@ func main() {
 	type rec struct {
 		id          uint32
 		expr        string
+		symbolic    string
 		answer      string
 		explanation string
 		oldBitmap   uint64
@@ -90,7 +95,7 @@ func main() {
 	var recs []rec
 	for rows.Next() {
 		var r rec
-		if err := rows.Scan(&r.id, &r.expr, &r.answer, &r.explanation, &r.oldBitmap); err != nil {
+		if err := rows.Scan(&r.id, &r.expr, &r.symbolic, &r.answer, &r.explanation, &r.oldBitmap); err != nil {
 			glog.Errorf("scan: %v", err)
 			continue
 		}
@@ -104,8 +109,10 @@ func main() {
 	var (
 		total, updated, unchanged, rewritten        int
 		lexFailed, zeroBitmap, unknownRuleViolation int
+		skeletonRejects                             int
 		tokenCensus                                 = map[string]int{}
 		zeroRows, rewriteRows, lexRows, unknownRows []uint32
+		skeletonRejectRows                          []uint32
 	)
 
 	// Print progress every progressStep rows so a multi-minute run isn't silent.
@@ -120,6 +127,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "  %d/%d (%.1f%%)\n", total, len(recs), 100*float64(total)/float64(len(recs)))
 		}
 		newExpr := r.expr
+		newSymbolic := r.symbolic
 		newAnswer := r.answer
 		newExplanation := r.explanation
 
@@ -152,8 +160,26 @@ func main() {
 			newBitmap = mathcore.DetectProblemTypeBitmap(r.expr)
 		}
 
-		if newBitmap&uint64(mathcore.WORD) != 0 {
-			// Preserve legacy self-reported topic bits on WORD rows.
+		if newBitmap&uint64(mathcore.WORD) != 0 && r.symbolic != "" {
+			if admSym := mathcore.AdmitExpression(r.symbolic); admSym.RejectStage == "" {
+				// Skeleton-carrying WORD row: the skeleton owns the bits,
+				// exactly as at insert (runWordGenerator). The admitted form
+				// is written back so the difficulty tool (which runs next and
+				// scores the stored symbolic_expression) sees the same text
+				// the bits were stamped from - e.g. a labeled-unknown
+				// skeleton collapses in both places, not just here.
+				newBitmap = mathcore.WordFormBitmap(admSym.Bitmap)
+				newSymbolic = admSym.Expr
+			} else {
+				// Unparseable skeleton: preserve the self-reported topic
+				// bits and surface the row for review.
+				skeletonRejects++
+				skeletonRejectRows = append(skeletonRejectRows, r.id)
+				newBitmap |= r.oldBitmap & legacyTopicMask
+			}
+		} else if newBitmap&uint64(mathcore.WORD) != 0 {
+			// Pre-skeleton legacy WORD row: preserve the self-reported
+			// topic bits (the parser can't see topics inside prose).
 			newBitmap |= r.oldBitmap & legacyTopicMask
 		}
 		// Legacy topic bits can carry 2 core ops without chained (etc.);
@@ -164,7 +190,7 @@ func main() {
 			zeroRows = append(zeroRows, r.id)
 		}
 
-		if newBitmap == r.oldBitmap && newExpr == r.expr && newAnswer == r.answer && newExplanation == r.explanation {
+		if newBitmap == r.oldBitmap && newExpr == r.expr && newSymbolic == r.symbolic && newAnswer == r.answer && newExplanation == r.explanation {
 			unchanged++
 			continue
 		}
@@ -173,11 +199,14 @@ func main() {
 			if newExpr != r.expr {
 				fmt.Printf("DRY id=%d expr %q -> %q bitmap %d -> %d\n", r.id, r.expr, newExpr, r.oldBitmap, newBitmap)
 			}
+			if newSymbolic != r.symbolic {
+				fmt.Printf("DRY id=%d symbolic %q -> %q\n", r.id, r.symbolic, newSymbolic)
+			}
 			continue
 		}
 		if _, err := db.Exec(
-			`UPDATE problems SET expression = ?, answer = ?, explanation = ?, problem_type_bitmap = ? WHERE id = ?`,
-			newExpr, newAnswer, newExplanation, newBitmap, r.id,
+			`UPDATE problems SET expression = ?, symbolic_expression = ?, answer = ?, explanation = ?, problem_type_bitmap = ? WHERE id = ?`,
+			newExpr, newSymbolic, newAnswer, newExplanation, newBitmap, r.id,
 		); err != nil {
 			glog.Errorf("update id=%d: %v", r.id, err)
 		}
@@ -193,6 +222,8 @@ func main() {
 	printIDList(zeroRows)
 	fmt.Printf("unknown-rule violations (REVIEW: multi-unknown legacy rows): %d rows", unknownRuleViolation)
 	printIDList(unknownRows)
+	fmt.Printf("WORD rows whose skeleton failed admission (REVIEW: kept legacy bits): %d rows", skeletonRejects)
+	printIDList(skeletonRejectRows)
 
 	fmt.Printf("\nlexer token census (offending token -> row count):\n")
 	type kv struct {

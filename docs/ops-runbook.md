@@ -232,9 +232,16 @@ Every DB tool takes `-config` (default `conf.json`) and connects with the
 
 | Tool | Flags | Purpose |
 |---|---|---|
-| `recompute_problem_type_bitmap` | `-dry-run`, `-limit` | restamps `problem_type_bitmap` via the admission pipeline; SET (re-runnable); applies the lone-letter `?` rewrite; prints lexer/zero-bitmap/unknown-rule reports. Run **before** the difficulty tool. |
+| `recompute_problem_type_bitmap` | `-dry-run`, `-limit` | restamps `problem_type_bitmap` via the admission pipeline; SET (re-runnable); WORD rows with a `symbolic_expression` restamp from the skeleton (`WordFormBitmap`, matching the insert path); applies the lone-letter `?` rewrite; prints lexer/zero-bitmap/unknown-rule/skeleton-reject reports. Run **before** the difficulty tool. |
 | `recompute_problem_difficulty` | `-dry-run`, `-limit` | restamps the `difficulty` column from `ComputeProblemDifficulty`; idempotent; skips rows already at `DifficultyVersion`. Run **after** the bitmap tool. |
 | `migrate_division_notation` | `-dry-run`, `-limit` | one-time obelus cutover: rewrites legacy spaced-slash division (` / ` → ` ÷ `) in non-WORD `expression` and WORD `symbolic_expression`; re-run-safe; purely notational (no `recompute_*`, no `DifficultyVersion` bump). Run it during the `llm_0.6` deploy **before** the server serves or any `recompute_*` re-lexes a row (an un-migrated spaced slash would mis-lex as a fraction). |
+
+### Development codegen (not deploy tools)
+
+`make gen-difficulty-fixtures` regenerates the Go↔JS difficulty-band parity fixtures
+(`web/src/difficulty_band_fixtures.json`, via `cmd/gen_difficulty_fixtures`) after a
+ceiling/floor formula change; the fixture sync tests fail CI until it is run. Development-time
+only — nothing on the host runs it.
 
 ### Diagnostics
 

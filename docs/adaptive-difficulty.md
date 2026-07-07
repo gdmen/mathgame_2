@@ -20,12 +20,13 @@ problem_selection_epsilon: 1.5
 
 ## The model
 
-Two persisted levers move a kid through the band, bounded above by the envelope ceiling
+Two persisted levers move a kid through the band, bounded by the envelope band
+`TargetDifficultyRange` — floor `max(MinTargetDifficulty, MinDiffForBitmap)`, ceiling
 `MaxDiffForBitmap` (owned by problem-generation.md):
 
 | Lever | Stored in | Adjusted by | Bounds |
 |---|---|---|---|
-| `settings.target_difficulty` | `settings` | global work-load adjuster | `[MinTargetDifficulty, MaxDiffForBitmap]` |
+| `settings.target_difficulty` | `settings` | global work-load adjuster | `TargetDifficultyRange(bitmap)` |
 | `gamestate.target` (problems per session) | `gamestates` | global work-load adjuster | `[minProbs, maxTarget]` |
 
 The difficulty lever feeds **selection** (docs/selection.md): selection draws within
@@ -45,9 +46,9 @@ All defined as locals/consts at their use site; cite the enclosing symbol.
 | `minProbs` | 5 | `processEvent`, `DONE_WATCHING_VIDEO` | floor on problems-per-session |
 | `epsilon` | 0.05 | `processEvent`, `DONE_WATCHING_VIDEO` | work%-on-target deadband |
 | `diffIncrease` | 0.05 | `processEvent` | proportional step (× current diff) |
-| `minDiff` | 3.0 | `processEvent` | difficulty floor in the adjuster |
+| `minDiff`/`maxDiff` | per-bitmap | `processEvent` (from `TargetDifficultyRange`) | the adjuster's difficulty band |
 | `recentPast` | 900s (15 min) | `processEvent`, `DONE_WATCHING_VIDEO` | work% lookback window |
-| `MinTargetDifficulty` | 3.0 | `difficulty.go` const | floor on a user-set `target_difficulty` |
+| `MinTargetDifficulty` | 3.0 | `difficulty.go` const | global floor inside `TargetDifficultyRange` |
 | `problemSelectionEpsilon` | 1.5 | `generate_problems.go` const | selection window half-width |
 | `spacedRepIntervals` | `[1, 3, 7]` days | `spaced_repetition.go` var | review schedule |
 
@@ -68,13 +69,15 @@ work percentage (work / work+watch over the last `recentPast` of events) against
 
 It then resets `gamestate.Solved` and picks a new reward video.
 
-The adjuster ratchets `target_difficulty` upward on success, so it is clamped to the envelope
-ceiling at two points: a standalone repair clamp at entry (`processEvent`, the
-`TargetDifficulty > maxDiff` branch — persisted immediately and emitted as a `SET_TARGET_DIFFICULTY`
-audit event) and the per-step `newDiff > maxDiff` guard. Without the ceiling the target drifts above
-anything the envelope can produce — an empty band by construction — and the selection window never
-matches again, so every serve falls through to the synchronous fallback (permanent churn). See
-`MaxDiffForBitmap` in problem-generation.md.
+The adjuster moves `target_difficulty` in both directions, so it is clamped to the envelope band
+(`TargetDifficultyRange`) at two points: a standalone repair clamp at entry (`processEvent`, the
+`ClampTargetDifficulty` branch — catches both a runaway high value and a below-floor value from
+before the floor existed; persisted immediately and emitted as a `SET_TARGET_DIFFICULTY` audit
+event) and the per-step guards (`newDiff > maxDiff` cap; step-down floored at `minDiff`, the band
+floor). Outside the band the target sits where the envelope can produce nothing — an empty band by
+construction, in either direction (a division-only envelope builds nothing easier than ~7) — and
+the selection window never matches, so every serve falls through to the synchronous fallback
+(permanent churn). See `TargetDifficultyRange` in problem-generation.md.
 
 ## Spaced repetition (`spaced_repetition.go`)
 
@@ -109,17 +112,13 @@ a later admin review (a follow-up) promotes `reported` to `incorrect` or back to
 
 ## Invariants
 
-- **No difficulty lever exceeds the envelope ceiling.** Both `SET_TARGET_DIFFICULTY` validation
-  (`processEvent`) and the work-load adjuster clamp to `MaxDiffForBitmap`.
-- **No difficulty lever drops below its floor.** The adjuster floors at `minDiff = 3.0`; user-set
-  targets floor at `MinTargetDifficulty = 3.0` (`difficulty.go`).
+- **No difficulty lever leaves the envelope band.** `SET_TARGET_DIFFICULTY` validation
+  (`processEvent`), the work-load adjuster, and the settings-save clamp all bound through
+  `TargetDifficultyRange` — ceiling `MaxDiffForBitmap`, floor
+  `max(MinTargetDifficulty, MinDiffForBitmap)`.
 
 ## Gotchas / non-obvious behavior
 
-- **`SET_TARGET_DIFFICULTY` validation accepts the bitmap ceiling but its error text shows the
-  global floor.** The message bounds are `MinTargetDifficulty` and the bitmap-derived ceiling
-  (`processEvent`, the `SET_TARGET_DIFFICULTY` branch) — the lower bound shown is the global floor,
-  not a per-bitmap value.
 - **The adjuster only runs on `DONE_WATCHING_VIDEO`.** Difficulty does not move mid-session; it
   re-tunes once, at the reward boundary, over the last 15 minutes of work/watch events.
 

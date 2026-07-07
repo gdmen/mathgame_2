@@ -18,9 +18,11 @@ the ceiling formula are a **mirror** of the server-authoritative copies — see 
 ```
 min_target_difficulty: 3
 ceiling_max_chain_len: 5
+ceiling_max_word_chain_len: 3
 ceiling_large_max_operand: 9999
 ceiling_small_max_operand: 12
 ceiling_medium_max_operand: 99
+floor_min_constructible_operand: 2
 validation_error_codes: NO_CORE_OP, LARGE_REQUIRES_MEDIUM, MISMATCHED_REQUIRES_FRACTIONS, PEMDAS_REQUIRES_CHAINED
 ```
 <!-- END DOC-SYNC ANCHORS -->
@@ -102,38 +104,47 @@ Errors render inside the card they concern: `ERROR_GROUPS` maps each `code` to a
 `errorsFor` filters the error list per card. A new error code with no `ERROR_GROUPS` entry would be
 computed but never displayed. `errCallback` propagates `!valid` so the host screen can block save.
 
-## The target-difficulty slider — `maxDiffForBitmap`
+## The target-difficulty slider — `targetDifficultyRange`
 
-`TargetDifficultySettingsView` sizes the slider's range to the current bitmap's ceiling: `min =
-MIN_TARGET_DIFFICULTY`, `max = maxDiffForBitmap(bitmap)`. The slider re-renders as the bitmap changes
-(`onBitmapChange` lifts the bitmap to `SettingsView` state). The displayed value is clamped down to
-the ceiling (`shown`); the **server clamps authoritatively on save** — this client copy only sizes
-the UI.
+`TargetDifficultySettingsView` sizes the slider's range to the current bitmap's band:
+`{lo, hi} = targetDifficultyRange(bitmap)` — `lo = max(MIN_TARGET_DIFFICULTY,
+minDiffForBitmap(bitmap))`, `hi = maxDiffForBitmap(bitmap)`. The slider re-renders as the bitmap
+changes (`onBitmapChange` lifts the bitmap to `SettingsView` state). The displayed value is clamped
+into the band (`shown`); the **server clamps authoritatively on save** — this client copy only sizes
+the UI. A high-weight envelope (division-only, multiplication-only) floors above the global minimum:
+nothing easier is constructible there, so the slider's low end starts at what the envelope can
+actually build.
 
 Parents see an integer **percent (1–100)**, not the raw formula number (`percent`): the position of
-`shown` within `[MIN, ceiling]`. The raw difficulty numbers are formula internals.
+`shown` within `[lo, hi]`. The raw difficulty numbers are formula internals.
 
-`maxDiffForBitmap` is a line-by-line mirror of the server's `MaxDiffForBitmap`
-(`server/mathcore/difficulty.go`):
+`maxDiffForBitmap` / `minDiffForBitmap` are line-by-line mirrors of the server's
+`MaxDiffForBitmap` / `MinDiffForBitmap` (`server/mathcore/difficulty.go`):
 
 ```
 maxOperand = 12 | 99 (MEDIUM) | 9999 (LARGE)
 magnitude  = log10(maxOperand + 1) + 0.3
 opWeight   = max over enabled ops (SUB 1.1, MUL 2.2, DIV 2.8; base 1.0)
 concept    = product of enabled concept multipliers
-             (FRACTIONS 2.0, MISMATCHED 1.5, NEGATIVES 1.3, WORD 1.3,
-              PEMDAS 1.5, DECIMALS 2.0, PERCENTAGES 2.0)
-structure  = 1.0; if CHAINED: 1.0 + 0.15 * (MaxChainLen - 1)   // = 1.6
-best       = magnitude * opWeight * concept * structure
-  if SINGLE_VARIABLE: max(best, base * 5.0 * structure)   // either/or
-  if MISSING_NUMBER:  max(best, base-without-x5 * (structure + 0.2))
-ceiling    = compress(best)   // 1 + 19*(ln(best+1)-ln(1.5))/(ln(16)-ln(1.5)), floored at 1
+             (FRACTIONS 2.0, MISMATCHED 1.5, NEGATIVES 1.3,
+              DECIMALS 2.0, PERCENTAGES 2.0)
+branch(c, s):  best of c*s | SINGLE_VARIABLE: c*5.0*s | MISSING: c*(s+0.2)
+non-word:  branch(concept * [PEMDAS 1.5], 1.0 or 1.0+0.15*(MaxChainLen-1))
+word:      branch(concept * WORD 1.3,    1.0 or 1.0+0.15*(MaxWordChainLen-1))
+ceiling    = compress(max of the branches)
+           // compress: 1 + 19*(ln(x+1)-ln(1.5))/(ln(16)-ln(1.5)), floored at 1
+
+floor      = compress((log10(2 + 1) + 0.3) * MIN over enabled op weights)
+           // operand 2 = the easiest constructible problem; concepts and
+           // structure are all MAY bits, so the floor ignores them
 ```
 
-The **either/or rule** (problem-generation.md "The ceiling"): MISSING_NUMBER and SINGLE_VARIABLE are
-per-problem mutually exclusive, so the ceiling takes the higher of the two branches rather than
-multiplying both in. The multiplier constants themselves are owned by problem-generation.md and the
-server's difficulty tests; this doc cites them as the mirror but does not own them.
+The **either/or rules** (problem-generation.md "The ceiling"): MISSING_NUMBER and SINGLE_VARIABLE
+are per-problem mutually exclusive, and the word band prices differently from the non-word band
+(word concept but capped chain and no PEMDAS), so the ceiling takes the highest reachable branch
+rather than multiplying exclusives in. The multiplier constants themselves are owned by
+problem-generation.md and the server's difficulty tests; this doc cites them as the mirror but does
+not own them.
 
 ## Other settings (non-envelope)
 
@@ -153,10 +164,15 @@ completeness:
 1. **Server is authoritative.** Both client rules here are mirrors. The bitmap dependency rules also
    live in server validation, and `MaxDiffForBitmap` is the source of truth for the ceiling. API
    clients bypassing the UI degrade gracefully — the server clamps and re-validates on save.
-2. **`maxDiffForBitmap` ⇔ `MaxDiffForBitmap` lockstep.** Any change to the server ceiling formula,
-   the multiplier set, `MaxChainLen`, or `LargeMaxOperand` must be reflected here in the same PR, or
-   the slider max diverges from the server clamp. The shared constants are anchored in
-   problem-generation.md.
+2. **`maxDiffForBitmap`/`minDiffForBitmap` ⇔ `MaxDiffForBitmap`/`MinDiffForBitmap` lockstep.** Any
+   change to the server band formulas, the multiplier set, `MaxChainLen`, `MaxWordChainLen`,
+   `MinConstructibleOperand`, or `LargeMaxOperand` must be reflected here in the same PR, or the
+   slider range diverges from the server clamp. Mechanically guarded by the generated fixtures
+   (`web/src/difficulty_band_fixtures.json`, `make gen-difficulty-fixtures`): the Go side pins the
+   fixtures to the formulas (`TestDifficultyBandFixturesSync`, server/api), and
+   `bitmap_validation.test.js` pins this mirror to the same fixtures at full float precision — a
+   formula change fails the Go test until regenerated, and the regenerated fixtures fail the JS
+   test until the mirror follows.
 3. **The saved bitmap is always valid OR not saved.** `commit` POSTs only when `validateBitmap`
    passes.
 4. **Dependent bits never outlive their parent.** Render-time gating plus the `applyToggleRules`
@@ -164,13 +180,11 @@ completeness:
 
 ## Gotchas
 
-- **No floor guard on the slider denominator.** `MIN_TARGET_DIFFICULTY` (3) mirrors the server's
-  `MinTargetDifficulty`. The percent computation divides by `ceiling - MIN`, which goes non-positive
-  if a bitmap's ceiling falls at or below the floor. In practice the cheapest legal envelope (one
-  core op) ceils above 3, so this isn't currently reachable, but there's no guard.
-- **No client-side test mirror.** No JS test asserts `maxDiffForBitmap` against `MaxDiffForBitmap`;
-  the doc-sync test asserts only the named constants, not the formula body. Drift in the formula body
-  would not be caught mechanically — review the two functions together.
+- **The slider-percent denominator relies on `lo < hi`.** The percent computation divides by
+  `ceiling - floor`. `targetDifficultyRange` collapses `lo` to `hi` when a degenerate envelope would
+  invert the band (mirroring the server), which keeps the clamp safe but would make the denominator
+  0 in that (currently unreachable) case; every valid envelope's floor sits strictly below its
+  ceiling (property-tested server-side in `TestTargetDifficultyRange`).
 - **Card and error placement are hand-maintained.** `PROBLEM_TYPE_GROUPS` and `ERROR_GROUPS` are not
   derived from the enum; a new bit or error code can be computed but invisible until added to these
   maps.
@@ -179,10 +193,14 @@ completeness:
 
 - `web/src/settings.js` — `PROBLEM_TYPE_GROUPS`, `applyToggleRules`, `ProblemTypesSettingsView`,
   `ERROR_GROUPS`, `TargetDifficultySettingsView`, `SettingsView`, `postSettings`.
-- `web/src/bitmap_validation.js` — `validateBitmap`, `maxDiffForBitmap`, `MIN_TARGET_DIFFICULTY`.
+- `web/src/bitmap_validation.js` — `validateBitmap`, `maxDiffForBitmap`, `minDiffForBitmap`,
+  `targetDifficultyRange`, `MIN_TARGET_DIFFICULTY`.
+- `web/src/difficulty_band_fixtures.json` — generated Go↔JS parity fixtures
+  (`make gen-difficulty-fixtures`, `cmd/gen_difficulty_fixtures`).
 - `web/src/enums.js` — `ProblemTypes` bit constants.
-- `server/mathcore/difficulty.go` — `MaxDiffForBitmap`, `MinTargetDifficulty`, `MaxChainLen`,
-  `LargeMaxOperand`, `smallMaxOperand`, `mediumMaxOperand` (the authoritative copies).
+- `server/mathcore/difficulty.go` — `MaxDiffForBitmap`, `MinDiffForBitmap`, `TargetDifficultyRange`,
+  `MinTargetDifficulty`, `MaxChainLen`, `MaxWordChainLen`, `MinConstructibleOperand`,
+  `LargeMaxOperand`, `SmallMaxOperand`, `MediumMaxOperand` (the authoritative copies).
 - [`docs/problem-generation.md`](problem-generation.md) — bit semantics, difficulty formula, the
   ceiling rationale, the new-bit checklist.
 

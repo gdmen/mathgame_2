@@ -1,5 +1,11 @@
-import { validateBitmap, maxDiffForBitmap } from "./bitmap_validation.js";
+import {
+  validateBitmap,
+  maxDiffForBitmap,
+  minDiffForBitmap,
+  targetDifficultyRange,
+} from "./bitmap_validation.js";
 import { ProblemTypes as T } from "./enums.js";
+import bandFixtures from "./difficulty_band_fixtures.json";
 
 describe("validateBitmap", () => {
   it("requires at least one core operation", () => {
@@ -39,19 +45,32 @@ describe("validateBitmap", () => {
   });
 });
 
-describe("maxDiffForBitmap (UI mirror of server MaxDiffForBitmap)", () => {
-  // Reference ceilings from the server's TestMaxDiffForBitmap tables - if
-  // these drift, the Go constants changed and this mirror must follow.
-  it("matches the server reference ceilings", () => {
-    expect(maxDiffForBitmap(T.ADDITION | T.SUBTRACTION)).toBeCloseTo(5.28, 1);
-    expect(
-      maxDiffForBitmap(T.ADDITION | T.SUBTRACTION | T.MISSING_NUMBER)
-    ).toBeCloseTo(6.2, 1);
-    expect(
-      maxDiffForBitmap(T.ADDITION | T.SUBTRACTION | T.SINGLE_VARIABLE)
-    ).toBeCloseTo(15.18, 1);
-    const all = Object.values(T).reduce((a, b) => a | b, 0);
-    expect(maxDiffForBitmap(all)).toBeCloseTo(61.82, 1);
+describe("difficulty band mirrors (maxDiffForBitmap / minDiffForBitmap)", () => {
+  // The fixtures are generated FROM the Go source of truth
+  // (make gen-difficulty-fixtures -> cmd/gen_difficulty_fixtures); the Go
+  // side pins them via TestDifficultyBandFixturesSync (server/api). Any
+  // drift between the Go formula and this hand-maintained mirror fails
+  // here at full float precision - not at a hand-copied 1-decimal snapshot.
+  it("matches the generated server fixtures exactly", () => {
+    expect(bandFixtures.length).toBeGreaterThan(0);
+    const failures = [];
+    for (const f of bandFixtures) {
+      const gotMax = maxDiffForBitmap(f.bits);
+      const gotMin = minDiffForBitmap(f.bits);
+      const { lo, hi } = targetDifficultyRange(f.bits);
+      if (Math.abs(gotMax - f.max) > 1e-9) {
+        failures.push(`${f.name} (bits=${f.bits}): max ${gotMax} != ${f.max}`);
+      }
+      if (Math.abs(gotMin - f.min) > 1e-9) {
+        failures.push(`${f.name} (bits=${f.bits}): min ${gotMin} != ${f.min}`);
+      }
+      if (Math.abs(lo - f.lo) > 1e-9 || Math.abs(hi - f.hi) > 1e-9) {
+        failures.push(
+          `${f.name} (bits=${f.bits}): range [${lo}, ${hi}] != [${f.lo}, ${f.hi}]`
+        );
+      }
+    }
+    expect(failures).toEqual([]);
   });
 
   it("the slider max grows with the envelope (dynamic max)", () => {
@@ -60,5 +79,16 @@ describe("maxDiffForBitmap (UI mirror of server MaxDiffForBitmap)", () => {
       T.ADDITION | T.MULTIPLICATION | T.MEDIUM_NUMBERS
     );
     expect(bigger).toBeGreaterThan(small);
+  });
+
+  it("targetDifficultyRange floors at the global minimum or the envelope floor", () => {
+    // Addition floors at the global minimum (its envelope floor is lower).
+    expect(targetDifficultyRange(T.ADDITION).lo).toBe(3);
+    // Division-only floors at its envelope floor (~7): nothing easier is
+    // constructible under the x2.8 op weight.
+    const div = targetDifficultyRange(T.DIVISION);
+    expect(div.lo).toBeGreaterThan(3);
+    expect(div.lo).toBeLessThan(div.hi);
+    expect(div.lo).toBe(Math.max(3, minDiffForBitmap(T.DIVISION)));
   });
 });

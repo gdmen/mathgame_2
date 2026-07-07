@@ -60,6 +60,18 @@ func NormalizeProblemBitmap(b uint64) uint64 {
 	return b
 }
 
+// WordFormBitmap is the final stamp for a WORD problem derived from its
+// symbolic skeleton: the skeleton's bits with the structural invariants
+// applied, minus PEMDAS, plus WORD. The PEMDAS drop matches computeBreakdown
+// suppressing the multiplier for word problems, so serving-eligibility and
+// score agree (the word rules in docs/problem-generation.md own the why).
+// Normalization runs BEFORE the drop so a PEMDAS-implied CHAINED_OPERATIONS
+// survives it.
+func WordFormBitmap(skeletonBits uint64) uint64 {
+	b := NormalizeProblemBitmap(skeletonBits)
+	return (b &^ uint64(PEMDAS)) | uint64(WORD)
+}
+
 // Admission is the result of running a candidate expression through the
 // pipeline stages [0]-[2.5]. RejectStage is "" when the candidate survives.
 type Admission struct {
@@ -131,12 +143,65 @@ func AdmitExpression(rawExpr string) Admission {
 		}
 	}
 
+	toks, stored, reduced := reduceLabeledUnknown(toks, stored)
+	if reduced {
+		// The unknown is gone from the stored text, so there is no '?' for
+		// prose to reference: leave any rewritten letter in the explanation
+		// as-is rather than splicing in a '?' the kid never sees.
+		letter = 0
+	}
+
 	return Admission{
 		Expr:          stored,
 		Tokens:        toks,
 		Bitmap:        DetectProblemTypeBitmap(stored),
 		RewroteLetter: letter,
 	}
+}
+
+// reduceLabeledUnknown collapses a labeled direct computation - an unknown
+// alone on one side of '=' with a COMPUTATION (at least one operator) and no
+// unknown on the other ("? = 100 - 25", "100 - 25 = ?") - to the bare
+// computation. The label carries no solve-for-the-blank load (the kid
+// computes the other side either way), so keeping it would mis-stamp
+// MISSING_NUMBER and mis-score the +0.2 structure bump. Kept as-is: a
+// genuine operand unknown ("? + 10 = 30", the blank does real work), an
+// identify-the-value form ("? = 3", collapsing it would leave a bare
+// answerless literal), and prose-carrying expressions. Runs after the
+// lone-letter rewrite, so "x = 100 - 25" reduces too.
+func reduceLabeledUnknown(toks []Token, stored string) ([]Token, string, bool) {
+	eq := -1
+	for i, t := range toks {
+		switch t.Kind {
+		case TokText:
+			return toks, stored, false
+		case TokEquals:
+			if eq >= 0 {
+				return toks, stored, false // malformed multi-equation: leave for later stages
+			}
+			eq = i
+		}
+	}
+	isComputation := func(ts []Token) bool {
+		ops := 0
+		for _, t := range ts {
+			switch t.Kind {
+			case TokMissing, TokVariable:
+				return false
+			case TokOperator:
+				ops++
+			}
+		}
+		return ops > 0
+	}
+	// Exactly one '=' token remains, so the byte split is unambiguous.
+	switch {
+	case eq == 1 && toks[0].Kind == TokMissing && isComputation(toks[2:]):
+		return toks[2:], strings.TrimSpace(stored[strings.IndexByte(stored, '=')+1:]), true
+	case eq == len(toks)-2 && eq > 0 && toks[len(toks)-1].Kind == TokMissing && isComputation(toks[:eq]):
+		return toks[:eq], strings.TrimSpace(stored[:strings.IndexByte(stored, '=')]), true
+	}
+	return toks, stored, false
 }
 
 // spliceLoneLetterRaw replaces the single standalone occurrence of letter in

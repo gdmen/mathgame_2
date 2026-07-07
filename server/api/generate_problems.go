@@ -412,7 +412,7 @@ func (a *Api) runWordGenerator(logPrefix string, settings *Settings, numProblems
 	rng := rand.New(rand.NewSource(rand.Int63()))
 	var skeletons []llm_generator.Skeleton
 	for i := 0; i < numProblems; i++ {
-		expr, answer, err := heuristic_generator.BuildProblemRaw(nonWordType, rawTarget, rng)
+		expr, answer, err := heuristic_generator.BuildWordSkeletonRaw(nonWordType, rawTarget, rng)
 		if err != nil {
 			glog.Errorf("%s word skeleton build failed: %v", logPrefix, err)
 			continue
@@ -486,13 +486,14 @@ func (a *Api) runWordGenerator(logPrefix string, settings *Settings, numProblems
 			continue
 		}
 
-		// Stamp from the SKELETON, not the prose: WORD plus the skeleton's own
-		// shape bits. The prose supplies word-ness and its canonical stored form
-		// only - admitting it for bits would re-derive magnitude from incidental
-		// story numerals (a "200 seats" story stamping LARGE_NUMBERS onto a small
-		// skeleton), which then trips the envelope check and drops a valid
-		// narration. The skeleton is the source of truth for the math and the bits.
-		bitmap := mathcore.NormalizeProblemBitmap(uint64(mathcore.WORD) | admSym.Bitmap)
+		// Stamp from the SKELETON, not the prose: WordFormBitmap (WORD plus
+		// the skeleton's own shape bits, minus PEMDAS). The prose supplies
+		// word-ness and its canonical stored form only - admitting it for
+		// bits would re-derive magnitude from incidental story numerals (a
+		// "200 seats" story stamping LARGE_NUMBERS onto a small skeleton),
+		// which then trips the envelope check and drops a valid narration.
+		// The skeleton is the source of truth for the math and the bits.
+		bitmap := mathcore.WordFormBitmap(admSym.Bitmap)
 		if v := mathcore.EnvelopeViolation(bitmap, settings.ProblemTypeBitmap); v != "" {
 			funnel.reject(rejectEnvelope)
 			glog.Infof("%s narration envelope reject [%s]: %q", logPrefix, v, p.Expression)

@@ -263,6 +263,143 @@ func TestComputeProblemDifficulty_SymbolicWithoutProseIsNotWord(t *testing.T) {
 	}
 }
 
+// TestComputeProblemDifficulty_WordSuppressesPEMDAS (v0.4): operator-precedence
+// parsing is a written-notation skill; a story solver takes the operation order
+// from the narrative. A word problem scored from a PEMDAS-firing skeleton gets
+// the word concept but NOT the PEMDAS multiplier; the bare symbolic form keeps
+// it.
+func TestComputeProblemDifficulty_WordSuppressesPEMDAS(t *testing.T) {
+	prose := `\text{Tickets cost 2 dollars plus 3 packs of 5; what is the total?}`
+	skeleton := "2 + 3 * 5" // dual-eval fires on the bare form
+
+	word := ComputeDifficultyBreakdownFor(prose, skeleton)
+	for _, c := range word.Concepts {
+		if c.Name == "pemdas" {
+			t.Fatalf("word scoring applied the PEMDAS multiplier: %+v", word.Concepts)
+		}
+	}
+
+	sym := ComputeDifficultyBreakdownFor(skeleton, "")
+	hasPEMDAS := false
+	for _, c := range sym.Concepts {
+		if c.Name == "pemdas" {
+			hasPEMDAS = true
+		}
+	}
+	if !hasPEMDAS {
+		t.Fatal("bare symbolic form should keep the PEMDAS multiplier")
+	}
+
+	// Exact relation: word raw = (symbolic raw without PEMDAS) x word concept.
+	wantRaw := sym.Raw / ConceptPEMDAS * ConceptWord
+	if math.Abs(word.Raw-wantRaw) > 1e-9 {
+		t.Errorf("word raw = %.6f, want %.6f (skeleton sans PEMDAS x word)", word.Raw, wantRaw)
+	}
+}
+
+// TestMaxDiffForBitmap_WordBranch (v0.4): the ceiling computes the word and
+// non-word bands as either/or branches. The word branch earns ConceptWord but
+// caps chain length at MaxWordChainLen (deep chains have no faithful story) and
+// never earns ConceptPEMDAS (suppressed for word problems). The field case
+// behind this: envelope ADD|SUB|MUL|DIV|NEGATIVES|WORD|MEDIUM|CHAINED
+// advertised ~21.1 while the narratable word ceiling was ~19.6 - the target
+// ratcheted into a band empty by construction.
+func TestMaxDiffForBitmap_WordBranch(t *testing.T) {
+	const tol = 0.1
+	env := uint64(ADDITION | SUBTRACTION | MULTIPLICATION | DIVISION |
+		NEGATIVES | WORD | MEDIUM_NUMBERS | CHAINED_OPERATIONS)
+	if got := MaxDiffForBitmap(env); math.Abs(got-19.56) > tol {
+		t.Errorf("word-enabled chained envelope ceiling = %.2f, want 19.56 (word branch, chain capped)", got)
+	}
+
+	// A PEMDAS-heavy envelope: the non-word branch (full chain, PEMDAS, no word
+	// concept) wins, so adding WORD leaves the ceiling unchanged.
+	pem := uint64(ADDITION | SUBTRACTION | CHAINED_OPERATIONS | PEMDAS)
+	if MaxDiffForBitmap(pem|uint64(WORD)) != MaxDiffForBitmap(pem) {
+		t.Errorf("WORD lifted a ceiling the non-word branch owns: %.2f != %.2f",
+			MaxDiffForBitmap(pem|uint64(WORD)), MaxDiffForBitmap(pem))
+	}
+
+	// Enabling WORD never lowers a ceiling (the non-word branch remains).
+	for _, b := range EnumerateValidBitmaps() {
+		if MaxDiffForBitmap(uint64(b|WORD)) < MaxDiffForBitmap(uint64(b)) {
+			t.Fatalf("bitmap %d: adding WORD lowered the ceiling", b)
+		}
+	}
+}
+
+// TestMinDiffForBitmap pins the per-bitmap difficulty floor: the score of the
+// EASIEST problem the envelope can construct. Concepts and structure are all
+// MAY bits (the easiest problem uses none), so the floor is the minimum
+// enabled op-weight at the smallest constructible magnitude.
+func TestMinDiffForBitmap(t *testing.T) {
+	const tol = 0.1
+	cases := []struct {
+		name string
+		bits uint64
+		want float64
+	}{
+		{"ADD only", uint64(ADDITION), 2.36},
+		{"SUB only", uint64(SUBTRACTION), 2.70},
+		{"MUL only", uint64(MULTIPLICATION), 5.75},
+		{"DIV only", uint64(DIVISION), 7.02},
+		{"DIV+MUL", uint64(DIVISION | MULTIPLICATION), 5.75},
+		{"DIV+ADD (min over ops)", uint64(DIVISION | ADDITION), 2.36},
+		// Every non-op bit is permissive: the floor ignores them.
+		{"DIV with concepts", uint64(DIVISION | FRACTIONS | DECIMALS | CHAINED_OPERATIONS |
+			MEDIUM_NUMBERS | LARGE_NUMBERS | WORD | NEGATIVES), 7.02},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := MinDiffForBitmap(tc.bits); math.Abs(got-tc.want) > tol {
+				t.Errorf("MinDiffForBitmap(%s) = %.2f, want %.2f", tc.name, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestTargetDifficultyRange: the one source of truth for the band
+// target_difficulty may occupy - floor = max(global floor, envelope floor),
+// ceiling = envelope ceiling - and the clamp into it.
+func TestTargetDifficultyRange(t *testing.T) {
+	// Low-floor envelope: the global MinTargetDifficulty dominates.
+	lo, hi := TargetDifficultyRange(uint64(ADDITION))
+	if lo != MinTargetDifficulty {
+		t.Errorf("ADD floor = %.2f, want the global floor %.2f", lo, MinTargetDifficulty)
+	}
+	if hi != MaxDiffForBitmap(uint64(ADDITION)) {
+		t.Errorf("ADD ceiling = %.2f, want MaxDiffForBitmap", hi)
+	}
+
+	// High-floor envelope: the per-bitmap floor dominates.
+	lo, _ = TargetDifficultyRange(uint64(DIVISION))
+	if math.Abs(lo-7.02) > 0.1 {
+		t.Errorf("DIV floor = %.2f, want ~7.02 (envelope floor above global)", lo)
+	}
+
+	// The band is non-empty for every valid envelope.
+	for _, b := range EnumerateValidBitmaps() {
+		lo, hi := TargetDifficultyRange(uint64(b))
+		if lo >= hi {
+			t.Fatalf("bitmap %d: empty band [%.2f, %.2f]", b, lo, hi)
+		}
+	}
+
+	// Clamp: up to the floor, down to the ceiling, identity inside.
+	div := uint64(DIVISION)
+	lo, hi = TargetDifficultyRange(div)
+	if got := ClampTargetDifficulty(div, 3.0); got != lo {
+		t.Errorf("clamp below floor = %.2f, want %.2f", got, lo)
+	}
+	if got := ClampTargetDifficulty(div, 999); got != hi {
+		t.Errorf("clamp above ceiling = %.2f, want %.2f", got, hi)
+	}
+	mid := (lo + hi) / 2
+	if got := ClampTargetDifficulty(div, mid); got != mid {
+		t.Errorf("in-band clamp = %.2f, want identity %.2f", got, mid)
+	}
+}
+
 // TestMaxDiffForBitmap_PerBitCeilings pins the per-bit ceiling-lift table
 // (each row = ADD|SUB baseline plus the named bits).
 func TestMaxDiffForBitmap_PerBitCeilings(t *testing.T) {
@@ -319,14 +456,16 @@ func TestMaxDiffForBitmap_CombinedProfiles(t *testing.T) {
 		bits uint64
 		want float64
 	}{
+		// p5+ carry WORD (p7+ PEMDAS too), so v0.4's word/non-word either-or
+		// prices them lower than v0.3's all-multiplied product.
 		{"p1", p1, 5.28},
 		{"p2", p2, 8.94},
 		{"p3", p3, 15.14},
 		{"p4", p4, 22.80},
-		{"p5", p5, 30.25},
-		{"p6", p6, 38.97},
-		{"p7", p7, 49.86},
-		{"p8 (everything)", p8, 61.82},
+		{"p5", p5, 28.81},
+		{"p6", p6, 37.52},
+		{"p7", p7, 47.76},
+		{"p8 (everything)", p8, 59.72},
 		{"spiky ADD|MEDIUM|CHAINED", uint64(ADDITION | MEDIUM_NUMBERS | CHAINED_OPERATIONS), 10.13},
 		{"spiky 4 ops small single-step", uint64(ADDITION | SUBTRACTION | MULTIPLICATION | DIVISION), 10.60},
 		{"spiky FRAC|MISMATCH|MEDIUM", uint64(ADDITION | SUBTRACTION | FRACTIONS | MISMATCHED_DENOMINATORS | MEDIUM_NUMBERS), 15.01},
@@ -414,5 +553,61 @@ func TestTargetForBucket(t *testing.T) {
 	// A bucket above the ceiling clamps down to the ceiling.
 	if got := TargetForBucket(bm, int(ceil)+50); got != ceil {
 		t.Errorf("TargetForBucket(above ceiling) = %v, want %v", got, ceil)
+	}
+}
+
+// TestWordStampScoreCoherence: the word-PEMDAS policy lives in two layers -
+// scoring (computeBreakdown suppresses the multiplier) and stamping
+// (WordFormBitmap drops the bit). This pins them TOGETHER: for a
+// PEMDAS-firing skeleton, the stamped word bitmap and the scored word
+// concepts must agree that PEMDAS is absent, and both must retain it on the
+// bare symbolic side.
+func TestWordStampScoreCoherence(t *testing.T) {
+	skeleton := "5 + 2 * 3"
+	adm := AdmitExpression(skeleton)
+	if adm.RejectStage != "" {
+		t.Fatalf("skeleton rejected: %s", adm.RejectWhy)
+	}
+	if adm.Bitmap&uint64(PEMDAS) == 0 {
+		t.Fatal("skeleton should fire PEMDAS symbolically")
+	}
+
+	stamp := WordFormBitmap(adm.Bitmap)
+	if stamp&uint64(PEMDAS) != 0 {
+		t.Error("word stamp kept the PEMDAS bit")
+	}
+
+	bd := ComputeDifficultyBreakdownFor(`\text{a story posing the skeleton}`, skeleton)
+	for _, c := range bd.Concepts {
+		if c.Name == "pemdas" {
+			t.Error("word score kept the PEMDAS multiplier")
+		}
+	}
+}
+
+// TestMinDiffForBitmap_Reachable pins the floor to CONCRETE constructible
+// problems: MinConstructibleOperand is a calibrated observation, and this is
+// the calibration check - the easiest real problem per op scores exactly the
+// floor, so the floor never advertises a band below what generation builds.
+func TestMinDiffForBitmap_Reachable(t *testing.T) {
+	const tol = 1e-9
+	cases := []struct {
+		bits uint64
+		expr string
+	}{
+		{uint64(ADDITION), "2 + 1"},
+		{uint64(SUBTRACTION), "2 - 1"},
+		{uint64(MULTIPLICATION), "2 * 2"},
+		{uint64(DIVISION), "2 ÷ 1"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.expr, func(t *testing.T) {
+			floor := MinDiffForBitmap(tc.bits)
+			got := ComputeProblemDifficulty(tc.expr, "")
+			if math.Abs(got-floor) > tol {
+				t.Errorf("easiest problem %q scores %.4f, floor says %.4f - recalibrate MinConstructibleOperand",
+					tc.expr, got, floor)
+			}
+		})
 	}
 }

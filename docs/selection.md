@@ -90,14 +90,17 @@ response.
 Stage 1 prefers newer generators: `newestVersionTier` runs the
 satisfying-set query, buckets candidates by `generatorRank` (generator_rank.go),
 and returns only the **highest-ranked version present**, falling back to older
-versions only when no newer one matches. Only the two current generators are
-ranked — `llm_0.6` (WORD narration) top, then the deterministic `heuristic_2.0`;
-every older version is retired (`status = 'deprecated'`, migration 47) and
+versions only when no newer one matches. The ranked set is `llm_0.7` (WORD
+narration) top, then `llm_0.6` (its still-servable predecessor), then the
+deterministic `heuristic_2.0`;
+every pre-`llm_0.6` version is retired (`status = 'deprecated'`, migration 47) and
 dropped from the satisfying set before ranking ever runs. An unranked/legacy
 generator string ranks 0, below every ranked version, so a stray still-`active`
-legacy row is preferred last. Since `llm_0.6` produces only WORD problems and the
+legacy row is preferred last. Since the `llm_*` generators produce only WORD
+problems and the
 heuristic produces only non-WORD, they never compete in a cell — a WORD cell
-draws `llm_0.6`, a symbolic cell `heuristic_2.0`. Version provenance — what each generator
+draws the newest `llm_*` rows present, a symbolic cell `heuristic_2.0`. Version
+provenance — what each generator
 string means — is owned by `docs/generator-versions.md`.
 
 The hard-exclusion list (`prevIds`) is the `recentProblemHistorySize`

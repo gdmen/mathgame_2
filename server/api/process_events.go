@@ -128,13 +128,14 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	if event.EventType == LOGGED_IN {
 		// no-op
 	} else if event.EventType == SET_TARGET_DIFFICULTY {
-		// Upper bound is the bitmap-derived ceiling: a target above the
-		// hardest problem the envelope can express lands in an empty band
-		// (see MaxDiffForBitmap).
-		ceiling := mathcore.MaxDiffForBitmap(settings.ProblemTypeBitmap)
+		// The bitmap-derived band: a target above the hardest problem the
+		// envelope can express - or below the easiest - lands the selection
+		// window in a band that is empty by construction (see
+		// TargetDifficultyRange).
+		lo, hi := mathcore.TargetDifficultyRange(settings.ProblemTypeBitmap)
 		val, parseErr := strconv.ParseFloat(event.Value, 64)
-		if parseErr != nil || val < mathcore.MinTargetDifficulty || val > ceiling {
-			msg := fmt.Sprintf("Invalid target_difficulty: %s (must be %.0f-%.1f for the current problem types)", event.Value, mathcore.MinTargetDifficulty, ceiling)
+		if parseErr != nil || val < lo || val > hi {
+			msg := fmt.Sprintf("Invalid target_difficulty: %s (must be %.1f-%.1f for the current problem types)", event.Value, lo, hi)
 			glog.Errorf("%s %s", logPrefix, msg)
 			c.JSON(http.StatusBadRequest, msg)
 			return errors.New(msg)
@@ -243,38 +244,38 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		epsilon := 0.05
 		var recentPast int = 900 // seconds aka 15 minutes. This assumes a 1 second event reporting interval.
 		var diffIncrease float64 = 0.05
-		var minDiff float64 = 3
 		var minProbs uint32 = 5
-		// Difficulty ceiling, derived from the user's settings bitmap: the
-		// difficulty of the hardest problem their enabled bits can express.
-		// WHY: this adjuster ratchets target_difficulty upward on success.
-		// Without the ceiling, the target can drift above anything the
-		// envelope can produce - into a band that is empty BY CONSTRUCTION -
-		// and selection's +/-epsilon window then never matches, every serve
-		// falls through to the synchronous fallback, and the system churns
-		// permanently (generation cannot fill an unreachable band). See
-		// MaxDiffForBitmap in difficulty.go.
-		maxDiff := mathcore.MaxDiffForBitmap(settings.ProblemTypeBitmap)
+		// The difficulty band, derived from the user's settings bitmap: the
+		// easiest and hardest problems their enabled bits can express.
+		// WHY: this adjuster ratchets target_difficulty up on success and
+		// down on struggle. Outside the band the target sits where the
+		// envelope can produce nothing - a band that is empty BY CONSTRUCTION
+		// - and selection's window never matches, every serve falls through
+		// to the synchronous fallback, and the system churns permanently
+		// (generation cannot fill an unreachable band). See
+		// TargetDifficultyRange in difficulty.go.
+		minDiff, maxDiff := mathcore.TargetDifficultyRange(settings.ProblemTypeBitmap)
 		// End difficulty adjustment limits
 
-		// Defensive: clamp any previously-runaway difficulty back into range.
-		// If TargetDifficulty was set to a wildly high value (from the unbounded
-		// adjuster bug), reset it to maxDiff immediately so even if later processing
-		// fails, the user gets appropriately-hard problems on their next session.
-		if settings.TargetDifficulty > maxDiff {
-			glog.Infof("%s TargetDifficulty %.2f exceeds cap %.2f, clamping down",
-				logPrefix, settings.TargetDifficulty, maxDiff)
-			settings.TargetDifficulty = maxDiff
+		// Defensive: clamp any stored out-of-band difficulty back into range
+		// (values written under different bounds - an older formula, a since-
+		// shrunk envelope - live in the DB indefinitely). Persisted
+		// immediately so even if later processing fails, the user gets
+		// appropriately-sized problems on their next session.
+		if clamped := min(max(settings.TargetDifficulty, minDiff), maxDiff); clamped != settings.TargetDifficulty {
+			glog.Infof("%s TargetDifficulty %.2f outside band [%.2f, %.2f], clamping",
+				logPrefix, settings.TargetDifficulty, minDiff, maxDiff)
+			settings.TargetDifficulty = clamped
 			if _, dbErr := a.DB.Exec(
 				`UPDATE settings SET target_difficulty = ? WHERE user_id = ?`,
-				maxDiff, user.Id,
+				clamped, user.Id,
 			); dbErr != nil {
 				glog.Errorf("%s failed to persist difficulty clamp: %v", logPrefix, dbErr)
 			}
 			// Also log as an event for audit trail
 			events = append(events, &Event{
 				EventType: SET_TARGET_DIFFICULTY,
-				Value:     strconv.FormatFloat(maxDiff, 'E', -1, 64),
+				Value:     strconv.FormatFloat(clamped, 'E', -1, 64),
 			})
 		}
 

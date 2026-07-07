@@ -170,3 +170,90 @@ func TestNormalizeProblemBitmap(t *testing.T) {
 		})
 	}
 }
+
+// TestWordFormBitmap: the final stamp for a WORD problem derived from its
+// symbolic skeleton. PEMDAS is dropped (a story solver takes operation order
+// from the narrative, so serving a word problem must not require the PEMDAS
+// bit - matching the scoring path, which suppresses the multiplier), WORD is
+// OR'd on, and the structural invariants are applied.
+func TestWordFormBitmap(t *testing.T) {
+	cases := []struct {
+		name     string
+		skeleton uint64
+		want     uint64
+	}{
+		{"pemdas dropped, chained kept",
+			uint64(ADDITION | MULTIPLICATION | CHAINED_OPERATIONS | PEMDAS),
+			uint64(WORD | ADDITION | MULTIPLICATION | CHAINED_OPERATIONS)},
+		{"plain skeleton gains WORD",
+			uint64(DIVISION | MEDIUM_NUMBERS),
+			uint64(WORD | DIVISION | MEDIUM_NUMBERS)},
+		{"structural invariant still applied",
+			uint64(ADDITION | SUBTRACTION),
+			uint64(WORD | ADDITION | SUBTRACTION | CHAINED_OPERATIONS)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := WordFormBitmap(tc.skeleton)
+			if got != tc.want {
+				t.Errorf("WordFormBitmap(%v) = %v, want %v",
+					ProblemTypeToFeatures(ProblemType(tc.skeleton)),
+					ProblemTypeToFeatures(ProblemType(got)),
+					ProblemTypeToFeatures(ProblemType(tc.want)))
+			}
+		})
+	}
+}
+
+// TestAdmitExpression_ReduceLabeledUnknown: a labeled DIRECT computation
+// ("? = 100 - 25") is just "100 - 25" wearing an answer label - it carries no
+// solve-for-the-blank load, so admission collapses it to the bare form rather
+// than mis-stamping MISSING_NUMBER. A genuine operand unknown stays.
+func TestAdmitExpression_ReduceLabeledUnknown(t *testing.T) {
+	cases := []struct {
+		expr       string
+		wantExpr   string
+		wantBitmap uint64
+	}{
+		{"? = 100 - 25", "100 - 25", uint64(SUBTRACTION | LARGE_NUMBERS)},
+		{"100 - 25 = ?", "100 - 25", uint64(SUBTRACTION | LARGE_NUMBERS)},
+		// Lone-letter labels reduce too (rewrite runs first: x -> ? -> collapsed).
+		{"x = 100 - 25", "100 - 25", uint64(SUBTRACTION | LARGE_NUMBERS)},
+		// Genuine operand unknowns are kept - the blank does real work.
+		{"? + 10 = 30", "? + 10 = 30", uint64(ADDITION | MISSING_NUMBER | MEDIUM_NUMBERS)},
+		{"30 = ? + 10", "30 = ? + 10", uint64(ADDITION | MISSING_NUMBER | MEDIUM_NUMBERS)},
+		{"12 - ? = 5", "12 - ? = 5", uint64(SUBTRACTION | MISSING_NUMBER)},
+		// Identify-the-value forms are kept: no computation on the other
+		// side, so collapsing would leave a bare answerless literal.
+		{"? = 3", "? = 3", uint64(MISSING_NUMBER)},
+		{"3 = ?", "3 = ?", uint64(MISSING_NUMBER)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.expr, func(t *testing.T) {
+			adm := AdmitExpression(tc.expr)
+			if adm.RejectStage != "" {
+				t.Fatalf("rejected [%s]: %s", adm.RejectStage, adm.RejectWhy)
+			}
+			if adm.Expr != tc.wantExpr {
+				t.Errorf("Expr = %q, want %q", adm.Expr, tc.wantExpr)
+			}
+			if adm.Bitmap != tc.wantBitmap {
+				t.Errorf("Bitmap = %v, want %v",
+					ProblemTypeToFeatures(ProblemType(adm.Bitmap)),
+					ProblemTypeToFeatures(ProblemType(tc.wantBitmap)))
+			}
+		})
+	}
+
+	// When the reduction removes a rewritten letter's '?' from the stored
+	// text, RewroteLetter must clear: there is no '?' for explanation prose
+	// to reference, so the letter stays in the prose untouched.
+	adm := AdmitExpression("x = 100 - 25")
+	if adm.RewroteLetter != 0 {
+		t.Errorf("RewroteLetter = %q after the unknown was reduced away, want 0", adm.RewroteLetter)
+	}
+	adm = AdmitExpression("12 - x = 5")
+	if adm.RewroteLetter != 'x' {
+		t.Errorf("RewroteLetter = %q for a kept rewrite, want 'x'", adm.RewroteLetter)
+	}
+}

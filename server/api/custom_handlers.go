@@ -127,16 +127,16 @@ func (a *Api) customUpdateSettings(c *gin.Context) {
 		return
 	}
 
-	// Clamp target_difficulty to the ceiling of the bitmap being saved
+	// Clamp target_difficulty into the band of the bitmap being saved
 	// BEFORE the write - this PUT persists the model first and only then
-	// runs event validation, so without the clamp an out-of-ceiling value
+	// runs event validation, so without the clamp an out-of-band value
 	// would land in the DB and 400 after the fact. Computed against the NEW
-	// bitmap: the same PUT may shrink the envelope, lowering the ceiling.
-	// (See MaxDiffForBitmap for why the ceiling exists.)
-	if ceiling := mathcore.MaxDiffForBitmap(model.ProblemTypeBitmap); model.TargetDifficulty > ceiling {
-		glog.Infof("%s clamping target_difficulty %.2f to bitmap ceiling %.2f",
-			logPrefix, model.TargetDifficulty, ceiling)
-		model.TargetDifficulty = ceiling
+	// bitmap: the same PUT may reshape the envelope, moving both bounds.
+	// (See TargetDifficultyRange for why the band exists.)
+	if clamped := mathcore.ClampTargetDifficulty(model.ProblemTypeBitmap, model.TargetDifficulty); clamped != model.TargetDifficulty {
+		glog.Infof("%s clamping target_difficulty %.2f into bitmap band (%.2f)",
+			logPrefix, model.TargetDifficulty, clamped)
+		model.TargetDifficulty = clamped
 	}
 
 	// Write to database

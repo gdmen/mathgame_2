@@ -1,11 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 
 import { ProblemTypes } from "./enums.js";
-import {
-  validateBitmap,
-  maxDiffForBitmap,
-  MIN_TARGET_DIFFICULTY,
-} from "./bitmap_validation.js";
+import { validateBitmap, targetDifficultyRange } from "./bitmap_validation.js";
 import { RequirePin } from "./pin.js";
 import "./settings.scss";
 
@@ -408,9 +404,11 @@ const PlaylistsSettingsView = ({ token, apiUrl, user, onPlaylistsChange }) => {
   );
 };
 
-// TargetDifficultySettingsView: the slider's max IS the envelope - the
-// ceiling of the hardest problem the current bitmap can express (mirrors the
-// server's MaxDiffForBitmap; the server clamps authoritatively on save).
+// TargetDifficultySettingsView: the slider's range IS the envelope - the
+// band from the easiest to the hardest problem the current bitmap can
+// express (mirrors the server's TargetDifficultyRange; the server clamps
+// authoritatively on save). A high-weight envelope (e.g. division-only)
+// floors above the global minimum: nothing easier is constructible.
 const TargetDifficultySettingsView = ({
   token,
   apiUrl,
@@ -418,11 +416,11 @@ const TargetDifficultySettingsView = ({
   settings,
   bitmap,
 }) => {
-  const ceiling = maxDiffForBitmap(bitmap);
+  const { lo: floor, hi: ceiling } = targetDifficultyRange(bitmap);
   const [targetDifficulty, setTargetDifficulty] = useState(
     settings.target_difficulty
   );
-  const shown = Math.min(targetDifficulty, ceiling);
+  const shown = Math.min(Math.max(targetDifficulty, floor), ceiling);
 
   const handleChange = (e) => {
     const val = parseFloat(e.target.value);
@@ -437,13 +435,10 @@ const TargetDifficultySettingsView = ({
   // The raw difficulty numbers are formula internals - parents only need
   // the relative position within what the enabled problem types allow,
   // shown as an integer percent (1-100) like the work-percentage slider.
-  const percent = Math.max(
-    1,
-    Math.round(
-      ((shown - MIN_TARGET_DIFFICULTY) / (ceiling - MIN_TARGET_DIFFICULTY)) *
-        100
-    )
-  );
+  // Guard the degenerate collapsed band (floor === ceiling): show full.
+  const span = ceiling - floor;
+  const percent =
+    span > 0 ? Math.max(1, Math.round(((shown - floor) / span) * 100)) : 100;
 
   return (
     <div id="target-difficulty-settings" className="settings-form">
@@ -454,7 +449,7 @@ const TargetDifficultySettingsView = ({
       <div>{percent} %</div>
       <input
         type="range"
-        min={MIN_TARGET_DIFFICULTY}
+        min={floor.toFixed(1)}
         max={ceiling.toFixed(1)}
         step="0.1"
         value={shown}
