@@ -12,12 +12,12 @@ them.
 
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
-difficulty_version: 0.4
+difficulty_version: 0.5
 max_chain_len: 5
 max_word_chain_len: 3
 min_constructible_operand: 2
 large_max_operand: 9999
-valid_bitmap_count: 12960
+valid_bitmap_count: 8784
 bits: addition, subtraction, multiplication, division, fractions, negatives, word, medium_numbers, large_numbers, chained_operations, missing_number, mismatched_denominators, decimals, pemdas, single_variable, percentages
 ```
 <!-- END DOC-SYNC ANCHORS -->
@@ -70,7 +70,7 @@ concern. Users compose their envelope directly.
 | `DECIMALS` | symbolic decimal token | `ConceptDecimals` |
 | `PEMDAS` | the dual-evaluation rule (below); never on WORD problems (suppressed in scoring AND dropped from the stamp — see "Word problems") | `ConceptPEMDAS` |
 | `SINGLE_VARIABLE` | variable letter with a coefficient (`3x`) or multiple occurrences (`x + x`); on WORD problems, validator-observed (pure-prose algebra) | `ConceptVariable` |
-| `PERCENTAGES` | symbolic `n%` token (evaluates as n/100) | `ConceptPercent` |
+| `PERCENTAGES` | symbolic `n%` token (evaluates as n/100); a percent literal appears ONLY as `n% of X` — the `of` connective lexes as multiplication, so the bit always co-fires with MULTIPLICATION | `ConceptPercent` |
 
 The factor constants (`Concept*`/`Weight*`/`Structure*`) live in
 `server/mathcore/difficulty.go`; their numeric values are owned by
@@ -110,7 +110,10 @@ ambiguous/multi-answer); an unknown requires an equation
 `stamping.go`).
 
 **Settings-level dependency rules** — at least one core operation; LARGE ⇒
-MEDIUM; MISMATCHED ⇒ FRACTIONS; PEMDAS ⇒ CHAINED. This doc is the canonical
+MEDIUM; MISMATCHED ⇒ FRACTIONS; PEMDAS ⇒ CHAINED; PERCENTAGES ⇒
+MULTIPLICATION + MEDIUM_NUMBERS (a percent problem asks for a percent OF a
+quantity, and every useful percent literal is itself a two-digit value, so a
+small-bracket envelope can construct no percent problem). This doc is the canonical
 statement; the rules are enforced client-side in `web/src/bitmap_validation.js`
 (the settings UI — API clients bypassing it degrade gracefully) and mirrored,
 WORD excluded, in `server/mathcore/bitmap.go` (`ValidBitmap`) for the servable
@@ -119,9 +122,13 @@ change.
 
 **The valid non-WORD bitmap space.** `EnumerateValidBitmaps`
 (`server/mathcore/bitmap.go`) materializes every bitmap that passes `ValidBitmap`
-— exactly **12,960** (`valid_bitmap_count` anchor): 15 core-op combos × 3
-(LARGE/MEDIUM brackets) × 3 (MISMATCHED/FRACTIONS) × 3 (PEMDAS/CHAINED) × 2⁵ free
-concept bits. It walks `0..ALL_PROBLEM_TYPES` filtering by `ValidBitmap` (~65k
+— exactly **8,784** (`valid_bitmap_count` anchor): per core-op combo, 3
+(MISMATCHED/FRACTIONS) × 3 (PEMDAS/CHAINED) × 2⁴ other free bits = 144 per
+bracket-percent state; the three brackets (none / MEDIUM / MEDIUM+LARGE)
+carry PERCENTAGES as a free bit only when MULTIPLICATION is present and the
+bracket is ≥ MEDIUM (5 states for mul combos, 3 otherwise): 8 mul combos ×
+720 + 7 non-mul combos × 432. It
+walks `0..ALL_PROBLEM_TYPES` filtering by `ValidBitmap` (~65k
 pure bit-tests). The admin bitmap × difficulty coverage matrix
 (`server/api/admin_bitmap_matrix.go`) live-generates one heuristic_2.0 example
 per (bitmap, difficulty) cell across this whole space.
@@ -175,7 +182,24 @@ and `\div`→`÷` before lex/eval/detection, and the lexer reads `÷` as the
 division operator (its AST op stays `/`), so the whole pipeline sees one form.
 `mathcore.Render` emits `÷` for division and unspaced `a/b` for fractions, so
 any rendered expression — a fraction under division included (`58/3 ÷ 8`,
-`3/4 ÷ 2/3`) — is unambiguous without relying on spacing. `Render` is also
+`3/4 ÷ 2/3`) — is unambiguous without relying on spacing.
+
+**The percent connective.** A percent literal may appear ONLY as `n% of X`
+(`25% of 80`): the keyword `of` lexes as the multiplication operator (its own
+lexer case, ahead of the letter/variable path), and the placement is enforced
+at lex — each percent number must be immediately followed by `of` and each
+`of` immediately preceded by a percent number, so `50% + 25%`, `80 × 25%`,
+and a bare trailing `25%` are lexer rejects (blocked by default: conversion
+equations, complements, and what-percent unknowns are deliberate later
+extensions). Past the lexer `of` IS multiplication — detection, the
+evaluator, PEMDAS dual-eval, and the difficulty formula see the same tree as
+a `*`, so the connective carries no formula change. `Render` emits the
+percent-of form for a multiplication whose left factor is a percent literal
+(precedence-parenthesizing the right operand: `25% of (40 + 28)`), and the
+display skin renders ` of ` as `\text{ of }` (KaTeX-safe), which NORMALIZE
+folds back. `25% of ? = 5` (find-the-whole) works — the percent stays left of
+`of`. Migration 48 rewrote the pool's legacy `n% × X` rows to the connective
+and retired the out-of-grammar percent shapes. `Render` is also
 **faithful**: it parenthesizes an operand
 whenever infix precedence/associativity would otherwise reparse it
 (`(a + b) * c`, `a - (b - c)`), so `Eval(node) == EvalTokens(Render(node))` for
@@ -198,7 +222,8 @@ on dialect ambiguity).
 
 `heuristic_2.0` splits the two forms across two columns: `expression` holds a
 **valid-LaTeX display skin** (`mathcore.DisplayExpression` folds `a/b`→`\frac`,
-`÷`→`\div`, `*`→`\times`, and `%`→`\%` — KaTeX reads a bare `%` as a comment),
+`÷`→`\div`, `*`→`\times`, ` of `→`\text{ of }`, and `%`→`\%` — KaTeX reads a
+bare `%` as a comment),
 and `symbolic_expression` holds the canonical grammar (`58/3 ÷ 8`). NORMALIZE
 bridges them — it folds both to the same form — so
 `NormalizeExpression(expression) == NormalizeExpression(symbolic_expression)`
@@ -249,7 +274,7 @@ as disagreement; a correct-side error is malformed and never fires. Unknowns
 are bound to fixed rational probes (`pemdasProbes`) — the formula stays a pure
 function of the expression because the recompute fast-path depends on that.
 
-## Difficulty formula (v0.4) and ceiling
+## Difficulty formula (v0.5) and ceiling
 
 `ComputeProblemDifficulty(expression, symbolic_expression)`
 (server/mathcore/difficulty.go); the version string is `DifficultyVersion`
@@ -281,7 +306,10 @@ single source of truth for the expr-vs-symbolic dispatch;
 calibration page without affecting scoring.
 
 Changing the formula in ANY way requires bumping `DifficultyVersion` and
-running `recompute_problem_difficulty` on deploy.
+running `recompute_problem_difficulty` on deploy. (v0.5's change is
+detection-side: the `of` connective and its `\text{ of }` normalizer fold
+make a legacy spliced form like `25%\text{ of }80` fire MULTIPLICATION where
+v0.4 read the connective as opaque prose.)
 
 **Word problems (v0.4):** a word problem's `expression` is prose inside
 `\text{...}`, so its operators are invisible to the token-level
@@ -339,6 +367,14 @@ recreate the exact drift the ceiling prevents):
   `ConceptWord` but caps chain structure at `MaxWordChainLen` and never earns
   `ConceptPEMDAS`; the non-word branch keeps the full `MaxChainLen` chain and
   PEMDAS with no word concept.
+- `ConceptPercent` multiplies in only when MULTIPLICATION and a ≥ MEDIUM
+  bracket are also enabled: a percent literal exists only as `n% of X` (a
+  multiplication), and every useful percent literal is a two-digit value
+  whose rest-operand needs range, so a small-bracket or ×-less PERCENTAGES
+  bit can construct no percent problem — an unguarded ceiling would
+  over-claim for legacy user bitmaps that predate the dependency rule
+  (measured: a `MUL|PCT` small-bracket envelope built 0 percent problems in
+  3,000 attempts while an unguarded ceiling advertised 13.6).
 
 **The floor, `MinDiffForBitmap`** — the symmetric twin (v0.4): the difficulty
 of the EASIEST problem the enabled bits can construct. A high-weight envelope

@@ -39,7 +39,7 @@ import (
 // any new feature in parseProblemFeatures, any change to the compression
 // curve). 0.x while the scale is still in active calibration; 1.0 once
 // stable. Minor bumps for tuning, major bumps for structural rewrites.
-const DifficultyVersion = "0.4"
+const DifficultyVersion = "0.5"
 
 // Shared shape constants - used by BOTH the generators' option mapping and
 // MaxDiffForBitmap so the ceiling and what generation can actually produce
@@ -576,7 +576,11 @@ func MaxDiffForBitmap(bitmap uint64) float64 {
 	if pt&DECIMALS != 0 {
 		concept *= ConceptDecimals
 	}
-	if pt&PERCENTAGES != 0 {
+	// Percent is constructible only with multiplication and a >=MEDIUM
+	// bracket (the percent connective rules, docs/problem-generation.md);
+	// counting it otherwise would advertise an unreachable band.
+	if pt&PERCENTAGES != 0 && pt&MULTIPLICATION != 0 &&
+		pt&(MEDIUM_NUMBERS|LARGE_NUMBERS) != 0 {
 		concept *= ConceptPercent
 	}
 

@@ -435,3 +435,58 @@ func TestBuildWordSkeletonRaw(t *testing.T) {
 		}
 	}
 }
+
+// TestBuildProblem_PercentOfShape: every percent problem the builder emits
+// uses the strict "n% of X" grammar - exactly one percent-of, never a
+// degenerate x1 factor or a percent chain - and admits through the
+// canonical pipeline.
+func TestBuildProblem_PercentOfShape(t *testing.T) {
+	rng := rand.New(rand.NewSource(20260705))
+	envs := []mathcore.ProblemType{
+		mathcore.MULTIPLICATION | mathcore.PERCENTAGES | mathcore.MEDIUM_NUMBERS,
+		mathcore.MULTIPLICATION | mathcore.PERCENTAGES | mathcore.MEDIUM_NUMBERS |
+			mathcore.DECIMALS,
+		mathcore.ADDITION | mathcore.MULTIPLICATION | mathcore.PERCENTAGES |
+			mathcore.MEDIUM_NUMBERS | mathcore.CHAINED_OPERATIONS,
+		mathcore.MULTIPLICATION | mathcore.PERCENTAGES | mathcore.MISSING_NUMBER |
+			mathcore.MEDIUM_NUMBERS,
+	}
+	for _, env := range envs {
+		percentSeen := 0
+		ceil := mathcore.MaxDiffForBitmap(uint64(env))
+		for target := 5.0; target <= ceil; target += 1.5 {
+			for k := 0; k < 8; k++ {
+				expr, ans, err := BuildProblem(env, target, rng)
+				if err != nil {
+					t.Fatalf("BuildProblem(%v, %.1f): %v", mathcore.ProblemTypeToFeatures(env), target, err)
+				}
+				adm := mathcore.AdmitExpression(expr)
+				if adm.RejectStage != "" {
+					t.Fatalf("built expr rejected (%s): %q", adm.RejectStage, expr)
+				}
+				if mathcore.VerifyAnswerSymbolic(adm.Tokens, ans) != nil {
+					t.Fatalf("built answer wrong: %q = %q", expr, ans)
+				}
+				if adm.Bitmap&uint64(mathcore.PERCENTAGES) == 0 {
+					continue
+				}
+				percentSeen++
+				if n := strings.Count(expr, "% of "); n != 1 {
+					t.Errorf("percent problem has %d '%% of' connectives, want exactly 1: %q", n, expr)
+				}
+				if reDegenerateFactor.MatchString(expr) {
+					t.Errorf("degenerate x1 factor: %q", expr)
+				}
+			}
+		}
+		// Per-env: percent is constructible in every listed envelope, so a
+		// silent zero means the concept gate or the split regressed.
+		if percentSeen == 0 {
+			t.Fatalf("no percent problems generated for %v", mathcore.ProblemTypeToFeatures(env))
+		}
+	}
+}
+
+// reDegenerateFactor matches a x1 factor in any placement ("* 1)", "of 1 +",
+// a trailing "of 1"): a multiplicative identity adds no operation to perform.
+var reDegenerateFactor = regexp.MustCompile(`(\*|of) 1\b`)

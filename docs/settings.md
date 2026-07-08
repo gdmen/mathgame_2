@@ -23,7 +23,7 @@ ceiling_large_max_operand: 9999
 ceiling_small_max_operand: 12
 ceiling_medium_max_operand: 99
 floor_min_constructible_operand: 2
-validation_error_codes: NO_CORE_OP, LARGE_REQUIRES_MEDIUM, MISMATCHED_REQUIRES_FRACTIONS, PEMDAS_REQUIRES_CHAINED
+validation_error_codes: NO_CORE_OP, LARGE_REQUIRES_MEDIUM, MISMATCHED_REQUIRES_FRACTIONS, PEMDAS_REQUIRES_CHAINED, PERCENTAGES_REQUIRE_MULTIPLICATION, PERCENTAGES_REQUIRE_MEDIUM
 ```
 <!-- END DOC-SYNC ANCHORS -->
 
@@ -50,15 +50,17 @@ problem-generation.md "Bit reference").
 
 | Card (`title`) | Question | Bits (in render order) |
 |---|---|---|
-| Operations | What can your child do? | ADDITION, SUBTRACTION, MULTIPLICATION, DIVISION |
-| Number types | What kinds of numbers? | DECIMALS, PERCENTAGES, NEGATIVES, FRACTIONS → MISMATCHED_DENOMINATORS |
+| Operations | What can your child do? | ADDITION, SUBTRACTION, DIVISION, MULTIPLICATION → PERCENTAGES |
+| Number types | What kinds of numbers? | DECIMALS, NEGATIVES, FRACTIONS → MISMATCHED_DENOMINATORS |
 | Number size | How big can the numbers be? | MEDIUM_NUMBERS, LARGE_NUMBERS |
 | Problem format | How can problems be posed? | WORD, MISSING_NUMBER, SINGLE_VARIABLE, CHAINED_OPERATIONS → PEMDAS |
 
 `→` marks a **dependent** (`dependsOn`) rendered on its own row directly below its **parent**
-(`hasDependent`). Two dependent pairs exist: FRACTIONS→MISMATCHED_DENOMINATORS and
-CHAINED_OPERATIONS→PEMDAS. A parent with dependents sits at the bottom of its card so the dependent
-row falls directly beneath it. The Number size card also carries a `hint`.
+(`hasDependent`). Three dependent pairs exist: FRACTIONS→MISMATCHED_DENOMINATORS,
+CHAINED_OPERATIONS→PEMDAS, and MULTIPLICATION→PERCENTAGES (a percent problem asks for a percent OF
+a quantity — `n% of X` is a multiplication, so PERCENTAGES lives under its parent in Operations
+rather than in Number types). A parent with dependents sits at the bottom of its card so the
+dependent row falls directly beneath it. The Number size card also carries a `hint`.
 
 Card-to-bit placement is hand-maintained and NOT enforced by a test: every `ProblemTypes` bit
 happens to be placed, but a new bit added to `enums.js` will silently not appear on the screen unless
@@ -81,6 +83,9 @@ saved bitmap is always valid:
 | disable MEDIUM_NUMBERS | also clears LARGE_NUMBERS | keeps LARGE ⇒ MEDIUM |
 | disable FRACTIONS | also clears MISMATCHED_DENOMINATORS | clears orphaned dependent |
 | disable CHAINED_OPERATIONS | also clears PEMDAS | clears orphaned dependent |
+| disable MULTIPLICATION | also clears PERCENTAGES | clears orphaned dependent |
+| enable PERCENTAGES | also sets MEDIUM_NUMBERS | percent literals are two-digit values (mirrors PERCENTAGES ⇒ MEDIUM) |
+| disable MEDIUM_NUMBERS | also clears PERCENTAGES | keeps PERCENTAGES ⇒ MEDIUM |
 
 These cover the up-front-fixable rules. `NO_CORE_OP` and `MISMATCHED_REQUIRES_FRACTIONS` are not
 auto-fixed by toggling (you can't auto-pick an operation for the parent; enabling MISMATCHED without
@@ -90,7 +95,7 @@ as validation errors instead.
 ## Validation — `validateBitmap`
 
 `validateBitmap` returns `{ valid: true }` or `{ valid: false, errors: [{ code, message,
-offendingBits }] }`. It encodes the four settings-level dependency rules from problem-generation.md
+offendingBits }] }`. It encodes the settings-level dependency rules from problem-generation.md
 ("Settings-level dependency rules"):
 
 | Code | Fires when | Anchored to card |
@@ -99,6 +104,8 @@ offendingBits }] }`. It encodes the four settings-level dependency rules from pr
 | `LARGE_REQUIRES_MEDIUM` | LARGE_NUMBERS set, MEDIUM_NUMBERS clear | Number size |
 | `MISMATCHED_REQUIRES_FRACTIONS` | MISMATCHED_DENOMINATORS set, FRACTIONS clear | Number types |
 | `PEMDAS_REQUIRES_CHAINED` | PEMDAS set, CHAINED_OPERATIONS clear | Problem format |
+| `PERCENTAGES_REQUIRE_MULTIPLICATION` | PERCENTAGES set, MULTIPLICATION clear | Operations |
+| `PERCENTAGES_REQUIRE_MEDIUM` | PERCENTAGES set, MEDIUM_NUMBERS clear | Operations |
 
 Errors render inside the card they concern: `ERROR_GROUPS` maps each `code` to a card `title`, and
 `errorsFor` filters the error list per card. A new error code with no `ERROR_GROUPS` entry would be
@@ -126,8 +133,10 @@ maxOperand = 12 | 99 (MEDIUM) | 9999 (LARGE)
 magnitude  = log10(maxOperand + 1) + 0.3
 opWeight   = max over enabled ops (SUB 1.1, MUL 2.2, DIV 2.8; base 1.0)
 concept    = product of enabled concept multipliers
-             (FRACTIONS 2.0, MISMATCHED 1.5, NEGATIVES 1.3,
-              DECIMALS 2.0, PERCENTAGES 2.0)
+             (FRACTIONS 2.0, MISMATCHED 1.5, NEGATIVES 1.3, DECIMALS 2.0,
+              PERCENTAGES 2.0 — counted only when MULTIPLICATION and a
+              >=MEDIUM bracket are enabled: a percent exists only as
+              "n% of X" with two-digit values)
 branch(c, s):  best of c*s | SINGLE_VARIABLE: c*5.0*s | MISSING: c*(s+0.2)
 non-word:  branch(concept * [PEMDAS 1.5], 1.0 or 1.0+0.15*(MaxChainLen-1))
 word:      branch(concept * WORD 1.3,    1.0 or 1.0+0.15*(MaxWordChainLen-1))

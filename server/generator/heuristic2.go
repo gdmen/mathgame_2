@@ -44,7 +44,7 @@ import (
 
 // VERSION is the generator version string stamped on created problems.
 // See docs/generator-versions.md for version history.
-const VERSION = "heuristic_2.0"
+const VERSION = "heuristic_2.1"
 
 // OptionsError is returned when the envelope cannot produce a problem.
 type OptionsError struct{ s string }
@@ -329,7 +329,9 @@ func (ctx *buildCtx) chooseConcepts(need float64) {
 			b&mathcore.PEMDAS != 0 && b&mathcore.CHAINED_OPERATIONS != 0 &&
 				b&(mathcore.MULTIPLICATION|mathcore.DIVISION|mathcore.SUBTRACTION) != 0},
 		{func() { ctx.decimals = true }, mathcore.ConceptDecimals, b&mathcore.DECIMALS != 0},
-		{func() { ctx.percent = true }, mathcore.ConceptPercent, b&mathcore.PERCENTAGES != 0},
+		{func() { ctx.percent = true }, mathcore.ConceptPercent,
+			b&mathcore.PERCENTAGES != 0 && b&mathcore.MULTIPLICATION != 0 &&
+				b&(mathcore.MEDIUM_NUMBERS|mathcore.LARGE_NUMBERS) != 0},
 		{func() { ctx.fractions = true }, mathcore.ConceptFractions, b&mathcore.FRACTIONS != 0},
 	}
 	ctx.rng.Shuffle(len(opts), func(i, j int) { opts[i], opts[j] = opts[j], opts[i] })
@@ -424,6 +426,20 @@ func randRange(lo, hi int, rng *rand.Rand) int {
 // leaf. This single recursion is where concepts compose: each split independently
 // chooses an enabled op and operand flavor.
 func expand(v *big.Rat, depth int, ctx buildCtx) (mathcore.Node, bool) {
+	// Percent realizes ONLY as "n% of X" at the outermost split that still
+	// carries the flag: the percent operand is a direct leaf (renderNum owns
+	// its formatting) and the other factor grows with percent cleared, so a
+	// problem carries at most one percent (the shape rules are owned by
+	// docs/problem-generation.md, the percent connective).
+	if ctx.percent {
+		ctx.percent = false // one shot: cleared for every path below
+		if pct, rest, ok := splitPercent(v, ctx); ok {
+			if right, rok := expand(rest, depth-1, ctx); rok {
+				leaf := mathcore.Num{Value: pct, IsPercent: true}
+				return mathcore.BinaryExpr{Op: '*', L: leaf, R: right}, true
+			}
+		}
+	}
 	if depth <= 0 || (depth < ctx.depth && ctx.rng.Intn(3) == 0) {
 		return realizeLeaf(v, ctx)
 	}
@@ -480,13 +496,6 @@ func splitValue(v *big.Rat, depth int, ctx buildCtx) (byte, *big.Rat, *big.Rat, 
 		}
 	}
 	return 0, nil, nil, false
-}
-
-// addendStyle picks how an additive operand is flavored this split: a fraction,
-// a decimal, a percent, or a plain integer — drawn from the active concepts so
-// the operand carries (and composes) the concept.
-func (ctx buildCtx) wantFractionalOperand() bool {
-	return ctx.fractions || ctx.decimals || ctx.percent
 }
 
 // splitAdd: a + b = v. When a fractional concept is active, a is a non-integer
@@ -575,23 +584,27 @@ func splitSub(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
 	return ri(a), ri(b), true
 }
 
-// splitMul: a * b = v. Integer factor split (v must be a positive integer with a
-// factor in range), or a percent split (a = n%, b = v/(n/100)) when percent is
-// the active concept.
-func splitMul(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
-	if ctx.percent {
-		// a = n%  (n in a nice set), b = v / (n/100) must be a clean integer.
-		nice := []int{5, 10, 20, 25, 40, 50, 75}
-		for _, tries := 0, 0; tries < 6; tries++ {
-			n := nice[ctx.rng.Intn(len(nice))]
-			pct := big.NewRat(int64(n), 100)
-			b := new(big.Rat).Quo(v, pct)
-			if b.IsInt() && b.Sign() > 0 && withinMag(b, ctx) {
-				return pct, b, true // a is the percent operand
-			}
+// splitPercent: n% of rest = v. n comes from a nice set; rest = v / (n/100)
+// must be a clean positive integer within the magnitude bracket. Consumed
+// only by expand's root percent split.
+func splitPercent(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
+	nice := []int{5, 10, 20, 25, 40, 50, 75}
+	ctx.rng.Shuffle(len(nice), func(i, j int) { nice[i], nice[j] = nice[j], nice[i] })
+	two := big.NewRat(2, 1)
+	for _, n := range nice {
+		pct := big.NewRat(int64(n), 100)
+		rest := new(big.Rat).Quo(v, pct)
+		// rest >= 2: "n% of 1" carries no real quantity to take a percent of.
+		if rest.IsInt() && rest.Cmp(two) >= 0 && withinMag(rest, ctx) {
+			return pct, rest, true
 		}
-		return nil, nil, false
 	}
+	return nil, nil, false
+}
+
+// splitMul: a * b = v. Integer factor split (v must be a positive integer with a
+// factor in range).
+func splitMul(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
 	if ctx.fractions || ctx.decimals {
 		if a, b, ok := splitMulFrac(v, ctx); ok {
 			return a, b, true
@@ -607,7 +620,10 @@ func splitMul(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
 	}
 	n := v.Num().Int64()
 	small := int64(max(2, min(ctx.maxOperand, 12)))
-	divs := divisorsInRange(n, small)
+	// Cap divisors at n/2 so the cofactor is >= 2 too: a x1 factor adds no
+	// operation to perform, only noise (a prime has no clean mul split - the
+	// caller falls back to another op or a leaf).
+	divs := divisorsInRange(n, min(small, n/2))
 	if len(divs) == 0 {
 		return nil, nil, false
 	}
@@ -810,12 +826,8 @@ func realizeLeaf(v *big.Rat, ctx buildCtx) (mathcore.Node, bool) {
 		}
 		return mathcore.Num{Value: new(big.Rat).Set(v)}, true
 	}
-	// non-integer: needs a fraction/decimal/percent rendering, which requires the
+	// non-integer: needs a fraction/decimal rendering, which requires the
 	// matching concept to be enabled (else it would violate the envelope).
-	if ctx.percent && isPercentValue(v) {
-		n := new(big.Rat).Mul(v, big.NewRat(100, 1))
-		return mathcore.Num{Value: new(big.Rat).Set(v), Raw: mathcore.RatDecimalOrInt(n) + "%", IsPercent: true}, true
-	}
 	if ctx.decimals && isTerminatingDecimal(v) {
 		return mathcore.Num{Value: new(big.Rat).Set(v), Raw: mathcore.RatDecimalOrInt(v), IsDecimal: true}, true
 	}
@@ -1029,11 +1041,6 @@ func isTerminatingDecimal(v *big.Rat) bool {
 		}
 	}
 	return d.Cmp(big.NewInt(1)) == 0
-}
-
-func isPercentValue(v *big.Rat) bool {
-	x := new(big.Rat).Mul(v, big.NewRat(100, 1))
-	return x.IsInt()
 }
 
 func ratFloor(v *big.Rat) int64 {

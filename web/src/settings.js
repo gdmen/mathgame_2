@@ -39,8 +39,17 @@ const PROBLEM_TYPE_GROUPS = [
     entries: [
       { bit: ProblemTypes.ADDITION, label: "Addition" },
       { bit: ProblemTypes.SUBTRACTION, label: "Subtraction" },
-      { bit: ProblemTypes.MULTIPLICATION, label: "Multiplication" },
       { bit: ProblemTypes.DIVISION, label: "Division" },
+      {
+        bit: ProblemTypes.MULTIPLICATION,
+        label: "Multiplication",
+        hasDependent: true,
+      },
+      {
+        bit: ProblemTypes.PERCENTAGES,
+        label: "Percentages",
+        dependsOn: ProblemTypes.MULTIPLICATION,
+      },
     ],
   },
   {
@@ -49,7 +58,6 @@ const PROBLEM_TYPE_GROUPS = [
     tint: "b",
     entries: [
       { bit: ProblemTypes.DECIMALS, label: "Decimals" },
-      { bit: ProblemTypes.PERCENTAGES, label: "Percentages" },
       { bit: ProblemTypes.NEGATIVES, label: "Negative numbers" },
       // Parents with dependents sit at the bottom of the card; the
       // dependent renders on its own row directly below.
@@ -104,14 +112,21 @@ const applyToggleRules = (bitmap, bit, enabled) => {
   if (enabled && bit === ProblemTypes.LARGE_NUMBERS) {
     b |= ProblemTypes.MEDIUM_NUMBERS;
   }
+  if (enabled && bit === ProblemTypes.PERCENTAGES) {
+    b |= ProblemTypes.MEDIUM_NUMBERS;
+  }
   if (!enabled && bit === ProblemTypes.MEDIUM_NUMBERS) {
     b &= ~ProblemTypes.LARGE_NUMBERS;
+    b &= ~ProblemTypes.PERCENTAGES;
   }
   if (!enabled && bit === ProblemTypes.FRACTIONS) {
     b &= ~ProblemTypes.MISMATCHED_DENOMINATORS;
   }
   if (!enabled && bit === ProblemTypes.CHAINED_OPERATIONS) {
     b &= ~ProblemTypes.PEMDAS;
+  }
+  if (!enabled && bit === ProblemTypes.MULTIPLICATION) {
+    b &= ~ProblemTypes.PERCENTAGES;
   }
   return b;
 };
@@ -154,6 +169,8 @@ const ProblemTypesSettingsView = ({
     LARGE_REQUIRES_MEDIUM: "Number size",
     MISMATCHED_REQUIRES_FRACTIONS: "Number types",
     PEMDAS_REQUIRES_CHAINED: "Problem format",
+    PERCENTAGES_REQUIRE_MULTIPLICATION: "Operations",
+    PERCENTAGES_REQUIRE_MEDIUM: "Operations",
   };
   const errorsFor = (groupTitle) =>
     validation.valid

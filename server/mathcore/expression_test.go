@@ -78,7 +78,7 @@ func TestLexExpression_Accepts(t *testing.T) {
 		{"42 ÷ 6", 3},      // obelus = division
 		{"42 / 6", 1},      // spaced slash = fraction (spacing-agnostic)
 		{"0.75 + 0.25", 3}, // decimals
-		{"25% * 80", 3},    // percent number
+		{"25% of 80", 3},   // percent-of (strict grammar)
 		{"? + 5 = 12", 5},  // missing, op, number, equals, number
 		{"3x + 7 = 22", 6}, // number, variable, op, number, equals, number
 		{"x + x = 10", 5},  // variable, op, variable, equals, number
@@ -266,5 +266,97 @@ func TestCountDistinctUnknowns(t *testing.T) {
 			t.Errorf("CountDistinctUnknowns(%q) = (%d, %d), want (%d, %d)",
 				tc.expr, d, q, tc.wantDistinct, tc.wantQuestions)
 		}
+	}
+}
+
+// TestLexExpression_PercentOfGrammar pins the strict percent grammar: a
+// percent literal may appear ONLY as "n% of X". `of` lexes as the
+// multiplication operator; any other percent placement is a lex reject
+// (blocked by default - conversion equations, complements, and what-percent
+// unknowns are deliberate later extensions).
+func TestLexExpression_PercentOfGrammar(t *testing.T) {
+	accepts := []struct {
+		expr    string
+		numToks int
+	}{
+		{"25% of 80", 3},
+		{"25% of (40 + 28)", 7},
+		{"25% of ? = 5", 5},  // find-the-whole: percent stays left of `of`
+		{"5 + 25% of 20", 5}, // percent-of as an additive-chain operand
+		{"25% of (40 + 28) ÷ 2", 9},
+	}
+	for _, tc := range accepts {
+		toks, err := LexExpression(NormalizeExpression(tc.expr))
+		if err != nil {
+			t.Errorf("Lex(%q) rejected: %v", tc.expr, err)
+			continue
+		}
+		if len(toks) != tc.numToks {
+			t.Errorf("Lex(%q) = %d tokens, want %d", tc.expr, len(toks), tc.numToks)
+		}
+	}
+	// `of` is the mul operator past the lexer.
+	toks, err := LexExpression("25% of 80")
+	if err != nil {
+		t.Fatalf("Lex(25%% of 80): %v", err)
+	}
+	if toks[1].Kind != TokOperator || toks[1].Op != '*' {
+		t.Errorf("`of` token = %+v, want TokOperator '*'", toks[1])
+	}
+
+	rejects := []string{
+		"25% * 80",         // percent must be followed by `of`
+		"80 * 25%",         // percent as a right factor
+		"50% + 25%",        // percent under addition
+		"25%",              // bare trailing percent
+		"80 of 3",          // `of` must follow a percent literal
+		"of 80",            // `of` with no percent before it
+		"2/4 of 80",        // fraction is not a percent literal
+		"3 * 25% of 4",     // percent preceded by `*`: would left-associate as a right factor
+		"6 ÷ 25% of 2",     // percent preceded by the obelus
+		"25% of 50% of 80", // percent chain: the second percent is preceded by `of`
+	}
+	for _, expr := range rejects {
+		if _, err := LexExpression(NormalizeExpression(expr)); err == nil {
+			t.Errorf("Lex(%q) accepted, want strict-grammar reject", expr)
+		}
+	}
+
+	// Rule-3 guarantee: every admitted percent string round-trips through
+	// Parse -> Render unchanged (the percent always binds as the left factor
+	// of its `of` multiplication, the only placement Render emits).
+	for _, tc := range accepts {
+		norm := NormalizeExpression(tc.expr)
+		node, err := Parse(norm)
+		if err != nil {
+			t.Errorf("Parse(%q): %v", tc.expr, err)
+			continue
+		}
+		if got := Render(node); got != norm {
+			t.Errorf("Render(Parse(%q)) = %q, want unchanged", tc.expr, got)
+		}
+	}
+
+	// Single letters o and f are still variables; `off` is still rejected.
+	if _, err := LexExpression("o + 5 = 12"); err != nil {
+		t.Errorf("lone 'o' variable rejected: %v", err)
+	}
+	if _, err := LexExpression("2 + off"); err == nil {
+		t.Error("'off' accepted, want reject")
+	}
+}
+
+// TestNormalizeDisplayOf: the display skin \text{ of } folds back to the
+// grammar's ` of ` (NormalizeExpression), and DisplayExpression emits it, so
+// the two columns round-trip exactly.
+func TestNormalizeDisplayOf(t *testing.T) {
+	if got := NormalizeExpression(`25\%\text{ of }80`); got != "25% of 80" {
+		t.Errorf("normalize display form = %q, want %q", got, "25% of 80")
+	}
+	if got := DisplayExpression("25% of 80"); got != `25\%\text{ of }80` {
+		t.Errorf("DisplayExpression = %q, want %q", got, `25\%\text{ of }80`)
+	}
+	if got := NormalizeExpression(DisplayExpression("25% of (40 + 28)")); got != "25% of (40 + 28)" {
+		t.Errorf("display round-trip = %q", got)
 	}
 }

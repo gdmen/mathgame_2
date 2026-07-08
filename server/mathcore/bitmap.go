@@ -23,6 +23,7 @@ package mathcore
 //	(3) LARGE_NUMBERS requires MEDIUM_NUMBERS
 //	(4) MISMATCHED_DENOMINATORS requires FRACTIONS
 //	(5) PEMDAS requires CHAINED_OPERATIONS
+//	(6) PERCENTAGES requires MULTIPLICATION and MEDIUM_NUMBERS
 func ValidBitmap(pt ProblemType) bool {
 	coreOps := ADDITION | SUBTRACTION | MULTIPLICATION | DIVISION
 	if pt&coreOps == 0 {
@@ -40,15 +41,18 @@ func ValidBitmap(pt ProblemType) bool {
 	if pt&PEMDAS != 0 && pt&CHAINED_OPERATIONS == 0 {
 		return false
 	}
+	if pt&PERCENTAGES != 0 && (pt&MULTIPLICATION == 0 || pt&MEDIUM_NUMBERS == 0) {
+		return false
+	}
 	return true
 }
 
 // EnumerateValidBitmaps returns every valid non-WORD bitmap in ascending order.
-// The result has exactly 12,960 entries (see docs/problem-generation.md
+// The result has exactly 8,784 entries (see docs/problem-generation.md
 // valid_bitmap_count). Filtering the whole 0..ALL_PROBLEM_TYPES range is ~65k
 // pure bit-tests (microseconds) — explicit beats clever here.
 func EnumerateValidBitmaps() []ProblemType {
-	out := make([]ProblemType, 0, 12960)
+	out := make([]ProblemType, 0, 8784)
 	for pt := ProblemType(0); pt <= ALL_PROBLEM_TYPES; pt++ {
 		if ValidBitmap(pt) {
 			out = append(out, pt)

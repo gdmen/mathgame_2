@@ -43,7 +43,7 @@ func TestRender(t *testing.T) {
 			R: Num{Value: ratF(1, 4), IsDecimal: true}}, "0.75 + 0.25"},
 		{"percent", BinaryExpr{Op: '*',
 			L: Num{Value: ratF(1, 4), IsPercent: true},
-			R: Num{Value: ratI(4)}}, "25% * 4"},
+			R: Num{Value: ratI(4)}}, "25% of 4"},
 		{"unreduced fraction via Raw", BinaryExpr{Op: '+',
 			L: Num{Value: ratF(3, 4), Raw: "6/8", IsFraction: true},
 			R: Num{Value: ratF(1, 8), IsFraction: true}}, "6/8 + 1/8"},

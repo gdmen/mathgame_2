@@ -52,6 +52,22 @@ const validateBitmap = (bitmap) => {
       offendingBits: [T.PEMDAS],
     });
   }
+  if ((bitmap & T.PERCENTAGES) !== 0 && (bitmap & T.MULTIPLICATION) === 0) {
+    errors.push({
+      code: "PERCENTAGES_REQUIRE_MULTIPLICATION",
+      message:
+        "Percentages need multiplication enabled (a percent problem asks for a percent OF a quantity).",
+      offendingBits: [T.PERCENTAGES],
+    });
+  }
+  if ((bitmap & T.PERCENTAGES) !== 0 && (bitmap & T.MEDIUM_NUMBERS) === 0) {
+    errors.push({
+      code: "PERCENTAGES_REQUIRE_MEDIUM",
+      message:
+        "Percentages need numbers up to 99 enabled (percent problems use two-digit values like 25% of 80).",
+      offendingBits: [T.PERCENTAGES],
+    });
+  }
   if (errors.length > 0) {
     return { valid: false, errors: errors };
   }
@@ -95,7 +111,15 @@ const maxDiffForBitmap = (bitmap) => {
   if ((bitmap & T.MISMATCHED_DENOMINATORS) !== 0) concept *= 1.5;
   if ((bitmap & T.NEGATIVES) !== 0) concept *= 1.3;
   if ((bitmap & T.DECIMALS) !== 0) concept *= 2.0;
-  if ((bitmap & T.PERCENTAGES) !== 0) concept *= 2.0;
+  // Percent is constructible only with multiplication and a >=MEDIUM
+  // bracket (mirrors the server's MaxDiffForBitmap gate).
+  if (
+    (bitmap & T.PERCENTAGES) !== 0 &&
+    (bitmap & T.MULTIPLICATION) !== 0 &&
+    (bitmap & (T.MEDIUM_NUMBERS | T.LARGE_NUMBERS)) !== 0
+  ) {
+    concept *= 2.0;
+  }
 
   const branchBest = (concept, structure) => {
     let best = magnitude * opWeight * concept * structure;

@@ -18,8 +18,8 @@ don't re-derive them here.
 
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
-heuristic_version: heuristic_2.0
-llm_version: llm_0.7
+heuristic_version: heuristic_2.1
+llm_version: llm_0.8
 ```
 <!-- END DOC-SYNC ANCHORS -->
 
@@ -34,8 +34,8 @@ permanent (see [problem-generation.md](problem-generation.md)).
 
 | Generator | Package | Current version | Nature |
 |-----------|---------|-----------------|--------|
-| Heuristic | `server/generator` | `heuristic_2.0` (`VERSION`) | Deterministic in-process Go; no API, no cost, fast. Difficulty-targeting, compositional. Owns the math for EVERY problem — the sole source for non-word, and the skeleton source for word. |
-| LLM | `server/llm_generator` | `llm_0.7` (`VERSION`) | Calls OpenAI to NARRATE a heuristic skeleton into a word problem (`llm_0.6`+); no longer authors math. Slower, costs per problem, batched up to `MAX_QUANTITY` per call. |
+| Heuristic | `server/generator` | `heuristic_2.1` (`VERSION`) | Deterministic in-process Go; no API, no cost, fast. Difficulty-targeting, compositional. Owns the math for EVERY problem — the sole source for non-word, and the skeleton source for word. |
+| LLM | `server/llm_generator` | `llm_0.8` (`VERSION`) | Calls OpenAI to NARRATE a heuristic skeleton into a word problem (`llm_0.6`+); no longer authors math. Slower, costs per problem, batched up to `MAX_QUANTITY` per call. |
 
 ## Heuristic versions
 
@@ -43,7 +43,8 @@ permanent (see [problem-generation.md](problem-generation.md)).
 |---------|-----------|
 | `heuristic_0.0` | Original hand-written generator — and, like `heuristic_2.0`, **compositional and difficulty-targeting**: it built expressions toward a requested difficulty rather than emitting fixed template shapes. Add/sub/mul only (wired up for add/sub at low difficulty), no fractions; output wrapped single numbers in parens (`(3)+(5)-(2)`). Problems remain in the DB for history but are `status = 'deprecated'` (see the note below). |
 | `heuristic_1.0` | Template-enumeration rewrite. Four operations (`+ - * /`); fixed template shapes (basic binary, missing-number, multi-term chains, same/different-denominator fractions). Did NOT target difficulty — it emitted a shape and let the formula score whatever fell out, and DECIMALS/PEMDAS/PERCENTAGES/SINGLE_VARIABLE were LLM-only (#227). Problems remain in the DB for history but are `status = 'deprecated'` (see the note below). |
-| `heuristic_2.0` (current) | Compositional, difficulty-targeting rewrite (#283) that RE-introduces the targeting `heuristic_0.0` had and `heuristic_1.0` dropped. Takes the envelope bitmap + the user's `target_difficulty` and aims each candidate at it; covers EVERY non-WORD bit and arbitrary STACKS of them (the previously-LLM-only DECIMALS/PEMDAS/PERCENTAGES/SINGLE_VARIABLE included). Builds answer-first on the `mathcore` render-only AST; see below. |
+| `heuristic_2.0` | Compositional, difficulty-targeting rewrite (#283) that RE-introduces the targeting `heuristic_0.0` had and `heuristic_1.0` dropped. Takes the envelope bitmap + the user's `target_difficulty` and aims each candidate at it; covers EVERY non-WORD bit and arbitrary STACKS of them (the previously-LLM-only DECIMALS/PEMDAS/PERCENTAGES/SINGLE_VARIABLE included). Builds answer-first on the `mathcore` render-only AST; see below. |
+| `heuristic_2.1` (current) | Percent-of output shape (#309). A percent realizes ONLY at the root of the tree as `n% of X`: the percent operand is a direct leaf (`expand` no longer recurses into it — `heuristic_2.0` re-split it, producing degenerate `25% × 1` factors and percent chains), the other factor grows with percent cleared (one percent per problem), and the percent concept is gated on MULTIPLICATION plus a ≥MEDIUM bracket (percent literals are two-digit values). Integer mul splits also stopped emitting ×1 cofactors (a prime has no clean mul split; the attempt falls back to another op). Same targeting machinery as `heuristic_2.0`. |
 
 ### Deprecated generator rows
 
@@ -90,7 +91,8 @@ read after an additive operator) and gated by the canonical `requiresPEMDAS` via
 | `llm_0.4` | Prompt-only (#249): tells the model to write the ENTIRE word problem as prose and never append the arithmetic or its result, using symbolic math outside `\text{}` only when the statement itself is an expression to manipulate. Fixed ~84% of `llm_0.3` word problems leaking the computation. No code path changed. |
 | `llm_0.5` | `symbolic_expression` for word problems (#266) — see below. |
 | `llm_0.6` | Skeleton narration — retires free-authoring. The heuristic builds a scored symbolic skeleton and the LLM only dresses it in prose. Also the obelus cutover (division prompt/notation). See below. |
-| `llm_0.7` (current) | Word narratability policy on the skeleton source — see below. |
+| `llm_0.7` | Word narratability policy on the skeleton source — see below. |
+| `llm_0.8` (current) | Percent-of prompt clause (#309): the narrator's notation rule now states percentages appear only as "n% of X" and are posed as percent-of stories, matching the strict grammar the admission lexer enforces (every enforced constraint is also communicated in the prompt). No flow change. |
 
 ### `llm_0.5` — symbolic_expression for word problems
 

@@ -28,7 +28,7 @@ func TestEvalTokens_Correct(t *testing.T) {
 		{"12 - (5 - 3)", big.NewRat(10, 1)},
 		{"1/2 + 1/4", big.NewRat(3, 4)},
 		{"0.75 + 0.25", big.NewRat(1, 1)},
-		{"25% * 80", big.NewRat(20, 1)},
+		{"25% of 80", big.NewRat(20, 1)},
 		{"42 ÷ 6", big.NewRat(7, 1)}, // obelus division
 		{"-4 * -3 + 2", big.NewRat(14, 1)},
 		{"3 - -5", big.NewRat(8, 1)}, // unary minus after a binary operator
