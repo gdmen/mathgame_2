@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	VERSION = "llm_0.7"
+	VERSION = "llm_0.8"
 	// PROMPT_NARRATE turns scored symbolic skeletons into prose. The heuristic
 	// owns the math and the difficulty; the model only dresses each skeleton in
 	// a story that poses that exact computation - it invents no numbers and
@@ -29,7 +29,7 @@ Rules:
 - Do NOT introduce new numbers, and do NOT change, add, or drop operations. Use precisely the numbers and operations shown.
 - Write the ENTIRE problem as prose inside \text{...}. Do NOT append the arithmetic the student must perform or its result: a problem posing "3 * 6" must NOT contain "3 * 6" or "= 18"; the student derives that.
 - Use symbolic math outside \text{} ONLY when the computation itself is an equation to manipulate, e.g. \text{Solve for }x: 3x + 7 = 22.
-- Division is the obelus (e.g. "60 ÷ 2"); fractions look like 3/8 or \frac{3}{8}. Return answers exactly as given.
+- Division is the obelus (e.g. "60 ÷ 2"); fractions look like 3/8 or \frac{3}{8}; percentages appear only in the form "n% of X" (e.g. "25% of 80") - pose them as percent-of stories. Return answers exactly as given.
 Example input: [{"symbolic_expression": "60 ÷ 2", "answer": "30"}]
 Example output: [{"symbolic_expression": "60 ÷ 2", "expression": "\\text{A 60-centimeter ribbon is cut into 2 equal pieces. How long is each piece?}", "explanation": "\\text{Divide the total length by the number of pieces: }60 \\div 2 = 30\\text{ centimeters.}"}]
 Return a JSON list with one object per input, each {"symbolic_expression": ..., "expression": ..., "explanation": ...}. Echo "symbolic_expression" back EXACTLY as given (verbatim) so each narration can be matched to its computation. The "explanation" explains the solution and MAY show the arithmetic and result. Return ONLY the JSON list, no markdown.

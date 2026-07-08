@@ -26,7 +26,7 @@ func TestDetectProblemTypeBitmap_Mapping(t *testing.T) {
 		{"-12 - 5", uint64(SUBTRACTION | NEGATIVES)},
 		{"0.5 + 0.5", uint64(ADDITION | DECIMALS)},
 		{"0.75 + 0.25", uint64(ADDITION | DECIMALS | MEDIUM_NUMBERS)}, // digit-magnitude 75
-		{"25% * 4", uint64(MULTIPLICATION | PERCENTAGES | MEDIUM_NUMBERS)},
+		{"25% of 4", uint64(MULTIPLICATION | PERCENTAGES | MEDIUM_NUMBERS)},
 		{"5 + 2 * 3", uint64(ADDITION | MULTIPLICATION | CHAINED_OPERATIONS | PEMDAS)},
 		{"2 * 3 + 5", uint64(ADDITION | MULTIPLICATION | CHAINED_OPERATIONS)}, // no PEMDAS
 		{"3x + 7 = 22", uint64(ADDITION | SINGLE_VARIABLE | MEDIUM_NUMBERS)},
@@ -99,7 +99,7 @@ func TestVerifyAnswerSymbolic(t *testing.T) {
 		{"1/2 + 1/4", "3/4", true},
 		{"1/2 + 1/4", "6/8", true}, // equivalent rational accepted
 		{"0.75 + 0.25", "1", true},
-		{"25% * 80", "20", true},
+		{"25% of 80", "20", true},
 		{"12 - 5 = 7", "7", true},  // equation, no unknown: sides + answer agree
 		{"12 - 5 = 8", "8", false}, // sides disagree
 		{"12 - ?", "5", false},     // unknown without an equation

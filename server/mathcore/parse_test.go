@@ -178,7 +178,7 @@ func TestParseRoundTripHandCases(t *testing.T) {
 		BinaryExpr{Op: '/', L: n(6), R: Num{Value: ratF(3, 4), IsFraction: true}},
 		// decimal and percent
 		BinaryExpr{Op: '*', L: Num{Value: ratF(1, 2), IsDecimal: true}, R: n(3)},
-		BinaryExpr{Op: '+', L: Num{Value: ratF(1, 4), IsPercent: true}, R: Num{Value: ratF(1, 2), IsPercent: true}},
+		BinaryExpr{Op: '*', L: Num{Value: ratF(1, 4), IsPercent: true}, R: n(80)}, // renders "25% of 80"
 		// negative operand
 		BinaryExpr{Op: '+', L: Num{Value: big.NewRat(-3, 1)}, R: n(5)},
 		// equation, missing, coefficient

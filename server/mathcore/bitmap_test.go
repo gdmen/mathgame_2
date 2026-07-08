@@ -25,6 +25,10 @@ func TestValidBitmap(t *testing.T) {
 		{"pemdas requires chained: violated", ADDITION | PEMDAS, false},
 		{"pemdas requires chained: satisfied", ADDITION | CHAINED_OPERATIONS | PEMDAS, true},
 		{"chained alone is fine", ADDITION | CHAINED_OPERATIONS, true},
+		{"percentages require multiplication: violated", ADDITION | MEDIUM_NUMBERS | PERCENTAGES, false},
+		{"percentages require medium: violated", MULTIPLICATION | PERCENTAGES, false},
+		{"percentages fully satisfied", MULTIPLICATION | MEDIUM_NUMBERS | PERCENTAGES, true},
+		{"multiplication alone is fine", MULTIPLICATION, true},
 		{"all non-word feature bits", ALL_PROBLEM_TYPES &^ WORD, true},
 	}
 	for _, tc := range cases {
@@ -42,9 +46,13 @@ func TestValidBitmap(t *testing.T) {
 func TestEnumerateValidBitmaps(t *testing.T) {
 	got := EnumerateValidBitmaps()
 
-	// 15 core-op combos x 3 (LARGE/MEDIUM) x 3 (MISMATCHED/FRACTIONS)
-	// x 3 (PEMDAS/CHAINED) x 2^5 free bits = 12,960.
-	const want = 12960
+	// Per core-op combo: 3 (MISMATCHED/FRACTIONS) x 3 (PEMDAS/CHAINED)
+	// x 2^4 other free bits x the bracket/percent states = 144 x brackets.
+	// Brackets: none, MEDIUM, MEDIUM+LARGE (3); PERCENTAGES is free only
+	// with MULTIPLICATION and a MEDIUM bracket, so mul combos get 5
+	// bracket-percent states (1 + 2x2) vs 3. 8 mul combos x 720 + 7 non-mul
+	// combos x 432 = 8,784.
+	const want = 8784
 	if len(got) != want {
 		t.Fatalf("EnumerateValidBitmaps() returned %d bitmaps, want %d", len(got), want)
 	}

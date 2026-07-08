@@ -1,9 +1,9 @@
 // Package api: the admin bitmap × difficulty coverage matrix report.
 //
 // Where admin_calibration.go samples the STORED pool into difficulty buckets,
-// this report LIVE-GENERATES one heuristic_2.0 example per (bitmap, difficulty)
+// this report LIVE-GENERATES one the live heuristic example per (bitmap, difficulty)
 // cell across the ENTIRE valid non-WORD bitmap space (mathcore.EnumerateValid
-// Bitmaps — exactly 12,960), including cells the pool has never populated, so
+// Bitmaps — exactly 8,784), including cells the pool has never populated, so
 // the newest generator can be human-assessed everywhere it could ever be asked
 // to build. It overlays a heatmap of current pool usage so the reviewer knows
 // where real traffic lives. It is the browser-rendered sibling of
@@ -83,7 +83,7 @@ var (
 	bitmapMatrixTotal     atomic.Int64
 )
 
-// buildMatrixCell asks heuristic_2.0 for one problem in the (bitmap, target)
+// buildMatrixCell asks the live heuristic for one problem in the (bitmap, target)
 // cell and returns its DISPLAY expression, answer, and computed difficulty.
 // BuildProblem returns the canonical grammar form (unspaced a/b), which would
 // render as literal text; DisplayExpression skins it to \frac/\div/\times for

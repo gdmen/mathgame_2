@@ -40,6 +40,21 @@ describe("validateBitmap", () => {
     ).toBe(true);
   });
 
+  it("PERCENTAGES require MULTIPLICATION and MEDIUM (percent-of is a two-digit multiplication)", () => {
+    const res = validateBitmap(T.ADDITION | T.PERCENTAGES);
+    expect(res.valid).toBe(false);
+    expect(res.errors.map((e) => e.code)).toContain(
+      "PERCENTAGES_REQUIRE_MULTIPLICATION"
+    );
+    expect(res.errors.map((e) => e.code)).toContain(
+      "PERCENTAGES_REQUIRE_MEDIUM"
+    );
+    expect(validateBitmap(T.MULTIPLICATION | T.PERCENTAGES).valid).toBe(false);
+    expect(
+      validateBitmap(T.MULTIPLICATION | T.MEDIUM_NUMBERS | T.PERCENTAGES).valid
+    ).toBe(true);
+  });
+
   it("accepts a minimal valid bitmap", () => {
     expect(validateBitmap(T.ADDITION).valid).toBe(true);
   });

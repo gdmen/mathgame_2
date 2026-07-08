@@ -228,7 +228,7 @@ const BitmapMatrixView = ({ token, apiUrl, user }) => {
       const offTarget =
         cell.e && Math.abs((cell.d || 0) - bucket) > TARGET_WINDOW;
       const title = offTarget
-        ? `off-target: asked d≈${bucket}, closest heuristic_2.0 built was d=${fmt1(
+        ? `off-target: asked d≈${bucket}, closest the heuristic built was d=${fmt1(
             cell.d
           )}` + (cell.a ? ` · answer: ${cell.a}` : "")
         : cell.a
@@ -283,17 +283,17 @@ const BitmapMatrixView = ({ token, apiUrl, user }) => {
     <div className="bm-page">
       <h1>Bitmap × difficulty coverage matrix</h1>
       <p className="bm-hint">
-        One live <code>heuristic_2.0</code> example per (bitmap, difficulty)
-        cell across the entire valid non-WORD bitmap space (12,960 bitmaps),
-        including cells the pool has never populated. Cell background heatmaps
-        current pool usage — green = well-covered, red = zero — counted by exact
-        bitmap match after the LARGE⇒MEDIUM normalization (
-        <code>status=active</code> only; WORD rows out of scope). Greyed cells
-        are above the bitmap's serving ceiling (not targetable). An amber
-        outline (<span className="bm-off">d≠</span>) marks an off-target cell:
-        the envelope couldn't reach that difficulty, so the example is the
-        closest the generator managed. ↻ regenerates a cell live without
-        touching the cache. The report is cached; rebuild with Recompute.
+        One live heuristic example per (bitmap, difficulty) cell across the
+        entire valid non-WORD bitmap space (8,784 bitmaps), including cells the
+        pool has never populated. Cell background heatmaps current pool usage —
+        green = well-covered, red = zero — counted by exact bitmap match after
+        the LARGE⇒MEDIUM normalization (<code>status=active</code> only; WORD
+        rows out of scope). Greyed cells are above the bitmap's serving ceiling
+        (not targetable). An amber outline (<span className="bm-off">d≠</span>)
+        marks an off-target cell: the envelope couldn't reach that difficulty,
+        so the example is the closest the generator managed. ↻ regenerates a
+        cell live without touching the cache. The report is cached; rebuild with
+        Recompute.
       </p>
 
       <div className="bm-control">

@@ -152,7 +152,8 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 	} else if event.EventType == SET_PROBLEM_TYPE_BITMAP {
 		// Only shape validity is checked here (nonzero, defined bits). The
 		// dependency rules (core-op required, LARGE=>MEDIUM,
-		// MISMATCHED=>FRACTIONS, PEMDAS=>CHAINED) are enforced by the
+		// MISMATCHED=>FRACTIONS, PEMDAS=>CHAINED,
+		// PERCENTAGES=>MULTIPLICATION+MEDIUM) are enforced by the
 		// settings UI's validateBitmap; an API client bypassing
 		// them gets an incoherent-but-harmless envelope (the ceiling and
 		// subset selection both degrade gracefully).

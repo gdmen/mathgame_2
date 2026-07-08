@@ -115,6 +115,15 @@ func renderNode(b *strings.Builder, n Node) {
 					b.WriteByte(r.Letter)
 					return
 				}
+				// Percent-of: a multiplication whose left factor is a percent
+				// literal renders with the `of` connective ("25% of 80") -
+				// the only percent placement the lexer admits.
+				if l.IsPercent {
+					b.WriteString(renderNum(l))
+					b.WriteString(" of ")
+					renderOperand(b, t.R, t.Op, true)
+					return
+				}
 			}
 		}
 		renderOperand(b, t.L, t.Op, false)

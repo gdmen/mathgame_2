@@ -40,7 +40,7 @@ func TestComputeProblemDifficulty_ReferenceValues(t *testing.T) {
 		{"2 * (3 + 5)", 10.81}, // fires
 		// Word problems (prose rule: difficulty reads prose numerals; ops don't fire).
 		{`\text{Mia has 12 stickers. She gives away 5. How many are left?}`, 6.12},
-		{`\text{What is }25%\text{ of }80\text{?}`, 13.06}, // percent + word
+		{`\text{What is }25%\text{ of }80\text{?}`, 18.71}, // percent-of: \text{ of } folds to the symbolic connective, so the mul fires
 		{`\text{Solve for x: }3x + 7 = 22`, 17.56},         // word-framed algebra stacks
 	}
 	for _, tc := range cases {
@@ -176,7 +176,7 @@ func TestComputeProblemDifficulty_Bounds(t *testing.T) {
 // scale is open-ended (bounded ~62 by construction); the floor at 1.0 stays.
 func TestComputeProblemDifficulty_OpenScale(t *testing.T) {
 	// A multi-concept stack exceeds 20 - the truth the old clamp hid.
-	monster := "(25% * x - 3/4 + 5/8) ÷ 0.8 - 99.99 = -1234"
+	monster := "(25% of x - 3/4 + 5/8) ÷ 0.8 - 99.99 = -1234"
 	d := ComputeProblemDifficulty(monster, "")
 	if d <= 20 {
 		t.Errorf("six-concept monster scored %.1f, want > 20 (clamp should be gone)", d)
@@ -420,7 +420,11 @@ func TestMaxDiffForBitmap_PerBitCeilings(t *testing.T) {
 		{"+MUL", base | uint64(MULTIPLICATION), 9.09},
 		{"+FRACTIONS", base | uint64(FRACTIONS), 9.09},
 		{"+DECIMALS", base | uint64(DECIMALS), 9.09},
-		{"+PERCENTAGES", base | uint64(PERCENTAGES), 9.09},
+		// Percent exists only as "n% of X" with two-digit operands: without
+		// MULTIPLICATION and a >=MEDIUM bracket the bit lifts nothing.
+		{"+PERCENTAGES (no mul: inert)", base | uint64(PERCENTAGES), 5.28},
+		{"+PERCENTAGES+MUL (no medium: inert)", base | uint64(PERCENTAGES|MULTIPLICATION), 9.09},
+		{"+PERCENTAGES+MUL+MEDIUM", base | uint64(PERCENTAGES|MULTIPLICATION|MEDIUM_NUMBERS), 17.08},
 		{"+CHAINED+PEMDAS", base | uint64(CHAINED_OPERATIONS|PEMDAS), 10.22},
 		{"+DIV", base | uint64(DIVISION), 10.60},
 		{"+FRAC+MISMATCHED", base | uint64(FRACTIONS|MISMATCHED_DENOMINATORS), 11.67},

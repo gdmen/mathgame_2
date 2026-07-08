@@ -85,7 +85,15 @@ var normalizeReplacer = strings.NewReplacer(
 	`\$`, "", // money prefix (escaped form): $15 means the number 15
 	"$", "",
 	`\%`, "%", // escaped percent (display form) folds back to the literal %
+	// The percent connective's display skin folds back to the grammar's
+	// keyword. Exact-literal replacement: narrated word-problem prose is one
+	// big \text{...} block and can never contain this subsequence.
+	percentOfSkin, " of ",
 )
+
+// percentOfSkin is the KaTeX-safe display form of the percent connective;
+// NormalizeExpression folds it back to the grammar's ` of `.
+const percentOfSkin = `\text{ of }`
 
 var reFracCmd = regexp.MustCompile(`\\frac\{(\d+)\}\{(\d+)\}`)
 
@@ -127,11 +135,17 @@ func NormalizeExpression(expr string) string {
 // so it round-trips. This is a presentation skin applied at storage time,
 // intended for symbolic (non-WORD) expressions.
 func DisplayExpression(expr string) string {
-	s := reFracLiteral.ReplaceAllString(expr, `\frac{$1}{$2}`)
-	s = strings.ReplaceAll(s, " ÷ ", ` \div `)
-	s = strings.ReplaceAll(s, " * ", ` \times `)
-	return strings.ReplaceAll(s, "%", `\%`)
+	return displayReplacer.Replace(reFracLiteral.ReplaceAllString(expr, `\frac{$1}{$2}`))
 }
+
+// displayReplacer is DisplayExpression's literal skin, the exact inverse of
+// the corresponding normalizeReplacer folds.
+var displayReplacer = strings.NewReplacer(
+	" ÷ ", ` \div `,
+	" * ", ` \times `,
+	" of ", percentOfSkin,
+	"%", `\%`,
+)
 
 func isDigit(c byte) bool  { return c >= '0' && c <= '9' }
 func isLetter(c byte) bool { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') }
@@ -255,6 +269,17 @@ func LexExpression(expr string) ([]Token, *LexError) {
 			toks = append(toks, tok)
 			prevMeaning = 1
 
+		case c == 'o' && strings.HasPrefix(expr[i:], "of") &&
+			(i+2 >= n || !isLetter(expr[i+2])):
+			// The percent connective: `of` lexes as the multiplication
+			// operator (its strict n%-of-X placement is enforced after the
+			// token loop). Its own case, ahead of the letter/variable path,
+			// so SINGLE_VARIABLE lexing and the prose-splice guard are
+			// untouched.
+			toks = append(toks, Token{Kind: TokOperator, Pos: i, Raw: "of", Op: '*'})
+			i += 2
+			prevMeaning = 2
+
 		case isLetter(c):
 			// Standalone single-letter variable (not followed by a letter).
 			if i+1 < n && isLetter(expr[i+1]) {
@@ -277,6 +302,31 @@ func LexExpression(expr string) ([]Token, *LexError) {
 
 		default:
 			return nil, &LexError{Pos: i, Snippet: snippet(expr, i)}
+		}
+	}
+
+	// Strict percent grammar (docs/problem-generation.md, the percent
+	// connective): a percent literal appears ONLY as the left factor of an
+	// `of` multiplication. Three placement rules make the admitted strings
+	// exactly the language Render can reproduce:
+	//  1. a percent number is immediately followed by `of`,
+	//  2. `of` is immediately preceded by a percent number,
+	//  3. a percent number is NOT immediately preceded by a multiplicative
+	//     operator - "3 * 25% of 4" would left-associate the percent into a
+	//     right-factor position that re-renders as an inadmissible string.
+	for idx, t := range toks {
+		if t.Kind == TokNumber && t.IsPercent {
+			if idx+1 >= len(toks) || toks[idx+1].Raw != "of" {
+				return nil, &LexError{Pos: t.Pos, Snippet: snippet(expr, t.Pos)}
+			}
+			if idx > 0 && toks[idx-1].Kind == TokOperator &&
+				(toks[idx-1].Op == '*' || toks[idx-1].Op == '/') {
+				return nil, &LexError{Pos: t.Pos, Snippet: snippet(expr, t.Pos)}
+			}
+		}
+		if t.Kind == TokOperator && t.Raw == "of" &&
+			(idx == 0 || toks[idx-1].Kind != TokNumber || !toks[idx-1].IsPercent) {
+			return nil, &LexError{Pos: t.Pos, Snippet: snippet(expr, t.Pos)}
 		}
 	}
 	return toks, nil

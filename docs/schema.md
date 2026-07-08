@@ -14,7 +14,7 @@ drift undocumented.
 
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
-latest_migration: 47
+latest_migration: 48
 model_tables: users, problems, playlists, videos, settings, gamestates, events
 ```
 <!-- END DOC-SYNC ANCHORS -->
@@ -77,7 +77,7 @@ Modelled tables (defined by `models.json`, full field list there):
 | Table | Model | Key | Purpose |
 |---|---|---|---|
 | `users` | `user` | `auth0_id` (PK), `id` (auto, unique) | account; `role` defaults `'student'` (migration 41) |
-| `problems` | `problem` | `id` | the generated problem pool; bitmap, expression, answer, difficulty, `symbolic_expression` (migration 43), `generator`, `difficulty_version` (migration 38), `status` ENUM (migration 46, replaced the old `disabled` boolean; migration 47 retired every pre-current generator version to `deprecated`) — see `docs/problem-generation.md` |
+| `problems` | `problem` | `id` | the generated problem pool; bitmap, expression, answer, difficulty, `symbolic_expression` (migration 43), `generator`, `difficulty_version` (migration 38), `status` ENUM (migration 46, replaced the old `disabled` boolean; migration 47 retired every pre-current generator version to `deprecated`; migration 48 rewrote percent rows to the `n% of X` connective and retired out-of-grammar percent shapes) — see `docs/problem-generation.md` |
 | `settings` | `settings` | `user_id` | per-user envelope: `problem_type_bitmap`, `target_difficulty`, `target_work_percentage` |
 | `gamestates` | `gamestate` | `user_id` | current served problem/video + solved/target counters |
 | `events` | `event` | `id` (auto) | append-only event log; `event_type` + `value` |
