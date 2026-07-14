@@ -209,7 +209,10 @@ maintenance page read them. Cert renewal: `certbot renew`, then restart
 ## The tools (`cmd/*`)
 
 Every DB tool takes `-config` (default `conf.json`) and connects with the
-`utf8mb4` / `parseTime` / UTC DSN. Tools that mutate take `-dry-run`.
+`utf8mb4` / `parseTime` / UTC DSN. Tools that mutate take `-dry-run` — with one
+deliberate exception: `cleanup_unused_problems` deletes rows irreversibly, so it
+inverts the convention and is dry-run **by default**, writing only under
+`-apply`.
 
 ### Servers / build artifacts
 
@@ -237,6 +240,12 @@ Every DB tool takes `-config` (default `conf.json`) and connects with the
 | `recompute_problem_type_bitmap` | `-dry-run`, `-limit` | restamps `problem_type_bitmap` via the admission pipeline; SET (re-runnable); WORD rows with a `symbolic_expression` restamp from the skeleton (`WordFormBitmap`, matching the insert path); applies the lone-letter `?` rewrite; prints lexer/zero-bitmap/unknown-rule/skeleton-reject reports. Run **before** the difficulty tool. |
 | `recompute_problem_difficulty` | `-dry-run`, `-limit` | restamps the `difficulty` column from `ComputeProblemDifficulty`; idempotent; skips rows already at `DifficultyVersion`. Run **after** the bitmap tool. |
 | `migrate_division_notation` | `-dry-run`, `-limit` | one-time obelus cutover: rewrites legacy spaced-slash division (` / ` → ` ÷ `) in non-WORD `expression` and WORD `symbolic_expression`; re-run-safe; purely notational (no `recompute_*`, no `DifficultyVersion` bump). Run it during the `llm_0.6` deploy **before** the server serves or any `recompute_*` re-lexes a row (an un-migrated spaced slash would mis-lex as a fraction). |
+
+### Manual cleanup (not scheduled)
+
+| Tool | Flags | Purpose |
+|---|---|---|
+| `cleanup_unused_problems` | `-apply`, `-generator`, `-status` (default `deprecated`), `-keep-per-cell`, `-limit`, `-batch-size` | culls problem rows nothing references, to bound pool growth. **Dry-run by default** (reports candidates by generator/status + a sample); `-apply` deletes. Guard (no DB-level FKs): a row is a candidate only if referenced by none of `events` (problem-id-carrying types, dual-format extraction), `gamestates`, `review_queue`, `recently_shown_problems`. Policy: never-referenced rows whose status is in `-status` (default just `deprecated`; `reported`/`incorrect` kept unless named) are culled outright; never-referenced `active` rows are culled only past `-keep-per-cell` (default `SelectionPoolCap`) per (bitmap, difficulty) cell, so a cull never drops an active pool below the selection cap (`active` in `-status` is ignored). Does one full `events` scan (no `event_type` index) — **run off-peak.** Not a timer; run by hand when the pool needs trimming. |
 
 ### Development codegen (not deploy tools)
 

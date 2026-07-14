@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -40,7 +41,12 @@ func TestGenerateProblemsBackground_DedupPerUser(t *testing.T) {
 		inFlight.Add(-1)
 	}
 
-	api := &Api{}
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
 	settings := &Settings{UserId: 42}
 
 	var wg sync.WaitGroup
@@ -54,10 +60,9 @@ func TestGenerateProblemsBackground_DedupPerUser(t *testing.T) {
 	wg.Wait()
 	close(startedAll)
 
-	deadline := time.Now().Add(500 * time.Millisecond)
-	for time.Now().Before(deadline) && inFlight.Load() > 0 {
-		time.Sleep(10 * time.Millisecond)
-	}
+	// The winning goroutine measures the pool (DB reads) before calling
+	// backgroundGenFn; wait for it to finish, not just to start.
+	waitForBackgroundGen(t, 42)
 
 	if got := maxConcurrent.Load(); got != 1 {
 		t.Errorf("maxConcurrent = %d, want 1", got)
@@ -91,11 +96,18 @@ func TestGenerateProblemsBackground_DedupIsPerUser(t *testing.T) {
 		inFlight.Add(-1)
 	}
 
-	api := &Api{}
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
 	_ = api.generateProblemsBackground("[test]", &Settings{UserId: 101})
 	_ = api.generateProblemsBackground("[test]", &Settings{UserId: 102})
 
-	deadline := time.Now().Add(500 * time.Millisecond)
+	// Each goroutine measures the pool (DB reads) before backgroundGenFn, so
+	// allow generous time for both to arrive before releasing them.
+	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) && inFlight.Load() < 2 {
 		time.Sleep(5 * time.Millisecond)
 	}
@@ -340,6 +352,184 @@ func TestGenerateProblems_Word_CollisionDedup(t *testing.T) {
 	}
 	if n := countByGenerator(t, api, llm_generator.VERSION); n != 1 {
 		t.Errorf("duplicate narrations produced %d word rows, want 1", n)
+	}
+}
+
+// TestSelectionPoolTarget pins the demand clamp: one week of distinct draws,
+// floored so the anti-repeat exclusion can never empty the pool, capped at the
+// recently-shown trim size (the demand signal saturates there).
+func TestSelectionPoolTarget(t *testing.T) {
+	cases := []struct {
+		recentServes int
+		want         int
+	}{
+		{0, selectionPoolFloor},
+		{selectionPoolFloor - 20, selectionPoolFloor},
+		{selectionPoolFloor, selectionPoolFloor},
+		{120, 120},
+		{SelectionPoolCap, SelectionPoolCap},
+		{SelectionPoolCap + 300, SelectionPoolCap},
+	}
+	for _, tc := range cases {
+		if got := selectionPoolTarget(tc.recentServes); got != tc.want {
+			t.Errorf("selectionPoolTarget(%d) = %d, want %d", tc.recentServes, got, tc.want)
+		}
+	}
+}
+
+// seedRecentlyShown inserts one recently_shown_problems row.
+func seedRecentlyShown(t *testing.T, api *Api, userID uint32, problemID uint32, shownAgo time.Duration) {
+	t.Helper()
+	_, err := api.DB.Exec(
+		`INSERT INTO recently_shown_problems (user_id, problem_id, shown_at) VALUES (?, ?, NOW() - INTERVAL ? SECOND)`,
+		userID, problemID, int(shownAgo.Seconds()))
+	if err != nil {
+		t.Fatalf("seed recently_shown_problems: %v", err)
+	}
+}
+
+// TestCountRecentServes: only rows inside the demand window count, and only
+// for the requested user.
+func TestCountRecentServes(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+
+	const user, otherUser = uint32(7), uint32(8)
+	seedRecentlyShown(t, api, user, 1001, time.Hour)
+	seedRecentlyShown(t, api, user, 1002, 2*24*time.Hour)
+	seedRecentlyShown(t, api, user, 1003, (demandWindowDays*24+1)*time.Hour) // outside the window
+	seedRecentlyShown(t, api, otherUser, 1004, time.Hour)
+
+	if got := api.countRecentServes("[test-count]", user); got != 2 {
+		t.Errorf("countRecentServes = %d, want 2 (in-window rows for this user only)", got)
+	}
+	if got := api.countRecentServes("[test-count]", uint32(999)); got != 0 {
+		t.Errorf("countRecentServes(unknown user) = %d, want 0", got)
+	}
+}
+
+// seedPoolProblem inserts one active, in-window problem row directly (id must
+// be unique; expression uniqueness doesn't matter for pool-count tests).
+func seedPoolProblem(t *testing.T, api *Api, id uint32, bitmap uint64, difficulty float64, generator string) {
+	t.Helper()
+	_, err := api.DB.Exec(
+		`INSERT INTO problems (id, expression, symbolic_expression, answer, explanation, problem_type_bitmap, difficulty, difficulty_version, generator)
+		 VALUES (?, ?, '', '1', '', ?, ?, ?, ?)`,
+		id, fmt.Sprintf("seed %d", id), bitmap, difficulty, mathcore.DifficultyVersion, generator)
+	if err != nil {
+		t.Fatalf("seed problem %d: %v", id, err)
+	}
+}
+
+// waitForBackgroundGen waits for the user's single-flight lock to be
+// releasable again, i.e. the background goroutine (if any) has finished.
+func waitForBackgroundGen(t *testing.T, userID uint32) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		muAny, ok := backgroundGenLocks.Load(userID)
+		if !ok {
+			return
+		}
+		mu := muAny.(*sync.Mutex)
+		if mu.TryLock() {
+			mu.Unlock()
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("background generation for user=%d did not finish in time", userID)
+}
+
+// TestGenerateProblemsBackground_BatchBoundedByDeficit: a background top-up
+// generates exactly min(backgroundGenBatchSize, target - pool) and skips
+// entirely when the satisfying pool is already at target. This bounds BOTH
+// call sites (selectProblem's thin-pool trigger and the envelope-change
+// pre-warm in process_events.go), which share this function.
+func TestGenerateProblemsBackground_BatchBoundedByDeficit(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	api, _, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+
+	originalFn := backgroundGenFn
+	defer func() { backgroundGenFn = originalFn }()
+	var calls atomic.Int32
+	var lastBatch atomic.Int32
+	backgroundGenFn = func(a *Api, logPrefix string, settings *Settings, numProblems int) {
+		calls.Add(1)
+		lastBatch.Store(int32(numProblems))
+	}
+
+	envelope := uint64(mathcore.ADDITION | mathcore.WORD)
+	settings := &Settings{UserId: 42, ProblemTypeBitmap: envelope, TargetDifficulty: 5}
+	defer backgroundGenLocks.Delete(uint32(42))
+
+	// Empty pool, no serve history: target = floor, deficit = floor, batch
+	// is capped at backgroundGenBatchSize.
+	if err := api.generateProblemsBackground("[test-batch-empty]", settings); err != nil {
+		t.Fatalf("generateProblemsBackground: %v", err)
+	}
+	waitForBackgroundGen(t, 42)
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("empty pool: backgroundGenFn calls = %d, want 1", got)
+	}
+	if got := lastBatch.Load(); got != backgroundGenBatchSize {
+		t.Errorf("empty pool: batch = %d, want %d", got, backgroundGenBatchSize)
+	}
+
+	// Pool 5 short of the floor target: batch = 5, not a full batch.
+	for i := 0; i < selectionPoolFloor-5; i++ {
+		seedPoolProblem(t, api, uint32(2000+i), uint64(mathcore.ADDITION), 5, llm_generator.VERSION)
+	}
+	calls.Store(0)
+	if err := api.generateProblemsBackground("[test-batch-partial]", settings); err != nil {
+		t.Fatalf("generateProblemsBackground: %v", err)
+	}
+	waitForBackgroundGen(t, 42)
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("partial pool: backgroundGenFn calls = %d, want 1", got)
+	}
+	if got := lastBatch.Load(); got != 5 {
+		t.Errorf("partial pool: batch = %d, want 5 (deficit, not full batch)", got)
+	}
+
+	// Pool at target: skip, no generation at all.
+	for i := 0; i < 5; i++ {
+		seedPoolProblem(t, api, uint32(3000+i), uint64(mathcore.ADDITION), 5, llm_generator.VERSION)
+	}
+	calls.Store(0)
+	if err := api.generateProblemsBackground("[test-batch-full]", settings); err != nil {
+		t.Fatalf("generateProblemsBackground: %v", err)
+	}
+	waitForBackgroundGen(t, 42)
+	if got := calls.Load(); got != 0 {
+		t.Errorf("full pool: backgroundGenFn calls = %d, want 0 (pool at target)", got)
+	}
+
+	// Demand raises the target above the floor: 60 in-window serves make the
+	// target 60, so a pool of floor-size (50) is 10 short again. The serve
+	// history must reference ids OUTSIDE the pool, or the recency exclusion
+	// would shrink the measured pool too.
+	for i := 0; i < 60; i++ {
+		seedRecentlyShown(t, api, 42, uint32(9000+i), time.Hour)
+	}
+	calls.Store(0)
+	if err := api.generateProblemsBackground("[test-batch-demand]", settings); err != nil {
+		t.Fatalf("generateProblemsBackground: %v", err)
+	}
+	waitForBackgroundGen(t, 42)
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("demand-raised target: backgroundGenFn calls = %d, want 1", got)
+	}
+	if got := lastBatch.Load(); got != 10 {
+		t.Errorf("demand-raised target: batch = %d, want 10 (target 60 - pool 50)", got)
 	}
 }
 

@@ -17,6 +17,9 @@ fails CI when the anchors below disagree with the code constants.
 recency_window: 50
 lru_top_frac: 0.20
 selection_epsilon: 1.5
+selection_pool_floor: 50
+selection_pool_cap: 200
+demand_window_days: 7
 ```
 <!-- END DOC-SYNC ANCHORS -->
 
@@ -51,10 +54,40 @@ frozen number — exact values are pinned by the anchor block above and
 |---|---|---|
 | `recencyWindow` | 50 | base unit for all recency sizing |
 | `recentProblemHistorySize` | `recencyWindow` | most-recent ids per user, hard-excluded |
-| `minSelectionPool` | `2*recencyWindow` | pool below this triggers background generation |
+| `selectionPoolFloor` | `recencyWindow` | smallest pool target any user gets |
+| `SelectionPoolCap` | `4*recencyWindow` | largest pool target; equals the trim size (below) |
+| `demandWindowDays` | 7 | lookback for the demand signal |
+| `backgroundGenBatchSize` | 20 | max problems one background top-up requests |
 | `recentlyShownProblemsTrimSize` | `4*recencyWindow` | max rows/user kept in `recently_shown_problems` |
 | `lruTopFrac` | 0.20 | fraction of recency-sorted pool picked from uniformly |
 | `problemSelectionEpsilon` | 1.5 | additive difficulty half-window |
+
+## The dynamic pool target
+
+The pool size the trigger maintains is **per-user and demand-scaled**, not a
+flat constant. `selectionPoolTarget` clamps the user's recent demand into
+`[selectionPoolFloor, SelectionPoolCap]`:
+
+```
+target = clamp(distinctServes7d, selectionPoolFloor, SelectionPoolCap)
+```
+
+- **Demand signal** (`countRecentServes`): `COUNT(*)` over
+  `recently_shown_problems` for the user within `demandWindowDays`. Because
+  `recordRecentlyShown` upserts on `(user_id, problem_id)`, this counts
+  *distinct problems shown in the last week* — the right "how much distinct
+  inventory does a week need" proxy. It rides the `(user_id, shown_at)` index
+  over a ≤`recentlyShownProblemsTrimSize`-row table, so it is cheap enough to
+  run on the serve path; no persisted target, no periodic job.
+- **Floor = `recencyWindow`.** The target is compared against the
+  *post-exclusion* pool (`getSatisfyingProblemIds` already removes the
+  `recentProblemHistorySize` recent ids), so a floor at the exclusion-window
+  size guarantees the pool can never be emptied by the exclusion alone.
+- **Cap = `recentlyShownProblemsTrimSize`.** The demand signal physically
+  saturates at the trim size, so a target above it could never be justified by
+  the metric — the two are tied deliberately, not coincidentally equal.
+- **Cold start** (new/dormant user, no rows) → floor; the target grows
+  serve-by-serve within a session as demand accrues.
 
 ## The selection pipeline
 
@@ -66,7 +99,7 @@ first that yields a servable problem:
                  matching the envelope + difficulty UPPER bound + status active.
                  (spaced_repetition.go) Serve it directly if still available.
 [1] DEFAULT      getSatisfyingProblemIds over the whole envelope; recency-bias
-                 pick. Pool < minSelectionPool AND WORD enabled -> background WORD
+                 pick. Pool < the demand target AND WORD enabled -> background WORD
                  generation (the expensive narration; non-WORD needs no batch).
 [2] HEURISTIC    no servable pooled problem: generate a non-WORD problem live via
                  the in-process heuristic (envelope &^ WORD) — the immediate answer
@@ -178,27 +211,46 @@ the recency sort.
   dedups concurrent runs per user via `backgroundGenLocks` (a `sync.Map` of
   mutexes); losers log and skip. Without it the 500ms working-on-problem ticker
   would stack goroutines over one slow LLM round-trip.
+- **Background generation never overshoots the target.** The batch is sized
+  inside the single-flight lock (`backgroundBatchSize`): the pool is
+  re-measured after any racing top-up finished, and
+  `batch = min(backgroundGenBatchSize, target − pool)`; a non-positive deficit
+  skips generation entirely. This bounds *both* call sites — the stage-1
+  thin-pool trigger and the envelope-change pre-warm (process_events.go) —
+  since they share this function. No cross-user cell ledger: the pool is
+  shared, so any user's top-up raises the satisfying set for identical
+  settings, and each user's own target bounds their view. Worst-case overshoot
+  is one in-flight batch per concurrently-triggering user on identical settings
+  (≤`backgroundGenBatchSize`), self-correcting on the next trigger.
 - **Cache failures degrade, never deny.** `loadRecentProblemIds` and
   `lastShownAt` fall back (empty exclusion / uniform random) rather than fail
-  the request.
+  the request; `countRecentServes` falls back to 0 (→ floor target); an
+  unmeasurable pool falls back to a full batch.
 
 ## Gotchas
 
 - **`getDueReviewProblem` has no lower difficulty bound** — a now-easy review is
   intentionally still served (`getDueReviewProblem`, the difficulty-upper-bound-only
   clause). `getSatisfyingProblemIds` is two-sided.
-- **Background generation requests a larger batch than the sync fallbacks.**
-  `generateProblemsBackground` asks for 20 problems while the synchronous
-  fallbacks request fewer — sizing differs by path. The thin-pool trigger fires
-  at `minSelectionPool` (100), well above the refill batch, so a thin pool is
-  refilled over several requests.
+- **A thin pool refills over several requests.** One background top-up adds at
+  most `backgroundGenBatchSize` (20) problems, but the target can be as high as
+  `SelectionPoolCap` (200), so several triggers fill a cold pool. The synchronous
+  last-resort fallbacks request fewer still — sizing differs by path.
+- **The trigger counts only the top generator tier.** `getSatisfyingProblemIds`
+  returns the highest-ranked version present (`newestVersionTier`), so a
+  WORD-enabled envelope whose window holds zero in-window `llm_0.6` rows measures
+  the heuristic tier's count. This is pre-existing behavior, unchanged by the
+  demand target.
 
 ## Related files
 
 - `server/api/generate_problems.go` — `selectProblem`, the candidate SQL,
-  `newestVersionTier`, background-generation single-flight, the constants.
-  (Bit detection, `DetectProblemTypeBitmap`, now lives in the shared
+  `newestVersionTier`, background-generation single-flight, the demand target
+  (`selectionPoolTarget`, `countRecentServes`, `backgroundBatchSize`), the
+  constants. (Bit detection, `DetectProblemTypeBitmap`, now lives in the shared
   `server/mathcore` kernel, not here — see [problem-generation.md](problem-generation.md).)
+- `cmd/cleanup_unused_problems/` — the guarded cull of never-referenced problem
+  rows (bounds pool growth; documented in `docs/ops-runbook.md`).
 - `server/api/select_lru.go` — `pickWithRecencyBias`, `recencyLess`,
   `lastShownAt`.
 - `server/api/trim_recently_shown.go` — `TrimRecentlyShownProblems`,
