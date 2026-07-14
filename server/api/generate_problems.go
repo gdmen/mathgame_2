@@ -29,24 +29,73 @@ const (
 	// Used by process_events.go to build prevIds.
 	recentProblemHistorySize = recencyWindow
 
-	// minSelectionPool is the smallest healthy candidate-pool size; below
-	// this we trigger background generation (non-blocking) to refill.
-	minSelectionPool = 2 * recencyWindow
-
 	// recentlyShownProblemsTrimSize is the max rows per user retained in the
 	// recently_shown_problems table. The async trim job evicts anything
 	// older than this many shown_at-DESC entries; evicted problems become
 	// "never shown" to the recency-bias sort and re-enter the rotation.
 	recentlyShownProblemsTrimSize = 4 * recencyWindow
 
+	// selectionPoolFloor is the smallest pool target any user gets: the
+	// hard-exclusion window is recencyWindow ids and the target compares
+	// against the post-exclusion pool, so a pool at the floor can never be
+	// emptied by the exclusion alone.
+	selectionPoolFloor = recencyWindow
+
+	// SelectionPoolCap bounds the pool target regardless of demand. It
+	// equals recentlyShownProblemsTrimSize deliberately: the demand signal
+	// (rows in recently_shown_problems) physically saturates at the trim
+	// size, so a larger target could never be justified by the metric.
+	SelectionPoolCap = recentlyShownProblemsTrimSize
+
+	// demandWindowDays is the lookback for the demand signal — distinct
+	// problems shown to the user. A week smooths weekday/weekend variance.
+	demandWindowDays = 7
+
+	// backgroundGenBatchSize is the most problems one background top-up may
+	// request; a smaller deficit shrinks the batch (never overshoot the
+	// target).
+	backgroundGenBatchSize = 20
+
 	// lruTopFrac is the fraction of the recency-sorted pool we pick from
-	// uniformly at random. With minSelectionPool=100 and 0.20 → top 20.
+	// uniformly at random.
 	lruTopFrac = 0.20
 
 	// problemSelectionEpsilon: candidate difficulty must be within this
 	// additive window of the user's target_difficulty (target ± epsilon).
 	problemSelectionEpsilon = 1.5
 )
+
+// selectionPoolTarget converts the demand signal into the pool size to
+// maintain for a user: one week of distinct draws, clamped to
+// [selectionPoolFloor, SelectionPoolCap]. A dormant or brand-new user gets
+// the floor; the target grows within a session as serves accrue.
+func selectionPoolTarget(recentServes int) int {
+	if recentServes < selectionPoolFloor {
+		return selectionPoolFloor
+	}
+	if recentServes > SelectionPoolCap {
+		return SelectionPoolCap
+	}
+	return recentServes
+}
+
+// countRecentServes returns the user's demand signal: distinct problems
+// shown in the last demandWindowDays. recordRecentlyShown upserts on
+// (user_id, problem_id), so this COUNT is distinct problems, not raw serves
+// — exactly the "how much distinct inventory does a week need" question the
+// pool target answers. Fail-tolerant: on error, returns 0 (→ floor target)
+// rather than failing selection.
+func (a *Api) countRecentServes(logPrefix string, userID uint32) int {
+	var n int
+	err := a.DB.QueryRow(
+		`SELECT COUNT(*) FROM recently_shown_problems WHERE user_id = ? AND shown_at > NOW() - INTERVAL ? DAY`,
+		userID, demandWindowDays).Scan(&n)
+	if err != nil {
+		glog.Errorf("%s countRecentServes user=%d: %v", logPrefix, userID, err)
+		return 0
+	}
+	return n
+}
 
 // formatUintsForSQLIn formats a slice of unsigned integers as "1,2,3" for use in a SQL "IN (...)" clause.
 func formatUintsForSQLIn[T ~uint32 | ~uint64](vals []T) string {
@@ -156,10 +205,15 @@ func (a *Api) selectProblem(logPrefix string, settings *Settings, prevIds *[]uin
 
 	// Background generation is WORD-only (the expensive LLM narration); kick it
 	// off only when WORD is enabled. Non-WORD problems are cheap and generated
-	// live below, so they need no background batch.
-	if len(*pids) < minSelectionPool && settings.ProblemTypeBitmap&uint64(mathcore.WORD) != 0 {
-		glog.Infof("%s generating new WORD problems because there are only %d matching", logPrefix, len(*pids))
-		a.generateProblemsBackground(logPrefix, settings)
+	// live below, so they need no background batch. The pool target is
+	// demand-scaled per user; a pool at or above SelectionPoolCap can never be
+	// below any target, so the demand query is skipped then. The authoritative
+	// sizing (and skip-at-target) happens inside generateProblemsBackground.
+	if len(*pids) < SelectionPoolCap && settings.ProblemTypeBitmap&uint64(mathcore.WORD) != 0 {
+		if target := selectionPoolTarget(a.countRecentServes(logPrefix, settings.UserId)); len(*pids) < target {
+			glog.Infof("%s satisfying pool %d below target %d; generating WORD problems in background", logPrefix, len(*pids), target)
+			a.generateProblemsBackground(logPrefix, settings)
+		}
 	}
 
 	if p := a.pickPooledProblem(logPrefix, settings, *pids); p != nil {
@@ -254,10 +308,39 @@ func (a *Api) generateProblemsBackground(logPrefix string, settings *Settings) e
 				glog.Errorf("%s background generation panicked: %v", logPrefix, r)
 			}
 		}()
-		backgroundGenFn(a, logPrefix, &settingsCopy, 20)
+		// Size the batch from the pool deficit here, inside the single-flight
+		// lock, so no call site can overshoot the target: the pool is
+		// re-measured after any racing top-up finished, and the envelope-change
+		// pre-warm (process_events.go) gets capped without carrying pool state.
+		batch := a.backgroundBatchSize(logPrefix, &settingsCopy)
+		if batch <= 0 {
+			glog.Infof("%s satisfying pool at target; skipping background generation", logPrefix)
+			return
+		}
+		backgroundGenFn(a, logPrefix, &settingsCopy, batch)
 	}()
 
 	return nil
+}
+
+// backgroundBatchSize returns how many problems a background top-up may
+// generate: min(backgroundGenBatchSize, target − current satisfying pool).
+// Zero or negative means the pool is already at target. If the pool can't be
+// measured, degrade to a full batch — a full top-up on a transient read error
+// beats starving the pool, and real DB trouble surfaces on the insert path
+// anyway.
+func (a *Api) backgroundBatchSize(logPrefix string, settings *Settings) int {
+	prevIds := loadRecentProblemIds(logPrefix, a.DB, settings.UserId)
+	pids, err := a.getSatisfyingProblemIds(logPrefix, settings, &prevIds)
+	if err != nil {
+		return backgroundGenBatchSize
+	}
+	target := selectionPoolTarget(a.countRecentServes(logPrefix, settings.UserId))
+	deficit := target - len(*pids)
+	if deficit > backgroundGenBatchSize {
+		return backgroundGenBatchSize
+	}
+	return deficit
 }
 
 // runHeuristicGenerator generates problems using the difficulty-targeting

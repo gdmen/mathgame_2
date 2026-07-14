@@ -39,6 +39,7 @@ build-cmds: build-api
 	$(GOBUILD) -o ./bin/recompute_problem_difficulty ./cmd/recompute_problem_difficulty/
 	$(GOBUILD) -o ./bin/recompute_problem_type_bitmap ./cmd/recompute_problem_type_bitmap/
 	$(GOBUILD) -o ./bin/trim_recently_shown_problems ./cmd/trim_recently_shown_problems/
+	$(GOBUILD) -o ./bin/cleanup_unused_problems ./cmd/cleanup_unused_problems/
 	$(GOBUILD) -o ./bin/maintenance_server ./cmd/maintenance_server/
 	$(GOBUILD) -o ./bin/migrate_division_notation ./cmd/migrate_division_notation/
 

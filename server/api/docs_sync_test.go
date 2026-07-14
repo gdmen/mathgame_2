@@ -145,6 +145,9 @@ func TestDocsSyncSelection(t *testing.T) {
 	assertIntAnchor(t, doc, "recency_window", anchors["recency_window"], recencyWindow)
 	assertFloatAnchor(t, doc, "lru_top_frac", anchors["lru_top_frac"], lruTopFrac)
 	assertFloatAnchor(t, doc, "selection_epsilon", anchors["selection_epsilon"], problemSelectionEpsilon)
+	assertIntAnchor(t, doc, "selection_pool_floor", anchors["selection_pool_floor"], selectionPoolFloor)
+	assertIntAnchor(t, doc, "selection_pool_cap", anchors["selection_pool_cap"], SelectionPoolCap)
+	assertIntAnchor(t, doc, "demand_window_days", anchors["demand_window_days"], demandWindowDays)
 }
 
 // TestDocsSyncAdaptiveDifficulty pins docs/adaptive-difficulty.md to the
