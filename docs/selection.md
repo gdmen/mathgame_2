@@ -92,7 +92,7 @@ satisfying-set query, buckets candidates by `generatorRank` (generator_rank.go),
 and returns only the **highest-ranked version present**, falling back to older
 versions only when no newer one matches. The ranked set is the `llm_*` WORD
 narrators top (`llm_0.8` > `llm_0.7` > `llm_0.6`, newest first), then the
-deterministic heuristics (`heuristic_2.1` > `heuristic_2.0`);
+deterministic heuristics (`heuristic_2.2` > `heuristic_2.1` > `heuristic_2.0`);
 every pre-`llm_0.6` version is retired (`status = 'deprecated'`, migration 47) and
 dropped from the satisfying set before ranking ever runs. An unranked/legacy
 generator string ranks 0, below every ranked version, so a stray still-`active`

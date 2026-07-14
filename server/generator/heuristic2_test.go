@@ -490,3 +490,91 @@ func TestBuildProblem_PercentOfShape(t *testing.T) {
 // reDegenerateFactor matches a x1 factor in any placement ("* 1)", "of 1 +",
 // a trailing "of 1"): a multiplicative identity adds no operation to perform.
 var reDegenerateFactor = regexp.MustCompile(`(\*|of) 1\b`)
+
+// TestBuildProblem_NegativesRealized: an envelope with NEGATIVES actually
+// produces negative-literal problems at a healthy rate, for every core op —
+// the bit must be realizable, not just priced into the plan. Two hard
+// invariants ride along: a negative ANSWER must stamp NEGATIVES (a "3 - 8"
+// with answer -5 would otherwise be served to a no-negatives kid — the stamp
+// reads expression tokens only), and the NEGATIVES ceiling must be reachable
+// (the +30% concept headroom exists only if the builder can spend it).
+func TestBuildProblem_NegativesRealized(t *testing.T) {
+	cases := []struct {
+		name string
+		bm   mathcore.ProblemType
+	}{
+		{"add neg", mathcore.ADDITION | mathcore.NEGATIVES},
+		{"sub neg", mathcore.SUBTRACTION | mathcore.NEGATIVES},
+		{"mul neg", mathcore.MULTIPLICATION | mathcore.NEGATIVES},
+		{"div neg", mathcore.DIVISION | mathcore.NEGATIVES},
+		{"rich neg", mathcore.ADDITION | mathcore.SUBTRACTION | mathcore.MULTIPLICATION |
+			mathcore.DIVISION | mathcore.NEGATIVES | mathcore.MEDIUM_NUMBERS |
+			mathcore.CHAINED_OPERATIONS},
+	}
+	rng := rand.New(rand.NewSource(20260714))
+	for _, c := range cases {
+		ceil := mathcore.MaxDiffForBitmap(uint64(c.bm))
+		lo := mathcore.MinTargetDifficulty
+		const n = 400
+		fired := 0
+		var maxDiff float64
+		for i := 0; i < n; i++ {
+			target := lo + rng.Float64()*(ceil-lo)
+			expr, ans, err := BuildProblem(c.bm, target, rng)
+			if err != nil {
+				t.Fatalf("%s: BuildProblem: %v", c.name, err)
+			}
+			bm := mathcore.ProblemType(mathcore.DetectProblemTypeBitmap(expr))
+			if bm&mathcore.NEGATIVES != 0 {
+				fired++
+			}
+			if strings.HasPrefix(ans, "-") && bm&mathcore.NEGATIVES == 0 {
+				t.Errorf("%s: negative answer without a NEGATIVES stamp would leak to no-negatives envelopes: %q = %q", c.name, expr, ans)
+			}
+			if d := mathcore.ComputeProblemDifficulty(mathcore.AdmitExpression(expr).Expr, ""); d > maxDiff {
+				maxDiff = d
+			}
+		}
+		t.Logf("%s: negatives fired in %d/%d, max difficulty %.2f (ceiling %.2f)", c.name, fired, n, maxDiff, ceil)
+		if fired < n/20 {
+			t.Errorf("%s: negatives fired in only %d/%d builds — the bit is not being realized", c.name, fired, n)
+		}
+		if maxDiff < ceil-targetWindow {
+			t.Errorf("%s: max difficulty %.2f fell short of ceiling %.2f-window — the negatives headroom is not reachable", c.name, maxDiff, ceil)
+		}
+	}
+}
+
+// TestBuildProblem_ConceptCoverageAtLowTargets: concept selection must explore
+// the feature space, not just cover the difficulty budget. An easy fraction or
+// decimal problem ("1/4 + 1/4", "0.2 + 0.3") is constructible in-window from
+// bucket ~5, so a rich MAY envelope asked for a low target must produce SOME —
+// a budget-greedy planner that only enables concepts when the target outgrows
+// magnitude leaves these pockets permanently empty.
+func TestBuildProblem_ConceptCoverageAtLowTargets(t *testing.T) {
+	bm := mathcore.ADDITION | mathcore.SUBTRACTION | mathcore.MULTIPLICATION |
+		mathcore.FRACTIONS | mathcore.DECIMALS | mathcore.MEDIUM_NUMBERS
+	rng := rand.New(rand.NewSource(20260715))
+	const n = 300
+	frac, dec := 0, 0
+	for i := 0; i < n; i++ {
+		expr, _, err := BuildProblem(bm, 6.0, rng)
+		if err != nil {
+			t.Fatalf("BuildProblem: %v", err)
+		}
+		got := mathcore.ProblemType(mathcore.DetectProblemTypeBitmap(expr))
+		if got&mathcore.FRACTIONS != 0 {
+			frac++
+		}
+		if got&mathcore.DECIMALS != 0 {
+			dec++
+		}
+	}
+	t.Logf("target 6.0: fractions %d/%d, decimals %d/%d", frac, n, dec, n)
+	if frac < n/20 {
+		t.Errorf("fractions fired in only %d/%d builds at target 6.0 — low-difficulty concept pocket is empty", frac, n)
+	}
+	if dec < n/20 {
+		t.Errorf("decimals fired in only %d/%d builds at target 6.0 — low-difficulty concept pocket is empty", dec, n)
+	}
+}

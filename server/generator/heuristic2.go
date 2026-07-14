@@ -19,9 +19,11 @@ package generator
 //     components): MEDIUM/LARGE magnitude rides on an integer operand
 //     (24 ÷ 2/3 = 36), never on an inflated numerator.
 //   - KNOB INVERSION sizes the build: RawForDifficulty(target) gives a raw
-//     target; planConfig picks, minimal-concept-first, how much magnitude /
-//     chain / concept to spend (binding to the shared mathcore difficulty
-//     constants, never a private copy).
+//     target; planConfig picks how much magnitude / chain / concept to spend
+//     (binding to the shared mathcore difficulty constants, never a private
+//     copy). Concept selection alternates a budget-greedy mode with a
+//     coverage-sampled mode so enabled MAY bits appear across the whole band,
+//     not only where their multiplier is the budget's arithmetic answer.
 //   - The canonical pipeline is the VERIFIER, not the source of truth for the
 //     answer: every candidate is rendered and run through AdmitExpression +
 //     VerifyAnswerSymbolic + DetectProblemTypeBitmap + EnvelopeViolation +
@@ -44,7 +46,7 @@ import (
 
 // VERSION is the generator version string stamped on created problems.
 // See docs/generator-versions.md for version history.
-const VERSION = "heuristic_2.1"
+const VERSION = "heuristic_2.2"
 
 // OptionsError is returned when the envelope cannot produce a problem.
 type OptionsError struct{ s string }
@@ -150,14 +152,20 @@ func buildRaw(bitmap mathcore.ProblemType, rawTarget float64, chainCap int, rng 
 			}
 			ansVal = v
 		}
-		if bitmap&mathcore.NEGATIVES == 0 && ansVal.Sign() < 0 {
-			continue // negative answer leaks negatives into a no-negatives envelope
+		bm := mathcore.NormalizeProblemBitmap(adm.Bitmap)
+		// A negative answer must ride a negative literal in the expression: the
+		// stamp reads expression tokens only, so "3 - 8" (answer -5) would stamp
+		// SUBTRACTION alone and be served to no-negatives envelopes. This subsumes
+		// the plain envelope check (a negative answer in a no-negatives envelope
+		// either carries a negative literal — caught by EnvelopeViolation below —
+		// or does not — caught here).
+		if ansVal.Sign() < 0 && bm&uint64(mathcore.NEGATIVES) == 0 {
+			continue
 		}
 		ans := formatAnswer(ansVal, ctx.decimals)
 		if mathcore.VerifyAnswerSymbolic(adm.Tokens, ans) != nil {
 			continue
 		}
-		bm := mathcore.NormalizeProblemBitmap(adm.Bitmap)
 		// Reject trivial candidates: a real problem must carry at least one
 		// operation or an unknown to solve for. A bare number ("7") or "1 = 1"
 		// detects no such bit — it passes the envelope (0 is a subset of
@@ -184,12 +192,12 @@ func buildRaw(bitmap mathcore.ProblemType, rawTarget float64, chainCap int, rng 
 
 // ---- the knob inverter (planConfig) ----
 
-// planConfig sizes one build attempt toward rawTarget under the minimal-concept
-// policy: magnitude and chain length are the near-continuous dials; concepts are
-// coarse jumps added cheapest-first only as the target outgrows what magnitude
-// and chain can supply. The randomized magnitude assumption spreads attempts
-// across the magnitude/concept tradeoff so generate-and-select can keep the
-// closest. Binds to the shared mathcore constants — no private copies.
+// planConfig sizes one build attempt toward rawTarget: magnitude and chain
+// length are the near-continuous dials; concepts are coarse jumps chosen by one
+// of two alternating modes (budget vs coverage — see chooseConcepts /
+// sampleConcepts). The randomized magnitude assumption spreads attempts across
+// the magnitude/concept tradeoff so generate-and-select can keep the closest.
+// Binds to the shared mathcore constants — no private copies.
 func planConfig(bitmap mathcore.ProblemType, rawTarget float64, chainCap int, rng *rand.Rand) buildCtx {
 	ctx := buildCtx{bitmap: bitmap, rng: rng, rawTarget: rawTarget, maxOperand: bracketCap(bitmap)}
 
@@ -237,8 +245,7 @@ func planConfig(bitmap mathcore.ProblemType, rawTarget float64, chainCap int, rn
 	}
 
 	// Concept budget: how much multiplier we still need beyond op*structure at
-	// the magnitude ceiling. Add cheapest enabled concepts (log-closest) until
-	// covered — the minimal-concept policy.
+	// the magnitude ceiling. `need` feeds budget mode; coverage mode ignores it.
 	const magMin = 0.6
 	magCeil := math.Log10(float64(ctx.maxOperand)+1) + 0.3
 	assumedMag := magMin + rng.Float64()*(magCeil-magMin)
@@ -246,8 +253,16 @@ func planConfig(bitmap mathcore.ProblemType, rawTarget float64, chainCap int, rn
 	if ctx.variable {
 		concForVariable = mathcore.ConceptVariable
 	}
+	// Budget mode adds cheapest concepts until they cover `need` (reliable
+	// targeting, reaches the full ceiling stack); coverage mode samples a subset
+	// and lets the magnitude solve compensate (explores the feature space). The
+	// even split is what keeps enabled MAY bits present across the whole band.
 	need := rawTarget / (opW * structure * assumedMag * concForVariable)
-	ctx.chooseConcepts(need)
+	if rng.Intn(2) == 0 {
+		ctx.chooseConcepts(need)
+	} else {
+		ctx.sampleConcepts()
+	}
 
 	// Solve the TARGET operand magnitude for the residual after op/structure/
 	// concept, so construction sizes operands to the target rather than maxing
@@ -311,19 +326,25 @@ func clampOperandCap(cap int, bitmap mathcore.ProblemType, hardCap int, rng *ran
 	return cap
 }
 
-// chooseConcepts enables a minimal subset of the envelope's value-concept bits
-// (fractions/decimals/percent/negatives) to cover need, cheapest-first by
-// multiplier, stopping when the next concept would overshoot need more than the
-// current shortfall (so the difficulty window absorbs the residual rather than a
-// coarse jump blowing past it). Shuffled so equal-cost concepts get fair turns.
-func (ctx *buildCtx) chooseConcepts(need float64) {
+// conceptOption is one enableable value-concept: its setter, its difficulty
+// multiplier, and whether the envelope makes it eligible. The eligibility
+// gates are shared by both selection modes below.
+type conceptOption struct {
+	on   func()
+	mult float64
+	ok   bool
+}
+
+// mismatchedEligible reports whether MISMATCHED may stack this attempt: it
+// rides on an active FRACTIONS realization, so it can only be chosen after
+// fractions is set (both selection modes share this gate).
+func (ctx *buildCtx) mismatchedEligible() bool {
+	return ctx.fractions && ctx.bitmap&mathcore.MISMATCHED_DENOMINATORS != 0
+}
+
+func (ctx *buildCtx) conceptOptions() []conceptOption {
 	b := ctx.bitmap
-	type opt struct {
-		on   func()
-		mult float64
-		ok   bool
-	}
-	opts := []opt{
+	return []conceptOption{
 		{func() { ctx.negatives = true }, mathcore.ConceptNegatives, b&mathcore.NEGATIVES != 0},
 		{func() { ctx.pemdas = true }, mathcore.ConceptPEMDAS,
 			b&mathcore.PEMDAS != 0 && b&mathcore.CHAINED_OPERATIONS != 0 &&
@@ -334,6 +355,15 @@ func (ctx *buildCtx) chooseConcepts(need float64) {
 				b&(mathcore.MEDIUM_NUMBERS|mathcore.LARGE_NUMBERS) != 0},
 		{func() { ctx.fractions = true }, mathcore.ConceptFractions, b&mathcore.FRACTIONS != 0},
 	}
+}
+
+// chooseConcepts (budget mode) enables a minimal subset of the envelope's
+// value-concept bits to cover need, cheapest-first by multiplier, stopping when
+// the next concept would overshoot need more than the current shortfall (so the
+// difficulty window absorbs the residual rather than a coarse jump blowing past
+// it). Shuffled so equal-cost concepts get fair turns.
+func (ctx *buildCtx) chooseConcepts(need float64) {
+	opts := ctx.conceptOptions()
 	ctx.rng.Shuffle(len(opts), func(i, j int) { opts[i], opts[j] = opts[j], opts[i] })
 	got := 1.0
 	logDist := func(v float64) float64 { return math.Abs(math.Log(need) - math.Log(v)) }
@@ -355,8 +385,24 @@ func (ctx *buildCtx) chooseConcepts(need float64) {
 		opts[best].ok = false
 	}
 	// MISMATCHED stacks on FRACTIONS when enabled and it helps close the gap.
-	if ctx.fractions && b&mathcore.MISMATCHED_DENOMINATORS != 0 &&
-		logDist(got*mathcore.ConceptMismatched) < logDist(got) {
+	if ctx.mismatchedEligible() && logDist(got*mathcore.ConceptMismatched) < logDist(got) {
+		ctx.mismatched = true
+	}
+}
+
+// sampleConcepts (coverage mode) enables a random subset of the eligible
+// value-concepts (each with probability 1/2), ignoring the difficulty budget:
+// the magnitude solve compensates by shrinking operands, and generate-and-select
+// keeps only what actually lands near the target. This mode reaches the feature
+// pockets budget mode never proposes — easy concept problems at low targets, and
+// combinations whose multiplier product is not the closest budget cover.
+func (ctx *buildCtx) sampleConcepts() {
+	for _, o := range ctx.conceptOptions() {
+		if o.ok && ctx.rng.Intn(2) == 0 {
+			o.on()
+		}
+	}
+	if ctx.mismatchedEligible() && ctx.rng.Intn(2) == 0 {
 		ctx.mismatched = true
 	}
 }
@@ -386,8 +432,11 @@ func buildOne(ctx buildCtx) (mathcore.Node, *big.Rat, bool) {
 // chooseAnswer picks a concept-friendly target value to grow the tree from: a
 // fraction/decimal when those concepts are active (so the tree's operands fall
 // out as fractions/decimals naturally), else an integer sized to the bracket.
+// With negatives active, half the seeds are negated — the splits then realize
+// negative operands naturally (a negative dividend, a mixed-sign sum).
 func chooseAnswer(ctx buildCtx) *big.Rat {
 	cap := ctx.operandCap
+	var v *big.Rat
 	switch {
 	case ctx.fractions:
 		// With mul/div available, half the time seed an INTEGER answer so a proper
@@ -397,20 +446,25 @@ func chooseAnswer(ctx buildCtx) *big.Rat {
 		// Otherwise a fraction answer; its components stay small (withinMag caps
 		// the multiplicative splits), and additive splits keep it bounded anyway.
 		if ctx.bitmap&(mathcore.MULTIPLICATION|mathcore.DIVISION) != 0 && ctx.rng.Intn(2) == 0 {
-			return big.NewRat(int64(randRange(2, max(2, cap*(ctx.depth+1)), ctx.rng)), 1)
+			v = big.NewRat(int64(randRange(2, max(2, cap*(ctx.depth+1)), ctx.rng)), 1)
+			break
 		}
 		d := pickDenom(ctx)
 		n := 1 + ctx.rng.Intn(d*3)
-		return big.NewRat(int64(n), int64(d))
+		v = big.NewRat(int64(n), int64(d))
 	case ctx.decimals:
 		scale := int64(decimalScale(ctx))
-		return big.NewRat(int64(1+ctx.rng.Intn(cap*int(scale)/10+1)), scale)
+		v = big.NewRat(int64(1+ctx.rng.Intn(cap*int(scale)/10+1)), scale)
 	default:
 		// Scale the seed with the tree size so an additive split yields operands
 		// near operandCap (not a tiny undershoot), and span a wide range so
 		// attempts vary and generate-and-select can match different op shapes.
-		return big.NewRat(int64(randRange(2, max(2, cap*(ctx.depth+1)), ctx.rng)), 1)
+		v = big.NewRat(int64(randRange(2, max(2, cap*(ctx.depth+1)), ctx.rng)), 1)
 	}
+	if ctx.negatives && ctx.rng.Intn(2) == 0 {
+		v.Neg(v)
+	}
+	return v
 }
 
 // randRange returns a uniform int in [lo, hi] (inclusive). hi<lo collapses to lo.
@@ -500,8 +554,21 @@ func splitValue(v *big.Rat, depth int, ctx buildCtx) (byte, *big.Rat, *big.Rat, 
 
 // splitAdd: a + b = v. When a fractional concept is active, a is a non-integer
 // operand of that flavor and b = v - a (also non-integer, rendered to match);
-// otherwise integers. Keeps both operands positive.
+// otherwise integers. Operands stay positive unless negatives are active.
 func splitAdd(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
+	// negatives: a mixed-sign pair (v+k) + (-k) = v, order shuffled — this is
+	// how a negative literal appears under addition for a seed of either sign.
+	if ctx.negatives && v.IsInt() && ctx.rng.Intn(2) == 0 {
+		k := ri(randRange(1, max(1, ctx.operandCap), ctx.rng))
+		a := new(big.Rat).Add(v, k)
+		if a.Sign() != 0 && withinMag(a, ctx) {
+			k.Neg(k)
+			if ctx.rng.Intn(2) == 0 {
+				return a, k, true
+			}
+			return k, a, true
+		}
+	}
 	if ctx.fractions {
 		// a = i/d, b = v - i/d. b's denominator falls out of the subtraction; it
 		// may differ from d (a mismatched pair) and is still a valid fraction
@@ -576,9 +643,13 @@ func splitSub(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
 	if !v.IsInt() {
 		return nil, nil, false
 	}
+	// A negative v yields a negative minuend when b < |v| ("-2 - 3 = -5"); a
+	// positive minuend over a negative v ("3 - 8 = -5") carries no negative
+	// literal, so buildRaw's stamp guard rejects it at the root (the answer
+	// would leak) — as an inner subtree it is fine.
 	b := 1 + ctx.rng.Intn(ctx.operandCap)
 	a := int(v.Num().Int64()) + b
-	if a > ctx.maxOperand {
+	if a > ctx.maxOperand || a < -ctx.maxOperand {
 		return nil, nil, false
 	}
 	return ri(a), ri(b), true
@@ -602,8 +673,8 @@ func splitPercent(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
 	return nil, nil, false
 }
 
-// splitMul: a * b = v. Integer factor split (v must be a positive integer with a
-// factor in range).
+// splitMul: a * b = v. Integer factor split; a negative v (negatives active)
+// factors its magnitude and carries the sign on one random factor.
 func splitMul(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
 	if ctx.fractions || ctx.decimals {
 		if a, b, ok := splitMulFrac(v, ctx); ok {
@@ -615,10 +686,14 @@ func splitMul(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
 			return a, b, true
 		}
 	}
-	if !v.IsInt() || v.Sign() <= 0 {
+	if !v.IsInt() || v.Sign() == 0 || (v.Sign() < 0 && !ctx.negatives) {
 		return nil, nil, false
 	}
 	n := v.Num().Int64()
+	negate := n < 0
+	if negate {
+		n = -n
+	}
 	small := int64(max(2, min(ctx.maxOperand, 12)))
 	// Cap divisors at n/2 so the cofactor is >= 2 too: a x1 factor adds no
 	// operation to perform, only noise (a prime has no clean mul split - the
@@ -627,14 +702,23 @@ func splitMul(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
 	if len(divs) == 0 {
 		return nil, nil, false
 	}
-	a := divs[ctx.rng.Intn(len(divs))]
-	return ri(int(a)), ri(int(n / a)), true
+	a := int(divs[ctx.rng.Intn(len(divs))])
+	b := int(n) / a
+	if negate {
+		if ctx.rng.Intn(2) == 0 {
+			a = -a
+		} else {
+			b = -b
+		}
+	}
+	return ri(a), ri(b), true
 }
 
 // splitDiv: a / b = v. Choose b in range, a = v*b (exact, so division is clean
-// by construction). a must stay within the magnitude bracket.
+// by construction; a negative v yields a negative dividend, "-15 ÷ 3"). a must
+// stay within the magnitude bracket.
 func splitDiv(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
-	if v.Sign() <= 0 {
+	if v.Sign() == 0 || (v.Sign() < 0 && !ctx.negatives) {
 		return nil, nil, false
 	}
 	if ctx.fractions || ctx.decimals {
@@ -642,7 +726,7 @@ func splitDiv(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
 			return a, b, true
 		}
 	}
-	if ctx.fractions && v.IsInt() {
+	if ctx.fractions && v.IsInt() && v.Sign() > 0 {
 		if a, b, ok := splitDivIntByFrac(v, ctx); ok {
 			return a, b, true
 		}
