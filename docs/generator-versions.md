@@ -18,7 +18,7 @@ don't re-derive them here.
 
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
-heuristic_version: heuristic_2.1
+heuristic_version: heuristic_2.2
 llm_version: llm_0.8
 ```
 <!-- END DOC-SYNC ANCHORS -->
@@ -34,7 +34,7 @@ permanent (see [problem-generation.md](problem-generation.md)).
 
 | Generator | Package | Current version | Nature |
 |-----------|---------|-----------------|--------|
-| Heuristic | `server/generator` | `heuristic_2.1` (`VERSION`) | Deterministic in-process Go; no API, no cost, fast. Difficulty-targeting, compositional. Owns the math for EVERY problem — the sole source for non-word, and the skeleton source for word. |
+| Heuristic | `server/generator` | `heuristic_2.2` (`VERSION`) | Deterministic in-process Go; no API, no cost, fast. Difficulty-targeting, compositional. Owns the math for EVERY problem — the sole source for non-word, and the skeleton source for word. |
 | LLM | `server/llm_generator` | `llm_0.8` (`VERSION`) | Calls OpenAI to NARRATE a heuristic skeleton into a word problem (`llm_0.6`+); no longer authors math. Slower, costs per problem, batched up to `MAX_QUANTITY` per call. |
 
 ## Heuristic versions
@@ -44,7 +44,8 @@ permanent (see [problem-generation.md](problem-generation.md)).
 | `heuristic_0.0` | Original hand-written generator — and, like `heuristic_2.0`, **compositional and difficulty-targeting**: it built expressions toward a requested difficulty rather than emitting fixed template shapes. Add/sub/mul only (wired up for add/sub at low difficulty), no fractions; output wrapped single numbers in parens (`(3)+(5)-(2)`). Problems remain in the DB for history but are `status = 'deprecated'` (see the note below). |
 | `heuristic_1.0` | Template-enumeration rewrite. Four operations (`+ - * /`); fixed template shapes (basic binary, missing-number, multi-term chains, same/different-denominator fractions). Did NOT target difficulty — it emitted a shape and let the formula score whatever fell out, and DECIMALS/PEMDAS/PERCENTAGES/SINGLE_VARIABLE were LLM-only (#227). Problems remain in the DB for history but are `status = 'deprecated'` (see the note below). |
 | `heuristic_2.0` | Compositional, difficulty-targeting rewrite (#283) that RE-introduces the targeting `heuristic_0.0` had and `heuristic_1.0` dropped. Takes the envelope bitmap + the user's `target_difficulty` and aims each candidate at it; covers EVERY non-WORD bit and arbitrary STACKS of them (the previously-LLM-only DECIMALS/PEMDAS/PERCENTAGES/SINGLE_VARIABLE included). Builds answer-first on the `mathcore` render-only AST; see below. |
-| `heuristic_2.1` (current) | Percent-of output shape (#309). A percent realizes ONLY at the root of the tree as `n% of X`: the percent operand is a direct leaf (`expand` no longer recurses into it — `heuristic_2.0` re-split it, producing degenerate `25% × 1` factors and percent chains), the other factor grows with percent cleared (one percent per problem), and the percent concept is gated on MULTIPLICATION plus a ≥MEDIUM bracket (percent literals are two-digit values). Integer mul splits also stopped emitting ×1 cofactors (a prime has no clean mul split; the attempt falls back to another op). Same targeting machinery as `heuristic_2.0`. |
+| `heuristic_2.1` | Percent-of output shape (#309). A percent realizes ONLY at the root of the tree as `n% of X`: the percent operand is a direct leaf (`expand` no longer recurses into it — `heuristic_2.0` re-split it, producing degenerate `25% × 1` factors and percent chains), the other factor grows with percent cleared (one percent per problem), and the percent concept is gated on MULTIPLICATION plus a ≥MEDIUM bracket (percent literals are two-digit values). Integer mul splits also stopped emitting ×1 cofactors (a prime has no clean mul split; the attempt falls back to another op). Same targeting machinery as `heuristic_2.0`. |
+| `heuristic_2.2` (current) | Coverage-aware concept selection + NEGATIVES realization. Concept planning alternates two modes per attempt: the budget-greedy minimal-concept cover (as before) and a coverage mode that samples a random subset of the eligible value-concepts, letting the magnitude solve compensate downward — so enabled MAY bits appear across the whole difficulty band (an easy fraction problem at a low target) instead of only where their multiplier is the budget's closest cover. NEGATIVES — priced by the plan and the ceiling since `heuristic_2.0` but never constructed (0 negative problems in 3,000 rich-envelope builds; the DIVISION+NEGATIVES ceiling advertised 12.3 while 10.6 was achievable) — is now realized: answer seeds are negated half the time when the concept is active, addition splits into mixed-sign pairs (`9 + -4`), and a negative value divides as a negative dividend (`-15 ÷ 3`), factors with the sign on one factor, and subtracts through (`-2 - 3`). A stamp guard rejects any candidate whose ANSWER is negative but whose expression carries no negative literal (`3 - 8` = -5 would stamp SUBTRACTION alone and be served to no-negatives envelopes — the stamp reads expression tokens only). Same targeting machinery; **no `DifficultyVersion` bump** (formula unchanged). |
 
 ### Deprecated generator rows
 

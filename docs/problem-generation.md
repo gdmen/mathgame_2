@@ -424,9 +424,14 @@ are the generation-relevant surface.)
   outward from a chosen answer via one recursion — operators are node choices,
   concepts are operand realizations in the split — so concepts COMPOSE and it
   covers every non-WORD bit and arbitrary stacks, including DECIMALS / PEMDAS /
-  PERCENTAGES / SINGLE_VARIABLE (previously LLM-only). A knob inverter
-  (`RawForDifficulty` → a magnitude/chain/concept budget, minimal-concept-first,
-  binding the shared difficulty constants) sizes each attempt; generate-and-select
+  PERCENTAGES / SINGLE_VARIABLE (previously LLM-only) and NEGATIVES
+  (mixed-sign sums, negative dividends/factors/minuends, negative answers — a
+  negative ANSWER always rides a negative literal in the expression, since the
+  stamp reads expression tokens only). A knob inverter (`RawForDifficulty` → a
+  magnitude/chain/concept budget, binding the shared difficulty constants) sizes
+  each attempt; concept selection alternates a minimal-concept budget mode with
+  a coverage-sampled mode, so enabled MAY bits appear across the whole band
+  rather than only where the budget arithmetic demands them; generate-and-select
   over the canonical pipeline keeps the closest in-window survivor and fails
   closed (closest-achievable, then a deterministic fallback, near the ceiling).
   Fraction operands stay proper and small; in a magnitude bracket the
