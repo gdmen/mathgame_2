@@ -22,6 +22,9 @@ func TestComputeProblemDifficulty_ReferenceValues(t *testing.T) {
 		{"12 - x = 5", 6.20}, // lone bare letter rewritten to '?' (stage 1.5)
 		{"47 + 28", 6.51},
 		{"99 - 87", 7.87},
+		{"8 - 3", 4.70},  // positive result: no negatives concept
+		{"3 - 8", 5.99},  // negative RESULT prices ConceptNegatives (v0.6) — no literal needed
+		{"-4 + 9", 5.69}, // negative literal, positive result: fires as before
 		{"9 * 12", 9.09},
 		{"1/2 + 1/2", 5.27},                   // same-denom fractions x2.0
 		{"11/12 - 5/12", 9.09},                // same-denom at 2-digit magnitude
