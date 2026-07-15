@@ -308,10 +308,10 @@ func (a *Api) runHeuristicGenerator(logPrefix string, settings *Settings, numPro
 		}
 		// Envelope is the problemType param (the caller-masked request for
 		// THIS generation call, always a subset of the user's settings), not
-		// settings.ProblemTypeBitmap directly. NormalizeProblemBitmap is a
-		// no-op on the parser's own output (it co-sets these bits already);
-		// applied for uniformity with the WORD path.
-		bitmap := mathcore.NormalizeProblemBitmap(adm.Bitmap)
+		// settings.ProblemTypeBitmap directly. The stamp is answer-aware (a
+		// negative answer ORs NEGATIVES in); the structural bits are a no-op
+		// on the parser's own output (it co-sets those already).
+		bitmap := mathcore.NormalizeProblemBitmap(adm.Bitmap, answer)
 		if v := mathcore.EnvelopeViolation(bitmap, uint64(problemType)); v != "" {
 			funnel.reject(rejectEnvelope)
 			glog.Infof("%s heuristic envelope reject [%s]: %q", logPrefix, v, expr)
@@ -493,7 +493,7 @@ func (a *Api) runWordGenerator(logPrefix string, settings *Settings, numProblems
 		// "200 seats" story stamping LARGE_NUMBERS onto a small skeleton),
 		// which then trips the envelope check and drops a valid narration.
 		// The skeleton is the source of truth for the math and the bits.
-		bitmap := mathcore.WordFormBitmap(admSym.Bitmap)
+		bitmap := mathcore.WordFormBitmap(admSym.Bitmap, p.Answer)
 		if v := mathcore.EnvelopeViolation(bitmap, settings.ProblemTypeBitmap); v != "" {
 			funnel.reject(rejectEnvelope)
 			glog.Infof("%s narration envelope reject [%s]: %q", logPrefix, v, p.Expression)

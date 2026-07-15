@@ -130,41 +130,63 @@ func TestEnvelopeViolation(t *testing.T) {
 }
 
 // TestNormalizeProblemBitmap: structural invariants that the WORD validator
-// (independent feature checkboxes) can violate. Each ORs in an implied bit;
-// the operation only narrows a problem's audience, never widens it.
+// (independent feature checkboxes) can violate, plus the answer-side
+// NEGATIVES rule (token detection sees only literals; a negative ANSWER is a
+// negatives problem regardless of notation — "3 - 8" = -5). Each ORs in an
+// implied bit; the operation only narrows a problem's audience, never widens
+// it.
 func TestNormalizeProblemBitmap(t *testing.T) {
 	cases := []struct {
-		name string
-		in   ProblemType
-		want ProblemType
+		name   string
+		in     ProblemType
+		answer string
+		want   ProblemType
 	}{
 		{"two core ops imply chained",
-			MULTIPLICATION | SUBTRACTION | WORD,
+			MULTIPLICATION | SUBTRACTION | WORD, "6",
 			MULTIPLICATION | SUBTRACTION | WORD | CHAINED_OPERATIONS},
 		{"three core ops imply chained",
-			ADDITION | SUBTRACTION | MULTIPLICATION | WORD,
+			ADDITION | SUBTRACTION | MULTIPLICATION | WORD, "6",
 			ADDITION | SUBTRACTION | MULTIPLICATION | WORD | CHAINED_OPERATIONS},
 		{"pemdas implies chained",
-			ADDITION | PEMDAS | WORD,
+			ADDITION | PEMDAS | WORD, "6",
 			ADDITION | PEMDAS | WORD | CHAINED_OPERATIONS},
 		{"mismatched implies fractions",
-			MISMATCHED_DENOMINATORS | WORD,
+			MISMATCHED_DENOMINATORS | WORD, "1/2",
 			MISMATCHED_DENOMINATORS | WORD | FRACTIONS},
 		{"single core op untouched",
-			SUBTRACTION | WORD | MEDIUM_NUMBERS,
+			SUBTRACTION | WORD | MEDIUM_NUMBERS, "6",
 			SUBTRACTION | WORD | MEDIUM_NUMBERS},
 		{"already-chained untouched",
-			ADDITION | SUBTRACTION | CHAINED_OPERATIONS,
+			ADDITION | SUBTRACTION | CHAINED_OPERATIONS, "6",
 			ADDITION | SUBTRACTION | CHAINED_OPERATIONS},
 		{"zero stays zero",
-			0, 0},
+			0, "", 0},
+		{"negative integer answer implies negatives",
+			SUBTRACTION, "-5",
+			SUBTRACTION | NEGATIVES},
+		{"negative fraction answer implies negatives",
+			SUBTRACTION | FRACTIONS | MISMATCHED_DENOMINATORS, "-1/42",
+			SUBTRACTION | FRACTIONS | MISMATCHED_DENOMINATORS | NEGATIVES},
+		{"negative decimal answer implies negatives",
+			SUBTRACTION | DECIMALS, "-0.5",
+			SUBTRACTION | DECIMALS | NEGATIVES},
+		{"positive answer untouched",
+			SUBTRACTION, "5",
+			SUBTRACTION},
+		{"negatives already set: idempotent",
+			SUBTRACTION | NEGATIVES, "-5",
+			SUBTRACTION | NEGATIVES},
+		{"unparseable answer untouched",
+			SUBTRACTION, "not a number",
+			SUBTRACTION},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := NormalizeProblemBitmap(uint64(tc.in))
+			got := NormalizeProblemBitmap(uint64(tc.in), tc.answer)
 			if got != uint64(tc.want) {
-				t.Errorf("NormalizeProblemBitmap(%d) = %d (%v), want %d (%v)",
-					tc.in, got, ProblemTypeToFeatures(ProblemType(got)),
+				t.Errorf("NormalizeProblemBitmap(%d, %q) = %d (%v), want %d (%v)",
+					tc.in, tc.answer, got, ProblemTypeToFeatures(ProblemType(got)),
 					tc.want, ProblemTypeToFeatures(tc.want))
 			}
 		})
@@ -180,21 +202,25 @@ func TestWordFormBitmap(t *testing.T) {
 	cases := []struct {
 		name     string
 		skeleton uint64
+		answer   string
 		want     uint64
 	}{
 		{"pemdas dropped, chained kept",
-			uint64(ADDITION | MULTIPLICATION | CHAINED_OPERATIONS | PEMDAS),
+			uint64(ADDITION | MULTIPLICATION | CHAINED_OPERATIONS | PEMDAS), "20",
 			uint64(WORD | ADDITION | MULTIPLICATION | CHAINED_OPERATIONS)},
 		{"plain skeleton gains WORD",
-			uint64(DIVISION | MEDIUM_NUMBERS),
+			uint64(DIVISION | MEDIUM_NUMBERS), "5",
 			uint64(WORD | DIVISION | MEDIUM_NUMBERS)},
 		{"structural invariant still applied",
-			uint64(ADDITION | SUBTRACTION),
+			uint64(ADDITION | SUBTRACTION), "5",
 			uint64(WORD | ADDITION | SUBTRACTION | CHAINED_OPERATIONS)},
+		{"negative skeleton answer implies negatives",
+			uint64(SUBTRACTION), "-5",
+			uint64(WORD | SUBTRACTION | NEGATIVES)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := WordFormBitmap(tc.skeleton)
+			got := WordFormBitmap(tc.skeleton, tc.answer)
 			if got != tc.want {
 				t.Errorf("WordFormBitmap(%v) = %v, want %v",
 					ProblemTypeToFeatures(ProblemType(tc.skeleton)),
