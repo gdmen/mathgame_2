@@ -45,7 +45,14 @@ const (
 // never needs this - it co-sets these from the token stream - so this is the
 // deterministic backstop for the validator and legacy-preserved stamps.
 // Apply at every FINAL stamp site, after any validator/legacy merge.
-func NormalizeProblemBitmap(b uint64) uint64 {
+//
+// The answer is part of the stamp: a negative ANSWER is a negatives problem
+// regardless of notation — "3 - 8" (answer -5) demands the kid produce a
+// signed number, but token detection sees only literals and would stamp
+// SUBTRACTION alone, leaking it to no-negatives envelopes. An unparseable
+// answer contributes nothing (legacy junk is surfaced by the recompute
+// census, not guessed at here).
+func NormalizeProblemBitmap(b uint64, answer string) uint64 {
 	pt := ProblemType(b)
 	coreOps := ADDITION | SUBTRACTION | MULTIPLICATION | DIVISION
 	if bits.OnesCount64(uint64(pt&coreOps)) >= 2 {
@@ -57,6 +64,9 @@ func NormalizeProblemBitmap(b uint64) uint64 {
 	if pt&MISMATCHED_DENOMINATORS != 0 {
 		b |= uint64(FRACTIONS) // mismatched denominators require fractions
 	}
+	if r, ok := parseAnswerToRat(answer); ok && r.Sign() < 0 {
+		b |= uint64(NEGATIVES) // producing a signed number is the negatives skill
+	}
 	return b
 }
 
@@ -67,8 +77,8 @@ func NormalizeProblemBitmap(b uint64) uint64 {
 // score agree (the word rules in docs/problem-generation.md own the why).
 // Normalization runs BEFORE the drop so a PEMDAS-implied CHAINED_OPERATIONS
 // survives it.
-func WordFormBitmap(skeletonBits uint64) uint64 {
-	b := NormalizeProblemBitmap(skeletonBits)
+func WordFormBitmap(skeletonBits uint64, answer string) uint64 {
+	b := NormalizeProblemBitmap(skeletonBits, answer)
 	return (b &^ uint64(PEMDAS)) | uint64(WORD)
 }
 

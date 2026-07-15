@@ -126,7 +126,9 @@ operational summary:
   1. `./bin/recompute_problem_type_bitmap -config conf.json -dry-run` — read the
      lexer census, zero-bitmap, and unknown-rule review lists; then run it for
      real. The lone-letter `?` rewrite mutates stored expressions, so this runs
-     **first**.
+     **first**. A stamp-rule change (e.g. the answer-side NEGATIVES invariant)
+     also requires this run — restamps read the stored answer, not just the
+     expression.
   2. `./bin/recompute_problem_difficulty -config conf.json` — restamps the
      difficulty column. **Must run after** the bitmap tool, because difficulty
      is computed from the post-rewrite expressions.

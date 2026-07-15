@@ -576,7 +576,7 @@ func TestWordStampScoreCoherence(t *testing.T) {
 		t.Fatal("skeleton should fire PEMDAS symbolically")
 	}
 
-	stamp := WordFormBitmap(adm.Bitmap)
+	stamp := WordFormBitmap(adm.Bitmap, "11")
 	if stamp&uint64(PEMDAS) != 0 {
 		t.Error("word stamp kept the PEMDAS bit")
 	}

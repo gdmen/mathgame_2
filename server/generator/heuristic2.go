@@ -152,20 +152,14 @@ func buildRaw(bitmap mathcore.ProblemType, rawTarget float64, chainCap int, rng 
 			}
 			ansVal = v
 		}
-		bm := mathcore.NormalizeProblemBitmap(adm.Bitmap)
-		// A negative answer must ride a negative literal in the expression: the
-		// stamp reads expression tokens only, so "3 - 8" (answer -5) would stamp
-		// SUBTRACTION alone and be served to no-negatives envelopes. This subsumes
-		// the plain envelope check (a negative answer in a no-negatives envelope
-		// either carries a negative literal — caught by EnvelopeViolation below —
-		// or does not — caught here).
-		if ansVal.Sign() < 0 && bm&uint64(mathcore.NEGATIVES) == 0 {
-			continue
-		}
 		ans := formatAnswer(ansVal, ctx.decimals)
 		if mathcore.VerifyAnswerSymbolic(adm.Tokens, ans) != nil {
 			continue
 		}
+		// The stamp is answer-aware: a negative answer ORs NEGATIVES in, so a
+		// no-literal shape like "3 - 8" (answer -5) stamps NEGATIVES and the
+		// EnvelopeViolation below rejects it for a no-negatives envelope.
+		bm := mathcore.NormalizeProblemBitmap(adm.Bitmap, ans)
 		// Reject trivial candidates: a real problem must carry at least one
 		// operation or an unknown to solve for. A bare number ("7") or "1 = 1"
 		// detects no such bit — it passes the envelope (0 is a subset of
@@ -643,10 +637,9 @@ func splitSub(v *big.Rat, ctx buildCtx) (*big.Rat, *big.Rat, bool) {
 	if !v.IsInt() {
 		return nil, nil, false
 	}
-	// A negative v yields a negative minuend when b < |v| ("-2 - 3 = -5"); a
-	// positive minuend over a negative v ("3 - 8 = -5") carries no negative
-	// literal, so buildRaw's stamp guard rejects it at the root (the answer
-	// would leak) — as an inner subtree it is fine.
+	// A negative v yields either a negative minuend ("-2 - 3 = -5") or the
+	// classic crossing-zero shape ("3 - 8 = -5"); the latter carries no
+	// negative literal, but the answer-aware stamp still marks it NEGATIVES.
 	b := 1 + ctx.rng.Intn(ctx.operandCap)
 	a := int(v.Num().Int64()) + b
 	if a > ctx.maxOperand || a < -ctx.maxOperand {

@@ -61,7 +61,7 @@ concern. Users compose their envelope directly.
 | `ADDITION` `SUBTRACTION` `MULTIPLICATION` `DIVISION` | operator token present | `opWeight` = MAX over present ops (`WeightSub`/`WeightMul`/`WeightDiv`; add is the 1.0 baseline) |
 | `FRACTIONS` | any fraction token (`3/8` unspaced; `\frac{a}{b}` normalizes to it) | `ConceptFractions` (same denominators) |
 | `MISMATCHED_DENOMINATORS` | ≥2 fractions, differing denominators; on WORD problems, validator-observed (prose fractions); forces FRACTIONS via the stamp-time invariant | `ConceptMismatched`, multiplied ON TOP of `ConceptFractions` |
-| `NEGATIVES` | unary-minus number token | `ConceptNegatives` |
+| `NEGATIVES` | unary-minus number token; the final stamp also ORs it in when the ANSWER is negative (`3 - 8` = -5 — see the stamp-time invariant) | `ConceptNegatives` |
 | `WORD` | `\text{...}` present | `ConceptWord` (stacks with SINGLE_VARIABLE) |
 | `MEDIUM_NUMBERS` | maxMagnitude 13–99 (bracket) | via magnitude |
 | `LARGE_NUMBERS` | maxMagnitude ≥ 100 (bracket — `1 + 999` is LARGE, not MEDIUM) | via magnitude |
@@ -235,11 +235,16 @@ around a subexpression) — so
 
 **Stamp-time structural invariant.** `NormalizeProblemBitmap`
 (`mathcore/stamping.go`) OR's in implied bits at every final stamp site: ≥2 distinct core ops or PEMDAS
-⇒ CHAINED_OPERATIONS; MISMATCHED ⇒ FRACTIONS. It only ever NARROWS the
-serving audience. Both stamp sites now feed it parser output — the symbolic
-path and the WORD skeleton co-set implied bits from the token stream already —
-so it is a defensive no-op applied uniformly, not a correction the WORD path
-relies on.
+⇒ CHAINED_OPERATIONS; MISMATCHED ⇒ FRACTIONS; and a **negative ANSWER ⇒
+NEGATIVES** — producing a signed number is the negatives skill, but token
+detection sees only literals, so `3 - 8` (answer -5) would otherwise stamp
+SUBTRACTION alone and be served to no-negatives envelopes. The answer is
+therefore an input to the stamp (`NormalizeProblemBitmap(bits, answer)`,
+`WordFormBitmap(bits, answer)` — the WORD rule reads the SKELETON's answer);
+an unparseable answer contributes nothing. It only ever NARROWS the
+serving audience. The structural bits are a defensive no-op on parser output —
+the symbolic path and the WORD skeleton co-set implied bits from the token
+stream already — but the answer rule is load-bearing on every path.
 
 Every drop is counted in a per-call funnel line:
 `funnel: requested= returned= lexer= unknown_rules= collision= answer= envelope= validator= create= inserted=`

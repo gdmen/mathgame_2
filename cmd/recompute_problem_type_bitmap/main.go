@@ -168,7 +168,7 @@ func main() {
 				// scores the stored symbolic_expression) sees the same text
 				// the bits were stamped from - e.g. a labeled-unknown
 				// skeleton collapses in both places, not just here.
-				newBitmap = mathcore.WordFormBitmap(admSym.Bitmap)
+				newBitmap = mathcore.WordFormBitmap(admSym.Bitmap, newAnswer)
 				newSymbolic = admSym.Expr
 			} else {
 				// Unparseable skeleton: preserve the self-reported topic
@@ -183,8 +183,10 @@ func main() {
 			newBitmap |= r.oldBitmap & legacyTopicMask
 		}
 		// Legacy topic bits can carry 2 core ops without chained (etc.);
-		// enforce the structural invariants (#246).
-		newBitmap = mathcore.NormalizeProblemBitmap(newBitmap)
+		// enforce the structural invariants and the answer-side NEGATIVES
+		// rule (legacy rows include negative-answer problems stamped from
+		// tokens alone).
+		newBitmap = mathcore.NormalizeProblemBitmap(newBitmap, newAnswer)
 		if newBitmap == 0 {
 			zeroBitmap++
 			zeroRows = append(zeroRows, r.id)

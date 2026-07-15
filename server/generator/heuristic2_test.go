@@ -184,7 +184,7 @@ func TestBuildProblem_PropertySweep(t *testing.T) {
 				t.Errorf("built answer wrong: %q = %q (bm=%d target=%.0f)", expr, ans, bm, target)
 				continue
 			}
-			stamped := mathcore.NormalizeProblemBitmap(adm.Bitmap)
+			stamped := mathcore.NormalizeProblemBitmap(adm.Bitmap, ans)
 			if v := mathcore.EnvelopeViolation(stamped, uint64(bm)); v != "" {
 				t.Errorf("envelope violation [%s]: %q (bm=%d target=%.0f)", v, expr, bm, target)
 				continue
@@ -492,12 +492,13 @@ func TestBuildProblem_PercentOfShape(t *testing.T) {
 var reDegenerateFactor = regexp.MustCompile(`(\*|of) 1\b`)
 
 // TestBuildProblem_NegativesRealized: an envelope with NEGATIVES actually
-// produces negative-literal problems at a healthy rate, for every core op —
-// the bit must be realizable, not just priced into the plan. Two hard
-// invariants ride along: a negative ANSWER must stamp NEGATIVES (a "3 - 8"
-// with answer -5 would otherwise be served to a no-negatives kid — the stamp
-// reads expression tokens only), and the NEGATIVES ceiling must be reachable
-// (the +30% concept headroom exists only if the builder can spend it).
+// produces negatives problems at a healthy rate, for every core op — the bit
+// must be realizable, not just priced into the plan. "Fired" is the
+// answer-aware STAMP (what serving matches on): a negative literal in the
+// expression or a negative answer both count. The NEGATIVES ceiling must be
+// reachable (the +30% concept headroom exists only if the builder can spend
+// it), and for subtraction the classic crossing-zero shape ("3 - 8" = -5)
+// must occur.
 func TestBuildProblem_NegativesRealized(t *testing.T) {
 	cases := []struct {
 		name string
@@ -516,7 +517,7 @@ func TestBuildProblem_NegativesRealized(t *testing.T) {
 		ceil := mathcore.MaxDiffForBitmap(uint64(c.bm))
 		lo := mathcore.MinTargetDifficulty
 		const n = 400
-		fired := 0
+		fired, negAnswers := 0, 0
 		var maxDiff float64
 		for i := 0; i < n; i++ {
 			target := lo + rng.Float64()*(ceil-lo)
@@ -524,20 +525,24 @@ func TestBuildProblem_NegativesRealized(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%s: BuildProblem: %v", c.name, err)
 			}
-			bm := mathcore.ProblemType(mathcore.DetectProblemTypeBitmap(expr))
-			if bm&mathcore.NEGATIVES != 0 {
+			stamp := mathcore.NormalizeProblemBitmap(mathcore.DetectProblemTypeBitmap(expr), ans)
+			if stamp&uint64(mathcore.NEGATIVES) != 0 {
 				fired++
 			}
-			if strings.HasPrefix(ans, "-") && bm&mathcore.NEGATIVES == 0 {
-				t.Errorf("%s: negative answer without a NEGATIVES stamp would leak to no-negatives envelopes: %q = %q", c.name, expr, ans)
+			if strings.HasPrefix(ans, "-") {
+				negAnswers++
 			}
 			if d := mathcore.ComputeProblemDifficulty(mathcore.AdmitExpression(expr).Expr, ""); d > maxDiff {
 				maxDiff = d
 			}
 		}
-		t.Logf("%s: negatives fired in %d/%d, max difficulty %.2f (ceiling %.2f)", c.name, fired, n, maxDiff, ceil)
+		t.Logf("%s: negatives stamped in %d/%d (negative answers %d), max difficulty %.2f (ceiling %.2f)",
+			c.name, fired, n, negAnswers, maxDiff, ceil)
 		if fired < n/20 {
-			t.Errorf("%s: negatives fired in only %d/%d builds — the bit is not being realized", c.name, fired, n)
+			t.Errorf("%s: negatives stamped in only %d/%d builds — the bit is not being realized", c.name, fired, n)
+		}
+		if c.name == "sub neg" && negAnswers == 0 {
+			t.Errorf("%s: no negative-answer problems — the crossing-zero shape (3 - 8 = -5) is not being emitted", c.name)
 		}
 		if maxDiff < ceil-targetWindow {
 			t.Errorf("%s: max difficulty %.2f fell short of ceiling %.2f-window — the negatives headroom is not reachable", c.name, maxDiff, ceil)
