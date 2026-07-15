@@ -222,10 +222,14 @@ on dialect ambiguity).
 
 `heuristic_2.0` splits the two forms across two columns: `expression` holds a
 **valid-LaTeX display skin** (`mathcore.DisplayExpression` folds `a/b`→`\frac`,
-`÷`→`\div`, `*`→`\times`, ` of `→`\text{ of }`, and `%`→`\%` — KaTeX reads a
-bare `%` as a comment),
+`÷`→`\div`, `*`→`\times`, ` of `→`\text{ of }`, `%`→`\%` — KaTeX reads a
+bare `%` as a comment — and parenthesizes a negative literal that follows an
+operator: `9 + (-4)`, the print convention; a LEADING negative and an equation
+RHS stay bare, `-15 ÷ 3`, `? - 3 = -7`),
 and `symbolic_expression` holds the canonical grammar (`58/3 ÷ 8`). NORMALIZE
-bridges them — it folds both to the same form — so
+bridges them — it folds both to the same form (parens around a bare negative
+literal strip back off; they are never PEMDAS-load-bearing, unlike parens
+around a subexpression) — so
 `NormalizeExpression(expression) == NormalizeExpression(symbolic_expression)`
 (pinned by `TestDisplaySymbolicRoundTrip`).
 
