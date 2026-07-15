@@ -39,7 +39,7 @@ import (
 // any new feature in parseProblemFeatures, any change to the compression
 // curve). 0.x while the scale is still in active calibration; 1.0 once
 // stable. Minor bumps for tuning, major bumps for structural rewrites.
-const DifficultyVersion = "0.5"
+const DifficultyVersion = "0.6"
 
 // Shared shape constants - used by BOTH the generators' option mapping and
 // MaxDiffForBitmap so the ceiling and what generation can actually produce
@@ -174,9 +174,12 @@ func parseProblemFeatures(expr string) problemFeatures {
 
 	letters := map[byte]bool{}
 	denoms := map[int64]bool{}
+	hasEquals := false
 
 	for _, t := range toks {
 		switch t.Kind {
+		case TokEquals:
+			hasEquals = true
 		case TokText:
 			f.isWord = true
 			// Difficulty-side prose scan: numerals, decimals, percents.
@@ -253,6 +256,17 @@ func parseProblemFeatures(expr string) problemFeatures {
 	f.distinctUnknowns = len(letters)
 	if f.questionMarks > 0 {
 		f.distinctUnknowns++
+	}
+	// A negative RESULT fires the negatives concept — producing a signed
+	// number is the negatives skill even with no negative literal ("3 - 8").
+	// Only a bare computation self-evaluates (no '=', no unknown, no prose);
+	// an equation's solution is not derivable from tokens alone, so its
+	// negative answer is caught by the answer-aware stamp
+	// (NormalizeProblemBitmap) but not priced here — the documented seam.
+	if !f.hasNegatives && !f.isWord && !hasEquals && f.distinctUnknowns == 0 {
+		if v, err := EvalTokens(toks, nil); err == nil && v.Sign() < 0 {
+			f.hasNegatives = true
+		}
 	}
 	f.requiresPEMDAS = requiresPEMDAS(toks)
 	return f

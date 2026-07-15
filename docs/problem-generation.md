@@ -12,7 +12,7 @@ them.
 
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
-difficulty_version: 0.5
+difficulty_version: 0.6
 max_chain_len: 5
 max_word_chain_len: 3
 min_constructible_operand: 2
@@ -283,7 +283,7 @@ as disagreement; a correct-side error is malformed and never fires. Unknowns
 are bound to fixed rational probes (`pemdasProbes`) — the formula stays a pure
 function of the expression because the recompute fast-path depends on that.
 
-## Difficulty formula (v0.5) and ceiling
+## Difficulty formula (v0.6) and ceiling
 
 `ComputeProblemDifficulty(expression, symbolic_expression)`
 (server/mathcore/difficulty.go); the version string is `DifficultyVersion`
@@ -315,10 +315,14 @@ single source of truth for the expr-vs-symbolic dispatch;
 calibration page without affecting scoring.
 
 Changing the formula in ANY way requires bumping `DifficultyVersion` and
-running `recompute_problem_difficulty` on deploy. (v0.5's change is
-detection-side: the `of` connective and its `\text{ of }` normalizer fold
-make a legacy spliced form like `25%\text{ of }80` fire MULTIPLICATION where
-v0.4 read the connective as opaque prose.)
+running `recompute_problem_difficulty` on deploy. (v0.6: a negative RESULT
+fires the negatives concept — a bare computation with no `=`, unknown, or
+prose self-evaluates, so `3 - 8` prices `ConceptNegatives` like its stamp; an
+equation's negative solution is stamped via the answer-aware invariant but
+NOT priced, the documented seam. v0.5 was detection-side: the `of` connective
+and its `\text{ of }` normalizer fold made a legacy spliced form like
+`25%\text{ of }80` fire MULTIPLICATION where v0.4 read the connective as
+opaque prose.)
 
 **Word problems (v0.4):** a word problem's `expression` is prose inside
 `\text{...}`, so its operators are invisible to the token-level
