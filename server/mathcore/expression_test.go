@@ -26,6 +26,15 @@ func TestNormalizeExpression(t *testing.T) {
 		{`15,000 + 5`, `15000 + 5`}, // thousands separator joined
 		{`1,234,567`, `1234567`},    // multi-group number
 		{`12,3456`, `12,3456`},      // not a thousands pattern: untouched
+		// Parenthesized negative literals (the display convention) fold to the
+		// bare grammar form; parens around a SUBEXPRESSION are load-bearing
+		// (PEMDAS) and stay.
+		{`9 + (-4)`, `9 + -4`},
+		{`5 - (-3)`, `5 - -3`},
+		{`3 \times (-5)`, `3 * -5`},
+		{`9 + (-3/4)`, `9 + -3/4`},
+		{`5 + (-0.5)`, `5 + -0.5`},
+		{`(-4 + 9) * 2`, `(-4 + 9) * 2`},
 	}
 	for _, tc := range cases {
 		if got := NormalizeExpression(tc.in); got != tc.want {
@@ -50,6 +59,17 @@ func TestDisplayExpression(t *testing.T) {
 		{`25% + 10%`, `25\% + 10\%`},                  // every percent escaped
 		{`47 + 28`, `47 + 28`},                        // no fractions: passthrough
 		{`1/2`, `\frac{1}{2}`},
+		// A negative literal after an operator is parenthesized (textbook
+		// convention: "9 + (-4)", never the bare "9 + -4"); a LEADING negative
+		// stays bare, and an equation RHS ("= -7") stays bare.
+		{`9 + -4`, `9 + (-4)`},
+		{`5 - -3`, `5 - (-3)`},
+		{`3 * -5`, `3 \times (-5)`},
+		{`10 ÷ -2`, `10 \div (-2)`},
+		{`-15 ÷ 3`, `-15 \div 3`},
+		{`-2 - 3`, `-2 - 3`},
+		{`9 + -3/4`, `9 + (-\frac{3}{4})`},
+		{`? - 3 = -7`, `? - 3 = -7`},
 	}
 	for _, tc := range cases {
 		got := DisplayExpression(tc.in)
@@ -73,7 +93,7 @@ func TestLexExpression_Accepts(t *testing.T) {
 		{"3+5", 3}, // unspaced ops lex too
 		{"12 - 5", 3},
 		{"-12 - 5", 3},     // unary minus number, op, number
-		{"(-3) + 5", 5},    // ( -3 ) + 5
+		{"(-3) + 5", 3},    // NORMALIZE folds (-3) to -3: number, op, number
 		{"1/2 + 3/4", 3},   // fraction op fraction
 		{"42 ÷ 6", 3},      // obelus = division
 		{"42 / 6", 1},      // spaced slash = fraction (spacing-agnostic)

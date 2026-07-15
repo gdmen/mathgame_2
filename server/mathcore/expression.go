@@ -108,6 +108,21 @@ var reFracLiteral = regexp.MustCompile(`(\d+)/(\d+)`)
 // the captured boundary.
 var reThousands = regexp.MustCompile(`(\d),(\d{3})($|[^\d])`)
 
+// reParenNegLiteral matches parens wrapped around a bare negative literal
+// ("(-4)", "(-3/4)", "(-0.5)") — the display convention for a negative
+// following an operator. NormalizeExpression strips them back to the bare
+// grammar form: parens around a single literal are never load-bearing for
+// PEMDAS (naive and correct evaluation agree on a lone number), unlike parens
+// around a subexpression, which this deliberately does not match.
+var reParenNegLiteral = regexp.MustCompile(`\((-\d[\d./]*)\)`)
+
+// reNegAfterOp matches a bare negative literal in operand position after a
+// binary operator ("9 + -4", "10 ÷ -2", "of -8"). DisplayExpression wraps it
+// in parens — print convention writes "9 + (-4)"; the bare juxtaposition is
+// calculator notation. A LEADING negative ("-15 ÷ 3") and an equation RHS
+// ("= -7") stay bare, matching textbook style.
+var reNegAfterOp = regexp.MustCompile(`((?:[+\-*÷]|of) )(-\d[\d./]*)`)
+
 // NormalizeExpression converts notation synonyms to one standard form.
 // \frac{a}{b} becomes the unspaced a/b fraction convention.
 // Replacements inside \text{...} are harmless (prose stays prose).
@@ -117,6 +132,7 @@ func NormalizeExpression(expr string) string {
 	// so a simple global pass is acceptable and keeps this O(n).
 	s := normalizeReplacer.Replace(expr)
 	s = reFracCmd.ReplaceAllString(s, "$1/$2")
+	s = reParenNegLiteral.ReplaceAllString(s, "$1")
 	for {
 		joined := reThousands.ReplaceAllString(s, "$1$2$3")
 		if joined == s {
@@ -129,13 +145,15 @@ func NormalizeExpression(expr string) string {
 
 // DisplayExpression converts a canonical (Render-produced) symbolic expression
 // to valid, human-facing KaTeX: unspaced a/b → \frac{a}{b} (stacked fraction),
-// ÷ → \div, * → \times, and a literal % → \% (KaTeX reads a bare % as a comment
-// that eats the rest of the expression). The result is self-contained valid
-// LaTeX; NormalizeExpression folds every one of these back to the grammar form,
-// so it round-trips. This is a presentation skin applied at storage time,
-// intended for symbolic (non-WORD) expressions.
+// ÷ → \div, * → \times, a literal % → \% (KaTeX reads a bare % as a comment
+// that eats the rest of the expression), and a negative literal after an
+// operator gets parens ("9 + (-4)", the print convention). The result is
+// self-contained valid LaTeX; NormalizeExpression folds every one of these
+// back to the grammar form, so it round-trips. This is a presentation skin
+// applied at storage time, intended for symbolic (non-WORD) expressions.
 func DisplayExpression(expr string) string {
-	return displayReplacer.Replace(reFracLiteral.ReplaceAllString(expr, `\frac{$1}{$2}`))
+	s := reNegAfterOp.ReplaceAllString(expr, "$1($2)")
+	return displayReplacer.Replace(reFracLiteral.ReplaceAllString(s, `\frac{$1}{$2}`))
 }
 
 // displayReplacer is DisplayExpression's literal skin, the exact inverse of
