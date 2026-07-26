@@ -53,11 +53,20 @@ is gated only client-side (no server `/admin` data endpoint backs it).
 
 ## Identity / Auth0 (`web/src/auth0.js`)
 
-Three buttons wrapping `@auth0/auth0-react`: `LoginButton` and `SignupButton` both
-`loginWithRedirect` (differing only in styling), `LogoutButton` calls `logout` returning to the
-window origin. The `Auth0Provider` is configured once at the app root (`index.js`,
+Two buttons wrapping `@auth0/auth0-react`: `LoginButton` calls `loginWithRedirect`, `LogoutButton`
+calls `logout` returning to the window origin. (A third, `SignupButton`, was removed with the old
+React landing page — it was byte-identical to `LoginButton` apart from styling.) The
+`Auth0Provider` is configured once at the app root (`index.js`,
 `cacheLocation: "localstorage"`); after login the app pulls an access token with
 `getAccessTokenSilently` and sends it as a `Bearer` token on every API call.
+
+**Entry point.** The marketing page at `/` is static HTML outside the React app, so it cannot call
+Auth0 itself; its CTAs link to `/login`, a route whose only job is to fire `loginWithRedirect` (and
+to bounce an already-signed-in visitor to `/play`). Auth0 then redirects back to the registered
+callback, the site origin — which is that same static page, with no SDK to finish the exchange. A
+few lines at the top of the landing hand `?code`/`&state` (and `?error`) to `/login` so the app
+completes the callback. That indirection is deliberate: it keeps the registered callback URL
+unchanged, so nothing in the Auth0 dashboard has to move. See #329.
 
 **First-login provisioning** (`index.js`): on page load the app GETs `/pageload/:auth0_id`; a 404
 means no `users` row yet, so it POSTs `/users` with `{auth0_id, email, username}` from the Auth0

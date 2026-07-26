@@ -11,16 +11,6 @@ const LoginButton = () => {
   );
 };
 
-const SignupButton = () => {
-  const { loginWithRedirect } = useAuth0();
-
-  return (
-    <button className="signup" onClick={() => loginWithRedirect()}>
-      <h3>Get Started!</h3>
-    </button>
-  );
-};
-
 const LogoutButton = () => {
   const { logout } = useAuth0();
 
@@ -36,4 +26,4 @@ const LogoutButton = () => {
   );
 };
 
-export { LoginButton, SignupButton, LogoutButton };
+export { LoginButton, LogoutButton };

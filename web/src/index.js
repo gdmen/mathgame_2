@@ -7,7 +7,6 @@ import { useAuth0 } from "@auth0/auth0-react";
 
 import { LoginButton, LogoutButton } from "./auth0.js";
 
-import { HomeView } from "./home.js";
 import { SetupView } from "./setup.js";
 import { PinView, ClearSessionPin } from "./pin.js";
 import { SettingsView } from "./settings.js";
@@ -18,6 +17,17 @@ import { AdminHomeView } from "./admin_home.js";
 import { DifficultyCalibrationView } from "./admin_calibration.js";
 import { BitmapMatrixView } from "./admin_bitmap_matrix.js";
 import { StyleGuideView } from "./style_guide.js";
+
+// Self-hosted fonts (families declared in styles.scss). Only the weights the
+// design actually uses are loaded; adding a weight here means documenting it
+// on /style-guide. Caveat is decorative-only (the landing page's annotation).
+import "@fontsource/quicksand/600.css";
+import "@fontsource/quicksand/700.css";
+import "@fontsource/nunito/400.css";
+import "@fontsource/nunito/400-italic.css";
+import "@fontsource/nunito/600.css";
+import "@fontsource/nunito/700.css";
+import "@fontsource/caveat/700.css";
 
 import "./index.scss";
 
@@ -35,10 +45,41 @@ const NotFound = () => {
   );
 };
 
+// The landing page is a separate static document, so getting there needs a real
+// navigation rather than a client-side <Redirect>.
+const ToLanding = () => {
+  useEffect(() => {
+    // Guard against a reload loop: if "/" is already what served this bundle,
+    // navigating there again would just re-serve it forever. That should not
+    // happen (prod swaps in the static page, dev has setupProxy.js), so the
+    // guard is a backstop rather than a path we expect to take.
+    if (window.location.pathname !== "/") {
+      window.location.replace("/");
+    }
+  }, []);
+  return <div className="content-loading"></div>;
+};
+
 // Protected routes render nothing for an unauthenticated visitor, leaving a
 // blank screen; send them to the landing page (which offers Login/Signup).
 const RequireAuth = ({ isAuthenticated, children }) =>
-  isAuthenticated ? children : <Redirect to="/" />;
+  isAuthenticated ? children : <ToLanding />;
+
+// The marketing page at "/" is static HTML outside the React app (#329), so it
+// cannot call Auth0 itself. Its CTAs point here instead: this route exists only
+// to hand off to Auth0, and to bounce an already-signed-in visitor into play.
+const LoginView = () => {
+  const { isLoading, isAuthenticated, loginWithRedirect } = useAuth0();
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      loginWithRedirect();
+    }
+  }, [isLoading, isAuthenticated, loginWithRedirect]);
+  if (!isLoading && isAuthenticated) {
+    return <Redirect to="/play" />;
+  }
+  return <div className="content-loading"></div>;
+};
 
 const MainView = ({
   token,
@@ -79,13 +120,16 @@ const MainView = ({
     return (
       <main>
         <Switch>
+          {/*
+            "/" is the static marketing page, not a React route (#329). This
+            entry only catches in-app navigations to "/" and hands them back to
+            the real document with a full page load.
+          */}
           <Route exact path="/">
-            <HomeView
-              isLoading={isLoading}
-              isAuthenticated={isAuthenticated}
-              user={user}
-              settings={settings}
-            />
+            <ToLanding />
+          </Route>
+          <Route exact path="/login">
+            <LoginView />
           </Route>
           <Route exact path="/pin/:redirect_pathname">
             <RequireAuth isAuthenticated={isAuthenticated}>
@@ -161,6 +205,9 @@ const AppView = () => {
   const [appUser, setAppUser] = useState(null);
   const [settings, setSettings] = useState(null);
   const [numEnabledVideos, setNumEnabledVideos] = useState(null);
+  // Phone-only nav disclosure. Above the breakpoint the nav is always inline
+  // and this flag is inert.
+  const [navOpen, setNavOpen] = useState(false);
 
   const genPostEventFcn = useCallback(() => {
     return async function (event_type, value) {
@@ -257,38 +304,57 @@ const AppView = () => {
 
   return (
     <div id="react-body">
-      <div id="main-menu" className="clearfix">
-        <a href="/">
-          <h3>Mikey's Math Game</h3>
-        </a>
+      <div id="main-menu" className={navOpen ? "nav-open" : ""}>
+        <div className="menu-wrap">
+          <a href="/">
+            <h3>Mikey's Math Game</h3>
+          </a>
 
-        <ul className="menu">
-          <li>{user ? user.username : ""}</li>
-          <li>
-            {isAuthenticated ? (
-              <button onClick={() => (window.location.pathname = "progress")}>
-                Progress
-              </button>
-            ) : (
-              <></>
-            )}
-            {isAuthenticated ? (
-              <button onClick={() => (window.location.pathname = "settings")}>
-                Adults
-              </button>
-            ) : (
-              <></>
-            )}
-            {isAuthenticated && appUser && appUser.role === "admin" ? (
-              <button onClick={() => (window.location.pathname = "/admin")}>
-                Admin
-              </button>
-            ) : (
-              <></>
-            )}
-            {isAuthenticated ? <LogoutButton /> : <LoginButton />}
-          </li>
-        </ul>
+          {/* Phone-only trigger; CSS hides it above the breakpoint, where the
+              nav sits inline. Bare icon, so the name has to come from the
+              label. */}
+          <button
+            className="menu-toggle"
+            type="button"
+            aria-label="Menu"
+            aria-expanded={navOpen}
+            aria-controls="main-nav"
+            onClick={() => setNavOpen((open) => !open)}
+          >
+            <span className="menu-bars" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          </button>
+
+          <ul className="menu" id="main-nav">
+            <li>
+              {isAuthenticated ? (
+                <button onClick={() => (window.location.pathname = "progress")}>
+                  Progress
+                </button>
+              ) : (
+                <></>
+              )}
+              {isAuthenticated ? (
+                <button onClick={() => (window.location.pathname = "settings")}>
+                  Adults
+                </button>
+              ) : (
+                <></>
+              )}
+              {isAuthenticated && appUser && appUser.role === "admin" ? (
+                <button onClick={() => (window.location.pathname = "/admin")}>
+                  Admin
+                </button>
+              ) : (
+                <></>
+              )}
+              {isAuthenticated ? <LogoutButton /> : <LoginButton />}
+            </li>
+          </ul>
+        </div>
       </div>
 
       <div id="content">
@@ -316,13 +382,7 @@ const AppView = () => {
               report an issue
             </a>
             <span className="separator">|</span>
-            <a
-              href="https://github.com/gdmen/mathgame_2"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              source code
-            </a>
+            <a href="/privacy">privacy</a>
           </>
         )}
       </div>
