@@ -1,4 +1,10 @@
 // colors
+//
+// Semantics (see /style-guide):
+//   green — content and brand surfaces
+//   blue  — action (CTAs) and reward (the earned-video moment)
+//   red   — parent/admin validation ONLY. Never kid correctness feedback:
+//           a wrong answer gets a neutral nudge, never a red mark.
 $color-one: #bee8b7;
 $color-two: #d6f7d2;
 $color-one-contrast: #007200;
@@ -8,22 +14,44 @@ $color-error: #dc143c;
 $color-card-tint-a: #f3faf3;
 $color-card-tint-b: #f7faf5;
 $color-chip-border: #c9d2c7;
-$background-color: white;
-$font-color: black;
+// Input edges need >= 3:1 against the field they bound. $color-chip-border is
+// a card outline (1.5:1 on white) and is too faint to read as a control edge.
+$color-field-border: #6b8650;
+// Action and reward deliberately share one blue: the thing you click and the
+// thing you earn are the same promise.
+$color-action: #2166a5;
+$color-action-deep: #1a5286;
+$color-reward: #2166a5;
+// Surface + ink. Pure black on pure white measures 21:1 and glares; these keep
+// 13:1 (about 3x the AA floor) with much less visual fatigue.
+$background-color: #faf9f3;
+$font-color: #24301f;
+$color-ink-soft: #55644e;
 
 // fonts
-@import url("https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&display=swap");
-$base-font-family: "Josefin Sans", sans-serif;
-html,
-button {
+// Self-hosted via @fontsource and imported in index.js, the same pattern the
+// app already uses for katex. No third-party font request at runtime, which is
+// what lets us claim no third-party trackers.
+//   display    — headings, buttons, wordmark
+//   base       — body copy
+//   annotation — decorative marginalia only (hand-drawn "try it!"); never for
+//                anything a user has to read to use the product.
+$display-font-family: "Quicksand", sans-serif;
+$base-font-family: "Nunito", sans-serif;
+$annotation-font-family: "Caveat", cursive;
+
+html {
   font-family: $base-font-family;
   font-size: 1em;
+  color: $font-color;
 }
 h1,
 h2,
 h3,
 h4,
 h5 {
+  font-family: $display-font-family;
+  font-weight: 600;
   line-height: 1.25em;
 }
 h1 {
@@ -35,9 +63,13 @@ h2 {
 h3 {
   font-size: 1.5em;
 }
-p,
 button {
-  font-weight: 300;
+  font-family: $display-font-family;
+  font-size: 1em;
+  font-weight: 600;
+}
+p {
+  font-weight: 400;
 }
 
 // placement
@@ -48,3 +80,33 @@ $max-width: 1200px;
 
 // shape
 $base-radius: 0.5em;
+$radius-small: 0.25em;
+$radius-large: 1em;
+$shadow-card: 0 0.5em 1.5em rgba(35, 48, 32, 0.1);
+
+// Keyboard-focus ring, shared by the app and the static landing (both @import
+// this file). :focus-visible fires only for keyboard/assistive-tech focus, so
+// mouse clicks never draw it.
+:focus-visible {
+  outline: 0.1875em solid $color-one-contrast;
+  outline-offset: 0.125em;
+  border-radius: $radius-small;
+}
+
+// The selectable skill chip. Defined here because BOTH the settings screen and
+// the landing page's preview of it use the shape: if the marketing page drew
+// its own, the two would drift the first time either changed.
+// Selection is COLOUR-ONLY — a chip must never change size between states, or
+// the whole grid reflows as a parent toggles bits.
+@mixin toggle-pill {
+  background: white;
+  border: 0.09375em solid $color-chip-border;
+  border-radius: 2.5 * $base-radius;
+  display: flex;
+  justify-content: center;
+  padding: 0.6em 0.85em 0.5em;
+}
+@mixin toggle-pill-on {
+  background-color: $color-two;
+  border-color: $color-one-contrast;
+}

@@ -59,7 +59,8 @@ boot). The three jobs that must not overlap a manual run hold a `flock`
 |---|---|
 | `build-api` | regenerates `*_model.generated.go` / `*_handlers.generated.go` from `server/api/models.json` (Python codegen), `gofmt -s`, then builds `bin/apiserver` |
 | `build-cmds` | depends on `build-api`; builds every `cmd/*` tool into `bin/` (see list below) |
-| `build-web` | `frontend-conf`, then `npm install --force` + build into `web/build.next`, prettier, then swap `build.next` → `build` |
+| `build-web` | `frontend-conf`, `npm install --force`, `landing-assets`, then build into `web/build.next`, prettier, the landing/app HTML swap (below), then swap `build.next` → `build` |
+| `landing-assets` | compiles `web/src/landing.scss` → `web/public/landing.css` and copies the landing's woff2 files into `web/public/fonts/`; both outputs are generated and gitignored |
 | `test` / `test-api` | `build-api` then `go test ./server/api` |
 | `test-bundle-secrets` | rebuilds the web bundle against a canary config and fails if a secret leaks into `web/build` (the CI scan) |
 | `test-all` | `test` + `test-bundle-secrets` — full local CI parity |
@@ -70,7 +71,23 @@ boot). The three jobs that must not overlap a manual run hold a `flock`
 | `prod-api` / `prod-web` / `prod-maintenance` | the three service entrypoints |
 | `clean` | drops test DBs, removes `bin/*`, generated Go, `swagger.yaml`, web build dirs; `go mod tidy` |
 
-Two build subtleties worth knowing:
+Three build subtleties worth knowing:
+
+- **The landing page is `index.html`; the React shell is `app.html`.** The
+  marketing page is static HTML so crawlers and link unfurlers get real content
+  instead of an empty JS shell. `serve` resolves `/` to whatever `index.html` is
+  and applies rewrites only to paths it cannot resolve, so the only way to put a
+  static page at `/` is to *be* `index.html` — hence the two renames at the end
+  of `build-web`. `web/public/serve.json` then rewrites `/:path+` (one or more
+  segments, so it never matches `/`) to `app.html`, which keeps every SPA route
+  and the app's own 404 page. A `**` catch-all would also match `/` and hide the
+  landing, and **`prod-web` must not pass `serve`'s `-s`/`--single` flag** — it
+  would rewrite everything to `index.html` and serve the marketing page in place
+  of the app. Verified against `serve` 14. One consequence worth knowing when
+  debugging: because the rewrite answers every path it cannot resolve, a
+  **missing static asset returns the app shell with a 200**, not a 404. A
+  mistyped image or script URL therefore surfaces as HTML where a binary was
+  expected, rather than as a clean missing-file error.
 
 - **`build-web` never empties the live dir.** `react-scripts` wipes its output
   dir at the start of every build; building in place left `web/build` a bare

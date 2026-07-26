@@ -8,23 +8,157 @@ body,
 #react-body {
   height: 100%;
 }
+// The chrome (menu/content/footer) is capped at $max-width and centred; without
+// a page background the browser default (white) shows in the gutters beyond it.
+// Paint the page the same surface so there are no white corners on wide screens.
+html,
+body {
+  background-color: $background-color;
+}
 #react-body {
   display: flex;
   flex-direction: column;
 }
 
+// The band's inset. Shared with the landing header (landing.scss .wrap sets the
+// horizontal, .nav the vertical), which uses it at EVERY width — so the app
+// keeps it at every width too, or the two headers stop lining up on a phone.
+$band-pad-y: 1.25 * $base-space;
+$band-pad-x: 1.5 * $base-space;
+
+// Full-bleed green band, matching the landing header (landing.scss .band-green
+// + .nav) so the app and the marketing page share one chrome, same $max-width
+// cap and same inset.
 #main-menu {
-  align-items: center;
-  background-color: $background-color;
-  display: flex;
-  justify-content: space-between;
-  margin: 0 auto;
-  max-width: $max-width;
-  padding: $base-space;
+  background-color: $color-one;
   width: 100%;
+  .menu-wrap {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    margin: 0 auto;
+    max-width: $max-width;
+    padding: $band-pad-y $band-pad-x;
+    width: 100%;
+  }
   a {
     color: inherit;
     text-decoration: none;
+  }
+  // Match the landing wordmark exactly (landing.scss .logo): Quicksand 700 at
+  // 1.3rem. The landing logo is a plain link inheriting body line-height (1.6);
+  // this <h3> would otherwise take the heading line-height (1.25) and make the
+  // band shorter, so pin it here too.
+  h3 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    line-height: 1.6;
+  }
+  // Nav items are bare text links on the green, exactly like the landing's
+  // single Log In link (landing.scss .nav .login): no padding, so they sit
+  // flush to the same right edge and never make the band taller than the
+  // wordmark does. Spacing between them comes from the flex gaps.
+  .menu {
+    align-items: center;
+    display: flex;
+    gap: 1.25 * $base-space;
+    li {
+      align-items: center;
+      display: flex;
+      gap: 1.25 * $base-space;
+    }
+    button {
+      background-color: transparent;
+      color: $font-color;
+      padding: 0;
+      &:hover {
+        color: $color-one-contrast;
+      }
+    }
+    .logout {
+      color: $color-ink-soft;
+    }
+  }
+  // Desktop keeps the nav inline, so the trigger has no job.
+  .menu-toggle {
+    display: none;
+  }
+}
+
+// Phones cannot fit the wordmark and every destination on one line: the
+// wordmark wraps to three lines and the band swallows the top of the screen.
+// Below this width the destinations move behind the hamburger and drop into a
+// sheet under the band, which keeps the band one line tall.
+@media only screen and (max-width: 700px) {
+  #main-menu {
+    // Bare icon, no container: the rest of the band is unboxed text, so an
+    // outlined toggle would be the only framed control in it. The padding
+    // stays — it is the tap target, which has to hold up without a visible
+    // edge to aim at.
+    .menu-toggle {
+      align-items: center;
+      background-color: transparent;
+      border: none;
+      display: flex;
+      justify-content: center;
+      // 2.75em is the 44px minimum touch target, but it must not make the band
+      // taller than the landing's: the negative block margins keep the wordmark
+      // the tallest thing in the row, and the negative inline margin pulls the
+      // tap padding out of the layout so the ICON, not the invisible box, lines
+      // up with the band's inset.
+      margin-block: -0.5em;
+      margin-right: -0.8125em;
+      min-height: 2.75em;
+      min-width: 2.75em;
+      padding: 0;
+    }
+    .menu-bars {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 0.1875em;
+      span {
+        background-color: $font-color;
+        border-radius: 0.125em;
+        display: block;
+        height: 0.125em;
+        width: 1.125em;
+      }
+    }
+    h3 {
+      // The band is one line tall only if the wordmark never wraps.
+      white-space: nowrap;
+    }
+    .menu-wrap {
+      // Wrapping is what lets the open sheet take a second row instead of
+      // squeezing in beside the wordmark as another flex item. The inset is
+      // inherited from the shared rule above — phones get the same one.
+      flex-wrap: wrap;
+    }
+    // A row under the band rather than an overlay, so it pushes the page down
+    // instead of covering the problem behind it.
+    .menu {
+      display: none;
+      li {
+        display: contents;
+      }
+      button {
+        border-radius: 0;
+        border-top: 0.0625em solid rgba($font-color, 0.12);
+        padding: 0.875 * $base-space $band-pad-x;
+        text-align: left;
+        width: 100%;
+      }
+    }
+    &.nav-open .menu {
+      display: block;
+      // Wider than the row forces the new line, and the extra width is exactly
+      // the wrap's own padding, which the negative side margins pull back so
+      // the sheet runs edge to edge like the band it hangs from. Widening the
+      // basis rather than just the margins matters: margins move a box, they
+      // do not grow it, so the background would stop short on the right.
+      flex-basis: calc(100% + #{2 * $band-pad-x});
+      margin: $band-pad-y (-$band-pad-x) (-$band-pad-y);
+    }
   }
 }
 
@@ -33,18 +167,22 @@ body,
   flex: 1 0 auto;
 }
 
+// Matches the landing footer (landing.scss footer): same links, same muted
+// ink, same size, so the two surfaces read as one footer.
 #footer {
   align-items: center;
   background-color: $background-color;
+  color: $color-ink-soft;
   display: flex;
   flex-shrink: 0;
+  font-size: 0.9rem;
   justify-content: center;
   margin: 0 auto;
   max-width: $max-width;
-  padding: $base-space;
+  padding: 2.125 * $base-space 1.5 * $base-space;
   width: 100%;
   a {
-    color: inherit;
+    color: $color-ink-soft;
     text-decoration: none;
   }
   .separator {

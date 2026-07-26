@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <script>
+      // Auth0 sends the user back to the registered callback URL (the site
+      // origin) after login, but "/" is this static page and has no Auth0 SDK
+      // to complete the code exchange, so the sign-in would silently never
+      // finish. Hand the callback straight to the React app, which mounts
+      // Auth0Provider and completes it on any path. Doing it here rather than
+      // re-pointing redirectUri means the Auth0 dashboard needs no change.
+      (function () {
+        var q = window.location.search;
+        if (
+          (/[?&]code=/.test(q) && /[?&]state=/.test(q)) ||
+          /[?&]error=/.test(q)
+        ) {
+          window.location.replace("/login" + q);
+        }
+      })();
+    </script>
+
+    <title>Mikey's Math Game: your kid earns YouTube time by doing math</title>
+    <meta
+      name="description"
+      content="Kids solve math problems to earn YouTube videos from playlists you pick. Free, no ads. Built for my little brother: 130,000+ problems solved by him since 2013."
+    />
+    <link rel="canonical" href="https://mikeymath.org/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://mikeymath.org/" />
+    <meta
+      property="og:title"
+      content="Your kid earns YouTube time by doing math"
+    />
+    <meta
+      property="og:description"
+      content="Kids solve math problems to earn YouTube videos from playlists you pick. Free, no ads, no grade levels."
+    />
+    <!--
+      TODO(pre-launch): web/public/og-image.png does not exist yet. Until it
+      does this URL resolves to the app shell (the SPA rewrite answers any
+      unmatched path with HTML and a 200), so unfurlers will simply show no
+      image. Needs a real 1200x630 PNG: the problem card beside a playing
+      video. Same for twitter:image below.
+    -->
+    <meta property="og:image" content="https://mikeymath.org/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="Your kid earns YouTube time by doing math"
+    />
+    <meta
+      name="twitter:description"
+      content="Kids solve math problems to earn YouTube videos from playlists you pick. Free, no ads, no grade levels."
+    />
+    <meta name="twitter:image" content="https://mikeymath.org/og-image.png" />
+
+    <!--
+      Static marketing page (#329). No React and no hydration: this document is
+      what crawlers and link unfurlers get, fully rendered, with no JS required
+      to read a word of it. Styles compile from the app's own tokens
+      (web/src/landing.scss -> /landing.css via `make landing-assets`), so the
+      page can never drift from the product's design system.
+
+      This file is built to build/index.html so it is served at "/". The React
+      shell becomes build/app.html and serve.json rewrites every deeper path to
+      it. See the Makefile's build-web target.
+    -->
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="/fonts/nunito-latin-400-normal.woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="/fonts/quicksand-latin-600-normal.woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="/landing.css" />
+  </head>
+
+  <body>
+    <header class="band-green">
+      <div class="wrap nav">
+        <a class="logo" href="/">Mikey's Math Game</a>
+        <a class="login" id="nav-cta" href="/login">Log In</a>
+      </div>
+    </header>
+
+    <script>
+      // The header is static, so it defaults to inviting a log in. But a
+      // signed-in parent who clicks the wordmark lands back here, where a
+      // "Log In" CTA reads as "you're logged out" and is confusing. Auth0
+      // caches its session in localStorage (cacheLocation: "localstorage");
+      // if a live one is present, swap the CTA to "Play". Pure progressive
+      // enhancement: with no JS (crawlers) the header stays "Log In".
+      (function () {
+        try {
+          for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (!k || k.indexOf("@@auth0spajs@@") !== 0) continue;
+            if (k.indexOf("@@user@@") !== -1) continue;
+            var entry = JSON.parse(localStorage.getItem(k));
+            if (
+              entry &&
+              entry.expiresAt &&
+              entry.expiresAt * 1000 > Date.now()
+            ) {
+              var cta = document.getElementById("nav-cta");
+              cta.textContent = "Play";
+              cta.setAttribute("href", "/play");
+              break;
+            }
+          }
+        } catch (e) {}
+      })();
+    </script>
+
+    <main>
+      <!-- ======================= HERO ======================= -->
+      <div class="band-green hero">
+        <div class="wrap hero-grid">
+          <div>
+            <p class="eyebrow">Free forever · No ads · We don't sell data</p>
+            <h1>
+              Your kid <span class="earn">earns YouTube time</span> by doing
+              math.
+            </h1>
+            <p class="sub">
+              They solve problems and get a video from
+              <b>playlists you pick</b>. No grade levels, no timers, no
+              surprises. This game was designed with
+              <b>neurodivergent kids</b> in mind.
+            </p>
+            <p class="story-line">
+              Built for my little brother, Trevor, who has solved 130,000+
+              problems on it since 2013.
+            </p>
+            <div class="cta-row">
+              <a class="btn btn-primary" href="/login"
+                >Get started in 5 minutes</a
+              >
+              <!--
+                Two purpose-drawn arrows, one per layout; landing.scss swaps
+                them at the 880px breakpoint. Each has its tail on the left at
+                exactly half the viewBox height, so the centred flex row pins
+                the tail to the vertical middle of the "!".
+              -->
+              <span class="try-note" aria-hidden="true">
+                <span class="try-word">try it!</span>
+                <svg
+                  class="try-arrow try-arrow-desktop"
+                  viewBox="0 0 104 64"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <g
+                    stroke="currentColor"
+                    stroke-width="3.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M4 32 C30 46 62 34 96 10" />
+                    <path d="M96 10 L83 11" />
+                    <path d="M96 10 L91 22" />
+                  </g>
+                </svg>
+                <svg
+                  class="try-arrow try-arrow-mobile"
+                  viewBox="0 0 60 84"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <g
+                    stroke="currentColor"
+                    stroke-width="3.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M6 42 C26 48 40 62 42 78" />
+                    <path d="M42 78 L47 66" />
+                    <path d="M42 78 L34 68" />
+                  </g>
+                </svg>
+              </span>
+            </div>
+            <p class="trust">
+              Free forever · No ads · We don't sell data ·
+              <a href="/privacy">Privacy</a>
+            </p>
+          </div>
+
+          <!--
+            The demo card. Nothing links to #demo: the "try it!" annotation
+            points at it and the card itself is the affordance. The id stays so
+            a /try URL can deep-link here once the real no-login demo ships.
+          -->
+          <div id="demo">
+            <div class="game">
+              <div class="game-bar">
+                <span class="title">Mikey's Math Game</span>
+                <span class="chip-demo">demo</span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" id="pfill"></div>
+              </div>
+
+              <div class="stages">
+                <div class="stage" id="stage-problem">
+                  <div class="problem" id="problem-text">4 + 3</div>
+                  <div class="answer-row">
+                    <input
+                      id="answer"
+                      type="text"
+                      inputmode="decimal"
+                      autocomplete="off"
+                      aria-label="Your answer"
+                    />
+                    <button class="submit" id="submit-btn" type="button">
+                      submit
+                    </button>
+                  </div>
+                  <div class="feedback" id="feedback">&nbsp;</div>
+                </div>
+
+                <div class="stage hidden" id="stage-reward">
+                  <div class="video">
+                    <!--
+                      Self-hosted clip (/demo.mp4). The <video> is injected by
+                      the script only on reaching the reward stage and torn down
+                      when the visitor leaves it; the whole page makes no
+                      third-party request at all.
+                    -->
+                    <div class="screen" id="video-screen"></div>
+                  </div>
+                  <p class="reward-caption">
+                    No controls, no link to YouTube. When it ends, it's back to
+                    the math.
+                  </p>
+                </div>
+
+                <div class="stage hidden" id="stage-done">
+                  <p>
+                    <b class="loop-done">That's the game!</b><br />Math → video
+                    → back to math.<br />Real setup takes about 5 minutes.
+                  </p>
+                  <div class="cta-row" style="margin-top: 1.125em">
+                    <a class="btn btn-primary" href="/login">Get started</a>
+                    <button class="btn btn-ghost" id="again-btn" type="button">
+                      Play again
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================= HOW IT WORKS ======================= -->
+      <section aria-labelledby="how-h">
+        <div class="wrap">
+          <h2 id="how-h">How it works</h2>
+          <div class="steps">
+            <div class="step">
+              <span class="num">1</span>
+              <h3>They solve math problems</h3>
+              <p>
+                Every problem is <b>generated</b>, never repeated from a fixed
+                list, and difficulty <b>adapts as your kid plays</b>. Missed
+                problems come back for review. 16 skill toggles, from addition
+                all the way up to basic algebra.
+              </p>
+            </div>
+            <div class="step reward-step">
+              <span class="num">2</span>
+              <h3>They earn a video</h3>
+              <p>
+                Rewards come from <b>YouTube playlists you choose</b> (starter
+                packs included). Videos auto-play with <b>no controls</b>: no
+                clicking away, no recommendations. When the video ends, it's
+                back to the math problems.
+              </p>
+            </div>
+            <div class="step">
+              <span class="num">3</span>
+              <h3>You stay in control</h3>
+              <p>
+                A <b>PIN-gated settings page</b> tunes skills, playlists, and
+                the target percentage of time spent doing math. A
+                <b>progress page</b> tracks problems solved, minutes of math,
+                minutes of video.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================= NO GRADE LEVELS ======================= -->
+      <section aria-labelledby="ngl-h" style="padding-top: 0">
+        <div class="wrap">
+          <h2 id="ngl-h">No grade levels. No assumptions.</h2>
+          <p class="section-lede">
+            Most math apps assume skills arrive in a fixed order. Plenty of
+            kids, especially neurodivergent kids, aren't built that way. This
+            game was designed for exactly that.
+          </p>
+
+          <!--
+            The real chips from the settings screen, live: they share the
+            toggle-pill mixin in styles.scss, so this preview cannot drift from
+            the control it is previewing. Toggling them changes nothing but
+            themselves - it is here to be played with.
+          -->
+          <div class="toggles">
+            <button type="button" class="tog" aria-pressed="true">
+              Addition
+            </button>
+            <button type="button" class="tog" aria-pressed="true">
+              Subtraction
+            </button>
+            <button type="button" class="tog" aria-pressed="true">
+              Multiplication
+            </button>
+            <button type="button" class="tog" aria-pressed="false">
+              Division
+            </button>
+            <button type="button" class="tog" aria-pressed="true">
+              Fractions
+            </button>
+            <button type="button" class="tog" aria-pressed="false">
+              Decimals
+            </button>
+            <button type="button" class="tog" aria-pressed="true">
+              Numbers up to 99
+            </button>
+            <button type="button" class="tog" aria-pressed="false">
+              Word problems <small>(when they're ready)</small>
+            </button>
+            <button type="button" class="tog" aria-pressed="false">
+              Algebra
+            </button>
+          </div>
+
+          <div class="points">
+            <div class="point">
+              <h3>Every skill is its own switch</h3>
+              <p>
+                16 independent toggles. One kid races ahead in multiplication
+                while easing into word problems; another crunches big numbers
+                but isn't touching fractions yet. Enable exactly the mix that
+                fits, and difficulty adapts within that mix.
+              </p>
+            </div>
+            <div class="point">
+              <h3>The same loop, every single time</h3>
+              <p>
+                Solve, watch, back to solving. The progress bar shows exactly
+                how many problems until the video. No surprise popups, no
+                countdown timers, no ads breaking the rhythm.
+              </p>
+            </div>
+            <div class="point">
+              <h3>Rewards that actually motivate</h3>
+              <p>
+                The prize isn't points or badges. It's the videos your kid
+                already loves. Their interests become the engine.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================= TREVOR ======================= -->
+      <div class="band-light trevor">
+        <div class="wrap trevor-grid">
+          <div>
+            <h2>Why this exists</h2>
+            <p>
+              Trevor was just starting math when I built him the first version
+              of this game in 2013, to practice addition and subtraction. We
+              loaded it up with his favorite Sesame Street and Disney songs as
+              the reward. He loved it. (We still sing some of those songs
+              together.)
+            </p>
+            <p>
+              The game grew with him: multiplication and division, then
+              fractions, decimals, negatives, and algebra, and every skill
+              became its own independent switch. His pace. His mix. His videos.
+            </p>
+            <p>
+              More than a decade and 130,000 problems later, he's still playing.
+            </p>
+            <p>
+              It's a one-person project: I design, build, and run every piece of
+              it. Now it's open to every family, free.
+            </p>
+          </div>
+          <div class="stats">
+            <div class="stat">
+              <span class="n">130,000+</span
+              ><span class="l">problems solved</span>
+            </div>
+            <div class="stat">
+              <span class="n">800+ hours</span><span class="l">of math</span>
+            </div>
+            <div class="stat">
+              <span class="n">Since 2013</span
+              ><span class="l">and still going</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================= CONTROLS + FAQ ======================= -->
+      <section aria-labelledby="faq-h">
+        <div class="wrap">
+          <h2>Built for parents' peace of mind</h2>
+          <p class="section-lede">
+            Everything a grown-up controls, in one PIN-gated place.
+          </p>
+          <div class="points" style="margin-bottom: 3em">
+            <div class="point">
+              <h3>Your playlists, only your playlists</h3>
+              <p>
+                Rewards are drawn exclusively from playlists you've added. Start
+                with curated packs or swap in your own.
+              </p>
+            </div>
+            <div class="point">
+              <h3>No ads, nothing to buy</h3>
+              <p>
+                No ads in the game, no in-app purchases, no upsells aimed at
+                your kid. Free.
+              </p>
+            </div>
+            <div class="point">
+              <h3>Your kid's data stays boring</h3>
+              <p>
+                Kids don't even get logins; one parent account per family. We
+                collect gameplay stats to run the game and nothing else.
+              </p>
+            </div>
+            <div class="point">
+              <h3>Nothing to install</h3>
+              <p>
+                Runs in the browser on laptops and tablets. No app store, no
+                updates to manage.
+              </p>
+            </div>
+          </div>
+
+          <h2 id="faq-h">Common questions</h2>
+          <details>
+            <summary>What ages is this for?</summary>
+            <p>
+              Roughly 5–13, but the game thinks in skills, not grades. The
+              toggles run from simple addition up through fractions, decimals,
+              negatives, percentages, multi-step problems, and starter algebra,
+              and difficulty adapts automatically inside whatever you enable.
+            </p>
+          </details>
+          <details>
+            <summary>
+              My kid is autistic, has ADHD, or just learns differently. Will
+              this fit?
+            </summary>
+            <p>
+              It was built for exactly that. My brother's skills never matched a
+              grade level and he thrives in routine. Nothing here assumes
+              normative grade level math - every problem type is an independent
+              toggle and word problems are optional. The gameplay is predictable
+              and the rewards are consistent.
+            </p>
+          </details>
+          <details>
+            <summary>Is it really free?</summary>
+            <p>
+              Yes. It started as a gift for my brother and it stays free for
+              families. Forever. No ads, no data selling.
+            </p>
+          </details>
+          <details>
+            <summary>Are the videos safe?</summary>
+            <p>
+              The game only ever plays videos from playlists that you, the parent,
+              added. Videos play with no controls and no way to browse. When a
+              video ends, the game returns to the math problems.
+            </p>
+          </details>
+          <details>
+            <summary>What do you collect about my kid?</summary>
+            <p>
+              Kids have no accounts and no logins. The parent account stores an
+              email (for login) and gameplay events (problems answered, minutes
+              worked and watched) that power the progress page. We don't sell
+              data or run analytics or ad trackers. Two third parties are
+              involved: Auth0, which handles the parent sign-in, and YouTube,
+              which plays the reward videos. Full details in the
+              <a href="/privacy">privacy policy</a>.
+            </p>
+          </details>
+        </div>
+      </section>
+
+      <!-- ======================= FINAL CTA ======================= -->
+      <div class="band-green final">
+        <div class="wrap">
+          <h2>Turn the YouTube battle into math practice.</h2>
+          <p class="sub">
+            It takes about five minutes to set up, and it's free forever.
+          </p>
+          <div class="cta-row">
+            <a class="btn btn-primary" href="/login"
+              >Get started in 5 minutes</a
+            >
+          </div>
+          <p class="trust">
+            Free forever · No ads · We don't sell data ·
+            <a href="/privacy">Privacy</a>
+          </p>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <a
+          href="https://forms.gle/r8uUSwyAoNivga3TA"
+          target="_blank"
+          rel="noopener noreferrer"
+          >report an issue</a
+        ><span class="separator">|</span><a href="/privacy">privacy</a>
+      </div>
+    </footer>
+
+    <script>
+      // Scripted mock of the loop. When the real no-login demo ships this card
+      // embeds it instead (real generator, real player, real KaTeX). The page
+      // is fully readable without this script; it only animates the demo card.
+      (function () {
+        // Deliberately easy: the job is to make anyone FEEL the loop in
+        // seconds, not to prove range. The toggles and copy carry breadth.
+        var problems = [
+          { text: "4 + 3", answers: ["7"] },
+          { text: "6 − 2", answers: ["4"] },
+          { text: "5 × 2", answers: ["10"] },
+          { text: "8 + 1", answers: ["9"] },
+        ];
+        var need = 2,
+          solved = 0,
+          idx = 0;
+        var pText = document.getElementById("problem-text"),
+          input = document.getElementById("answer"),
+          btn = document.getElementById("submit-btn"),
+          fb = document.getElementById("feedback"),
+          pfill = document.getElementById("pfill"),
+          stageP = document.getElementById("stage-problem"),
+          stageR = document.getElementById("stage-reward"),
+          stageD = document.getElementById("stage-done"),
+          again = document.getElementById("again-btn"),
+          videoScreen = document.getElementById("video-screen"),
+          game = document.querySelector(".game");
+        var rewardTimer = null;
+        var reduced = window.matchMedia(
+          "(prefers-reduced-motion: reduce)"
+        ).matches;
+        var interacted = false;
+
+        function show(el) {
+          [stageP, stageR, stageD].forEach(function (s) {
+            s.classList.add("hidden");
+          });
+          el.classList.remove("hidden");
+        }
+        function loadProblem() {
+          pText.textContent = problems[idx % problems.length].text;
+          input.value = "";
+          fb.innerHTML = "&nbsp;";
+          fb.classList.remove("nudge");
+          if (interacted) input.focus();
+        }
+        function norm(s) {
+          return s.replace(/\s+/g, "").toLowerCase();
+        }
+
+        function check() {
+          var ok = problems[idx % problems.length].answers.some(function (a) {
+            return norm(input.value) === norm(a);
+          });
+          if (!ok) {
+            // Same voice as the real game, and never red.
+            fb.textContent = "Try again!";
+            fb.classList.add("nudge");
+            if (!reduced) {
+              game.classList.remove("shake");
+              void game.offsetWidth;
+              game.classList.add("shake");
+            }
+            input.select();
+            return;
+          }
+          solved++;
+          idx++;
+          pfill.style.width = (solved / need) * 100 + "%";
+          fb.textContent = "Nice!";
+          fb.classList.remove("nudge");
+          if (solved >= need) {
+            setTimeout(reward, 100);
+          } else {
+            setTimeout(loadProblem, 100);
+          }
+        }
+
+        function mountVideo() {
+          // Self-hosted clip: no third-party request, no player chrome, no
+          // controls to click. Plays once with sound (not muted, not looped).
+          var v = document.createElement("video");
+          v.autoplay = true;
+          v.setAttribute("playsinline", "");
+          v.src = "/demo.mp4";
+          videoScreen.innerHTML = "";
+          videoScreen.appendChild(v);
+          // The visitor has already interacted (they solved problems), so most
+          // browsers allow autoplay with sound. Kick playback now and again once
+          // there's data; if a browser still blocks unmuted autoplay, fall back
+          // to muted so the clip at least plays.
+          var start = function () {
+            var p = v.play();
+            if (p && p.catch) {
+              p.catch(function () {
+                v.muted = true;
+                v.play().catch(function () {});
+              });
+            }
+          };
+          start();
+          v.addEventListener("canplay", start, { once: true });
+        }
+        // Emptying the container removes the video, which stops playback the
+        // moment we leave the reward stage.
+        function clearVideo() {
+          videoScreen.innerHTML = "";
+        }
+        // Reveal the done stage as an overlay: it shares the reward stage's grid
+        // cell, so removing .hidden stacks it on top of the still-playing video,
+        // then .fade-in transitions its scrim + text in.
+        function fadeInDone() {
+          stageD.classList.remove("hidden");
+          requestAnimationFrame(function () {
+            stageD.classList.add("fade-in");
+          });
+        }
+        function reward() {
+          show(stageR);
+          mountVideo();
+          if (rewardTimer) clearTimeout(rewardTimer);
+          rewardTimer = setTimeout(fadeInDone, 7000);
+        }
+
+        again.addEventListener("click", function () {
+          if (rewardTimer) clearTimeout(rewardTimer);
+          clearVideo();
+          stageD.classList.remove("fade-in");
+          solved = 0;
+          pfill.style.width = "0%";
+          show(stageP);
+          loadProblem();
+        });
+        btn.addEventListener("click", check);
+        input.addEventListener("keydown", function (e) {
+          if (e.key === "Enter") check();
+        });
+        input.addEventListener("focus", function () {
+          interacted = true;
+        });
+        loadProblem();
+      })();
+
+      // The skill chips are a live preview of the settings control, so they
+      // toggle. Nothing is persisted; flipping one only flips the chip.
+      (function () {
+        var chips = document.querySelectorAll(".toggles .tog");
+        for (var i = 0; i < chips.length; i++) {
+          chips[i].addEventListener("click", function () {
+            var on = this.getAttribute("aria-pressed") === "true";
+            this.setAttribute("aria-pressed", on ? "false" : "true");
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>

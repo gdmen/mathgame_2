@@ -1,0 +1,647 @@
+// Marketing landing page styles (#329).
+//
+// Compiled to web/public/landing.css by `make landing-assets`, which also
+// copies the woff2 files this page needs into web/public/fonts. Importing
+// styles.scss is the point: the landing and the app share ONE token source,
+// so a token change can never drift between them.
+//
+// The page is static HTML with no React and no hydration, so it cannot use
+// the app's JS @fontsource imports; the @font-face blocks below cover it.
+//
+// reset before styles.scss matches the app's cascade order (index.scss), so the
+// landing shares the app's reset instead of hand-rolling its own.
+@import "reset.scss";
+@import "styles.scss";
+
+// ---------------------------------------------------------------- fonts
+@font-face {
+  font-family: "Quicksand";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/quicksand-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Quicksand";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/quicksand-latin-700-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Nunito";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/nunito-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Nunito";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/nunito-latin-400-italic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Nunito";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/nunito-latin-700-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Caveat";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/caveat-latin-700-normal.woff2") format("woff2");
+}
+// The app renders problems with KaTeX; borrowing its roman face keeps the
+// demo card's math looking like the real thing without shipping all of KaTeX.
+@font-face {
+  font-family: "KaTeX_Main";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/KaTeX_Main-Regular.woff2") format("woff2");
+}
+
+// ---------------------------------------------------------------- base
+html {
+  scroll-behavior: smooth;
+}
+body {
+  background-color: $background-color;
+  // font-family and color are inherited from the app's html rule (styles.scss).
+  // Same 16px base as the app, so shared em-based chrome (header, footer)
+  // resolves to identical pixels on both surfaces.
+  font-size: 1em;
+  font-weight: 400;
+  line-height: 1.6;
+}
+a {
+  color: $color-one-contrast;
+}
+.wrap {
+  margin: 0 auto;
+  max-width: $max-width;
+  padding: 0 1.5 * $base-space;
+}
+// Headings inherit family/weight/line-height from the app's h1-h5 rule
+// (styles.scss); the landing only overrides the fixed sizes with fluid ones
+// (the h1/h2 clamp rules below).
+
+// full-bleed colour bands
+.band-green {
+  background-color: $color-one;
+}
+.band-light {
+  background-color: $color-two;
+}
+
+// ---------------------------------------------------------------- nav
+.nav {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  // padding-block only: a `padding` shorthand here would reset the horizontal
+  // padding .wrap sets, dropping the header's inset and misaligning it from the
+  // body below (and from the app menu, which shares this frame).
+  padding-block: 1.25 * $base-space;
+}
+.logo {
+  color: $font-color;
+  font-family: $display-font-family;
+  font-size: 1.3rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.nav .login {
+  color: $font-color;
+  font-family: $display-font-family;
+  font-weight: 600;
+  text-decoration: none;
+  &:hover {
+    color: $color-one-contrast;
+  }
+}
+
+// ---------------------------------------------------------------- hero
+.hero {
+  padding: 4 * $base-space 0 4.5 * $base-space;
+}
+.hero-grid {
+  align-items: center;
+  display: grid;
+  gap: 3.5 * $base-space;
+  grid-template-columns: 1.05fr 0.95fr;
+}
+.eyebrow {
+  color: $color-one-contrast;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  margin-bottom: 0.875 * $base-space;
+  text-transform: uppercase;
+}
+h1 {
+  font-size: clamp(2.1rem, 4.4vw, 3rem);
+  letter-spacing: -0.005em;
+  // em against a clamp()ed 48px font, so keep the multiplier well under 1
+  margin-bottom: 0.5 * $base-space;
+  .earn {
+    color: $color-one-contrast;
+  }
+}
+.sub {
+  font-size: 1.12rem;
+  margin-bottom: 0.625 * $base-space;
+  max-width: 33em;
+}
+.story-line {
+  color: $color-ink-soft;
+  font-style: italic;
+  margin-bottom: 1.625 * $base-space;
+}
+.trust {
+  color: $color-ink-soft;
+  font-size: 0.85rem;
+  a {
+    color: $color-ink-soft;
+  }
+}
+
+// ---------------------------------------------------------------- buttons
+.cta-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: $base-space;
+  margin-bottom: 0.75 * $base-space;
+}
+.btn {
+  border: 0.125em solid transparent;
+  border-radius: $base-radius;
+  cursor: pointer;
+  display: inline-block;
+  font-family: $display-font-family;
+  font-size: 1.02rem;
+  font-weight: 600;
+  padding: 0.9375 * $base-space 1.625 * $base-space;
+  text-decoration: none;
+  transition: transform 0.1s ease, background-color 0.1s ease;
+  &:active {
+    transform: scale(0.95);
+  }
+}
+.btn-primary {
+  background-color: $color-action;
+  color: white;
+  &:hover {
+    background-color: $color-action-deep;
+  }
+}
+.btn-ghost {
+  background-color: transparent;
+  border-color: $color-one-contrast;
+  color: $color-one-contrast;
+}
+
+// "try it!" is a drawn annotation, not a link: the demo card is the
+// affordance. Decorative, so it is aria-hidden and ignores the pointer.
+.try-note {
+  align-items: center;
+  color: $color-action;
+  display: inline-flex;
+  // Sits with the CTA (plus a little air beyond the row gap); the arrow itself
+  // carries the eye across to the demo card.
+  margin-left: 0.75 * $base-space;
+  pointer-events: none;
+  user-select: none;
+}
+.try-word {
+  font-family: $annotation-font-family;
+  font-size: 2.05rem;
+  font-weight: 700;
+  line-height: 1;
+  transform: rotate(-7deg);
+}
+// Each layout gets its own drawn arrow (landing.html); both tails sit at half
+// the viewBox height, so the centred flex row pins them to the middle of the
+// "!". The breakpoint below swaps which one shows.
+.try-arrow {
+  margin-left: 0.375 * $base-space;
+  overflow: visible;
+}
+.try-arrow-desktop {
+  height: 4em;
+  width: 6.5em;
+}
+.try-arrow-mobile {
+  display: none;
+  height: 4.375em;
+  width: 3.125em;
+}
+
+// ---------------------------------------------------------------- demo card
+.game {
+  background-color: white;
+  border: 0.125em solid $color-action;
+  border-radius: $radius-large;
+  box-shadow: 0 0 0 0.375em rgba($color-action, 0.1),
+    0 0.625em 1.75em rgba($color-action, 0.18);
+  overflow: hidden;
+}
+.game-bar {
+  align-items: center;
+  border-bottom: 0.0625em solid $color-two;
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75 * $base-space 1.125 * $base-space;
+  .title {
+    font-family: $display-font-family;
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+}
+.chip-demo {
+  background-color: $color-two;
+  border-radius: 99px;
+  color: $color-one-contrast;
+  font-family: $display-font-family;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  padding: 0.1875em 0.625em;
+  text-transform: uppercase;
+}
+.progress-track {
+  background-color: $color-two;
+  border-radius: 99px;
+  height: 0.5625em;
+  margin: $base-space 1.125 * $base-space 0;
+  overflow: hidden;
+}
+.progress-fill {
+  background-color: $color-one-contrast;
+  border-radius: 99px;
+  height: 100%;
+  transition: width 0.5s ease;
+  width: 0%;
+}
+// Every stage shares one grid cell, so the card is always as tall as its
+// tallest stage and NEVER resizes as the loop advances. That is the product's
+// own no-surprises principle applied to its own marketing.
+.stages {
+  display: grid;
+}
+.stages .stage {
+  grid-area: 1/1;
+}
+.stage {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 15.625em;
+  padding: 1.625 * $base-space 1.125 * $base-space 1.5 * $base-space;
+  text-align: center;
+}
+// A hidden stage still reserves its height, which is what keeps the card fixed.
+.hidden {
+  pointer-events: none;
+  visibility: hidden;
+}
+// The "That's the loop" payoff isn't a separate screen: it fades in over the
+// reward video (they share the grid cell), fully opaque once the fade lands.
+#stage-done {
+  background-color: $background-color;
+  opacity: 0;
+  // Positioned + z-index so the scrim paints above the reward stage's video.
+  position: relative;
+  transition: opacity 1.6s ease;
+  z-index: 2;
+  &.fade-in {
+    opacity: 1;
+  }
+}
+.problem {
+  font-family: "KaTeX_Main", serif;
+  font-size: 2.1rem;
+  margin-bottom: 0.375 * $base-space;
+}
+.answer-row {
+  display: flex;
+  gap: 0.625 * $base-space;
+  margin-top: $base-space;
+  input {
+    background-color: $background-color;
+    border: 0.125em solid $color-field-border;
+    border-radius: $base-radius;
+    font-family: "KaTeX_Main", serif;
+    font-size: 1.25rem;
+    padding: 0.625 * $base-space;
+    text-align: center;
+    width: 9.375em;
+    &:focus {
+      border-color: $color-one-contrast;
+      outline: none;
+    }
+  }
+}
+.submit {
+  // font-family and weight come from the app's button rule (styles.scss).
+  background-color: $color-one-contrast;
+  border: none;
+  border-radius: $base-radius;
+  color: white;
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 0.625 * $base-space 1.25 * $base-space;
+  transition: transform 0.1s ease;
+  &:active {
+    transform: scale(0.95);
+  }
+}
+// Feedback is never red. A wrong answer gets the same neutral nudge the real
+// game gives; red is reserved for parent/admin validation.
+.feedback {
+  color: $color-one-contrast;
+  font-size: 0.92rem;
+  font-weight: 700;
+  height: 1.375em;
+  margin-top: 0.75 * $base-space;
+  &.nudge {
+    color: $color-ink-soft;
+  }
+}
+.shake {
+  animation: landing-shake 0.3s ease;
+}
+@keyframes landing-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-0.375em);
+  }
+  75% {
+    transform: translateX(0.375em);
+  }
+}
+
+// Borderless, like the real game (video.scss): a clean 16:9 player with no dark
+// frame around it. The video autoplays (muted) the moment the reward stage shows.
+.video {
+  margin: 0 auto;
+  max-width: 20em;
+  width: 100%;
+  .screen {
+    aspect-ratio: 16/9;
+    background-color: $font-color;
+    border-radius: $radius-small;
+    overflow: hidden;
+    video {
+      display: block;
+      height: 100%;
+      object-fit: cover;
+      width: 100%;
+    }
+  }
+}
+.reward-caption {
+  color: $color-ink-soft;
+  font-size: 0.86rem;
+  margin-top: 0.75 * $base-space;
+}
+
+// ---------------------------------------------------------------- sections
+section {
+  padding: 4.5 * $base-space 0;
+}
+h2 {
+  font-size: clamp(1.5rem, 2.6vw, 2rem);
+  margin-bottom: 0.75 * $base-space;
+}
+.section-lede {
+  color: $color-ink-soft;
+  margin-bottom: 2.5 * $base-space;
+  max-width: 40em;
+}
+.steps {
+  display: grid;
+  gap: 1.625 * $base-space;
+  grid-template-columns: repeat(3, 1fr);
+}
+.step {
+  background-color: white;
+  border: 0.0625em solid $color-chip-border;
+  border-radius: $radius-large;
+  box-shadow: $shadow-card;
+  padding: 1.625 * $base-space 1.5 * $base-space;
+  .num {
+    align-items: center;
+    background-color: $color-one-contrast;
+    border-radius: 50%;
+    color: white;
+    display: inline-flex;
+    font-family: $display-font-family;
+    font-weight: 700;
+    height: 2.125em;
+    justify-content: center;
+    margin-bottom: 0.875 * $base-space;
+    width: 2.125em;
+  }
+  h3 {
+    font-size: 1.05rem;
+    margin-bottom: 0.5 * $base-space;
+  }
+  p {
+    color: $color-ink-soft;
+    font-size: 0.95rem;
+    b {
+      color: $font-color;
+    }
+  }
+  // step 2 is the reward step
+  &.reward-step .num {
+    background-color: $color-reward;
+  }
+}
+
+// settings-style switch rows: show the product's own mechanic
+// The settings screen's skill chips, previewed. Shape comes from the shared
+// toggle-pill mixin so this can never drift from the real control.
+.toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625 * $base-space;
+  margin: 1.625 * $base-space 0 2.125 * $base-space;
+}
+.tog {
+  @include toggle-pill;
+  align-items: baseline;
+  color: $font-color;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 1rem;
+  gap: 0.375 * $base-space;
+  &[aria-pressed="true"] {
+    @include toggle-pill-on;
+  }
+  small {
+    color: $color-ink-soft;
+    font-size: 0.85em;
+  }
+}
+
+.points {
+  display: grid;
+  gap: 1.375 * $base-space;
+  grid-template-columns: repeat(2, 1fr);
+}
+.point {
+  border-left: 0.25em solid $color-one-contrast;
+  padding: 0.25 * $base-space 0 0.25 * $base-space 1.125 * $base-space;
+  h3 {
+    font-size: 1rem;
+    margin-bottom: 0.25 * $base-space;
+  }
+  p {
+    color: $color-ink-soft;
+    font-size: 0.93rem;
+  }
+}
+
+// ---------------------------------------------------------------- trevor
+.trevor {
+  padding: 4.5 * $base-space 0;
+  p {
+    margin-bottom: 0.875 * $base-space;
+  }
+}
+.trevor-grid {
+  align-items: center;
+  display: grid;
+  gap: 3 * $base-space;
+  grid-template-columns: 1.1fr 0.9fr;
+}
+.stats {
+  display: grid;
+  gap: $base-space;
+}
+.stat {
+  align-items: baseline;
+  background-color: white;
+  border: 0.0625em solid $color-chip-border;
+  border-radius: $radius-large;
+  box-shadow: $shadow-card;
+  display: flex;
+  gap: 0.875 * $base-space;
+  padding: 1.125 * $base-space 1.375 * $base-space;
+  .n {
+    color: $color-one-contrast;
+    font-family: $display-font-family;
+    font-size: 1.55rem;
+    font-weight: 700;
+    min-width: 5.6em;
+  }
+  .l {
+    color: $color-ink-soft;
+    font-size: 0.9rem;
+  }
+}
+
+// ---------------------------------------------------------------- faq
+details {
+  border-bottom: 0.0625em solid $color-chip-border;
+  padding: $base-space 0.25 * $base-space;
+  &:first-of-type {
+    border-top: 0.0625em solid $color-chip-border;
+  }
+  p {
+    color: $color-ink-soft;
+    font-size: 0.95rem;
+    max-width: 46em;
+    padding: 0.625 * $base-space 0 0.25 * $base-space;
+  }
+}
+summary {
+  cursor: pointer;
+  font-family: $display-font-family;
+  font-size: 1rem;
+  font-weight: 600;
+  &::marker {
+    color: $color-one-contrast;
+  }
+}
+
+// ---------------------------------------------------------------- final + footer
+.final {
+  padding: 5 * $base-space 0;
+  text-align: center;
+  .sub {
+    margin: 0 auto 1.625 * $base-space;
+  }
+  .cta-row {
+    justify-content: center;
+  }
+}
+footer {
+  color: $color-ink-soft;
+  font-size: 0.9rem;
+  padding: 2.125 * $base-space 0;
+  text-align: center;
+  a {
+    color: $color-ink-soft;
+  }
+  .separator {
+    margin: 0 0.5em;
+  }
+}
+
+// ---------------------------------------------------------------- responsive
+@media only screen and (max-width: 880px) {
+  .hero {
+    padding: 2.5 * $base-space 0 3.5 * $base-space;
+  }
+  .hero-grid,
+  .trevor-grid,
+  .steps,
+  .points {
+    gap: 2 * $base-space;
+    grid-template-columns: 1fr;
+  }
+  .toggles {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .cta-row {
+    justify-content: center;
+  }
+  // the demo now sits directly under the CTA; the closing band repeats these
+  // assurances, so keeping them here only pushes the demo further down
+  .hero .trust {
+    display: none;
+  }
+  // the demo stacks BELOW the copy here, so show the downward arrow instead
+  .try-arrow-desktop {
+    display: none;
+  }
+  .try-arrow-mobile {
+    display: block;
+  }
+  .stat .n {
+    min-width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}

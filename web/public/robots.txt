@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /$
+Allow: /privacy
+# Everything below is the signed-in app: personalised, gated, and useless to a
+# crawler. Disallowing it keeps the indexable surface to the pages that are
+# actually public.
+Disallow: /play
+Disallow: /settings
+Disallow: /progress
+Disallow: /companion/
+Disallow: /pin/
+Disallow: /login
+Disallow: /admin
+
+Sitemap: https://mikeymath.org/sitemap.xml

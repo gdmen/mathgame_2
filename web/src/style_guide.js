@@ -10,7 +10,6 @@ import "./settings.scss";
 import "./pin.scss";
 import "./play.scss";
 import "./progress.scss";
-import "./home.scss";
 
 // Design tokens — keep in sync with styles.scss. Labels are the static
 // reference; rendered examples below use the actual SCSS variables, so a
@@ -19,8 +18,15 @@ const COLORS = [
   { name: "color-one", hex: "#bee8b7", note: "primary brand" },
   { name: "color-two", hex: "#d6f7d2", note: "primary brand, lighter" },
   { name: "color-one-contrast", hex: "#007200", note: "contrast on color-one" },
+  { name: "color-action", hex: "#2166a5", note: "primary CTAs" },
+  { name: "color-action-deep", hex: "#1a5286", note: "CTA hover" },
+  { name: "color-reward", hex: "#2166a5", note: "the earned-video moment" },
   { name: "color-inactive", hex: "#a9a9a9", note: "disabled / muted" },
-  { name: "color-error", hex: "#dc143c", note: "errors, destructive" },
+  {
+    name: "color-error",
+    hex: "#dc143c",
+    note: "parent/admin validation ONLY — never kid correctness",
+  },
   {
     name: "color-card-tint-a",
     hex: "#f3faf3",
@@ -36,8 +42,14 @@ const COLORS = [
     hex: "#c9d2c7",
     note: "toggle chip / card borders",
   },
-  { name: "background-color", hex: "#ffffff", note: "page background" },
-  { name: "font-color", hex: "#000000", note: "default text" },
+  {
+    name: "color-field-border",
+    hex: "#6b8650",
+    note: "form-input edges (chip-border is too faint at 1.5:1)",
+  },
+  { name: "background-color", hex: "#faf9f3", note: "page background" },
+  { name: "font-color", hex: "#24301f", note: "default text" },
+  { name: "color-ink-soft", hex: "#55644e", note: "secondary / muted text" },
 ];
 
 // Used in production but not assigned to an SCSS variable.
@@ -55,13 +67,12 @@ const UNTOKENIZED_COLORS = [
   { name: "gray", hex: "#808080", note: "settings-hint text, generic borders" },
 ];
 
-// Weights actually in use across the site. The base reset sets 300 for
-// p/button; everything else is hand-applied.
+// Weights actually in use across the site. The base reset sets 400 on p and
+// 600 on button; everything else is hand-applied.
 const FONT_WEIGHTS = [
-  { value: "300", note: "body, buttons (default reset)" },
-  { value: "400", note: "settings/home/setup buttons" },
-  { value: "600", note: "progress-summary value, table headers" },
-  { value: "bold", note: "rare; setup strong tags" },
+  { value: "400", note: "body copy (default reset)" },
+  { value: "600", note: "headings, buttons; progress values, table headers" },
+  { value: "700", note: "wordmark, stat numbers, strong emphasis" },
 ];
 
 // Below the base 1em sit a few recurring small-text sizes.
@@ -84,25 +95,36 @@ const SHAPE = [
   {
     name: "base-radius",
     value: "0.5em",
-    note: "default corner radius (token)",
+    note: "default corner radius",
   },
   {
-    name: "small radius",
+    name: "radius-small",
     value: "0.25em",
-    note: "pills, pin inputs, modal/textarea corners (not tokenized — used inline)",
+    note: "pills, pin inputs, modal/textarea corners",
+  },
+  {
+    name: "radius-large",
+    value: "1em",
+    note: "marketing / feature cards",
+  },
+  {
+    name: "shadow-card",
+    value: "0 8px 24px rgba(35, 48, 32, 0.1)",
+    note: "raised card surface",
+    kind: "shadow",
   },
 ];
 
 const BREAKPOINTS = [
   {
-    name: "Mobile (home)",
-    value: "max-width: 768px",
-    note: "hero collapses; image hidden",
-  },
-  {
     name: "Mobile (setup/settings)",
     value: "max-width: 870px",
     note: "tab labels hidden, form widens to 100%",
+  },
+  {
+    name: "Mobile (landing)",
+    value: "max-width: 880px",
+    note: "landing.scss: grids collapse to one column",
   },
 ];
 
@@ -188,6 +210,24 @@ const StyleGuideView = () => {
             />
           ))}
         </div>
+        <h3>What the colors mean</h3>
+        <p>
+          <strong>Green</strong> — content and brand surfaces: bands, links,
+          step badges. The work half of the loop.
+        </p>
+        <p>
+          <strong>Blue</strong> — action and reward. Primary CTAs and the
+          earned-video moment share one hue on purpose: the thing you click and
+          the thing you earn are the same promise.
+        </p>
+        <p>
+          <strong>Red</strong> — parent/admin form validation only.{" "}
+          <strong>Never</strong> used to tell a kid they answered wrong; a wrong
+          answer gets a neutral nudge. Treat this as an invariant rather than a
+          preference — it is the single most important property of the palette
+          for the kids who use this.
+        </p>
+
         <h3>Untokenized but used</h3>
         <p>
           These show up in production CSS as bare named colors. Worth knowing
@@ -213,8 +253,32 @@ const StyleGuideView = () => {
 
       <Section title="Typography">
         <p>
-          Font family: <code>Josefin Sans, sans-serif</code> (loaded from Google
-          Fonts).
+          Two families, both self-hosted via <code>@fontsource</code> and
+          imported in <code>index.js</code> — no runtime request to Google,
+          which is what lets the product claim no third-party trackers.{" "}
+          <code>$display-font-family</code> is{" "}
+          <span
+            style={{ fontFamily: "Quicksand, sans-serif", fontWeight: 600 }}
+          >
+            Quicksand
+          </span>{" "}
+          (headings, buttons, wordmark); <code>$base-font-family</code> is{" "}
+          <span style={{ fontFamily: "Nunito, sans-serif" }}>Nunito</span> (body
+          copy).
+        </p>
+        <p>
+          <code>$annotation-font-family</code> is{" "}
+          <span
+            style={{
+              fontFamily: "Caveat, cursive",
+              fontWeight: 700,
+              fontSize: "1.4em",
+            }}
+          >
+            Caveat
+          </span>{" "}
+          — decorative only, for hand-drawn marginalia on the landing page.
+          Never use it for anything a user has to read to operate the product.
         </p>
         <div className="sg-type-scale">
           <div className="sg-type-row">
@@ -248,8 +312,8 @@ const StyleGuideView = () => {
 
         <h3>Font weights</h3>
         <p>
-          The base reset sets weight 300 on <code>p</code> and{" "}
-          <code>button</code>. Heavier weights are applied per-component.
+          The base reset sets weight 400 on <code>p</code> and 600 on{" "}
+          <code>button</code>. Other weights are applied per-component.
         </p>
         <div className="sg-type-scale">
           {FONT_WEIGHTS.map((w) => (
@@ -328,10 +392,14 @@ const StyleGuideView = () => {
               swatch={
                 <div
                   className="sg-shape-swatch"
-                  style={{ borderRadius: s.value }}
+                  style={
+                    s.kind === "shadow"
+                      ? { borderRadius: "0.5em", boxShadow: s.value }
+                      : { borderRadius: s.value }
+                  }
                 />
               }
-              name={s.name.startsWith("base") ? "$" + s.name : s.name}
+              name={"$" + s.name}
               value={s.value}
               note={s.note}
             />
@@ -624,34 +692,6 @@ const StyleGuideView = () => {
         )}
       </Section>
 
-      <Section title="Landing hero">
-        <p>
-          The homepage hero band. Color-one background, two-column flex layout,
-          primary CTA in the contrast color. On <code>max-width: 768px</code>{" "}
-          the image hides and the copy goes full-width.
-        </p>
-        <CompoundExample
-          name="#landing-hero"
-          context="renders inside #content; full-bleed bg"
-        >
-          <div id="landing-hero">
-            <div className="hero-content">
-              <div className="hero-copy">
-                <h2>Headline copy goes here</h2>
-                <p>
-                  Supporting paragraph at 1.125em, line-height 1.5, with a
-                  primary CTA below.
-                </p>
-                <div className="button-container">
-                  <button>Get started</button>
-                </div>
-              </div>
-              <div className="hero-image sg-hero-placeholder" />
-            </div>
-          </div>
-        </CompoundExample>
-      </Section>
-
       <Section title="Stat cards">
         <p>
           The progress page's summary tiles. Big value, small label, light gray
@@ -756,6 +796,15 @@ const StyleGuideView = () => {
       <Section title="States">
         <p>The site's stock loading state:</p>
         <div className="content-loading" />
+        <h3>Keyboard focus</h3>
+        <p>
+          A shared <code>:focus-visible</code> ring (defined in{" "}
+          <code>styles.scss</code>, so the app and the static landing use one
+          source): a 3px <code>$color-one-contrast</code> outline with a 2px
+          offset. It appears only for keyboard/assistive-tech navigation, never
+          on mouse click. Tab to the button below to see it:
+        </p>
+        <button type="button">Focusable example</button>
       </Section>
 
       <footer className="sg-footer">

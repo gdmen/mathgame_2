@@ -23,7 +23,7 @@ all: build-api build-cmds build-web
 dev-api:
 	$(GOBIN)/apiserver -v 3 --logtostderr 1
 
-dev-web: frontend-conf
+dev-web: frontend-conf landing-assets
 	cd web && npm start
 
 build-api:
@@ -106,6 +106,7 @@ clean:
 	GOBIN=$(GOBIN) $(GOCLEAN) -testcache
 	$(GOMOD) tidy
 	$(RM) ./web/build/* ./web/build.next ./web/build.prev
+	$(RM) ./web/public/landing.css ./web/public/fonts
 
 # Emit web/src/conf.json with ONLY the public fields the frontend reads.
 frontend-conf:
@@ -118,9 +119,35 @@ frontend-conf:
 # serving it (#243). The swap is two renames (sub-ms); serve re-reads per
 # request, so no restart is needed and the live dir holds valid content right
 # up to the swap. A failed build aborts (set -e) with web/build untouched.
+# Assets the STATIC landing page needs (#329). The landing is plain HTML with
+# no React, so it cannot use the app's JS @fontsource imports or its compiled
+# bundle: it gets its own stylesheet and its own copies of the woff2 files.
+# landing.scss @imports styles.scss, so both surfaces share one token source.
+# Outputs land in web/public/, which CRA copies verbatim into the build; both
+# are generated, so both are gitignored.
+landing-assets:
+	mkdir -p ./web/public/fonts
+	cd web && npx sass --no-source-map --load-path=node_modules \
+		src/landing.scss public/landing.css
+	cp ./web/node_modules/@fontsource/quicksand/files/quicksand-latin-600-normal.woff2 ./web/public/fonts/
+	cp ./web/node_modules/@fontsource/quicksand/files/quicksand-latin-700-normal.woff2 ./web/public/fonts/
+	cp ./web/node_modules/@fontsource/nunito/files/nunito-latin-400-normal.woff2 ./web/public/fonts/
+	cp ./web/node_modules/@fontsource/nunito/files/nunito-latin-400-italic.woff2 ./web/public/fonts/
+	cp ./web/node_modules/@fontsource/nunito/files/nunito-latin-700-normal.woff2 ./web/public/fonts/
+	cp ./web/node_modules/@fontsource/caveat/files/caveat-latin-700-normal.woff2 ./web/public/fonts/
+	cp ./web/node_modules/katex/dist/fonts/KaTeX_Main-Regular.woff2 ./web/public/fonts/
+
 build-web: frontend-conf
-	cd web && npm install --force && BUILD_PATH=build.next npm run build; cd -
+	cd web && npm install --force; cd -
+	$(MAKE) landing-assets
+	cd web && BUILD_PATH=build.next npm run build; cd -
 	$(MAKE) fmt-web
+# The static landing must be the document served at "/", so it becomes
+# index.html and the React shell moves to app.html. web/public/serve.json
+# rewrites every deeper path to app.html, which is why prod-web must not pass
+# serve's -s flag. See #329.
+	mv ./web/build.next/index.html ./web/build.next/app.html
+	mv ./web/build.next/landing.html ./web/build.next/index.html
 	$(RM) ./web/build.prev
 	if [ -d ./web/build ]; then mv ./web/build ./web/build.prev; fi
 	mv ./web/build.next ./web/build
@@ -150,7 +177,7 @@ prod-web:
 	CERT=$$(python3 -c "import json; print(json.load(open('$(CONF)')).get('tls_cert_file',''))"); \
 	KEY=$$(python3 -c "import json; print(json.load(open('$(CONF)')).get('tls_key_file',''))"); \
 	if [ -z "$$CERT" ] || [ -z "$$KEY" ]; then echo "tls_cert_file/tls_key_file not set in $(CONF)" >&2; exit 1; fi; \
-	cd web && serve -s build -l 443 --ssl-cert "$$CERT" --ssl-key "$$KEY"
+	cd web && serve build -l 443 --ssl-cert "$$CERT" --ssl-key "$$KEY"
 
 prod-api:
 	GIN_MODE=release $(GOBIN)/apiserver
