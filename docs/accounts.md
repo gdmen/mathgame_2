@@ -100,7 +100,10 @@ PIN against `user.pin` by equality.
 account is off an admin path and has `user.pin === ""` **or** `numEnabledVideos < 3`:
 
 1. **Problem Types** — continue gated on a valid bitmap (`problem_type_bitmap >= 1`).
-2. **Add Videos** — playlists + videos; continue gated on ≥ 1 enabled video.
+2. **Add Videos** — playlists (each expandable to its videos); continue gated on
+   `MIN_PLAYABLE_VIDEOS` playable videos. The count is reported up by
+   `PlaylistsSettingsView`'s `onPlayableCountChange` rather than derived from a second
+   list — see [settings.md](settings.md).
 3. **Set Parent Pin** — `PinView` in `isSetup` mode; continue POSTs the user with the freshly-set
    session PIN (`PinTabView`).
 4. **Start Playing!** — requires ≥ 1 enabled playlist, then links to `/play`.

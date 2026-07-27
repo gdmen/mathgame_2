@@ -14,6 +14,9 @@ $color-error: #dc143c;
 $color-card-tint-a: #f3faf3;
 $color-card-tint-b: #f7faf5;
 $color-chip-border: #c9d2c7;
+// Hairline between rows in a list. Lighter than the chip border on purpose: it
+// separates without drawing a box.
+$color-divider: #e3e0d5;
 // Input edges need >= 3:1 against the field they bound. $color-chip-border is
 // a card outline (1.5:1 on white) and is too faint to read as a control edge.
 $color-field-border: #6b8650;

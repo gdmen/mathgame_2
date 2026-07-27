@@ -1,28 +1,98 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import { ProblemTypes } from "./enums.js";
 import { validateBitmap, targetDifficultyRange } from "./bitmap_validation.js";
 import { RequirePin } from "./pin.js";
 import "./settings.scss";
 
+// Throws on any non-2xx or network failure so callers can surface it. A save
+// that fails silently is indistinguishable from one that worked, which is how
+// a parent loses settings without knowing.
 const postSettings = async function (token, apiUrl, model) {
-  try {
-    const reqParams = {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + token,
-      },
-      body: JSON.stringify(model),
-    };
-    const req = await fetch(apiUrl + "/settings/" + model.user_id, reqParams);
-    const json = await req.json();
-    return json;
-  } catch (e) {
-    console.log(e);
+  const reqParams = {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token,
+    },
+    body: JSON.stringify(model),
+  };
+  const req = await fetch(apiUrl + "/settings/" + model.user_id, reqParams);
+  if (!req.ok) {
+    throw new Error("save failed with status " + req.status);
   }
+  return req.json();
 };
+
+// Drives the per-card save indicator: idle -> saving -> saved (auto-clearing)
+// or error, with a retry that replays the last attempt.
+const useSaveState = () => {
+  const [status, setStatus] = useState("idle");
+  const lastAttempt = useRef(null);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    return () => clearTimeout(timerRef.current);
+  }, []);
+
+  const run = useCallback(async (fn) => {
+    lastAttempt.current = fn;
+    clearTimeout(timerRef.current);
+    setStatus("saving");
+    try {
+      await fn();
+      setStatus("saved");
+      timerRef.current = setTimeout(() => setStatus("idle"), 2000);
+    } catch (e) {
+      setStatus("error");
+    }
+  }, []);
+
+  const retry = useCallback(() => {
+    if (lastAttempt.current) run(lastAttempt.current);
+  }, [run]);
+
+  return { status, run, retry };
+};
+
+const SaveState = ({ state }) => {
+  if (state.status === "idle") {
+    return null;
+  }
+  if (state.status === "error") {
+    return (
+      <span className="save-state save-error">
+        Not saved
+        <button type="button" className="save-retry" onClick={state.retry}>
+          Retry
+        </button>
+      </span>
+    );
+  }
+  return (
+    <span className="save-state">
+      {state.status === "saving" ? "Saving…" : "Saved ✓"}
+    </span>
+  );
+};
+
+// How far a range input's track is filled. Only the position lives here; the
+// colours stay in settings.scss with the rest of the tokens.
+const fillTo = (percent) => ({ "--fill-pct": percent + "%" });
+
+// A settings card: the question-titled surface the problem-type groups already
+// use, extended to every control on the page.
+const SettingsCard = ({ title, question, wide, saveState, children }) => (
+  <section className={"settings-card" + (wide ? " settings-card-wide" : "")}>
+    <div className="settings-card-head">
+      <h4>{title}</h4>
+      {saveState && <SaveState state={saveState} />}
+    </div>
+    {question && <p className="settings-hint">{question}</p>}
+    {children}
+  </section>
+);
 
 // Problem-type taxonomy: each bit is placed by one question -
 // verb / noun-kind / noun-size / framing. Labels are parent vocabulary;
@@ -35,7 +105,6 @@ const PROBLEM_TYPE_GROUPS = [
   {
     title: "Operations",
     question: "What can your child do?",
-    tint: "a",
     entries: [
       { bit: ProblemTypes.ADDITION, label: "Addition" },
       { bit: ProblemTypes.SUBTRACTION, label: "Subtraction" },
@@ -55,7 +124,6 @@ const PROBLEM_TYPE_GROUPS = [
   {
     title: "Number types",
     question: "What kinds of numbers?",
-    tint: "b",
     entries: [
       { bit: ProblemTypes.DECIMALS, label: "Decimals" },
       { bit: ProblemTypes.NEGATIVES, label: "Negative numbers" },
@@ -72,7 +140,6 @@ const PROBLEM_TYPE_GROUPS = [
   {
     title: "Number size",
     question: "How big can the numbers be?",
-    tint: "b",
     hint: "Without these, numbers stay 1–12.",
     entries: [
       { bit: ProblemTypes.MEDIUM_NUMBERS, label: "Numbers up to 99" },
@@ -82,7 +149,6 @@ const PROBLEM_TYPE_GROUPS = [
   {
     title: "Problem format",
     question: "How can problems be posed?",
-    tint: "a",
     entries: [
       { bit: ProblemTypes.WORD, label: "Word problems" },
       {
@@ -142,6 +208,7 @@ const ProblemTypesSettingsView = ({
   const [problemTypeBitmap, setProblemTypeBitmap] = useState(
     settings.problem_type_bitmap
   );
+  const saveState = useSaveState();
   const validation = validateBitmap(problemTypeBitmap);
 
   useEffect(() => {
@@ -155,7 +222,7 @@ const ProblemTypesSettingsView = ({
     if (onBitmapChange) onBitmapChange(newBitmap);
     if (v.valid) {
       settings.problem_type_bitmap = newBitmap;
-      postSettings(token, apiUrl, settings);
+      saveState.run(() => postSettings(token, apiUrl, settings));
     }
   };
 
@@ -180,14 +247,16 @@ const ProblemTypesSettingsView = ({
         );
 
   return (
-    <>
-      <div id="problem-types-settings" className="settings-form">
+    <SettingsCard
+      title="Skills"
+      question="What can your child do, and how can problems be posed?"
+      wide
+      saveState={saveState}
+    >
+      <div id="problem-types-settings">
         <div className="problem-type-grid">
           {PROBLEM_TYPE_GROUPS.map((group) => (
-            <div
-              key={group.title}
-              className={"problem-type-card tint-" + group.tint}
-            >
+            <div key={group.title} className="problem-type-card">
               <h5>{group.title}</h5>
               <p className="settings-hint group-question">{group.question}</p>
               <ul id="problem-type-buttons">
@@ -235,24 +304,147 @@ const ProblemTypesSettingsView = ({
           ))}
         </div>
       </div>
-    </>
+    </SettingsCard>
   );
 };
 
 // Add public YouTube playlist links to show as "Recommended playlists" (UI only).
 const RECOMMENDED_PLAYLISTS = [];
 
-const PlaylistsSettingsView = ({ token, apiUrl, user, onPlaylistsChange }) => {
+// The reward loop needs at least this many playable videos to draw from.
+const MIN_PLAYABLE_VIDEOS = 3;
+
+const playlistName = (p) => p.title || p.you_tube_id || "Playlist " + p.id;
+
+// One playlist row, expandable in place to the videos it contributes. Videos
+// load on first open, so a parent with many playlists pays for only what they
+// look at.
+const PlaylistRow = ({ playlist, apiUrl, authHeaders, onRemove }) => {
+  const [videos, setVideos] = useState(null);
+  const [error, setError] = useState(null);
+
+  // <details> owns the open/closed state, so the whole row is one hit target
+  // and the keyboard behaviour is the browser's. onToggle only mirrors it and
+  // triggers the first load.
+  const handleToggle = async (e) => {
+    if (!e.target.open || videos != null) return;
+    try {
+      const req = await fetch(
+        apiUrl + "/playlists/" + playlist.id + "/videos",
+        { method: "GET", headers: authHeaders() }
+      );
+      if (!req.ok) throw new Error("status " + req.status);
+      const json = await req.json();
+      setVideos(Array.isArray(json) ? json : []);
+    } catch (e) {
+      setError("Could not load this playlist's videos.");
+    }
+  };
+
+  // Remove sits inside the summary for layout, so it has to opt out of the
+  // summary's default toggle.
+  const handleRemoveClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onRemove(playlist);
+  };
+
+  const total = playlist.video_count || 0;
+  const playable = playlist.playable_count || 0;
+  const countLabel =
+    playable === total
+      ? total + (total === 1 ? " video" : " videos")
+      : total + " videos · " + playable + " playable";
+
+  return (
+    <li className="playlist-item">
+      <details onToggle={handleToggle}>
+        <summary className="playlist-row">
+          <span className="playlist-caret">▶</span>
+          <span
+            className="playlist-thumbnail"
+            style={{
+              backgroundImage: playlist.thumbnailurl
+                ? `url(${playlist.thumbnailurl})`
+                : "none",
+            }}
+          />
+          <span className="playlist-title">{playlistName(playlist)}</span>
+          <span className="playlist-count">{countLabel}</span>
+          <button
+            type="button"
+            className="playlist-remove"
+            onClick={handleRemoveClick}
+          >
+            Remove…
+          </button>
+        </summary>
+        <div className="playlist-videos">
+          {error && <p className="error">{error}</p>}
+          {!error && videos == null && (
+            <p className="settings-hint">Loading…</p>
+          )}
+          {!error && videos != null && videos.length === 0 && (
+            <p className="settings-hint">
+              No videos yet. YouTube playlists sync shortly after they're added.
+            </p>
+          )}
+          {!error &&
+            videos != null &&
+            videos.map((v) => (
+              <div
+                key={v.id}
+                className={"playlist-video" + (v.disabled ? " disabled" : "")}
+              >
+                <span
+                  className="playlist-video-thumbnail"
+                  style={{
+                    backgroundImage: v.thumbnailurl
+                      ? `url(${v.thumbnailurl})`
+                      : "none",
+                  }}
+                />
+                <a
+                  className="playlist-video-title"
+                  href={videoPlayUrl(v)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {v.title}
+                </a>
+                {v.disabled && (
+                  <span className="playlist-video-state">unavailable</span>
+                )}
+              </div>
+            ))}
+        </div>
+      </details>
+    </li>
+  );
+};
+
+const PlaylistsSettingsView = ({
+  token,
+  apiUrl,
+  user,
+  onPlaylistsChange,
+  onPlayableCountChange,
+}) => {
   const [myPlaylists, setMyPlaylists] = useState([]);
   const [playlistInput, setPlaylistInput] = useState("");
   const [playlistError, setPlaylistError] = useState(null);
   const [addingPlaylist, setAddingPlaylist] = useState(false);
 
-  const authHeaders = () => ({
-    Accept: "application/json",
-    "Content-Type": "application/json",
-    Authorization: "Bearer " + token,
-  });
+  // Stable per token: the playlist rows take it as a prop, and fetchMyPlaylists
+  // declares it as a dependency.
+  const authHeaders = useCallback(
+    () => ({
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token,
+    }),
+    [token]
+  );
 
   const fetchMyPlaylists = useCallback(async () => {
     if (token == null || apiUrl == null || user == null) return;
@@ -268,11 +460,24 @@ const PlaylistsSettingsView = ({ token, apiUrl, user, onPlaylistsChange }) => {
     } catch (e) {
       console.log(e.message);
     }
-  }, [token, apiUrl, user]);
+  }, [token, apiUrl, user, authHeaders]);
 
   useEffect(() => {
     fetchMyPlaylists();
   }, [fetchMyPlaylists]);
+
+  // The union the reward loop actually draws from, summed from the per-playlist
+  // counts the list endpoint returns.
+  const totalPlayable = myPlaylists.reduce(
+    (sum, p) => sum + (p.playable_count || 0),
+    0
+  );
+  const belowMinimum = totalPlayable < MIN_PLAYABLE_VIDEOS;
+
+  // The setup wizard gates its "continue" on this count.
+  useEffect(() => {
+    if (onPlayableCountChange) onPlayableCountChange(totalPlayable);
+  }, [onPlayableCountChange, totalPlayable]);
 
   const handleAddPlaylistByUrl = async (e) => {
     setPlaylistError(null);
@@ -306,29 +511,65 @@ const PlaylistsSettingsView = ({ token, apiUrl, user, onPlaylistsChange }) => {
     }
   };
 
-  const handleRemovePlaylist = async (playlistId) => {
+  // MIN_PLAYABLE_VIDEOS mirrors the floor the reward loop needs; removing a
+  // playlist that would breach it warns before it happens rather than leaving
+  // the parent to discover it from the video count.
+  const handleRemovePlaylist = async (playlist) => {
+    const remaining = totalPlayable - (playlist.playable_count || 0);
+    const warning =
+      remaining < MIN_PLAYABLE_VIDEOS
+        ? "Removing “" +
+          playlistName(playlist) +
+          "” leaves " +
+          remaining +
+          " playable video" +
+          (remaining === 1 ? "" : "s") +
+          ", below the " +
+          MIN_PLAYABLE_VIDEOS +
+          " the game needs to hand out rewards. Remove it anyway?"
+        : "Remove “" + playlistName(playlist) + "” from your rewards?";
+    if (!window.confirm(warning)) return;
+    setPlaylistError(null);
     try {
-      const req = await fetch(apiUrl + "/playlists/" + playlistId, {
+      const req = await fetch(apiUrl + "/playlists/" + playlist.id, {
         method: "DELETE",
         headers: authHeaders(),
       });
-      if (req.ok) {
-        fetchMyPlaylists();
-        if (onPlaylistsChange) onPlaylistsChange();
+      if (!req.ok) {
+        setPlaylistError("Could not remove that playlist. Try again.");
+        return;
       }
+      fetchMyPlaylists();
+      if (onPlaylistsChange) onPlaylistsChange();
     } catch (e) {
-      console.log(e.message);
+      setPlaylistError("Could not remove that playlist. Try again.");
     }
   };
 
   return (
-    <>
-      <div className="settings-form" id="playlists-settings">
-        <h4>Your playlists</h4>
-        <p className="settings-hint">
-          Add YouTube playlists; reward videos will be chosen from the union of
-          all your playlists.
-        </p>
+    <SettingsCard
+      title={
+        <>
+          Playlists{" "}
+          <span
+            className={
+              "playlist-total" + (belowMinimum ? " playlist-total-low" : "")
+            }
+          >
+            {totalPlayable} playable video{totalPlayable === 1 ? "" : "s"}
+          </span>
+        </>
+      }
+      question="Rewards are drawn only from these."
+      wide
+    >
+      <div id="playlists-settings">
+        {belowMinimum && (
+          <p className="error">
+            The game needs at least {MIN_PLAYABLE_VIDEOS} playable videos to
+            hand out a reward. Add a playlist below.
+          </p>
+        )}
         {playlistError && (
           <p className="error playlist-error">{playlistError}</p>
         )}
@@ -348,42 +589,24 @@ const PlaylistsSettingsView = ({ token, apiUrl, user, onPlaylistsChange }) => {
             disabled={addingPlaylist}
             aria-busy={addingPlaylist}
           >
-            {addingPlaylist ? "Adding…" : "Add playlist"}
+            {addingPlaylist ? "Adding…" : "Add"}
           </button>
         </div>
         <ul id="playlist-list">
-          <li className="playlist-list-header">
-            <span className="playlist-thumbnail"> </span>
-            <span className="playlist-title">PLAYLIST</span>
-          </li>
-          {myPlaylists.map((p) => (
-            <li key={p.id} className="playlist-item">
-              <span
-                className="playlist-thumbnail"
-                style={{
-                  backgroundImage: p.thumbnailurl
-                    ? `url(${p.thumbnailurl})`
-                    : "none",
-                }}
-              />
-              <a
-                href={
-                  "https://www.youtube.com/playlist?list=" +
-                  (p.you_tube_id || "")
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-                className="playlist-title"
-              >
-                {p.title || p.you_tube_id || "Playlist " + p.id}
-              </a>
-              <span
-                className="playlist-remove"
-                onClick={() => handleRemovePlaylist(p.id)}
-              >
-                x
-              </span>
+          {myPlaylists.length === 0 && (
+            <li className="settings-hint">
+              No playlists yet. Add one above to give your child something to
+              earn.
             </li>
+          )}
+          {myPlaylists.map((p) => (
+            <PlaylistRow
+              key={p.id}
+              playlist={p}
+              apiUrl={apiUrl}
+              authHeaders={authHeaders}
+              onRemove={handleRemovePlaylist}
+            />
           ))}
         </ul>
         {RECOMMENDED_PLAYLISTS.length > 0 && (
@@ -417,7 +640,7 @@ const PlaylistsSettingsView = ({ token, apiUrl, user, onPlaylistsChange }) => {
           </div>
         )}
       </div>
-    </>
+    </SettingsCard>
   );
 };
 
@@ -438,16 +661,7 @@ const TargetDifficultySettingsView = ({
     settings.target_difficulty
   );
   const shown = Math.min(Math.max(targetDifficulty, floor), ceiling);
-
-  const handleChange = (e) => {
-    const val = parseFloat(e.target.value);
-    setTargetDifficulty(val);
-    settings.target_difficulty = val;
-  };
-
-  const handleSubmit = () => {
-    postSettings(token, apiUrl, settings);
-  };
+  const saveState = useSaveState();
 
   // The raw difficulty numbers are formula internals - parents only need
   // the relative position within what the enabled problem types allow,
@@ -457,28 +671,62 @@ const TargetDifficultySettingsView = ({
   const percent =
     span > 0 ? Math.max(1, Math.round(((shown - floor) / span) * 100)) : 100;
 
+  // This value is the adaptive system's, not the parent's: the readout is a
+  // meter and the parent's control is a nudge, so the copy and the affordance
+  // finally agree. A nudge steps a tenth of the envelope and clamps to it,
+  // exactly as dragging the old slider to that point did.
+  const nudge = (direction) => {
+    if (span <= 0) return;
+    const stepped = shown + direction * span * 0.1;
+    const clamped = Math.min(Math.max(stepped, floor), ceiling);
+    setTargetDifficulty(clamped);
+    settings.target_difficulty = clamped;
+    saveState.run(() => postSettings(token, apiUrl, settings));
+  };
+
   return (
-    <div id="target-difficulty-settings" className="settings-form">
-      <h4>Current difficulty:</h4>
-      <p className="settings-hint">
-        Adjusts automatically as your child plays.
-      </p>
-      <div>{percent} %</div>
-      <input
-        type="range"
-        min={floor.toFixed(1)}
-        max={ceiling.toFixed(1)}
-        step="0.1"
-        value={shown}
-        onChange={handleChange}
-        onMouseUp={handleSubmit}
-        onBlur={handleSubmit}
-      />
-      <div className="scale-labels">
-        <span>easiest</span>
-        <span>hardest these settings allow</span>
+    <SettingsCard
+      title="Current difficulty"
+      question="Adjusts automatically as your child plays; nudge it if it feels off."
+      saveState={saveState}
+    >
+      <div id="target-difficulty-settings">
+        <p className="settings-value">{percent}%</p>
+        <div
+          className="settings-meter"
+          role="meter"
+          aria-valuenow={percent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Current difficulty"
+        >
+          <div
+            className="settings-meter-fill"
+            style={{ width: percent + "%" }}
+          />
+        </div>
+        <div className="scale-labels">
+          <span>easiest</span>
+          <span>hardest these settings allow</span>
+        </div>
+        <div className="settings-nudges">
+          <button
+            type="button"
+            onClick={() => nudge(-1)}
+            disabled={span <= 0 || shown <= floor}
+          >
+            ← Easier
+          </button>
+          <button
+            type="button"
+            onClick={() => nudge(1)}
+            disabled={span <= 0 || shown >= ceiling}
+          >
+            Harder →
+          </button>
+        </div>
       </div>
-    </div>
+    </SettingsCard>
   );
 };
 
@@ -491,6 +739,7 @@ const TargetWorkPercentageSettingsView = ({
   const [targetWorkPercentage, setTargetWorkPercentage] = useState(
     settings.target_work_percentage
   );
+  const saveState = useSaveState();
 
   const handleChange = (e) => {
     let val = e.target.value;
@@ -498,25 +747,39 @@ const TargetWorkPercentageSettingsView = ({
     settings.target_work_percentage = parseInt(val);
   };
 
-  const handleSubmit = (e) => {
-    // post updated settings
-    postSettings(token, apiUrl, settings);
+  const handleSubmit = () => {
+    saveState.run(() => postSettings(token, apiUrl, settings));
   };
 
   return (
-    <>
-      <div id="target-work-percentage-settings" className="settings-form">
-        <h4>Percentage of time doing math:</h4>
-        <div>{targetWorkPercentage} %</div>
+    <SettingsCard
+      title="Math / video balance"
+      question="How much of a session is math?"
+      saveState={saveState}
+    >
+      <div id="target-work-percentage-settings">
+        <p className="settings-value">{targetWorkPercentage}% math</p>
+        {/* A native range paints only a track and thumb, so the filled portion
+            is drawn as a background gradient — without it this control reads as
+            a different component from the difficulty meter beside it. */}
         <input
+          className="settings-slider"
           type="range"
           value={targetWorkPercentage}
+          aria-label="Percentage of time doing math"
+          style={fillTo(targetWorkPercentage)}
           onChange={handleChange}
           onMouseUp={handleSubmit}
+          onTouchEnd={handleSubmit}
+          onKeyUp={handleSubmit}
           onBlur={handleSubmit}
         />
+        <div className="scale-labels">
+          <span>more video time</span>
+          <span>more math time</span>
+        </div>
       </div>
-    </>
+    </SettingsCard>
   );
 };
 
@@ -527,105 +790,19 @@ function videoPlayUrl(video) {
   return "#";
 }
 
-const VideosSettingsView = ({
-  token,
-  apiUrl,
-  user,
-  errCallback,
-  refreshKey,
-}) => {
-  const [error, setError] = useState(true);
-  const [videos, setVideos] = useState([]);
-
-  const getEnabledVideoCount = (list) => list.filter((v) => !v.disabled).length;
-
-  useEffect(() => {
-    const getVideos = async () => {
-      try {
-        if (token == null || apiUrl == null || user == null) return;
-        const req = await fetch(apiUrl + "/videos", {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + token,
-          },
-        });
-        if (req.ok) {
-          const json = await req.json();
-          const list = Array.isArray(json) ? json : [];
-          setVideos(list);
-          const numEnabled = getEnabledVideoCount(list);
-          setError(numEnabled < 3);
-          if (errCallback) errCallback(numEnabled < 3);
-        }
-      } catch (e) {
-        console.log(e.message);
-      }
-    };
-    getVideos();
-  }, [token, apiUrl, user, errCallback, refreshKey]);
-
-  return (
-    <>
-      <div className="settings-form">
-        <h4>
-          Videos from your playlists{" "}
-          <span className={error ? "error" : ""}>(at least three)</span>
-        </h4>
-        <p className="settings-hint">
-          These are the reward videos (union of the playlists you added above).
-          To add or remove videos, manage the playlists on YouTube or remove a
-          playlist above.
-        </p>
-        <ul id="video-list">
-          <li id="video-list-header">
-            <span className="video-number">#</span>
-            <span className="video-title">TITLE</span>
-          </li>
-          {videos.map((video, i) => (
-            <li key={video.id} className={video.disabled ? "disabled" : ""}>
-              <span className="video-number">{i + 1}</span>
-              <span
-                className="video-thumbnail"
-                style={{
-                  backgroundImage: video.thumbnailurl
-                    ? `url(${video.thumbnailurl})`
-                    : "none",
-                }}
-              >
-                <a
-                  className="video-play"
-                  href={videoPlayUrl(video)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {video.disabled ? (
-                    <span>unavailable</span>
-                  ) : (
-                    <span>&#9654;</span>
-                  )}
-                </a>
-              </span>
-              <span className="video-title">{video.title}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </>
-  );
-};
-
 const SettingsView = ({ token, apiUrl, user, settings }) => {
-  const [videosRefreshKey, setVideosRefreshKey] = useState(0);
   const [bitmap, setBitmap] = useState(settings.problem_type_bitmap);
   if (!RequirePin(user.pin)) {
     return <div className="content-loading"></div>;
   }
   return (
     <div id="settings" className="settings">
-      <h2>Settings</h2>
-      <div className="tab-content">
+      <h1 className="settings-header">Settings</h1>
+      {/* Every control is a card in one grid, so a parent adjusting one dial
+          can see the state of the others without scrolling. Skills leads
+          because it defines the envelope the difficulty meter beneath it is
+          measured against. */}
+      <div className="settings-grid">
         <ProblemTypesSettingsView
           token={token}
           apiUrl={apiUrl}
@@ -634,9 +811,12 @@ const SettingsView = ({ token, apiUrl, user, settings }) => {
           errCallback={(e) => null}
           onBitmapChange={setBitmap}
         />
-      </div>
-
-      <div className="tab-content">
+        <TargetWorkPercentageSettingsView
+          token={token}
+          apiUrl={apiUrl}
+          user={user}
+          settings={settings}
+        />
         <TargetDifficultySettingsView
           token={token}
           apiUrl={apiUrl}
@@ -644,42 +824,15 @@ const SettingsView = ({ token, apiUrl, user, settings }) => {
           settings={settings}
           bitmap={bitmap}
         />
-      </div>
-
-      <div className="tab-content">
-        <TargetWorkPercentageSettingsView
-          token={token}
-          apiUrl={apiUrl}
-          user={user}
-          settings={settings}
-        />
-      </div>
-
-      <div className="tab-content">
-        <PlaylistsSettingsView
-          token={token}
-          apiUrl={apiUrl}
-          user={user}
-          onPlaylistsChange={() => setVideosRefreshKey((k) => k + 1)}
-        />
-      </div>
-
-      <div className="tab-content">
-        <VideosSettingsView
-          token={token}
-          apiUrl={apiUrl}
-          user={user}
-          errCallback={(e) => null}
-          refreshKey={videosRefreshKey}
-        />
+        <PlaylistsSettingsView token={token} apiUrl={apiUrl} user={user} />
       </div>
     </div>
   );
 };
 
 export {
+  MIN_PLAYABLE_VIDEOS,
   ProblemTypesSettingsView,
   PlaylistsSettingsView,
-  VideosSettingsView,
   SettingsView,
 };

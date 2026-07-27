@@ -1,7 +1,7 @@
 # The settings screen
 
 The parent-facing controls that author a user's problem envelope: the problem-type bitmap and the
-target-difficulty slider, plus the playlist/video reward controls. This doc owns the **client** of
+target-difficulty control, plus the playlist/video reward controls. This doc owns the **client** of
 the problem-generation system — how the bitmap is composed, validated, and clamped in the UI. The
 bit *semantics* (what each bit fires on, its difficulty factor) live in
 [`docs/problem-generation.md`](problem-generation.md); this doc points there rather than re-deriving
@@ -34,12 +34,12 @@ The settings screen exposes the two user controls described in problem-generatio
 - **`problem_type_bitmap`** — the envelope. Authored directly by toggling problem-type chips. Bit
   constants come from `web/src/enums.js` `ProblemTypes` (the frontend copy of
   `server/mathcore/problem_type.go`).
-- **`target_difficulty`** — the adaptive lever, surfaced as a slider whose max IS the bitmap's
-  difficulty ceiling.
+- **`target_difficulty`** — the adaptive lever, surfaced as a meter whose max IS the bitmap's
+  difficulty ceiling, nudged rather than dragged.
 
 Settings persist via `POST /settings/{user_id}` (`postSettings`). The bitmap is POSTed only on a
-valid commit (`commit` — the `v.valid` branch); the difficulty / work-percentage sliders POST on
-mouseup/blur. The whole screen is PIN-gated (`SettingsView` calls `RequirePin(user.pin)`; see
+valid commit (`commit` — the `v.valid` branch); a difficulty nudge POSTs on click and the
+work-percentage slider POSTs on release/blur. Every POST reports its outcome (see Save feedback). The whole screen is PIN-gated (`SettingsView` calls `RequirePin(user.pin)`; see
 [accounts.md](accounts.md)).
 
 ## Problem-type taxonomy
@@ -111,16 +111,22 @@ Errors render inside the card they concern: `ERROR_GROUPS` maps each `code` to a
 `errorsFor` filters the error list per card. A new error code with no `ERROR_GROUPS` entry would be
 computed but never displayed. `errCallback` propagates `!valid` so the host screen can block save.
 
-## The target-difficulty slider — `targetDifficultyRange`
+## The target-difficulty meter — `targetDifficultyRange`
 
-`TargetDifficultySettingsView` sizes the slider's range to the current bitmap's band:
+`TargetDifficultySettingsView` sizes the control to the current bitmap's band:
 `{lo, hi} = targetDifficultyRange(bitmap)` — `lo = max(MIN_TARGET_DIFFICULTY,
-minDiffForBitmap(bitmap))`, `hi = maxDiffForBitmap(bitmap)`. The slider re-renders as the bitmap
+minDiffForBitmap(bitmap))`, `hi = maxDiffForBitmap(bitmap)`. It re-renders as the bitmap
 changes (`onBitmapChange` lifts the bitmap to `SettingsView` state). The displayed value is clamped
 into the band (`shown`); the **server clamps authoritatively on save** — this client copy only sizes
 the UI. A high-weight envelope (division-only, multiplication-only) floors above the global minimum:
-nothing easier is constructible there, so the slider's low end starts at what the envelope can
+nothing easier is constructible there, so the band's low end starts at what the envelope can
 actually build.
+
+The value belongs to the adaptive system, not the parent, so it renders as a **read-only meter**
+(no thumb) with two **nudge buttons**. A nudge steps `shown` by a tenth of the band and clamps to
+`[lo, hi]` — the same positions the old draggable slider could reach, minus the implication that
+the parent sets this number outright. Each nudge saves immediately; the buttons disable at the
+band's ends and when the band is degenerate (`lo === hi`).
 
 Parents see an integer **percent (1–100)**, not the raw formula number (`percent`): the position of
 `shown` within `[lo, hi]`. The raw difficulty numbers are formula internals.
@@ -160,13 +166,25 @@ not own them.
 These views live in settings.js but are outside the problem-generation envelope; noted here for
 completeness:
 
-- **`TargetWorkPercentageSettingsView`** — a 0–100 slider for `target_work_percentage` (share of
-  time on math vs. reward video).
+- **`TargetWorkPercentageSettingsView`** — a 0–100 slider for `target_work_percentage`, labelled
+  "Math / video balance" with both ends named so the direction is unambiguous.
 - **`PlaylistsSettingsView`** — add/remove YouTube reward playlists (`GET/POST/DELETE /playlists`);
   accepts a URL (`playlist_url`) or a raw playlist ID (`youtube_playlist_id`).
   `RECOMMENDED_PLAYLISTS` is an empty UI-only curation list, hidden unless populated.
-- **`VideosSettingsView`** — read-only list of reward videos (union of the playlists); flags an error
-  when fewer than three are enabled (`getEnabledVideoCount`).
+  Each row is a **disclosure**: opening one lazily fetches
+  `GET /playlists/{playlist_id}/videos` and lists that playlist's videos, with unavailable ones
+  muted and labelled (never red — unavailable is a status, not a validation error). The card header
+  carries the total playable count, summed from the `playable_count` each playlist row returns;
+  removing a playlist confirms first, and warns when it would drop the total below
+  `MIN_PLAYABLE_VIDEOS`. There is no separate reward-video list: per-playlist counts plus the
+  drill-down carry everything it showed.
+
+## Save feedback
+
+Every control saves on change, and `postSettings` **throws** on a non-2xx or network failure so the
+result is visible. `useSaveState` drives a per-card indicator (`saving` → `saved`, auto-clearing,
+or `error`), and the error state offers a retry that replays the last attempt. The indicator sits
+on the card that changed, so a failure is attached to the control that caused it.
 
 ## Invariants
 
@@ -189,7 +207,7 @@ completeness:
 
 ## Gotchas
 
-- **The slider-percent denominator relies on `lo < hi`.** The percent computation divides by
+- **The meter-percent denominator relies on `lo < hi`.** The percent computation divides by
   `ceiling - floor`. `targetDifficultyRange` collapses `lo` to `hi` when a degenerate envelope would
   invert the band (mirroring the server), which keeps the clamp safe but would make the denominator
   0 in that (currently unreachable) case; every valid envelope's floor sits strictly below its
@@ -201,7 +219,10 @@ completeness:
 ## Related files
 
 - `web/src/settings.js` — `PROBLEM_TYPE_GROUPS`, `applyToggleRules`, `ProblemTypesSettingsView`,
-  `ERROR_GROUPS`, `TargetDifficultySettingsView`, `SettingsView`, `postSettings`.
+  `ERROR_GROUPS`, `TargetDifficultySettingsView`, `PlaylistsSettingsView`, `PlaylistRow`,
+  `SettingsCard`, `useSaveState`, `MIN_PLAYABLE_VIDEOS`, `SettingsView`, `postSettings`.
+- `server/api/custom_handlers.go` — `customListPlaylists` (returns `PlaylistWithCounts`),
+  `customListPlaylistVideos` (the drill-down; the `user_playlist` join is its authorization).
 - `web/src/bitmap_validation.js` — `validateBitmap`, `maxDiffForBitmap`, `minDiffForBitmap`,
   `targetDifficultyRange`, `MIN_TARGET_DIFFICULTY`.
 - `web/src/difficulty_band_fixtures.json` — generated Go↔JS parity fixtures

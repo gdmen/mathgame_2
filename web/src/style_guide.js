@@ -43,6 +43,11 @@ const COLORS = [
     note: "toggle chip / card borders",
   },
   {
+    name: "color-divider",
+    hex: "#e3e0d5",
+    note: "hairline between list rows; lighter than a chip border",
+  },
+  {
     name: "color-field-border",
     hex: "#6b8650",
     note: "form-input edges (chip-border is too faint at 1.5:1)",
@@ -764,38 +769,176 @@ const StyleGuideView = () => {
         </CompoundExample>
       </Section>
 
-      <Section title="Playlist list item">
+      <Section title="Playlist disclosure row">
         <p>
-          Row layout for playlists and videos: optional thumbnail (16:9), title
-          (ellipsizes), remove/action cell on the right.
+          A playlist row in settings: thumbnail, title (ellipsizes), a count
+          chip, and a remove action. The row is a <code>&lt;summary&gt;</code>
+          inside <code>&lt;details&gt;</code>, so the whole row — arrow included
+          — opens the list, and the browser owns the keyboard behaviour.{" "}
+          <b>It must not be a button:</b> the page's button rule presses with{" "}
+          <code>scale(0.95)</code>, which on a full-width row pulls the row out
+          from under the cursor near its left edge and swallows the click.
+          Remove sits inside the summary and calls <code>preventDefault()</code>{" "}
+          so it does not toggle. Unavailable videos are muted and labelled —{" "}
+          <b>a status, not an error</b>, so never red.
         </p>
         <CompoundExample
           name=".playlist-item"
-          context=".settings .tab-content #playlists-settings ul#playlist-list > .playlist-item"
+          context=".settings #playlists-settings ul#playlist-list > .playlist-item"
         >
           <div className="settings">
-            <div className="tab-content sg-no-padding">
-              <div id="playlists-settings">
-                <ul id="playlist-list">
-                  <li className="playlist-list-header">
-                    <span style={{ marginLeft: "0.5em" }}>Title</span>
-                  </li>
-                  <li className="playlist-item">
-                    <div className="playlist-thumbnail sg-thumb-placeholder" />
-                    <a
-                      href="#"
-                      className="playlist-title"
-                      onClick={(e) => e.preventDefault()}
-                    >
-                      Sample playlist title that may overflow if very long
-                    </a>
-                    <span className="playlist-remove">×</span>
-                  </li>
-                </ul>
-              </div>
+            <div id="playlists-settings">
+              <ul id="playlist-list">
+                <li className="playlist-item">
+                  <details open>
+                    <summary className="playlist-row">
+                      <span className="playlist-caret">▶</span>
+                      <span className="playlist-thumbnail sg-thumb-placeholder" />
+                      <span className="playlist-title">
+                        A playlist title long enough to prove the point, because
+                        titles come from YouTube and are not length-limited
+                      </span>
+                      <span className="playlist-count">
+                        6 videos · 5 playable
+                      </span>
+                      <button type="button" className="playlist-remove">
+                        Remove…
+                      </button>
+                    </summary>
+                    <div className="playlist-videos">
+                      <div className="playlist-video">
+                        <span className="playlist-video-thumbnail sg-thumb-placeholder" />
+                        <a
+                          href="#"
+                          className="playlist-video-title"
+                          onClick={(e) => e.preventDefault()}
+                        >
+                          A video that plays
+                        </a>
+                      </div>
+                      <div className="playlist-video disabled">
+                        <span className="playlist-video-thumbnail sg-thumb-placeholder" />
+                        <a
+                          href="#"
+                          className="playlist-video-title"
+                          onClick={(e) => e.preventDefault()}
+                        >
+                          A video whose title runs on well past the width of
+                          this row so the ellipsis has something to do
+                        </a>
+                        <span className="playlist-video-state">
+                          unavailable
+                        </span>
+                      </div>
+                    </div>
+                  </details>
+                </li>
+              </ul>
             </div>
           </div>
         </CompoundExample>
+      </Section>
+
+      <Section title="Settings card">
+        <p>
+          Every settings control lives in one of these: a question-titled
+          surface with an optional save indicator in the corner. Cards sit in{" "}
+          <code>.settings-grid</code>; <code>.settings-card-wide</code> spans
+          it. Card surfaces are keyed to <b>nesting depth</b>, never to position
+          in the grid: every top-level card is <code>$color-card-tint-a</code>{" "}
+          and a card nested inside one is the lighter{" "}
+          <code>$color-card-tint-b</code>. The read-only meter is for values the
+          adaptive system owns — it has no thumb, and the parent's control is a
+          nudge.
+        </p>
+        <CompoundExample
+          name=".settings-card"
+          context=".settings .settings-grid > .settings-card"
+        >
+          <div className="settings">
+            <section className="settings-card">
+              <div className="settings-card-head">
+                <h4>Current difficulty</h4>
+                <span className="save-state">Saved ✓</span>
+              </div>
+              <p className="settings-hint">
+                Adjusts automatically as your child plays; nudge it if it feels
+                off.
+              </p>
+              <p className="settings-value">62%</p>
+              <div className="settings-meter">
+                <div className="settings-meter-fill" style={{ width: "62%" }} />
+              </div>
+              <div className="scale-labels">
+                <span>easiest</span>
+                <span>hardest these settings allow</span>
+              </div>
+              <div className="settings-nudges">
+                <button type="button">← Easier</button>
+                <button type="button">Harder →</button>
+              </div>
+            </section>
+          </div>
+        </CompoundExample>
+        <p>
+          The failed-save state, with the retry that replays the last attempt:
+        </p>
+        <div className="settings">
+          <span className="save-state save-error">
+            Not saved
+            <button type="button" className="save-retry">
+              Retry
+            </button>
+          </span>
+        </div>
+        <h3>Slider</h3>
+        <p>
+          The editable sibling of the meter, for values the parent sets. A
+          native range paints no fill of its own, so the filled portion is a
+          gradient whose stop the component sets via <code>--fill-pct</code> —
+          without it the control reads as a different component from the meter
+          beside it.
+        </p>
+        <CompoundExample
+          name=".settings-slider"
+          context=".settings .settings-card input.settings-slider"
+        >
+          <div className="settings">
+            <section className="settings-card">
+              <div className="settings-card-head">
+                <h4>Math / video balance</h4>
+              </div>
+              <p className="settings-value">38% math</p>
+              <input
+                className="settings-slider"
+                type="range"
+                defaultValue={38}
+                style={{ "--fill-pct": "38%" }}
+                aria-label="Percentage of time doing math"
+              />
+              <div className="scale-labels">
+                <span>more video time</span>
+                <span>more math time</span>
+              </div>
+            </section>
+          </div>
+        </CompoundExample>
+        <h3>Pills</h3>
+        <p>
+          Small status chips. All share one recipe: a line box taller than the
+          text (the inherited <code>line-height</code> is 1.0, which lets glyphs
+          spill out and read as off-centre) and pill corners. Filled outranks
+          outlined — the card-header total is filled, the per-row counts are
+          outlined.
+        </p>
+        <div className="settings">
+          <span className="playlist-total">11 playable videos</span>{" "}
+          <span className="playlist-total playlist-total-low">
+            2 playable videos
+          </span>{" "}
+          <span className="playlist-count">6 videos · 5 playable</span>{" "}
+          <span className="playlist-video-state">unavailable</span>
+        </div>
       </Section>
 
       <Section title="States">

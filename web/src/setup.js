@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 
 import {
+  MIN_PLAYABLE_VIDEOS,
   ProblemTypesSettingsView,
   PlaylistsSettingsView,
-  VideosSettingsView,
 } from "./settings.js";
 import { GetSessionPin, PinView } from "./pin.js";
 import "./settings.scss";
@@ -72,12 +72,11 @@ const ProblemTypesTabView = ({
 };
 
 const VideosTabView = ({ token, apiUrl, user, advanceSetup }) => {
-  const [error, setError] = useState(true);
-  const [videosRefreshKey, setVideosRefreshKey] = useState(0);
-
-  const errCallback = (e) => {
-    setError(e);
-  };
+  // The playlists view owns the playable-video tally (it is summed from the
+  // per-playlist counts), so the gate reads it from there rather than
+  // re-deriving it from a second list.
+  const [playableCount, setPlayableCount] = useState(0);
+  const error = playableCount < MIN_PLAYABLE_VIDEOS;
 
   const handleSubmitClick = (e) => {
     // redirect to next setup step
@@ -90,14 +89,7 @@ const VideosTabView = ({ token, apiUrl, user, advanceSetup }) => {
         token={token}
         apiUrl={apiUrl}
         user={user}
-        onPlaylistsChange={() => setVideosRefreshKey((k) => k + 1)}
-      />
-      <VideosSettingsView
-        token={token}
-        apiUrl={apiUrl}
-        user={user}
-        errCallback={errCallback}
-        refreshKey={videosRefreshKey}
+        onPlayableCountChange={setPlayableCount}
       />
       <button
         className={error ? "submit error" : "submit"}
