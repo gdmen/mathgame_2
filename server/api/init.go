@@ -191,6 +191,7 @@ func (a *Api) GetRouter() *gin.Engine {
 			playlists.GET("/", userMiddleware, a.customListPlaylists)
 			playlists.POST("", userMiddleware, a.customAddPlaylist)
 			playlists.POST("/", userMiddleware, a.customAddPlaylist)
+			playlists.GET("/:playlist_id/videos", userMiddleware, a.customListPlaylistVideos)
 			playlists.DELETE("/:playlist_id", userMiddleware, a.customRemovePlaylist)
 		}
 		problem := v1.Group("/problems")

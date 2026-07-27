@@ -618,6 +618,15 @@ func (a *Api) refreshUserHasVideo(userId uint32) error {
 	return err
 }
 
+// PlaylistWithCounts carries the per-playlist video tallies the settings page
+// shows on each row. Embedding Playlist keeps its JSON shape unchanged, so the
+// counts are additive for any existing caller.
+type PlaylistWithCounts struct {
+	Playlist
+	VideoCount    int `json:"video_count"`
+	PlayableCount int `json:"playable_count"`
+}
+
 func (a *Api) customListPlaylists(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	user := GetUserFromContext(c)
@@ -625,11 +634,18 @@ func (a *Api) customListPlaylists(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, common.GetError("unauthorized"))
 		return
 	}
+	// LEFT JOIN so a playlist YouTube has not been scraped into playlist_video
+	// yet still lists, with zero counts, rather than vanishing from settings.
 	rows, err := a.DB.Query(`
-		SELECT p.id, p.you_tube_id, p.title, p.thumbnailurl, p.etag
+		SELECT p.id, p.you_tube_id, p.title, p.thumbnailurl, p.etag,
+		       COUNT(v.id) AS video_count,
+		       COALESCE(SUM(v.disabled = 0), 0) AS playable_count
 		FROM playlists p
 		INNER JOIN user_playlist up ON p.id = up.playlist_id
-		WHERE up.user_id = ?`,
+		LEFT JOIN playlist_video pv ON pv.playlist_id = p.id
+		LEFT JOIN videos v ON v.id = pv.video_id
+		WHERE up.user_id = ?
+		GROUP BY p.id, p.you_tube_id, p.title, p.thumbnailurl, p.etag`,
 		user.Id)
 	if err != nil {
 		glog.Errorf("%s list my playlists: %v", logPrefix, err)
@@ -637,10 +653,11 @@ func (a *Api) customListPlaylists(c *gin.Context) {
 		return
 	}
 	defer rows.Close()
-	var list []Playlist
+	var list []PlaylistWithCounts
 	for rows.Next() {
-		var p Playlist
-		err := rows.Scan(&p.Id, &p.YouTubeId, &p.Title, &p.ThumbnailURL, &p.Etag)
+		var p PlaylistWithCounts
+		err := rows.Scan(&p.Id, &p.YouTubeId, &p.Title, &p.ThumbnailURL, &p.Etag,
+			&p.VideoCount, &p.PlayableCount)
 		if err != nil {
 			glog.Errorf("%s scan playlist: %v", logPrefix, err)
 			c.JSON(http.StatusInternalServerError, common.GetError("Could not list playlists"))
@@ -654,7 +671,58 @@ func (a *Api) customListPlaylists(c *gin.Context) {
 		return
 	}
 	if list == nil {
-		list = []Playlist{}
+		list = []PlaylistWithCounts{}
+	}
+	c.JSON(http.StatusOK, list)
+}
+
+// customListPlaylistVideos backs the settings page's per-playlist drill-down.
+// The user_playlist join is the authorization: a caller can only read the
+// contents of a playlist they have added.
+func (a *Api) customListPlaylistVideos(c *gin.Context) {
+	logPrefix := common.GetLogPrefix(c)
+	user := GetUserFromContext(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, common.GetError("unauthorized"))
+		return
+	}
+	var uri struct {
+		PlaylistID uint32 `uri:"playlist_id" binding:"required"`
+	}
+	if err := c.ShouldBindUri(&uri); err != nil {
+		c.JSON(http.StatusBadRequest, common.GetError("Invalid playlist_id"))
+		return
+	}
+	rows, err := a.DB.Query(`
+		SELECT v.id, v.title, v.url, v.thumbnailurl, v.you_tube_id, v.disabled
+		FROM videos v
+		INNER JOIN playlist_video pv ON pv.video_id = v.id
+		INNER JOIN user_playlist up ON up.playlist_id = pv.playlist_id
+		WHERE pv.playlist_id = ? AND up.user_id = ?`,
+		uri.PlaylistID, user.Id)
+	if err != nil {
+		glog.Errorf("%s list playlist videos: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("Could not list videos"))
+		return
+	}
+	defer rows.Close()
+	var list []Video
+	for rows.Next() {
+		var v Video
+		if err := rows.Scan(&v.Id, &v.Title, &v.URL, &v.ThumbnailURL, &v.YouTubeId, &v.Disabled); err != nil {
+			glog.Errorf("%s scan playlist video: %v", logPrefix, err)
+			c.JSON(http.StatusInternalServerError, common.GetError("Could not list videos"))
+			return
+		}
+		list = append(list, v)
+	}
+	if err = rows.Err(); err != nil {
+		glog.Errorf("%s rows.Err: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("Could not list videos"))
+		return
+	}
+	if list == nil {
+		list = []Video{}
 	}
 	c.JSON(http.StatusOK, list)
 }

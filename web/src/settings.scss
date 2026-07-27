@@ -1,388 +1,524 @@
 @import "styles.scss";
 
-$add-video-bg: linear-gradient(
-  90deg,
-  white 0%,
-  rgb(245, 245, 245, 0.75) 5%,
-  rgb(245, 245, 245, 0.75) 95%,
-  white 100%
-);
-
 .settings {
-  border-top: 1px gray;
   margin: 0 auto;
   max-width: $max-width;
-  padding: 0 $base-space;
+  // Top padding balances the space the header puts below itself, and gives the
+  // title room to clear the full-bleed menu band (same shape as #problem).
+  padding: 1.75 * $base-space $base-space 0;
   text-align: center;
+
+  // The page title. Every other page uses an h1 for this; settings was the one
+  // outlier at h2, so it rendered a third smaller than Progress.
+  .settings-header {
+    margin-bottom: 0.6em;
+  }
+
+  // One grid of cards: the skills and playlists cards span it, the two dials
+  // sit side by side so their values are comparable at a glance.
+  .settings-grid {
+    display: grid;
+    gap: 1.25 * $base-space;
+    grid-template-columns: 1fr 1fr;
+    margin: 0 auto 3 * $base-space;
+    text-align: left;
+    @media (max-width: 760px) {
+      grid-template-columns: 1fr;
+    }
+  }
+  // Surfaces are keyed to nesting depth, not to position in the grid:
+  // every top-level card is $color-card-tint-a and every card nested inside one
+  // is the lighter $color-card-tint-b. Alternating tints between siblings read
+  // as meaning that isn't there.
+  .settings-card {
+    background: $color-card-tint-a;
+    border: 0.0625em solid $color-chip-border;
+    border-radius: $base-radius * 4;
+    // Grid tracks are min-content-floored by default, so a wide child (the
+    // nested skills grid, a long playlist title) would push the column past
+    // the viewport instead of wrapping inside it.
+    min-width: 0;
+    padding: 1.25 * $base-space 1.4 * $base-space;
+    // Owned by the card, not the grid: these views also render in the setup
+    // wizard and the style guide, where .settings centres by default.
+    text-align: left;
+    &.settings-card-wide {
+      grid-column: 1 / -1;
+      @media (max-width: 760px) {
+        grid-column: auto;
+      }
+    }
+    h4 {
+      margin-bottom: 0;
+    }
+  }
+  .settings-card-head {
+    align-items: baseline;
+    display: flex;
+    gap: 0.75em;
+    justify-content: space-between;
+    // The card title and its question are two separate thoughts; with the h4's
+    // own margin zeroed they otherwise sit on top of each other.
+    margin-bottom: 0.35em;
+  }
+  // Save feedback lives on the card that changed, so a failure is attached to
+  // the control that failed rather than announced page-wide.
+  .save-state {
+    align-items: center;
+    background: $color-two;
+    border-radius: $radius-pill;
+    color: $color-one-contrast;
+    display: inline-flex;
+    flex: none;
+    font-family: $display-font-family;
+    font-size: 0.72em;
+    font-weight: 600;
+    gap: 0.5em;
+    letter-spacing: 0.05em;
+    // The inherited line-height is 1.0, tighter than the glyphs themselves, so
+    // they spill out of their line box and read as sitting off-centre. Giving
+    // every pill a line box taller than its text makes the centring true.
+    line-height: 1.4;
+    padding: 0.35em 0.9em;
+    &.save-error {
+      background: transparent;
+      border: 0.0625em solid $color-error;
+      color: $color-error;
+    }
+    .save-retry {
+      background: none;
+      color: inherit;
+      font-size: 1em;
+      padding: 0;
+      text-decoration: underline;
+    }
+  }
+  .settings-value {
+    font-family: $display-font-family;
+    font-size: 1.3em;
+    font-weight: 600;
+    margin: 0.5em 0 0;
+  }
+  // Read-only companion to the progress meter: same track, no thumb, because
+  // this number belongs to the adaptive system and not to the parent.
+  .settings-meter {
+    background: $color-two;
+    border-radius: $radius-pill;
+    height: 0.625em;
+    margin: 0.5em 0 0.35em;
+    overflow: hidden;
+    .settings-meter-fill {
+      background: $color-one-contrast;
+      border-radius: $radius-pill;
+      height: 100%;
+    }
+  }
+  .settings-nudges {
+    display: flex;
+    gap: 0.625em;
+    margin-top: $base-space;
+    button {
+      background: white;
+      border: 0.09375em solid $color-one-contrast;
+      color: $color-one-contrast;
+      padding: 0.45em 1em;
+      &:disabled {
+        border-color: $color-chip-border;
+        color: $color-inactive;
+        cursor: not-allowed;
+      }
+    }
+  }
+  // Same track as .settings-meter, including the filled portion: a native range
+  // paints no fill of its own, so it comes from a gradient whose stop position
+  // the component sets (--fill-pct). Both stops meet at that point to keep the
+  // edge hard.
+  .settings-slider {
+    appearance: none;
+    background: linear-gradient(
+      to right,
+      $color-one-contrast 0%,
+      $color-one-contrast var(--fill-pct, 0%),
+      $color-two var(--fill-pct, 0%),
+      $color-two 100%
+    );
+    border-radius: $radius-pill;
+    display: block;
+    height: 0.625em;
+    margin: 0.75em 0 0.35em;
+    width: 100%;
+    &::-webkit-slider-thumb {
+      appearance: none;
+      background: $color-one-contrast;
+      border: 0.1875em solid white;
+      border-radius: 50%;
+      box-shadow: 0 0.0625em 0.25em rgba(35, 48, 32, 0.25);
+      height: 1.4em;
+      width: 1.4em;
+    }
+    &::-moz-range-thumb {
+      background: $color-one-contrast;
+      border: 0.1875em solid white;
+      border-radius: 50%;
+      box-shadow: 0 0.0625em 0.25em rgba(35, 48, 32, 0.25);
+      height: 1.4em;
+      width: 1.4em;
+    }
+  }
+  .scale-labels {
+    color: $color-ink-soft;
+    display: flex;
+    font-size: 0.8em;
+    justify-content: space-between;
+  }
+
   .tab-content {
     padding: 2 * $base-space;
     h2 {
       margin-bottom: $base-space;
     }
-    button {
-      background-color: $color-one-contrast;
-      color: white;
-      font-weight: 400;
-      transition-duration: 0.1s;
-      &.submit {
-        display: block;
-        margin: 0 auto;
-        margin-top: 1.5 * $base-space;
-        padding: 0.5em 0.75em;
-      }
-      &:active {
-        transform: scale(0.95);
-      }
-      &.error {
-        background-color: lightgray;
-        pointer-events: none;
-      }
+  }
+
+  // The page's default button. Outline/quiet variants (card nudges, playlist
+  // remove, save retry) override it from their own, more specific selectors.
+  button {
+    background-color: $color-one-contrast;
+    color: white;
+    font-weight: 400;
+    transition-duration: 0.1s;
+    &.submit {
+      display: block;
+      margin: 0 auto;
+      margin-top: 1.5 * $base-space;
+      padding: 0.5em 0.75em;
     }
-    .settings-form {
-      display: inline-block;
-      text-align: left;
-      width: 80%;
-      h4 {
-        margin-bottom: $base-space;
-        span.error {
-          color: $color-error;
-        }
-      }
+    &:active {
+      transform: scale(0.95);
     }
-    #problem-types-settings {
-      .error {
+    &.error {
+      background-color: lightgray;
+      pointer-events: none;
+    }
+  }
+
+  .settings-form {
+    display: inline-block;
+    text-align: left;
+    width: 80%;
+    h4 {
+      margin-bottom: $base-space;
+      span.error {
         color: $color-error;
-        margin-top: $base-space;
-      }
-      .problem-type-grid {
-        display: grid;
-        gap: 1.25 * $base-space;
-        grid-template-columns: 1fr 1fr;
-        margin-top: $base-space;
-        @media (max-width: 760px) {
-          grid-template-columns: 1fr;
-        }
-      }
-      .problem-type-card {
-        border: 1px solid $color-chip-border;
-        border-radius: $base-radius * 4;
-        padding: 1.25 * $base-space 1.4 * $base-space;
-        &.tint-a {
-          background: $color-card-tint-a;
-        }
-        &.tint-b {
-          background: $color-card-tint-b;
-        }
-        h5 {
-          font-size: 1.15em;
-          margin-bottom: 0;
-        }
-        .group-question {
-          margin-bottom: 0.6 * $base-space;
-        }
-        .group-hint {
-          font-size: 0.8em;
-          margin: 0.6em 0 0 0;
-        }
-      }
-      #problem-type-buttons {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: flex-start;
-        list-style-type: none;
-        li {
-          display: inline-block;
-          margin-top: 0.7em;
-          margin-right: 0.7em;
-          input[type="checkbox"] {
-            display: none;
-            // Selection is COLOR-ONLY: chips must never change size on any
-            // state change (no glyphs, no font-weight shifts).
-            &:checked + label .problem-type-button {
-              background-color: $color-two;
-              border-color: $color-one-contrast;
-            }
-          }
-          label {
-            cursor: pointer;
-            .problem-type-button {
-              background: #fff;
-              border: 1.5px solid $color-chip-border;
-              border-radius: $base-radius * 2.5;
-              display: flex;
-              justify-content: center;
-              padding: 0.6em 0.85em 0.5em;
-            }
-          }
-          // Parents with dependents sit at the bottom of the card on their
-          // own row; their dependent renders on the row below, indented,
-          // disabled until the parent is on. Constant size in all states.
-          &.has-dep {
-            flex-basis: 100%;
-            label .problem-type-button {
-              display: inline-flex;
-            }
-          }
-          &.dep {
-            flex-basis: 100%;
-            margin-left: 1.6 * $base-space;
-            margin-top: 0.45em;
-            label .problem-type-button {
-              border-style: dashed;
-              display: inline-flex;
-              font-size: 0.92em;
-              .dep-arrow {
-                color: $color-one-contrast;
-                font-weight: 700;
-                margin-right: 0.35em;
-              }
-            }
-            &.parent-off {
-              opacity: 0.45;
-              label {
-                cursor: not-allowed;
-              }
-            }
-          }
-        }
       }
     }
-    #target-difficulty-settings {
-      .scale-labels {
-        color: gray;
-        display: flex;
-        font-size: 0.8em;
-        justify-content: space-between;
-        margin-top: 0.3em;
-      }
-    }
-    #target-difficulty-settings,
-    #target-work-percentage-settings {
-      input[type="range"] {
-        background: $color-two;
-        border: 1px solid gray;
-        border-radius: 0.25em;
-        display: block;
-        height: 0.5em;
-        width: 100%;
-      }
-    }
-    .settings-hint {
-      color: gray;
-      font-size: 0.9em;
-      margin-bottom: $base-space;
-    }
-    .playlist-error {
+  }
+  #problem-types-settings {
+    .error {
       color: $color-error;
-      margin-bottom: $base-space;
+      margin-top: $base-space;
     }
-    #playlists-settings {
-      #playlist-inputs {
-        background: $add-video-bg;
-        display: flex;
-        justify-content: center;
-        padding: $base-space;
-        input {
-          border: 0.25em solid $color-one;
-          min-width: 20em;
-          padding: 0.25em 0.5em;
-        }
-        button {
-          border-radius: 0.25em;
-          margin-left: 1em;
-          padding: 0.25em 0.5em;
-        }
-      }
-      ul#playlist-list,
-      ul#curated-playlist-list {
-        list-style-type: none;
-        padding: 0;
-        .playlist-list-header {
-          border-bottom: 1px solid lightgray;
-          display: flex;
-          align-items: center;
-          height: 2em;
-          margin-bottom: 0.25em;
-        }
-        .playlist-item {
-          align-items: center;
-          display: flex;
-          height: 3em;
-          margin-bottom: 0.25em;
-          padding: 0;
-          .playlist-thumbnail {
-            aspect-ratio: 16 / 9;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-size: 100% auto;
-            flex: 0 0 4em;
-            height: 2.25em;
-          }
-          .playlist-title {
-            color: inherit;
-            flex: 1 1 auto;
-            margin-left: 0.5em;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            text-decoration: none;
-            white-space: nowrap;
-            &:hover {
-              text-decoration: underline;
-            }
-          }
-          .playlist-remove {
-            color: $color-error;
-            cursor: pointer;
-            font-size: 1.5em;
-            padding: 0 0.5em;
-            &:hover {
-              opacity: 0.8;
-            }
-          }
-          .add-curated {
-            margin-left: 0.5em;
-            padding: 0.25em 0.5em;
-          }
-        }
-      }
-      .curated-section {
-        margin-top: 1.5 * $base-space;
-        ul#recommended-playlist-list {
-          list-style-type: none;
-          padding: 0;
-        }
-        .recommended-playlist-item {
-          align-items: center;
-          display: flex;
-          margin-bottom: 0.5em;
-          .recommended-link {
-            color: $color-one;
-            margin-right: 0.5em;
-          }
-          .add-recommended {
-            margin-left: 0.5em;
-            padding: 0.25em 0.5em;
-          }
-        }
+    .problem-type-grid {
+      display: grid;
+      gap: 1.25 * $base-space;
+      grid-template-columns: 1fr 1fr;
+      margin-top: $base-space;
+      @media (max-width: 760px) {
+        grid-template-columns: 1fr;
       }
     }
-    #video-inputs {
-      background: $add-video-bg;
+    // One level deeper than .settings-card, so one step lighter.
+    .problem-type-card {
+      background: $color-card-tint-b;
+      border: 0.0625em solid $color-chip-border;
+      border-radius: $base-radius * 4;
+      min-width: 0;
+      padding: 1.25 * $base-space 1.4 * $base-space;
+      h5 {
+        font-size: 1.15em;
+        // Matches .settings-card-head: title and question are two thoughts.
+        margin-bottom: 0.35em;
+      }
+      .group-question {
+        margin-bottom: 0.6 * $base-space;
+      }
+      .group-hint {
+        font-size: 0.8em;
+        margin: 0.6em 0 0 0;
+      }
+    }
+    #problem-type-buttons {
       display: flex;
-      justify-content: center;
-      padding: $base-space;
-      input {
-        border: 0.25em solid $color-one;
-        min-width: 20em;
-        padding: 0.25em 0.5em;
-        &.error {
-          border-color: $color-error;
+      flex-wrap: wrap;
+      justify-content: flex-start;
+      list-style-type: none;
+      li {
+        display: inline-block;
+        margin-top: 0.7em;
+        margin-right: 0.7em;
+        input[type="checkbox"] {
+          display: none;
+          // Selection is COLOR-ONLY: chips must never change size on any
+          // state change (no glyphs, no font-weight shifts).
+          &:checked + label .problem-type-button {
+            @include toggle-pill-on;
+          }
         }
+        label {
+          cursor: pointer;
+          .problem-type-button {
+            @include toggle-pill;
+          }
+        }
+        // Parents with dependents sit at the bottom of the card on their
+        // own row; their dependent renders on the row below, indented,
+        // disabled until the parent is on. Constant size in all states.
+        &.has-dep {
+          flex-basis: 100%;
+          label .problem-type-button {
+            display: inline-flex;
+          }
+        }
+        &.dep {
+          flex-basis: 100%;
+          margin-left: 1.6 * $base-space;
+          margin-top: 0.45em;
+          label .problem-type-button {
+            border-style: dashed;
+            display: inline-flex;
+            font-size: 0.92em;
+            .dep-arrow {
+              color: $color-one-contrast;
+              font-weight: 700;
+              margin-right: 0.35em;
+            }
+          }
+          &.parent-off {
+            opacity: 0.45;
+            label {
+              cursor: not-allowed;
+            }
+          }
+        }
+      }
+    }
+  }
+  .settings-hint {
+    color: $color-ink-soft;
+    font-size: 0.9em;
+    margin-bottom: $base-space;
+  }
+  .playlist-error {
+    color: $color-error;
+    margin-bottom: $base-space;
+  }
+  // The card-header tally. Filled, where the per-row counts are outlined, so
+  // the total for the whole reward pool outranks any single playlist's.
+  .playlist-total {
+    background: $color-two;
+    border-radius: $radius-pill;
+    color: $color-one-contrast;
+    display: inline-block;
+    font-family: $display-font-family;
+    font-size: 0.7em;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    line-height: 1.4;
+    padding: 0.3em 0.85em;
+    vertical-align: 0.15em;
+    // Too few playable videos is parent-facing validation, which is the one
+    // place red is allowed (see the style guide's colour invariant).
+    &.playlist-total-low {
+      background: transparent;
+      border: 0.0625em solid $color-error;
+      color: $color-error;
+    }
+  }
+  // Outlined counterparts to .playlist-total: quieter, because a single
+  // playlist's tally ranks below the whole pool's. Defined at .settings level
+  // so a chip is not tied to sitting inside the playlist list.
+  .playlist-count {
+    background: white;
+    border: 0.0625em solid $color-chip-border;
+    border-radius: $radius-pill;
+    color: $color-ink-soft;
+    flex: none;
+    font-family: $base-font-family;
+    font-size: 0.72em;
+    font-weight: 400;
+    line-height: 1.4;
+    padding: 0.3em 0.85em;
+    white-space: nowrap;
+  }
+  .playlist-video-state {
+    border: 0.0625em solid $color-chip-border;
+    border-radius: $radius-pill;
+    color: $color-inactive;
+    flex: none;
+    font-size: 0.7em;
+    line-height: 1.4;
+    padding: 0.25em 0.75em;
+    white-space: nowrap;
+  }
+  #playlists-settings {
+    text-align: left;
+    // Secondary to the list it feeds: sized down so adding a playlist does not
+    // out-shout the playlists already there.
+    #playlist-inputs {
+      display: flex;
+      gap: 0.5em;
+      // Matched to the gap between the hairline and a row's TEXT, not its box:
+      // the row's height is set by its 2.125em thumbnail, so the title centres
+      // about 10px below the box top. Using the row's padding here would leave
+      // the line visibly closer to the input than to the first title.
+      margin: 0.75em 0 1.5em;
+      input {
+        background: white;
+        border: 0.125em solid $color-field-border;
+        border-radius: $base-radius;
+        flex: 1 1 auto;
+        font-size: 0.9em;
+        min-width: 0;
+        padding: 0.45em 0.6em;
       }
       button {
-        border-radius: 0.25em;
-        margin-left: 1em;
-        padding: 0.25em 0.5em;
+        border-radius: $base-radius;
+        flex: none;
+        font-size: 0.9em;
+        padding: 0.45em 0.9em;
       }
     }
-    ul#video-list {
-      li {
+    ul#playlist-list,
+    ul#curated-playlist-list {
+      list-style-type: none;
+      padding: 0;
+      // Each playlist is a disclosure: the row is the trigger, the videos it
+      // contributes expand underneath so a half-broken playlist is findable
+      // without a second list on the page.
+      .playlist-item {
+        border-top: 0.0625em solid $color-divider;
+        padding: 0;
+      }
+      // <summary> is the whole trigger, so every part of the row — arrow
+      // included — opens the list. It must NOT be a <button>: the page's
+      // button rule presses with scale(0.95), which on a full-width row pulls
+      // the row out from under the cursor near its left edge and swallows the
+      // click on the arrow.
+      .playlist-row {
+        align-items: center;
+        cursor: pointer;
+        display: flex;
+        gap: 0.625em;
+        list-style: none;
+        padding: 0.85em 0.125em;
+        &::-webkit-details-marker {
+          display: none;
+        }
+      }
+      .playlist-caret {
+        color: $color-ink-soft;
+        flex: none;
+        font-size: 0.75em;
+        text-align: center;
+        transition: transform 0.15s ease;
+        width: 0.875em;
+      }
+      details[open] > .playlist-row .playlist-caret {
+        transform: rotate(90deg);
+      }
+      .playlist-thumbnail {
+        background-color: $color-two;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: cover;
+        border-radius: $radius-small;
+        flex: 0 0 3.5em;
+        height: 2.125em;
+      }
+      .playlist-title {
+        color: inherit;
+        flex: 1 1 auto;
+        font-size: 0.95em;
+        // A flex item will not shrink below its own text width without this,
+        // so the ellipsis never engages on a long title.
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .playlist-remove {
+        background: white;
+        border: 0.09375em solid $color-chip-border;
+        color: $color-ink-soft;
+        flex: none;
+        font-size: 0.8em;
+        padding: 0.35em 0.8em;
+        &:hover {
+          border-color: $color-error;
+          color: $color-error;
+        }
+      }
+      .playlist-videos {
+        padding: 0 0 0.9em 2.125em;
+        .settings-hint {
+          margin-bottom: 0.35em;
+        }
+      }
+      .playlist-video {
         align-items: center;
         display: flex;
-        height: 3em;
-        padding: 0;
-        justify-content: space-between;
-        margin-bottom: 0.25em;
-        &#new-video {
-          background: $add-video-bg;
-          height: 3em + $base-space;
-          padding-bottom: $base-space;
-        }
-        &#video-list-header {
-          border-bottom: 1px solid lightgray;
-          height: 1.5em;
-          .video-title {
-            margin-left: 0;
-          }
-        }
-        .video-number {
-          flex: 0 0 2em;
-          padding-left: 0.5em;
-        }
-        .video-thumbnail {
-          aspect-ratio: 16 / 9;
+        gap: 0.625em;
+        padding: 0.45em 0.125em;
+        .playlist-video-thumbnail {
+          background-color: $color-two;
           background-position: center;
           background-repeat: no-repeat;
-          background-size: 100% auto;
-          display: table;
-          height: 100%;
-          .video-play {
-            display: table-cell;
-            font-size: 1.5em;
-            opacity: 0;
-            padding-top: 0.3em; // this is to fix the vertical alignment of the play html character
-            text-align: center;
-            text-decoration: none;
-            transition: opacity 0.1s;
-            vertical-align: middle;
-            &:hover {
-              background-color: whitesmoke;
-              color: $font-color;
-              cursor: pointer;
-              opacity: 0.7;
-            }
-          }
+          background-size: cover;
+          border-radius: $radius-small;
+          flex: 0 0 2.75em;
+          height: 1.625em;
         }
-        &.disabled {
-          .video-number {
-            opacity: 0.3;
-            text-decoration: line-through;
-          }
-          .video-thumbnail {
-            opacity: 0.3;
-            .video-play {
-              color: $font-color;
-              font-size: 1em;
-              opacity: 0.7;
-              padding-top: 0;
-              &:hover {
-                background-color: $background-color;
-              }
-            }
-          }
-          .video-title {
-            opacity: 0.3;
-            text-decoration: line-through;
-          }
-        }
-        .video-title {
+        .playlist-video-title {
+          color: inherit;
           flex: 1 1 auto;
-          margin-left: 0.5em;
+          font-size: 0.9em;
+          min-width: 0;
           overflow: hidden;
-          padding: 0;
+          text-decoration: none;
           text-overflow: ellipsis;
           white-space: nowrap;
-        }
-        .video-delete {
-          aspect-ratio: 1;
-          color: $color-error;
-          display: flex;
-          font-size: 2em;
-          flex-direction: column;
-          height: 100%;
-          justify-content: center;
-          text-align: center;
-          transition-duration: 0.1s;
-          &:active {
-            transform: scale(0.9);
-          }
           &:hover {
-            cursor: pointer;
+            text-decoration: underline;
           }
-          &.disabled {
-            color: lightgray;
-            pointer-events: none;
+        }
+        // Unavailable is a status, not an error: muted, never red.
+        &.disabled {
+          .playlist-video-thumbnail {
+            opacity: 0.45;
           }
+          .playlist-video-title {
+            color: $color-inactive;
+          }
+        }
+      }
+    }
+    .curated-section {
+      margin-top: 1.5 * $base-space;
+      ul#recommended-playlist-list {
+        list-style-type: none;
+        padding: 0;
+      }
+      .recommended-playlist-item {
+        align-items: center;
+        display: flex;
+        margin-bottom: 0.5em;
+        .recommended-link {
+          color: $color-one;
+          margin-right: 0.5em;
+        }
+        .add-recommended {
+          margin-left: 0.5em;
+          padding: 0.25em 0.5em;
         }
       }
     }
