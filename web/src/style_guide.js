@@ -108,6 +108,11 @@ const SHAPE = [
     note: "marketing / feature cards",
   },
   {
+    name: "radius-pill",
+    value: "99px",
+    note: "fully-rounded ends: progress tracks, chips, status pills",
+  },
+  {
     name: "shadow-card",
     value: "0 8px 24px rgba(35, 48, 32, 0.1)",
     note: "raised card surface",

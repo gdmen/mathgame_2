@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import parse from "html-react-parser";
 
 import "./problem.scss";
@@ -27,6 +27,9 @@ class AnswerTracker {
   constructor(eventReporter) {
     var singleton = AnswerTracker._instance;
     if (singleton) {
+      // Same handover as EventReporterSingleton: a remount brings a new
+      // reporter, and the tracker must post through it, not the dead one.
+      singleton.eventReporter = eventReporter;
       return singleton;
     }
     AnswerTracker._instance = this;
@@ -72,6 +75,7 @@ class AnswerTracker {
 const ProblemView = ({ gamestate, latex, eventReporter, interval }) => {
   const [answer, setAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const problemId = gamestate ? gamestate.problem_id : null;
 
   useEffect(() => {
     setAnswer("");
@@ -81,21 +85,48 @@ const ProblemView = ({ gamestate, latex, eventReporter, interval }) => {
     setSubmitting(false);
   }, [gamestate]);
 
-  if (gamestate == null || latex == null || interval == null) {
+  // The tracker is a singleton, so this only ever hands it the live reporter.
+  const answerTracker = useMemo(
+    () => (eventReporter ? new AnswerTracker(eventReporter) : null),
+    [eventReporter]
+  );
+
+  // Resetting tracker state is a mutation, so it waits for commit rather than
+  // running mid-render.
+  useEffect(() => {
+    if (answerTracker) answerTracker.problemWasDisplayed(problemId);
+  }, [answerTracker, problemId]);
+
+  // "Time on problem" accrues only while a problem is actually on screen and
+  // unanswered. Adding on mount and removing on cleanup replaces the old
+  // clear-every-render dance, and covers unmount (moving to the video) for
+  // free.
+  useEffect(() => {
+    if (!eventReporter || submitting) return;
+    eventReporter.add("working_on_problem");
+    return () => eventReporter.remove("working_on_problem");
+  }, [eventReporter, submitting, problemId]);
+
+  if (
+    gamestate == null ||
+    latex == null ||
+    interval == null ||
+    answerTracker == null
+  ) {
     return <div className="content-loading"></div>;
   }
 
-  var answerTracker = new AnswerTracker(eventReporter);
-  answerTracker.problemWasDisplayed(gamestate.problem_id);
-  if (!submitting) {
-    console.log("adding working_on_problem");
-    eventReporter.add("working_on_problem");
-  }
   var progress = String((100.0 * gamestate.solved) / gamestate.target) + "%";
+  // The last problem before the reward switches the meter to $color-reward and
+  // announces the video, so the thing being earned is visible while earning it.
+  const isFinalProblem = gamestate.target - gamestate.solved === 1;
   return (
     <>
       <div id="problem" className={submitting ? "submitting" : ""}>
-        <div className="progress">
+        <p className="progress-cue">
+          {isFinalProblem ? "1 more until your video" : " "}
+        </p>
+        <div className={"progress" + (isFinalProblem ? " final" : "")}>
           <div className="progress-meter" style={{ width: progress }}></div>
         </div>
         <div id="problem-display">{parse(latex)}</div>
@@ -120,30 +151,30 @@ const ProblemView = ({ gamestate, latex, eventReporter, interval }) => {
               }
             }}
           />
-          <div>
-            <button
-              onClick={() => {
-                !submitting &&
-                  setSubmitting(
-                    answerTracker.reportAnswer(answer, gamestate.problem_id)
-                  );
-              }}
-            >
-              <h3>
-                <span id="submit-text">submit</span>
-                <span className="loader-wrap">
-                  <span className="loader"></span>
-                </span>
-              </h3>
-            </button>
-          </div>
+          <button
+            onClick={() => {
+              !submitting &&
+                setSubmitting(
+                  answerTracker.reportAnswer(answer, gamestate.problem_id)
+                );
+            }}
+          >
+            <span className="submit-label">
+              <span id="submit-text">submit</span>
+              <span className="loader-wrap">
+                <span className="loader"></span>
+              </span>
+            </span>
+          </button>
         </div>
-        {!submitting &&
-          answerTracker.wasIncorrectAnswer(gamestate.problem_id) && (
-            <div className="label alert">
-              <div>Try Again!</div>
-            </div>
-          )}
+        {/* Height is reserved whether or not the nudge shows, so nothing below
+            it moves when an answer comes back wrong. Never red (see the
+            style guide's colour invariant). */}
+        <div className="problem-feedback">
+          {!submitting && answerTracker.wasIncorrectAnswer(gamestate.problem_id)
+            ? "Try Again!"
+            : " "}
+        </div>
       </div>
     </>
   );

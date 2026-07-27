@@ -1,5 +1,5 @@
 import katex from "katex";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import PinInput from "react-pin-input";
 
 import "katex/dist/katex.min.css";
@@ -18,6 +18,10 @@ class EventReporterSingleton {
   constructor(postEvent, interval) {
     var singleton = EventReporterSingleton._instance;
     if (singleton) {
+      // A remount hands over the new view's reporter, or the instance would
+      // keep calling the unmounted one's callback.
+      singleton.postEvent = postEvent;
+      singleton.interval = interval;
       singleton.setUp();
       return singleton;
     }
@@ -27,6 +31,11 @@ class EventReporterSingleton {
 
     this.postEvent = postEvent;
     this.interval = interval;
+    // Bound once and stored: removeEventListener only matches the same
+    // reference, so binding per-call would leak a listener on every teardown.
+    this.onFocus = this.onFocus.bind(this);
+    this.onBlur = this.onBlur.bind(this);
+    this.executeInterval = this.executeInterval.bind(this);
 
     this.setUp();
   }
@@ -65,13 +74,10 @@ class EventReporterSingleton {
 
   setUp() {
     if (!this.listenersAlive) {
-      window.addEventListener("focus", this.onFocus.bind(this));
-      window.addEventListener("blur", this.onBlur.bind(this));
+      window.addEventListener("focus", this.onFocus);
+      window.addEventListener("blur", this.onBlur);
       clearInterval(this.intervalId);
-      this.intervalId = setInterval(
-        this.executeInterval.bind(this),
-        this.interval
-      );
+      this.intervalId = setInterval(this.executeInterval, this.interval);
       this.listenersAlive = true;
     }
     // Call this.onFocus when the window loads
@@ -176,33 +182,71 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
     renderLatex();
   }, [gamestate, problem, postEvent]);
 
-  const eventReporter = new EventReporterSingleton(
-    async (event_type, value) => {
-      let json = await postEvent(event_type, value);
-      if (event_type == "answered_problem" && json && json.gamestate) {
+  // postEvent is a fresh function on every parent render (index.js calls
+  // genPostEventFcn()), so the reporter reads it through a ref instead of being
+  // rebuilt — rebuilding would tear down and re-arm the reporting interval
+  // constantly.
+  const postEventRef = useRef(postEvent);
+  useEffect(() => {
+    postEventRef.current = postEvent;
+  }, [postEvent]);
+
+  // Built in an effect, not during render: the constructor attaches focus/blur
+  // listeners and starts the reporting interval, and those must be undone when
+  // the view goes away.
+  const [eventReporter, setEventReporter] = useState(null);
+  useEffect(() => {
+    const reporter = new EventReporterSingleton(async (event_type, value) => {
+      const json = await postEventRef.current(event_type, value);
+      if (event_type === "answered_problem" && json && json.gamestate) {
         setGamestate(json["gamestate"]);
         setProblem(json["problem"]);
         setVideo(json["video"]);
       }
-    },
-    interval
-  );
-  eventReporter.clear();
+    }, interval);
+    setEventReporter(reporter);
+    return () => reporter.tearDown();
+  }, [interval]);
 
-  if (!gamestate || !problem) {
+  // The dev fast-forward: auto-answer, auto-watch, reload. It posts events, so
+  // it belongs in an effect rather than mid-render. Ships false in conf.json.
+  const solved = gamestate ? gamestate.solved : null;
+  const target = gamestate ? gamestate.target : null;
+  const quickplayVideoId = gamestate ? gamestate.video_id : null;
+  const correctAnswer = problem ? problem.answer : null;
+  useEffect(() => {
+    if (!conf.debug_quickplay || solved == null || correctAnswer == null) {
+      return;
+    }
+    let cancelled = false;
+    const advance = async () => {
+      const post = postEventRef.current;
+      if (solved >= target) {
+        if ((await post("watching_video", 5000)) == null || cancelled) return;
+        if ((await post("done_watching_video", quickplayVideoId)) == null) {
+          return;
+        }
+      } else {
+        if ((await post("working_on_problem", 1000)) == null || cancelled) {
+          return;
+        }
+        if ((await post("answered_problem", correctAnswer)) == null) return;
+      }
+      if (!cancelled) window.location.pathname = "play";
+    };
+    advance();
+    return () => {
+      cancelled = true;
+    };
+  }, [solved, target, quickplayVideoId, correctAnswer]);
+
+  if (!gamestate || !problem || !eventReporter) {
     return <div className="content-loading"></div>;
   }
 
   if (gamestate.solved >= gamestate.target) {
+    // debug_quickplay drives the loop from the effect above; render nothing.
     if (conf.debug_quickplay) {
-      postEvent("watching_video", 5000).then((json) => {
-        if (json == null) return;
-        postEvent("done_watching_video", gamestate.video_id).then(
-          (doneJson) => {
-            if (doneJson != null) window.location.pathname = "play";
-          }
-        );
-      });
       return null;
     } else {
       return (
@@ -215,12 +259,6 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
     }
   } else {
     if (conf.debug_quickplay) {
-      postEvent("working_on_problem", 1000).then((json) => {
-        if (json == null) return;
-        postEvent("answered_problem", problem.answer).then((answeredJson) => {
-          if (answeredJson != null) window.location.pathname = "play";
-        });
-      });
       return null;
     } else {
       const handleReportSubmit = () => {

@@ -35,10 +35,13 @@ const ProblemCompanionView = ({ gamestate, latex, answer, attempts }) => {
   }
 
   var progress = String((100.0 * gamestate.solved) / gamestate.target) + "%";
+  // Mirrors the kid's final-problem cue; the adult view must never disagree
+  // with what the kid is looking at.
+  const isFinalProblem = gamestate.target - gamestate.solved === 1;
   return (
     <div id="problem-companion">
       <div id="problem-mirror">
-        <div className="progress">
+        <div className={"progress" + (isFinalProblem ? " final" : "")}>
           <div className="progress-meter" style={{ width: progress }}></div>
         </div>
         <div id="problem-display">{parse(latex)}</div>
