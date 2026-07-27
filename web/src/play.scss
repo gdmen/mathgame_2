@@ -1,12 +1,16 @@
 @import "styles.scss";
 
+// A parent affordance sitting on the kid's screen: legible, but quiet enough
+// that it never competes with the answer box.
 .report-problem-link {
   background: none;
   border: none;
-  color: $color-one-contrast;
+  color: $color-ink-soft;
   cursor: pointer;
   display: block;
-  font-size: 0.9em;
+  font-family: $base-font-family;
+  font-size: 0.8em;
+  font-weight: 400;
   margin: 0.5em auto 1em;
   text-decoration: underline;
 }
@@ -61,8 +65,8 @@
     }
 
     textarea {
-      border: 1px solid #ccc;
-      border-radius: 0.25em;
+      border: 0.0625em solid $color-field-border;
+      border-radius: $radius-small;
       box-sizing: border-box;
       font-family: inherit;
       padding: 0.5em;

@@ -1,4 +1,10 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import ReactPlayer from "react-player";
 
 import "./video.scss";
@@ -12,29 +18,36 @@ const VideoView = ({ video, eventReporter, interval }) => {
     elapsedRef.current = elapsed;
   }, [elapsed]);
 
+  const playPause = useCallback(() => {
+    setPlaying((wasPlaying) => !wasPlaying);
+  }, []);
+
+  // addEventListener with a matching cleanup, rather than assigning
+  // document.body.onkeyup: assignment silently replaces whatever else owned the
+  // handler and leaves it installed after this view is gone.
+  useEffect(() => {
+    if (video == null) return;
+    const onKeyUp = (e) => {
+      if (e.key === " " || e.code === "Space" || e.keyCode === 32) {
+        playPause();
+      }
+    };
+    document.addEventListener("keyup", onKeyUp);
+    return () => document.removeEventListener("keyup", onKeyUp);
+  }, [video, playPause]);
+
+  // Derived, not written back onto the prop: a single video should play, not
+  // the playlist it came from.
+  const playUrl = useMemo(() => {
+    if (video == null) return null;
+    const u = new URL(video.url);
+    u.searchParams.delete("list");
+    return u.toString();
+  }, [video]);
+
   if (video == null || eventReporter == null || interval == null) {
     return <div className="content-loading"></div>;
   }
-
-  const playPause = () => {
-    setPlaying(!playing);
-    /* Uncomment to test faster */
-    //if (!playing && elapsed > 1000) {
-    //  eventReporter.postEvent("done_watching_video", video.id);
-    //  window.location.pathname="play";
-    //}
-  };
-
-  document.body.onkeyup = function (e) {
-    if (e.key === " " || e.code === "Space" || e.keyCode === 32) {
-      playPause();
-    }
-  };
-
-  // Remove the playlist parameter from the video url
-  var u = new URL(video.url);
-  u.searchParams.delete("list");
-  video.url = u.toString();
 
   return (
     <div id="video-container">
@@ -43,7 +56,7 @@ const VideoView = ({ video, eventReporter, interval }) => {
           className="react-player"
           width="100%"
           height="100%"
-          url={video.url}
+          url={playUrl}
           playing={playing}
           progressInterval={interval}
           onProgress={(e) => {

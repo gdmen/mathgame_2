@@ -22,7 +22,11 @@ gamestate.solved >= gamestate.target  ?  show the reward video  :  show the prob
 ```
 
 `solved` / `target` also drive the progress-meter width (`ProblemView`,
-`ProblemCompanionView`).
+`ProblemCompanionView`) and, one problem out from the reward
+(`target - solved === 1`), the meter's `final` modifier: the bar switches from
+`$color-one-contrast` to `$color-reward` and `ProblemView` shows a
+"1 more until your video" cue above it. Both surfaces compute the flag, so the
+adult mirror never disagrees with the kid's screen about what is coming.
 
 | Route | View | File | Audience |
 |---|---|---|---|
@@ -95,7 +99,20 @@ Two focus-gated loops keep traffic off backgrounded tabs:
   gating, no event Set.
 
 Each is a true singleton (the constructor returns the existing `_instance`), so a re-render reuses
-the one live loop instead of stacking intervals.
+the one live loop instead of stacking intervals. Re-construction **hands over** the caller's
+callback (`postEvent` / `eventReporter`) to the existing instance: a remount otherwise leaves the
+singleton posting through the unmounted view's closure.
+
+`PlayView` builds the reporter in an effect and tears it down on unmount — the constructor attaches
+focus/blur listeners and starts the interval, so it must not run during render, and those handlers
+are bound once and stored so `removeEventListener` can actually match them. Because `postEvent` is
+a fresh function on every parent render (`index.js` calls `genPostEventFcn()`), the reporter reads
+it through a ref rather than being rebuilt, which would re-arm the interval constantly.
+
+`ProblemView` owns the sticky membership through one effect: it adds `working_on_problem` while an
+unanswered problem is mounted and removes it on cleanup, which covers submitting, advancing to the
+next problem, and unmounting to the reward video. `src/problem_reporting.test.js` pins that
+lifecycle.
 
 ## AnswerTracker — submit and "Try Again"
 
@@ -113,6 +130,11 @@ without the server round-tripping a verdict:
 
 The wrong-answer signal is thus **inferred from non-advancement**, not from an explicit verdict
 field — see Gotchas.
+
+"Try Again!" renders into `.problem-feedback`, a slot whose height is reserved whether or not the
+nudge is showing, so a wrong answer never moves the answer box or anything under it. It is styled
+in `$color-ink-soft` and never red — red is reserved for parent/admin validation (see the style
+guide's colour invariant).
 
 ## Report-problem flow
 
@@ -168,15 +190,13 @@ otherwise flushing the buffer into `attempts`. The result is rendered with relat
   "Try Again!".
 - **`debug_quickplay` auto-plays the loop.** When `conf.debug_quickplay` is true, `PlayView`
   auto-posts `working_on_problem` then the correct `problem.answer`, and auto-watches the video,
-  reloading `/play` each step — a dev fast-forward, shipped `false` in `conf.json`.
-- **`video.url` is mutated in place.** `VideoView` rewrites `video.url` on the prop object rather
-  than copying — harmless because the view re-fetches, but it mutates a prop.
-- **Global keyup handler is reassigned, not added.** `VideoView` sets `document.body.onkeyup`
-  directly, overwriting any prior handler each render; it is not an `addEventListener` and does not
-  clean up. Fine only because the video view is the sole setter.
-- **Render-phase side effects.** Both views construct singletons and call `postEvent` /
-  `eventReporter.add` during render rather than in an effect (`PlayView`, `ProblemView`). It works
-  only because the singletons are idempotent; it is not idiomatic React and re-runs on every render.
+  reloading `/play` each step — a dev fast-forward, shipped `false` in `conf.json`. It runs from an
+  effect (it posts events), and both views render `null` while it drives.
+- **The wrong-answer check reads tracker state before the reset effect runs.** `problemWasDisplayed`
+  now resets in an effect, so on the first render of a *new* problem the tracker still holds the
+  previous answer. `wasIncorrectAnswer` is unaffected because it also requires
+  `lastProblemId === problem_id`, which is false on exactly that render; the reset lands before any
+  render where the ids match. Removing that id comparison would resurrect a stale "Try Again!".
 
 ## Related files
 
@@ -184,6 +204,7 @@ otherwise flushing the buffer into `attempts`. The result is rendered with relat
   `conf.event_reporting_interval` wiring.
 - `web/src/conf.json` — `event_reporting_interval`, `debug_quickplay`.
 - `web/src/problem_companion.js`, `web/src/video_companion.js` — read-only mirror sub-views.
+- `web/src/problem_reporting.test.js` — pins the `working_on_problem` add/remove lifecycle.
 - `web/src/pin.js` — `RequirePin`, `ClearSessionPin` (companion gate / play PIN clear).
 - `server/api/event_types.go` — authoritative event-type constants.
 - `server/api/meta_models.go` — `PlayData`, the `/play` response shape.

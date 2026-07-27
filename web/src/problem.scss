@@ -1,22 +1,38 @@
 @import "styles.scss";
 
+// Same shape as the landing page's demo card (landing.scss .progress-track):
+// the marketing page shows this bar, so the real one has to be it.
 .progress {
-  border-radius: $base-radius;
-  border: 1px solid gray;
-  font-size: 1.5em;
-  height: 1em;
+  background-color: $color-two;
+  border-radius: $radius-pill;
+  height: 0.75em;
+  overflow: hidden;
   .progress-meter {
-    background-color: $color-one;
-    border-radius: $base-radius 0 0 $base-radius;
+    background-color: $color-one-contrast;
+    border-radius: $radius-pill;
     height: 100%;
+    transition: width 0.5s ease;
   }
+  // One problem left: the meter takes the reward hue.
+  &.final .progress-meter {
+    background-color: $color-reward;
+  }
+}
+// Always occupies its line so the meter never shifts when the cue appears.
+.progress-cue {
+  color: $color-reward;
+  font-family: $display-font-family;
+  font-size: 0.9em;
+  font-weight: 600;
+  margin-bottom: 0.25em;
+  min-height: 1.4em;
+  text-align: right;
 }
 
 #problem {
-  border-top: 1px gray;
   margin: 0 auto;
   max-width: $max-width;
-  padding: 0 $base-space;
+  padding: $base-space $base-space 0;
   text-align: center;
   &.submitting {
     #problem-answer-input {
@@ -29,18 +45,37 @@
       }
     }
   }
+  // A centred box sized to the answers kids actually type, rather than a rule
+  // spanning the whole column; matches the landing demo's answer row.
+  #problem-answer {
+    align-items: stretch;
+    display: flex;
+    gap: 0.625 * $base-space;
+    justify-content: center;
+    margin-top: $base-space;
+  }
   #problem-answer-input {
-    border: none;
-    border-bottom: 2px solid #333;
-    font-size: 3em;
-    width: 100%;
+    background-color: $background-color;
+    border: 0.125em solid $color-field-border;
+    border-radius: $base-radius;
+    font-family: "KaTeX_Main", serif;
+    font-size: 2em;
+    padding: 0.2em 0.4em;
+    text-align: center;
+    width: 5em;
+    &:focus {
+      border-color: $color-one-contrast;
+      outline: none;
+    }
   }
   button {
     background-color: $color-one-contrast;
     color: white;
-    font-weight: 400;
-    margin-top: 1.5 * $base-space;
-    h3 {
+    font-weight: 600;
+    padding: 0 1.25 * $base-space;
+    .submit-label {
+      display: block;
+      font-size: 1.15em;
       position: relative;
     }
     .loader-wrap {
@@ -53,9 +88,9 @@
       justify-content: center;
       .loader {
         display: none;
-        width: 1.5em;
-        height: 1.5em;
-        border: 5px solid #fff;
+        width: 1.1em;
+        height: 1.1em;
+        border: 0.1875em solid #fff;
         border-bottom-color: transparent;
         border-radius: 50%;
         box-sizing: border-box;
@@ -71,8 +106,12 @@
       }
     }
   }
-  .alert {
-    margin-top: 0.5em;
+  .problem-feedback {
+    color: $color-ink-soft;
+    font-family: $display-font-family;
+    font-weight: 600;
+    margin-top: 0.75em;
+    min-height: 1.5em;
   }
 }
 #problem-display {

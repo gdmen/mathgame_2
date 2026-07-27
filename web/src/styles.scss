@@ -82,6 +82,9 @@ $max-width: 1200px;
 $base-radius: 0.5em;
 $radius-small: 0.25em;
 $radius-large: 1em;
+// Larger than any element it is applied to, so the browser clamps it to a
+// fully-rounded end: progress tracks, chips, status pills.
+$radius-pill: 99em;
 $shadow-card: 0 0.5em 1.5em rgba(35, 48, 32, 0.1);
 
 // Keyboard-focus ring, shared by the app and the static landing (both @import

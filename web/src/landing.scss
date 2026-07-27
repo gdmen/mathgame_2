@@ -266,7 +266,7 @@ h1 {
 }
 .chip-demo {
   background-color: $color-two;
-  border-radius: 99px;
+  border-radius: $radius-pill;
   color: $color-one-contrast;
   font-family: $display-font-family;
   font-size: 0.7rem;
@@ -277,14 +277,14 @@ h1 {
 }
 .progress-track {
   background-color: $color-two;
-  border-radius: 99px;
+  border-radius: $radius-pill;
   height: 0.5625em;
   margin: $base-space 1.125 * $base-space 0;
   overflow: hidden;
 }
 .progress-fill {
   background-color: $color-one-contrast;
-  border-radius: 99px;
+  border-radius: $radius-pill;
   height: 100%;
   transition: width 0.5s ease;
   width: 0%;
