@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>og mock</title>
+<style>
+  /* 1200x630 og-image mock. To re-render web/public/og-image.png:
+       1. cp web/og-mock.html web/public/   (this file lives outside public/
+          so the mock page itself never ships in the build)
+       2. make landing-assets && (cd web/public && python3 -m http.server 5077 &)
+       3. /Applications/Firefox.app/Contents/MacOS/firefox --headless \
+            --no-remote -profile $(mktemp -d) \
+            --screenshot "$PWD/web/public/og-image.png" --window-size=1200,630 \
+            http://localhost:5077/og-mock.html
+       4. rm web/public/og-mock.html
+     The reward screen's still is a data-URI below; to use a frame from a real
+     clip: ffmpeg -ss <t> -i <clip> -frames:v 1 -q:v 3 still.jpg && base64 -i
+     still.jpg, then replace the src.
+
+     Built from the landing's own tokens:
+     $color-one #bee8b7, $color-one-contrast #007200, $color-action #2166a5,
+     $background-color #faf9f3, $font-color #24301f, ink-soft #55644e */
+  @font-face {
+    font-family: "Quicksand";
+    font-weight: 700;
+    src: url("/fonts/quicksand-latin-700-normal.woff2") format("woff2");
+  }
+  @font-face {
+    font-family: "Nunito";
+    font-weight: 400;
+    src: url("/fonts/nunito-latin-400-normal.woff2") format("woff2");
+  }
+  @font-face {
+    font-family: "KaTeX_Main";
+    font-weight: 400;
+    src: url("/fonts/KaTeX_Main-Regular.woff2") format("woff2");
+  }
+  @font-face {
+    font-family: "Caveat";
+    font-weight: 700;
+    src: url("/fonts/caveat-latin-700-normal.woff2") format("woff2");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    background-color: #bee8b7;
+    color: #24301f;
+    font-family: "Nunito", sans-serif;
+    padding: 44px 64px;
+  }
+  .wordmark {
+    font-family: "Quicksand", sans-serif;
+    font-weight: 700;
+    font-size: 30px;
+  }
+  h1 {
+    font-family: "Quicksand", sans-serif;
+    font-weight: 700;
+    font-size: 60px;
+    line-height: 1.14;
+    letter-spacing: -0.005em;
+    margin-top: 22px;
+  }
+  h1 .earn { color: #007200; }
+  .cards {
+    align-items: center;
+    display: flex;
+    gap: 36px;
+    justify-content: center;
+    margin-top: 30px;
+  }
+  .card {
+    background-color: white;
+    border: 2.5px solid #2166a5;
+    border-radius: 18px;
+    box-shadow: 0 0 0 7px rgba(33, 102, 165, 0.10), 0 12px 30px rgba(33, 102, 165, 0.18);
+    overflow: hidden;
+    width: 380px;
+  }
+  .bar {
+    align-items: center;
+    border-bottom: 1.5px solid #d6f7d2;
+    display: flex;
+    justify-content: space-between;
+    font-family: "Quicksand", sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    padding: 12px 18px;
+  }
+  .chip {
+    background-color: #d6f7d2;
+    border-radius: 99px;
+    color: #007200;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    padding: 3px 12px;
+    text-transform: uppercase;
+  }
+  .track { background-color: #d6f7d2; height: 10px; margin: 16px 18px 0; border-radius: 99px; overflow: hidden; }
+  .fill { background-color: #007200; height: 100%; width: 55%; border-radius: 99px; }
+  .problem {
+    font-family: "KaTeX_Main", serif;
+    font-size: 46px;
+    padding: 18px 0 4px;
+    text-align: center;
+  }
+  .answer { display: flex; gap: 12px; justify-content: center; padding: 8px 0 24px; }
+  .input {
+    background-color: #faf9f3;
+    border: 2.5px solid #6b8650;
+    border-radius: 10px;
+    height: 48px;
+    width: 140px;
+  }
+  .submit {
+    align-items: center;
+    background-color: #007200;
+    border-radius: 10px;
+    color: white;
+    display: flex;
+    font-family: "Quicksand", sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    padding: 0 26px;
+  }
+  .vcard { padding: 14px 16px 14px; }
+  .screen {
+    align-items: center;
+    aspect-ratio: 16/9;
+    background-color: #24301f;
+    border-radius: 10px;
+    display: flex;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+  .still {
+    height: 100%;
+    left: 0;
+    object-fit: cover;
+    position: absolute;
+    top: 0;
+    width: 100%;
+  }
+  .play {
+    filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.35));
+    position: relative;
+    border-bottom: 20px solid transparent;
+    border-left: 34px solid #2166a5;
+    border-top: 20px solid transparent;
+    height: 0;
+    width: 0;
+  }
+  .vbar { background-color: #d6f7d2; border-radius: 99px; height: 10px; margin-top: 12px; overflow: hidden; }
+  .vfill { background-color: #2166a5; border-radius: 99px; height: 100%; width: 42%; }
+  .vlabel {
+    color: #55644e;
+    font-size: 14px;
+    margin-top: 10px;
+    text-align: center;
+  }
+  .link-arrow { color: #2166a5; flex-shrink: 0; }
+</style>
+</head>
+<body>
+  <div class="wordmark">Mikey&rsquo;s Math Game</div>
+  <h1>Your kid <span class="earn">earns YouTube time</span><br />by doing math.</h1>
+
+  <div class="cards">
+    <div class="card">
+      <div class="bar">Mikey&rsquo;s Math Game <span class="chip">demo</span></div>
+      <div class="track"><div class="fill"></div></div>
+      <div class="problem">4 + 3</div>
+      <div class="answer"><div class="input"></div><div class="submit">submit</div></div>
+    </div>
+
+    <svg class="link-arrow" width="110" height="70" viewBox="0 0 110 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 48 C36 24 72 22 100 34" />
+        <path d="M100 34 L84 24" />
+        <path d="M100 34 L85 44" />
+      </g>
+    </svg>
+
+    <div class="card" style="width:352px">
+      <div class="bar">Reward <span class="chip">earned</span></div>
+      <div class="vcard">
+        <div class="screen"><img class="still" alt="" src="data:image/jpeg;base64,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" /><div class="play"></div></div>
+        <div class="vbar"><div class="vfill"></div></div>
+        <div class="vlabel">From playlists you pick &middot; no controls</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
