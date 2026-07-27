@@ -121,9 +121,13 @@ const MainView = ({
       <main>
         <Switch>
           {/*
-            "/" is the static marketing page, not a React route (#329). This
-            entry only catches in-app navigations to "/" and hands them back to
-            the real document with a full page load.
+            "/" and "/privacy" are static pages, not React routes. This entry
+            only catches in-app navigations to "/" and hands them back to the
+            real document with a full page load.
+
+            Production serves the shell only for the routes enumerated in
+            web/public/serve.json — a new top-level route added here must be
+            added there too, or its deployed URL is a 404.
           */}
           <Route exact path="/">
             <ToLanding />

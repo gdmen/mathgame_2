@@ -74,20 +74,26 @@ boot). The three jobs that must not overlap a manual run hold a `flock`
 Three build subtleties worth knowing:
 
 - **The landing page is `index.html`; the React shell is `app.html`.** The
-  marketing page is static HTML so crawlers and link unfurlers get real content
-  instead of an empty JS shell. `serve` resolves `/` to whatever `index.html` is
-  and applies rewrites only to paths it cannot resolve, so the only way to put a
-  static page at `/` is to *be* `index.html` — hence the two renames at the end
-  of `build-web`. `web/public/serve.json` then rewrites `/:path+` (one or more
-  segments, so it never matches `/`) to `app.html`, which keeps every SPA route
-  and the app's own 404 page. A `**` catch-all would also match `/` and hide the
-  landing, and **`prod-web` must not pass `serve`'s `-s`/`--single` flag** — it
-  would rewrite everything to `index.html` and serve the marketing page in place
-  of the app. Verified against `serve` 14. One consequence worth knowing when
-  debugging: because the rewrite answers every path it cannot resolve, a
-  **missing static asset returns the app shell with a 200**, not a 404. A
-  mistyped image or script URL therefore surfaces as HTML where a binary was
-  expected, rather than as a clean missing-file error.
+  marketing pages (`/`, `/privacy`) are static HTML so crawlers, link unfurlers,
+  and no-JS readers get real content instead of an empty JS shell. `serve`
+  resolves `/` to whatever `index.html` is, so the only way to put a static page
+  at `/` is to *be* `index.html` — hence the two renames at the end of
+  `build-web`. `web/public/serve.json` rewrites **an enumerated list of app
+  routes** (`/login`, `/play`, `/settings`, `/progress`, `/pin/*`,
+  `/companion/*`, `/admin/*`) to `app.html`; a new top-level React route must be
+  added there too or its deployed URL 404s (the `Switch` in `web/src/index.js`
+  carries the same warning). A catch-all rewrite cannot coexist with static
+  clean URLs: `serve` 14 checks the filesystem before rewrites only for paths
+  with an extension, and its rewrite engine cascades each rule's output through
+  the remaining rules, so `/privacy → /privacy.html → catch-all → app.html` no
+  matter the order (verified against `serve` 14 and its `serve-handler`
+  source). With no catch-all, extensionless statics resolve via `cleanUrls`
+  (`/privacy` → `privacy.html`), unknown paths get a **real 404** served from
+  the branded `404.html` (`serve-handler` picks up that filename natively), and
+  a missing asset is now a clean 404 rather than the old
+  shell-with-a-200 behavior. **`prod-web` must not pass `serve`'s
+  `-s`/`--single` flag** — it would rewrite everything to `index.html` and
+  serve the marketing page in place of the app.
 
 - **`build-web` never empties the live dir.** `react-scripts` wipes its output
   dir at the start of every build; building in place left `web/build` a bare

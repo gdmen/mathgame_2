@@ -1,4 +1,4 @@
-// Dev-server parity with production for the "/" route (#329).
+// Dev-server parity with production for the static pages.
 //
 // In production the static marketing page IS index.html and the React shell is
 // app.html (the two renames at the end of the Makefile's build-web). The CRA
@@ -17,5 +17,10 @@ const path = require("path");
 module.exports = function (app) {
   app.get("/", function (req, res) {
     res.sendFile(path.join(__dirname, "..", "public", "landing.html"));
+  });
+  // Same parity story for the static privacy page: in production `serve`
+  // resolves /privacy to privacy.html before the SPA rewrite applies.
+  app.get("/privacy", function (req, res) {
+    res.sendFile(path.join(__dirname, "..", "public", "privacy.html"));
   });
 };
