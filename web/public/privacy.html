@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy · Mikey's Math Game</title>
+    <meta
+      name="description"
+      content="What Mikey's Math Game collects and what it never does: one parent account, no kid logins, no ads, no analytics trackers, no selling data."
+    />
+    <link rel="canonical" href="https://mikeymath.org/privacy" />
+    <!--
+      Static like the landing (see landing.html for the serving story): served
+      at /privacy because `serve` resolves real files before applying the SPA
+      rewrite, and the dev server mirrors that in setupProxy.js. Styles compile
+      from the app's own tokens via /landing.css.
+    -->
+    <link rel="stylesheet" href="/landing.css" />
+    <style>
+      /* Page-local layout only; all color/type comes from landing.css. */
+      .privacy-body {
+        max-width: 46em;
+      }
+      .privacy-body h2 {
+        margin-top: 1.75em;
+      }
+      .privacy-body p,
+      .privacy-body li {
+        margin-bottom: 0.75em;
+      }
+      .privacy-body ul {
+        list-style: disc;
+        padding-left: 1.25em;
+      }
+      .updated {
+        color: #55644e;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header class="band-green">
+      <div class="wrap nav">
+        <a class="logo" href="/">Mikey's Math Game</a>
+        <a class="login" id="nav-cta" href="/login">Log In</a>
+      </div>
+    </header>
+
+    <main>
+      <section>
+        <div class="wrap privacy-body">
+          <h1>Privacy</h1>
+          <p class="updated">Last updated: July 27, 2026</p>
+
+          <p>
+            Mikey's Math Game is a solo effort that I built for my little
+            brother. The privacy model is simple on purpose: collect the
+            minimum needed to run the game, and nothing else.
+          </p>
+
+          <h2>The short version</h2>
+          <ul>
+            <li>One parent account per family. <b>Kids have no logins</b> and
+              are never asked for their name, age, or anything else.</li>
+            <li><b>No ads. No analytics or ad trackers. We don't sell or share
+              data for marketing.</b></li>
+            <li>The only third parties are Auth0 (parent sign-in) and YouTube
+              (the reward videos you pick).</li>
+          </ul>
+
+          <h2>What we collect</h2>
+          <ul>
+            <li><b>Account:</b> the parent's email and login identity, handled
+              by Auth0, our sign-in provider; a display username; and the
+              4-digit PIN that keeps kids out of the settings pages.</li>
+            <li><b>Settings:</b> the skills you enable, the YouTube playlists
+              you add, and the target percentage of time spent on math.</li>
+            <li><b>Gameplay events:</b> which problems were shown and
+              answered, and minutes spent solving and watching. This is what
+              drives the difficulty adaptation, and it also powers the
+              progress page.</li>
+          </ul>
+
+          <h2>What we never collect</h2>
+          <ul>
+            <li>No child accounts, names, birthdays, photos, or contacts.
+              Gameplay stats belong to the family account, not to a child
+              identity.</li>
+            <li>No location, no microphone or camera, no address book.</li>
+            <li>No third-party analytics or advertising trackers anywhere on
+              the site. Fonts and assets are self-hosted.</li>
+          </ul>
+
+          <h2>Third parties</h2>
+          <ul>
+            <li><b>Auth0</b> handles parent sign-in, so it processes the
+              email address and credentials used to log in. See the
+              <a
+                href="https://www.okta.com/privacy-policy/"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Okta/Auth0 privacy policy</a
+              >.</li>
+            <li><b>YouTube</b> plays the reward videos, drawn only from
+              playlists a parent added. When a video plays, YouTube may set
+              cookies and collect viewing data under the
+              <a
+                href="https://policies.google.com/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Google privacy policy</a
+              >.</li>
+          </ul>
+
+          <h2>Changes</h2>
+          <p>
+            If how the game handles data ever changes, this page changes with
+            it, with the date above updated.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <a
+          href="https://forms.gle/r8uUSwyAoNivga3TA"
+          target="_blank"
+          rel="noopener noreferrer"
+          >report an issue</a
+        ><span class="separator">|</span><a href="/privacy">privacy</a>
+      </div>
+    </footer>
+
+    <script>
+      // Same auth-aware header as the landing (see landing.html for why).
+      (function () {
+        try {
+          for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (!k || k.indexOf("@@auth0spajs@@") !== 0) continue;
+            if (k.indexOf("@@user@@") !== -1) continue;
+            var entry = JSON.parse(localStorage.getItem(k));
+            if (
+              entry &&
+              entry.expiresAt &&
+              entry.expiresAt * 1000 > Date.now()
+            ) {
+              var cta = document.getElementById("nav-cta");
+              cta.textContent = "Play";
+              cta.setAttribute("href", "/play");
+              break;
+            }
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </body>
+</html>
