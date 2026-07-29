@@ -28,13 +28,20 @@ type Config struct {
 	// empty on dev hosts, where nothing serves TLS.
 	TLSCertFile string `json:"tls_cert_file"`
 	TLSKeyFile  string `json:"tls_key_file"`
+	// Auth0 Management API (machine-to-machine) credentials. Optional: when
+	// unset, account deletion still scrubs our DB but skips removing the
+	// Auth0 identity.
+	Auth0ManagementClientId     string `json:"auth0_management_clientId"`
+	Auth0ManagementClientSecret string `json:"auth0_management_clientSecret"`
 }
 
 // optionalConfigFields may legitimately be empty (set only on hosts that
 // need them); Validate skips these.
 var optionalConfigFields = map[string]bool{
-	"tls_cert_file": true,
-	"tls_key_file":  true,
+	"tls_cert_file":                 true,
+	"tls_key_file":                  true,
+	"auth0_management_clientId":     true,
+	"auth0_management_clientSecret": true,
 }
 
 func ReadConfig(path string) (*Config, error) {

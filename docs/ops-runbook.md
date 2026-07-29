@@ -229,6 +229,14 @@ subscribed in the ntfy app) and the TLS paths `tls_cert_file` / `tls_key_file`
 maintenance page read them. Cert renewal: `certbot renew`, then restart
 `mathgame-web`.
 
+`auth0_management_clientId` / `auth0_management_clientSecret` are the credentials
+of an Auth0 machine-to-machine application authorized for the Management API with
+the `delete:users` scope. Account deletion needs them to remove the Auth0
+identity; with them unset it still scrubs our database and only logs the skip, so
+the visible symptom of forgetting them is orphaned Auth0 identities, not a failed
+deletion. Setting exactly one of the two logs an error on every deletion. See
+[accounts.md](accounts.md).
+
 ## The tools (`cmd/*`)
 
 Every DB tool takes `-config` (default `conf.json`) and connects with the

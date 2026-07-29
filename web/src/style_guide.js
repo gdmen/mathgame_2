@@ -454,6 +454,22 @@ const StyleGuideView = () => {
             </div>
           </div>
         </CompoundExample>
+        <p>
+          <code>$color-error</code> red carries a button only when the action is
+          destructive and parent-facing — today just the delete-account flow,
+          which uses it twice: the button that opens the confirmation and the
+          confirm button inside it. Never for a kid-facing control.
+        </p>
+        <CompoundExample
+          name=".delete-account-open"
+          context=".settings .delete-account button.delete-account-open"
+        >
+          <div className="settings">
+            <div className="delete-account sg-no-padding">
+              <button className="delete-account-open">Delete account</button>
+            </div>
+          </div>
+        </CompoundExample>
       </Section>
 
       <Section title="Form elements">

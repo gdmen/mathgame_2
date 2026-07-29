@@ -114,6 +114,63 @@ which lets a caller change their own `email`/`username`/`pin` but force-overwrit
 from the stored row — so this endpoint can never self-promote to admin even though the bound `User`
 struct includes a `role` field.
 
+## Account deletion (`server/api/delete_account.go`, `DeleteAccountView` in `settings.js`)
+
+`DELETE /api/v1/users/:auth0_id` is the only self-service way out. It is immediate and
+irreversible: there is no recovery window and no soft-delete flag.
+
+**Two server-side checks.** The path `auth0_id` must equal the token-authenticated identity (you
+can only delete yourself), and the request body must carry the account's PIN, compared against
+`users.pin` on the server. An account with no PIN set is **not** deletable (`pin` defaults to
+`''`, so an empty submitted PIN would otherwise satisfy an equality check); the caller is told to
+set one first.
+
+**The PIN check here confirms intent; it is not a second factor.** Being server-side makes it
+harder to skip than the browser-side `RequirePin` gate, but it adds no security against a stolen
+access token: the same token reads the PIN back from `GET /pageload/:auth0_id` and can overwrite it
+outright via `customUpdateUser`. Per the PIN section above, the PIN is a kid gate, and the
+authorization boundary for deletion is the JWT plus the self-only check. Making deletion resistant
+to a compromised token needs a real re-authentication (an Auth0 `max_age`/`prompt=login` round trip
+before the DELETE), which this endpoint does not do.
+
+**Anonymize in place, don't delete the row.** `anonymizeAndPurgeUser` runs one transaction that
+hard-deletes every purely per-user table (`perUserDeleteSQL`) and then scrubs the `users` row
+rather than removing it:
+
+| Column | After deletion |
+|---|---|
+| `auth0_id` | `deleted-<id>` sentinel — breaks the login link, stays unique per user |
+| `email`, `username`, `pin` | `''` |
+| `id`, `role` | unchanged |
+
+`events` is the one user-keyed table deliberately **retained** (`retainedUserTables`): its
+aggregate solve-time data feeds difficulty calibration. The `users` row survives to hold that
+grouping key steady. There is no DB-level foreign key on `events.user_id` (see
+`CreateEventTableSQL`) — the reason to keep the row is that a retired `id` must never be handed to
+a future account, which is what would let a stranger's events merge with a deleted person's.
+
+Retention is not the same as retaining identity. `bad_problem_user` is the one event type a person
+types prose into, so the same transaction scrubs `$.explanation` out of those rows (guarded by
+`JSON_VALID`, since pre-JSON rows hold a bare problem id); what stays is the report, not the
+reporter. Because the sentinel replaces the Auth0 `sub`, the same person logging in again
+provisions a **fresh** row rather than re-claiming the anonymized one.
+
+`TestDeleteAccount_NoUnpurgedUserTables` reads `information_schema` and fails if any table with a
+`user_id` column is neither purged nor listed as retained — so a new per-user table can't silently
+start leaking rows past deletion.
+
+**Auth0 removal is best-effort.** After the local transaction commits, the handler calls
+`auth0.DeleteUser` (Management API, client-credentials grant) behind the optional config keys
+`auth0_management_clientId` / `auth0_management_clientSecret`. Both unset is a normal dev
+configuration and only logs; exactly one set is a misconfiguration and logs an error. A failure
+never fails the request — our DB is already scrubbed, and an orphaned Auth0 identity just creates a
+fresh row on next login.
+
+**Client.** The delete card sits last in the settings grid (already behind the PIN gate), and its
+confirmation modal re-asks for the PIN. On 204 the client clears the session PIN and logs out of
+Auth0. Its copy has to stay truthful about the retained events: it says anonymous gameplay data is
+kept, because saying "deletes everything" would be a promise this endpoint does not keep.
+
 ## Invariants
 
 - **Role is never client-settable.** Neither create (`createUserSQL` omits `role`) nor update
@@ -127,6 +184,9 @@ struct includes a `role` field.
   route guard (renders 404 to non-admins).
 - **New rows default to `student` / empty PIN.** The empty PIN is the signal that drives a new
   account into the setup wizard.
+- **A deleted account's `users` row is never removed, and its `id` is never handed out again.**
+  That is what keeps retained `events` attributable to one retired account and no live one. The
+  Auth0 `sub` itself *is* released: the sentinel overwrites it, so re-login provisions a fresh row.
 
 ## Gotchas / non-obvious behavior
 
@@ -154,6 +214,9 @@ struct includes a `role` field.
 - `server/api/handler_helpers.go` — context accessors (`GetAuth0IdFromContext`,
   `GetUserFromContext`/`Lenient`).
 - `server/api/custom_handlers.go` — `customUpdateUser`, `customCreateOrUpdateUser`.
+- `server/api/delete_account.go` — `customDeleteAccount`, `anonymizeAndPurgeUser`,
+  `perUserDeleteSQL`, `retainedUserTables`, `bestEffortDeleteAuth0User`.
+- `server/common/auth0/management.go` — `DeleteUser`, `managementToken` (Management API client).
 - `server/api/migrations/41.sql` — adds `users.role` (default `student`).
 - `server/api/models.json` (`users` table) — `pin` and `role` fields; regenerate
   `user_model.generated.go` (which holds `createUserSQL`) via `make build-api`, never edit it.

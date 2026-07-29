@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useAuth0 } from "@auth0/auth0-react";
+import PinInput from "react-pin-input";
 
 import { ProblemTypes } from "./enums.js";
 import { validateBitmap, targetDifficultyRange } from "./bitmap_validation.js";
-import { RequirePin } from "./pin.js";
+import { RequirePin, ClearSessionPin } from "./pin.js";
 import "./settings.scss";
 
 // Throws on any non-2xx or network failure so callers can surface it. A save
@@ -790,6 +792,123 @@ function videoPlayUrl(video) {
   return "#";
 }
 
+// Deleting is destructive and irreversible, so it is gated twice: the Adults
+// PIN already guards this page, and the modal re-asks for it. The server
+// verifies the PIN itself, so a stolen token alone can't delete an account.
+const DeleteAccountView = ({ token, apiUrl, user }) => {
+  const { logout } = useAuth0();
+  const [showModal, setShowModal] = useState(false);
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const openModal = () => {
+    setPin("");
+    setError(null);
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    if (submitting) return;
+    setShowModal(false);
+  };
+
+  const handleDelete = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const req = await fetch(
+        apiUrl + "/users/" + encodeURIComponent(user.auth0_id),
+        {
+          method: "DELETE",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+          },
+          body: JSON.stringify({ pin }),
+        }
+      );
+      if (req.status === 204) {
+        // The account is gone; drop the adult PIN session and log out of Auth0.
+        ClearSessionPin();
+        logout({ returnTo: window.location.origin });
+        return;
+      }
+      if (req.status === 403) {
+        setError("Incorrect PIN. Please try again.");
+      } else {
+        setError("Couldn't delete your account. Please try again.");
+      }
+    } catch (e) {
+      console.log(e.message);
+      setError("Couldn't delete your account. Please try again.");
+    }
+    setSubmitting(false);
+  };
+
+  return (
+    <SettingsCard
+      title="Delete account"
+      question="Want to remove this account and everything in it?"
+      wide
+    >
+      <div className="delete-account">
+        <p className="settings-hint">
+          This deletes your account, settings, playlists and saved progress,
+          then signs you out. Anonymous gameplay data is kept, with nothing left
+          in it that identifies you. It can&rsquo;t be undone.
+        </p>
+        <button
+          type="button"
+          className="delete-account-open"
+          onClick={openModal}
+        >
+          Delete account
+        </button>
+      </div>
+
+      {showModal && (
+        <>
+          <div className="report-modal-overlay" onClick={closeModal} />
+          <div className="report-modal" onClick={(e) => e.stopPropagation()}>
+            <h4>Delete account?</h4>
+            <p className="report-modal-copy">
+              This permanently deletes the account. Enter your PIN to confirm.
+            </p>
+            <div className="report-modal-pin">
+              <label>Enter PIN to confirm</label>
+              <PinInput
+                length={4}
+                type="numeric"
+                inputMode="numeric"
+                inputStyle={{ borderRadius: "0.25em" }}
+                onChange={(value) => setPin(value)}
+                onComplete={() => {}}
+              />
+            </div>
+            {error && <p className="report-modal-error">{error}</p>}
+            <div className="report-modal-actions">
+              <button type="button" onClick={closeModal} disabled={submitting}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="delete-account-confirm"
+                onClick={handleDelete}
+                disabled={submitting || pin.length < 4}
+                aria-busy={submitting}
+              >
+                {submitting ? "Deleting…" : "Delete forever"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </SettingsCard>
+  );
+};
+
 const SettingsView = ({ token, apiUrl, user, settings }) => {
   const [bitmap, setBitmap] = useState(settings.problem_type_bitmap);
   if (!RequirePin(user.pin)) {
@@ -825,6 +944,7 @@ const SettingsView = ({ token, apiUrl, user, settings }) => {
           bitmap={bitmap}
         />
         <PlaylistsSettingsView token={token} apiUrl={apiUrl} user={user} />
+        <DeleteAccountView token={token} apiUrl={apiUrl} user={user} />
       </div>
     </div>
   );
@@ -834,5 +954,6 @@ export {
   MIN_PLAYABLE_VIDEOS,
   ProblemTypesSettingsView,
   PlaylistsSettingsView,
+  DeleteAccountView,
   SettingsView,
 };

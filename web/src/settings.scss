@@ -523,6 +523,27 @@
       }
     }
   }
+
+  // The only red buttons in the app: the one that ends the account and its
+  // confirm twin. Red is reserved for parent-facing destructive/validation
+  // states (see /style-guide), which is exactly what this is.
+  .delete-account {
+    button.delete-account-open {
+      background-color: $color-error;
+      margin-top: $base-space;
+      padding: 0.5em 0.75em;
+    }
+  }
+  // The confirmation reuses the shared modal shape, which lives outside this
+  // page's green-button default and so needs its actions re-neutralised here.
+  .report-modal-actions button {
+    background-color: white;
+    color: $font-color;
+    &.delete-account-confirm {
+      background-color: $color-error;
+      color: white;
+    }
+  }
 }
 
 @media only screen and (max-width: 870px) {

@@ -178,6 +178,10 @@ completeness:
   removing a playlist confirms first, and warns when it would drop the total below
   `MIN_PLAYABLE_VIDEOS`. There is no separate reward-video list: per-playlist counts plus the
   drill-down carry everything it showed.
+- **`DeleteAccountView`** — the last card in the grid: self-service account deletion, confirmed by
+  a modal that re-asks for the PIN (`DELETE /users/:auth0_id`). It is the only red-button surface
+  on the page. Semantics — what is purged, what is retained, the server-side PIN check — are owned
+  by [accounts.md](accounts.md); the modal shape is the shared one documented on `/style-guide`.
 
 ## Save feedback
 
@@ -220,7 +224,8 @@ on the card that changed, so a failure is attached to the control that caused it
 
 - `web/src/settings.js` — `PROBLEM_TYPE_GROUPS`, `applyToggleRules`, `ProblemTypesSettingsView`,
   `ERROR_GROUPS`, `TargetDifficultySettingsView`, `PlaylistsSettingsView`, `PlaylistRow`,
-  `SettingsCard`, `useSaveState`, `MIN_PLAYABLE_VIDEOS`, `SettingsView`, `postSettings`.
+  `SettingsCard`, `useSaveState`, `MIN_PLAYABLE_VIDEOS`, `SettingsView`, `postSettings`,
+  `DeleteAccountView`.
 - `server/api/custom_handlers.go` — `customListPlaylists` (returns `PlaylistWithCounts`),
   `customListPlaylistVideos` (the drill-down; the `user_playlist` join is its authorization).
 - `web/src/bitmap_validation.js` — `validateBitmap`, `maxDiffForBitmap`, `minDiffForBitmap`,
