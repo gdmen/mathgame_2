@@ -231,10 +231,13 @@ maintenance page read them. Cert renewal: `certbot renew`, then restart
 
 `auth0_management_clientId` / `auth0_management_clientSecret` are the credentials
 of an Auth0 machine-to-machine application authorized for the Management API with
-the `delete:users` scope. Account deletion needs them to remove the Auth0
-identity; with them unset it still scrubs our database and only logs the skip, so
-the visible symptom of forgetting them is orphaned Auth0 identities, not a failed
-deletion. Setting exactly one of the two logs an error on every deletion. See
+the `delete:users` scope, and `auth0_management_domain` is the tenant's canonical
+`<tenant>.<region>.auth0.com` (the Management API is not served on a custom
+domain; leave it empty only if `auth0_domain` already *is* the canonical one).
+Account deletion needs these to remove the Auth0 identity; with them unset it
+still scrubs our database and only logs the skip, so the visible symptom of
+forgetting them is orphaned Auth0 identities, not a failed deletion. Setting
+exactly one of the two credentials logs an error on every deletion. See
 [accounts.md](accounts.md).
 
 ## The tools (`cmd/*`)

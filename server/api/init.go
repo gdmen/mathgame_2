@@ -62,6 +62,7 @@ type Api struct {
 	auth0Domain                 string
 	auth0ManagementClientId     string
 	auth0ManagementClientSecret string
+	auth0ManagementDomain       string
 	isTest                      bool
 	userManager                 *UserManager
 	videoManager                *VideoManager
@@ -95,6 +96,7 @@ func NewApi(db *sql.DB, cfg *common.Config) (*Api, error) {
 		a.auth0Domain = cfg.Auth0Domain
 		a.auth0ManagementClientId = cfg.Auth0ManagementClientId
 		a.auth0ManagementClientSecret = cfg.Auth0ManagementClientSecret
+		a.auth0ManagementDomain = cfg.Auth0ManagementDomain
 	}
 	a.userManager = &UserManager{DB: db}
 	a.videoManager = &VideoManager{DB: db}

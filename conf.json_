@@ -11,6 +11,7 @@
   "auth0_audience": "",
   "auth0_management_clientId": "",
   "auth0_management_clientSecret": "",
+  "auth0_management_domain": "",
   "openai_api_key": "",
   "youtube_api_key": "",
   "ntfy_topic": "",

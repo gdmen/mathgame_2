@@ -51,6 +51,29 @@ tools without completing kid onboarding. The client gate is cosmetic; server `Re
 authoritative — a forged request to `/api/v1/admin/*` still gets 403. Note `/admin/style-guide`
 is gated only client-side (no server `/admin` data endpoint backs it).
 
+## Auth0 tenant objects
+
+Three distinct objects in the Auth0 dashboard, one config key each. They are easy to conflate
+because two of them are named after the product and a third is named after the domain:
+
+| Auth0 object | Type | Config key | Breaks if wrong |
+|---|---|---|---|
+| the game's front end | Single Page Application | `auth0_clientId` | login redirect fails; this ID is public and ships in the JS bundle |
+| the game's API | Custom API (resource server) | `auth0_audience` | every authenticated request 401s: the SPA mints tokens *for* this identifier and `EnsureValidToken` validates against it |
+| the deletion client | Machine to Machine | `auth0_management_clientId` / `Secret` | account deletion still scrubs our DB, but the Auth0 identity is orphaned |
+
+The M2M application must be authorized against the **Auth0 Management API** (built in to every
+tenant, identifier `https://<canonical-domain>/api/v2/`) with the `delete:users` scope — *not*
+against the game's own Custom API, which would hand the server a token to call itself with.
+
+**Two domains, and they are not interchangeable.** `auth0_domain` is whatever domain issues logins,
+because it is the JWT issuer that `EnsureValidToken` builds its JWKS URL and issuer check from. When
+that is a **custom** domain, Management API calls cannot use it: Auth0 answers
+`403 access_denied, "Service not enabled within domain"` for the `/api/v2/` audience, which is only
+served on the tenant's canonical `<tenant>.<region>.auth0.com`. That is what `auth0_management_domain`
+is for. Leave it empty on a tenant with no custom domain and it falls back to `auth0_domain`
+(`managementDomain()`, pinned by `TestManagementDomain_FallsBackToIssuerDomain`).
+
 ## Identity / Auth0 (`web/src/auth0.js`)
 
 Two buttons wrapping `@auth0/auth0-react`: `LoginButton` calls `loginWithRedirect`, `LogoutButton`
@@ -160,7 +183,8 @@ provisions a **fresh** row rather than re-claiming the anonymized one.
 start leaking rows past deletion.
 
 **Auth0 removal is best-effort.** After the local transaction commits, the handler calls
-`auth0.DeleteUser` (Management API, client-credentials grant) behind the optional config keys
+`auth0.DeleteUser` (Management API, client-credentials grant, against `managementDomain()` — see the
+tenant-objects section above for why that is not `auth0_domain`) behind the optional config keys
 `auth0_management_clientId` / `auth0_management_clientSecret`. Both unset is a normal dev
 configuration and only logs; exactly one set is a misconfiguration and logs an error. A failure
 never fails the request — our DB is already scrubbed, and an orphaned Auth0 identity just creates a

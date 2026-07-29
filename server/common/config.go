@@ -33,6 +33,13 @@ type Config struct {
 	// Auth0 identity.
 	Auth0ManagementClientId     string `json:"auth0_management_clientId"`
 	Auth0ManagementClientSecret string `json:"auth0_management_clientSecret"`
+	// The tenant's canonical Auth0 domain, used only for Management API calls.
+	// It is a separate key because Auth0Domain is the token issuer and must
+	// stay whatever domain issues logins: a tenant on a custom domain gets
+	// "Service not enabled within domain" for the /api/v2/ audience, since the
+	// Management API answers only on the canonical domain. Optional; defaults
+	// to Auth0Domain, which is correct for a tenant without a custom domain.
+	Auth0ManagementDomain string `json:"auth0_management_domain"`
 }
 
 // optionalConfigFields may legitimately be empty (set only on hosts that
@@ -42,6 +49,7 @@ var optionalConfigFields = map[string]bool{
 	"tls_key_file":                  true,
 	"auth0_management_clientId":     true,
 	"auth0_management_clientSecret": true,
+	"auth0_management_domain":       true,
 }
 
 func ReadConfig(path string) (*Config, error) {

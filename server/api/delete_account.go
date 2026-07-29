@@ -150,11 +150,25 @@ func (a *Api) anonymizeAndPurgeUser(userID uint32) (err error) {
 	return tx.Commit()
 }
 
+// managementDomain is the domain Management API calls go to. It is deliberately
+// not auth0Domain: that one is the token issuer, and a tenant whose logins run
+// through a custom domain gets "Service not enabled within domain" for the
+// /api/v2/ audience, because the Management API answers only on the tenant's
+// canonical domain. Falling back keeps a tenant without a custom domain working
+// with the domain it already configured.
+func (a *Api) managementDomain() string {
+	if a.auth0ManagementDomain != "" {
+		return a.auth0ManagementDomain
+	}
+	return a.auth0Domain
+}
+
 // bestEffortDeleteAuth0User removes the Auth0 identity if Management API
 // credentials are configured; otherwise it logs and returns. Never fatal.
 func (a *Api) bestEffortDeleteAuth0User(logPrefix, auth0Id string) {
 	id, secret := a.auth0ManagementClientId, a.auth0ManagementClientSecret
-	if a.auth0Domain == "" || (id == "" && secret == "") {
+	domain := a.managementDomain()
+	if domain == "" || (id == "" && secret == "") {
 		glog.Infof("%s skipping Auth0 deletion for %s: management credentials not configured", logPrefix, auth0Id)
 		return
 	}
@@ -164,7 +178,7 @@ func (a *Api) bestEffortDeleteAuth0User(logPrefix, auth0Id string) {
 		glog.Errorf("%s skipping Auth0 deletion for %s: management credentials partially configured (need both clientId and clientSecret)", logPrefix, auth0Id)
 		return
 	}
-	if err := auth0.DeleteUser(a.auth0Domain, a.auth0ManagementClientId, a.auth0ManagementClientSecret, auth0Id); err != nil {
+	if err := auth0.DeleteUser(domain, id, secret, auth0Id); err != nil {
 		glog.Errorf("%s best-effort Auth0 deletion failed for %s: %v", logPrefix, auth0Id, err)
 		return
 	}
