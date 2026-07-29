@@ -250,6 +250,31 @@ func TestDeleteAccount_NoUnpurgedUserTables(t *testing.T) {
 	}
 }
 
+// The Management API answers only on the tenant's canonical domain, so a tenant
+// whose logins run through a custom domain needs a separate domain for it. This
+// is the config wiring that a wrong answer makes fail only at deletion time,
+// with a 403 "Service not enabled within domain" from Auth0.
+func TestManagementDomain_FallsBackToIssuerDomain(t *testing.T) {
+	cases := []struct {
+		name             string
+		issuer           string
+		managementDomain string
+		want             string
+	}{
+		{"custom login domain uses the canonical one", "auth.example.org", "example.us.auth0.com", "example.us.auth0.com"},
+		{"no custom domain reuses the issuer", "example.us.auth0.com", "", "example.us.auth0.com"},
+		{"unset everything stays empty", "", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := &Api{auth0Domain: tc.issuer, auth0ManagementDomain: tc.managementDomain}
+			if got := a.managementDomain(); got != tc.want {
+				t.Errorf("managementDomain() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestDeleteAccount_OtherUser_Forbidden(t *testing.T) {
 	c, err := common.ReadConfig("../../test_conf.json")
 	if err != nil {
