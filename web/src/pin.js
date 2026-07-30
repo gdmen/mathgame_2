@@ -6,6 +6,11 @@ import "./pin.scss";
 
 const pinSessionStorageName = "math-game-pin";
 
+// react-pin-input names each input after the digit it holds unless given an
+// ariaLabel, so a masked field reads its own contents out loud and an empty one
+// has no name at all. One label for all four boxes is what the widget forwards.
+const PIN_DIGIT_LABEL = "PIN digit";
+
 const SetSessionPin = function (pin) {
   sessionStorage.setItem(pinSessionStorageName, pin);
 };
@@ -84,12 +89,17 @@ const PinView = ({
           // being asked to invent another. The gate route never prefills —
           // typing the code is the entire check.
           initialValue={isSetup ? user.pin : ""}
-          inputMode="number"
+          inputMode="numeric"
           inputStyle={{ borderRadius: "0.25em" }}
           length={4}
           onChange={(value, index) => {
             handlePinChange(value);
           }}
+          ariaLabel={PIN_DIGIT_LABEL}
+          // Masked at the gate, plain during setup: the gate is typed with a
+          // kid watching the same screen, while setup is the one moment the
+          // adult has to be able to read back the code they are choosing.
+          secret={!isSetup}
           type="numeric"
         />
       </div>
@@ -97,4 +107,11 @@ const PinView = ({
   );
 };
 
-export { SetSessionPin, GetSessionPin, RequirePin, ClearSessionPin, PinView };
+export {
+  PIN_DIGIT_LABEL,
+  SetSessionPin,
+  GetSessionPin,
+  RequirePin,
+  ClearSessionPin,
+  PinView,
+};

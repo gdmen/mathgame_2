@@ -121,11 +121,15 @@ guide's colour invariant).
 
 ## Report-problem flow
 
-A kid-visible "Report problem" link opens a PIN-gated modal. `handleReportSubmit` (`web/src/play.js`)
-checks the 4-digit PIN client-side against `user.pin` (and requires a PIN to already be set in
-settings), then posts `bad_problem_user` with `{problem_id, explanation}` — explanation capped at
-`REPORT_EXPLANATION_MAX_LENGTH`. If the response carries a fresh gamestate, the problem is swapped
-out.
+A kid-visible "Report problem" link opens the shared `PinConfirmModal`
+(`web/src/pin_confirm_modal.js`; the modal shape is documented on `/style-guide`), which holds the
+typed PIN and won't enable Submit until all four digits are in. This page contributes only the
+optional explanation field, passed as children and styled by `.report-explanation` in `play.scss`.
+
+`handleReportSubmit` (`web/src/play.js`) receives the entered PIN, checks it client-side against
+`user.pin` (and requires a PIN to already be set in settings), then posts `bad_problem_user` with
+`{problem_id, explanation}` — explanation capped at `REPORT_EXPLANATION_MAX_LENGTH`. If the response
+carries a fresh gamestate, the problem is swapped out.
 
 ## Video playback
 
@@ -173,6 +177,8 @@ once `solved >= target`. Notable behavior:
 - `web/src/conf.json` — `event_reporting_interval`, `debug_quickplay`.
 - `web/src/problem_reporting.test.js` — pins the `working_on_problem` add/remove lifecycle.
 - `web/src/pin.js` — `RequirePin`, `ClearSessionPin` (the play view clears the session PIN).
+- `web/src/pin_confirm_modal.js` — the shared PIN-confirmation modal the report flow renders;
+  shape and styles are the design system's (`/style-guide`, `components.scss`).
 - `server/api/event_types.go` — authoritative event-type constants.
 - `server/api/meta_models.go` — `PlayData`, the `/play` response shape.
 - `server/api/custom_handlers.go` — `customGetPlayData` (the `/play` handler, video-count gate,

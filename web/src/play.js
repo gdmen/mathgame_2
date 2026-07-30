@@ -1,12 +1,12 @@
 import katex from "katex";
 import React, { useEffect, useRef, useState } from "react";
-import PinInput from "react-pin-input";
 
 import "katex/dist/katex.min.css";
 
 import { ProblemView, PreprocessExpression } from "./problem.js";
 import { VideoView } from "./video.js";
 import { ClearSessionPin } from "./pin.js";
+import { PinConfirmModal } from "./pin_confirm_modal.js";
 
 import "./play.scss";
 
@@ -101,7 +101,6 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
   const [latex, setLatex] = useState(null);
   const [video, setVideo] = useState(null);
   const [showReportModal, setShowReportModal] = useState(false);
-  const [reportPin, setReportPin] = useState("");
   const [reportExplanation, setReportExplanation] = useState("");
   const [reportError, setReportError] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
@@ -272,13 +271,19 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
     if (conf.debug_quickplay) {
       return null;
     } else {
-      const handleReportSubmit = () => {
+      const closeReportModal = () => {
+        setShowReportModal(false);
+        setReportExplanation("");
+        setReportError("");
+      };
+
+      const handleReportSubmit = (pin) => {
         setReportError("");
         if (!user.pin || user.pin.length < 4) {
           setReportError("Set a PIN in settings first.");
           return;
         }
-        if (reportPin.length !== 4 || reportPin !== user.pin) {
+        if (pin !== user.pin) {
           setReportError("Incorrect PIN");
           return;
         }
@@ -296,10 +301,7 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
               setProblem(json.problem);
               setVideo(json.video);
             }
-            setShowReportModal(false);
-            setReportPin("");
-            setReportExplanation("");
-            setReportError("");
+            closeReportModal();
           })
           .finally(() => setReportSubmitting(false));
       };
@@ -318,81 +320,44 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
             onClick={() => {
               setShowReportModal(true);
               setReportError("");
-              setReportPin("");
               setReportExplanation("");
             }}
           >
             Report problem
           </button>
           {showReportModal && (
-            <div
-              className="report-modal-overlay"
-              onClick={() => !reportSubmitting && setShowReportModal(false)}
+            <PinConfirmModal
+              title="Report problem"
+              copy="Report if this problem is unsuitable or doesn't accept the correct answer. Your PIN is required."
+              pinLabel="PIN"
+              confirmLabel="Submit"
+              submittingLabel="Submitting…"
+              submitting={reportSubmitting}
+              error={reportError}
+              onConfirm={handleReportSubmit}
+              onCancel={closeReportModal}
             >
-              <div
-                className="report-modal"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h4>Report problem</h4>
-                <p className="report-modal-copy">
-                  Report if this problem is unsuitable or doesn&apos;t accept
-                  the correct answer. Your PIN is required.
-                </p>
-                <div className="report-modal-pin">
-                  <label htmlFor="report-pin">PIN</label>
-                  <PinInput
-                    id="report-pin"
-                    length={4}
-                    type="numeric"
-                    inputMode="number"
-                    value={reportPin}
-                    onChange={(value) => setReportPin(value)}
-                    inputStyle={{ borderRadius: "0.25em" }}
-                  />
-                </div>
-                <div className="report-modal-explanation">
-                  <label htmlFor="report-explanation">
-                    Why are you reporting this problem? (optional)
-                  </label>
-                  <textarea
-                    id="report-explanation"
-                    value={reportExplanation}
-                    onChange={(e) =>
-                      setReportExplanation(
-                        e.target.value.slice(0, REPORT_EXPLANATION_MAX_LENGTH)
-                      )
-                    }
-                    maxLength={REPORT_EXPLANATION_MAX_LENGTH}
-                    rows={3}
-                    placeholder="e.g. Wrong answer was marked correct"
-                  />
-                  <span className="report-char-count">
-                    {reportExplanation.length}/{REPORT_EXPLANATION_MAX_LENGTH}
-                  </span>
-                </div>
-                {reportError && (
-                  <p className="report-modal-error">{reportError}</p>
-                )}
-                <div className="report-modal-actions">
-                  <button
-                    type="button"
-                    onClick={handleReportSubmit}
-                    disabled={reportSubmitting}
-                  >
-                    {reportSubmitting ? "Submitting…" : "Submit"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      !reportSubmitting && setShowReportModal(false)
-                    }
-                    disabled={reportSubmitting}
-                  >
-                    Cancel
-                  </button>
-                </div>
+              <div className="report-explanation">
+                <label htmlFor="report-explanation">
+                  Why are you reporting this problem? (optional)
+                </label>
+                <textarea
+                  id="report-explanation"
+                  value={reportExplanation}
+                  onChange={(e) =>
+                    setReportExplanation(
+                      e.target.value.slice(0, REPORT_EXPLANATION_MAX_LENGTH)
+                    )
+                  }
+                  maxLength={REPORT_EXPLANATION_MAX_LENGTH}
+                  rows={3}
+                  placeholder="e.g. Wrong answer was marked correct"
+                />
+                <span className="report-char-count">
+                  {reportExplanation.length}/{REPORT_EXPLANATION_MAX_LENGTH}
+                </span>
               </div>
-            </div>
+            </PinConfirmModal>
           )}
         </>
       );

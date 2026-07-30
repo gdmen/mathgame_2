@@ -171,6 +171,17 @@ keeps a kid from wandering into adult surfaces.
 | `RequirePin(correctPin)` | route guard: redirects to `/pin/<encoded current path>` unless the session PIN equals `correctPin`; returns whether access is allowed |
 | `PinView` | four-digit entry component (`react-pin-input`), used in setup (`isSetup`), at the `/pin/:redirect_pathname` gate route, and as the videos repair page's inline gate. `isSetup` suppresses its prompt heading (the wizard step names the PIN in its own heading; everywhere else the prompt is the page's only cue) and prefills the current code (authoring; a gate never prefills). Gate-mode success either navigates back to `redirect_pathname` or, when `onSuccess` is passed (the inline gate), calls it and stays put |
 
+Every PIN field in the app — this gate and the shared `PinConfirmModal` — passes
+`inputMode="numeric"` to `react-pin-input`. `"number"` is not a value the spec defines: browsers
+ignore it silently and fall back to the full keyboard, so a mobile parent gets no keypad.
+
+**Entry is masked (`secret`) everywhere except the setup wizard.** A parent types the PIN on the
+device the kid is holding, so displayed digits hand over the gate. Setup is the exception: that is
+where the parent chooses the code and has to be able to read back what they set (`PinView` masks on
+`!isSetup`, the same flag that prefills it). Masking is only half of it — `react-pin-input` names
+each box after the digit it holds unless given an `ariaLabel`, so every site passes
+`PIN_DIGIT_LABEL` (exported from `pin.js`) and a masked PIN is not read aloud.
+
 Two-stage gate for a protected surface: a guarded view (`/settings`) calls `RequirePin`, which on a
 missing/invalid session PIN redirects to the `/pin/...` route; that route renders `PinView` in gate
 mode, which validates length ≥ 4 and `pin === user.pin`, stores the session PIN, and redirects back

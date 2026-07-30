@@ -102,9 +102,9 @@ describe("DeleteAccountView", () => {
       );
     });
 
-    expect(container.querySelector(".report-modal-error").textContent).toMatch(
-      /Incorrect PIN/
-    );
+    expect(
+      container.querySelector(".pin-confirm-modal-error").textContent
+    ).toMatch(/Incorrect PIN/);
     expect(mockLogout).not.toHaveBeenCalled();
     expect(GetSessionPin()).toBe("1234");
   });
