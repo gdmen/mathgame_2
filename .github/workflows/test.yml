@@ -32,3 +32,19 @@ jobs:
 
     - name: Test
       run: make test-api
+
+  web_test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 18
+        cache: npm
+        cache-dependency-path: web/package-lock.json
+
+    # Identical to running `make test-web` locally: the target installs the node
+    # deps and runs the suite, so there is one set of flags for both.
+    - name: Test
+      run: make test-web

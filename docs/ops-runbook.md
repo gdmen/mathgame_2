@@ -62,8 +62,10 @@ boot). The three jobs that must not overlap a manual run hold a `flock`
 | `build-web` | `frontend-conf`, `npm install --force`, `landing-assets`, then build into `web/build.next`, prettier, the landing/app HTML swap (below), then swap `build.next` → `build` |
 | `landing-assets` | compiles `web/src/landing.scss` → `web/public/landing.css` and copies the landing's woff2 files into `web/public/fonts/`; both outputs are generated and gitignored |
 | `test` / `test-api` | `build-api` then `go test ./server/api` |
+| `web-deps` | `npm ci` in `web/` — lockfile-exact, and fails if `package.json` and the lockfile have drifted (`build-web` uses `npm install` instead, which would hide that) |
+| `test-web` | `web-deps`, then the `web/src` jest suite in one pass (`CI=true`). This is exactly what the CI web job runs |
 | `test-bundle-secrets` | rebuilds the web bundle against a canary config and fails if a secret leaks into `web/build` (the CI scan) |
-| `test-all` | `test` + `test-bundle-secrets` — full local CI parity |
+| `test-all` | `test` + `test-web` + `test-bundle-secrets` — full local CI parity |
 | `fmt` / `fmt-file` / `fmt-web` / `fmt-web-file` | canonical formatters — `gofmt -s` on the tree or a single Go file (`FILE=`), and `prettier --write` on `web/src` or a single web file (`FILE=`); single source of truth, invoked by `build-api` / `build-web` and the format-on-edit hook in `.claude/hooks/fmt-on-edit.sh` |
 | `docs-check` | `scripts/docs_check.py`; pass `BASE=origin/master` to enforce per-area doc updates |
 | `frontend-conf` | emits `web/src/conf.json` with only the public config fields |
@@ -335,6 +337,8 @@ watchdog a quiet no-op. To add a watch, append a
 - `deploy/mathgame-maintenance.service` — the `Conflicts=`/`After=` swap with web.
 - `deploy/drop.sql` — destructive full-DB reset.
 - `Makefile` — all build/test/prod targets.
+- `.github/workflows/test.yml` — CI: the Go suite against a real MySQL, and the web jest suite.
+- `.github/workflows/web-bundle-secrets.yml` — CI: the bundle secret scan.
 - `cmd/apiserver/main.go` — `main` runs `api.RunMigrations` on API startup.
 - `cmd/maintenance_server/main.go` — `Handler` (503 page), `main` (TLS guard).
 - `cmd/recompute_problem_type_bitmap/main.go`, `cmd/recompute_problem_difficulty/main.go`,
