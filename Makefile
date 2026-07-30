@@ -62,6 +62,19 @@ test: build-api test-api
 test-api: server/api
 	$(GOTEST) ./$^
 
+# Node deps for the test suite, from the lockfile alone. npm ci (not the
+# npm install build-web uses) because this feeds a merge gate: it fails loudly
+# when package.json and package-lock.json have drifted, where npm install would
+# quietly resolve the drift and rewrite the lock. It reinstalls from scratch
+# every run, which for this dependency set is a few seconds.
+web-deps:
+	cd web && npm ci
+
+# The web unit tests (jest via react-scripts). CI=true makes the runner exit
+# after one pass instead of dropping into interactive watch mode.
+test-web: web-deps
+	cd web && CI=true npx react-scripts test --env=jsdom
+
 # Regenerate the Go<->JS difficulty-band parity fixtures
 # (web/src/difficulty_band_fixtures.json). Run after any change to the
 # difficulty ceiling/floor formulas; TestDifficultyBandFixturesSync fails
@@ -166,8 +179,8 @@ test-bundle-secrets:
 	$(MAKE) build-web CONF=canary_conf.json
 	$(MAKE) check-bundle-secrets CONF=canary_conf.json
 
-# Full local parity with CI: Go tests + the web bundle secret scan.
-test-all: test test-bundle-secrets
+# Full local parity with CI: Go tests, web tests, and the bundle secret scan.
+test-all: test test-web test-bundle-secrets
 
 # Fails loudly if the TLS paths are missing from $(CONF): with empty --ssl
 # args, serve silently falls back to plain HTTP on 443 and every HTTPS
