@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
-import PinInput from "react-pin-input";
 
 import { ProblemTypes } from "./enums.js";
 import { validateBitmap, targetDifficultyRange } from "./bitmap_validation.js";
 import { RequirePin, ClearSessionPin } from "./pin.js";
+import { PinConfirmModal } from "./pin_confirm_modal.js";
 import "./settings.scss";
 
 // Throws on any non-2xx or network failure so callers can surface it. A save
@@ -924,22 +924,15 @@ function videoPlayUrl(video) {
 const DeleteAccountView = ({ token, apiUrl, user }) => {
   const { logout } = useAuth0();
   const [showModal, setShowModal] = useState(false);
-  const [pin, setPin] = useState("");
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   const openModal = () => {
-    setPin("");
     setError(null);
     setShowModal(true);
   };
 
-  const closeModal = () => {
-    if (submitting) return;
-    setShowModal(false);
-  };
-
-  const handleDelete = async () => {
+  const handleDelete = async (pin) => {
     setSubmitting(true);
     setError(null);
     try {
@@ -995,41 +988,17 @@ const DeleteAccountView = ({ token, apiUrl, user }) => {
       </div>
 
       {showModal && (
-        <>
-          <div className="report-modal-overlay" onClick={closeModal} />
-          <div className="report-modal" onClick={(e) => e.stopPropagation()}>
-            <h4>Delete account?</h4>
-            <p className="report-modal-copy">
-              This permanently deletes the account. Enter your PIN to confirm.
-            </p>
-            <div className="report-modal-pin">
-              <label>Enter PIN to confirm</label>
-              <PinInput
-                length={4}
-                type="numeric"
-                inputMode="numeric"
-                inputStyle={{ borderRadius: "0.25em" }}
-                onChange={(value) => setPin(value)}
-                onComplete={() => {}}
-              />
-            </div>
-            {error && <p className="report-modal-error">{error}</p>}
-            <div className="report-modal-actions">
-              <button type="button" onClick={closeModal} disabled={submitting}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="delete-account-confirm"
-                onClick={handleDelete}
-                disabled={submitting || pin.length < 4}
-                aria-busy={submitting}
-              >
-                {submitting ? "Deleting…" : "Delete forever"}
-              </button>
-            </div>
-          </div>
-        </>
+        <PinConfirmModal
+          title="Delete account?"
+          copy="This permanently deletes the account. Enter your PIN to confirm."
+          confirmLabel="Delete forever"
+          submittingLabel="Deleting…"
+          confirmClassName="delete-account-confirm"
+          submitting={submitting}
+          error={error}
+          onConfirm={handleDelete}
+          onCancel={() => setShowModal(false)}
+        />
       )}
     </SettingsCard>
   );

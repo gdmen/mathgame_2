@@ -11,6 +11,9 @@ import "./pin.scss";
 import "./play.scss";
 import "./progress.scss";
 
+import { PIN_DIGIT_LABEL } from "./pin.js";
+import { PinConfirmModal } from "./pin_confirm_modal.js";
+
 // Design tokens — keep in sync with styles.scss. Labels are the static
 // reference; rendered examples below use the actual SCSS variables, so a
 // mismatch between label and rendered look means this list drifted.
@@ -82,13 +85,16 @@ const FONT_WEIGHTS = [
 
 // Below the base 1em sit a few recurring small-text sizes.
 const SMALL_TEXT = [
-  { value: "0.95em", note: "report-modal copy + error text" },
+  { value: "0.95em", note: "pin-confirm-modal copy + error text" },
   { value: "0.9em", note: ".settings-hint, report-problem-link, sub-headings" },
   {
     value: "0.875rem",
     note: ".progress-by-month-table, .progress-summary-label",
   },
-  { value: "0.85em", note: ".report-char-count, .report-modal-actions" },
+  {
+    value: "0.85em",
+    note: ".report-char-count, .pin-confirm-modal-actions",
+  },
 ];
 
 const SPACING = [
@@ -649,20 +655,18 @@ const StyleGuideView = () => {
       <Section title="PIN input">
         <p>
           Four-digit PIN entry using <code>react-pin-input</code>. Used in the
-          parent-gate pin screen and in the report-problem / delete-account
-          modals. The shared modal extraction is tracked in{" "}
-          <a
-            href="https://github.com/gdmen/mathgame_2/issues/217"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            #217
-          </a>
-          .
+          parent-gate pin screen and, via the shared modal below, in the
+          report-problem and delete-account flows. Always{" "}
+          <code>inputMode=&quot;numeric&quot;</code> (the mobile keypad) and
+          always <code>secret</code> — an adult types this with a kid watching
+          the same screen. The one exception is the setup wizard, where the
+          parent is choosing the code and has to read it back. Every site also
+          passes <code>ariaLabel</code>, or the widget names each box after the
+          digit inside it and reads a masked PIN aloud.
         </p>
         <CompoundExample
           name="PinInput"
-          context='length=4, inputStyle={{ borderRadius: "0.25em" }}'
+          context='length=4, secret, ariaLabel, inputStyle={{ borderRadius: "0.25em" }}'
         >
           <div className="pin-form sg-pin-frame">
             <PinInput
@@ -672,6 +676,8 @@ const StyleGuideView = () => {
               onComplete={() => {}}
               type="numeric"
               inputMode="numeric"
+              secret
+              ariaLabel={PIN_DIGIT_LABEL}
               inputStyle={{ borderRadius: "0.25em" }}
             />
           </div>
@@ -680,17 +686,13 @@ const StyleGuideView = () => {
 
       <Section title="Modal">
         <p>
-          Centered overlay card. Used today in the report-problem flow (
-          <code>.report-modal</code>) and the delete-account flow. Will collapse
-          into a single shared component per{" "}
-          <a
-            href="https://github.com/gdmen/mathgame_2/issues/217"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            #217
-          </a>
-          .
+          Centered overlay card gated on the parent PIN:{" "}
+          <code>PinConfirmModal</code> (
+          <code>web/src/pin_confirm_modal.js</code>, styles in{" "}
+          <code>components.scss</code>). The only modal shape in the app — the
+          report-problem and delete-account flows are both this component,
+          differing only in copy, confirm label, and the fields they pass as
+          children. Confirm stays disabled until four digits are in.
         </p>
         <button
           className="sg-modal-open-btn"
@@ -699,34 +701,14 @@ const StyleGuideView = () => {
           Open demo modal
         </button>
         {showModal && (
-          <>
-            <div
-              className="report-modal-overlay"
-              onClick={() => setShowModal(false)}
-            />
-            <div className="report-modal" onClick={(e) => e.stopPropagation()}>
-              <h4>Confirm action</h4>
-              <p className="report-modal-copy">
-                Demonstration of the modal shape: centered card with shadow,
-                overlay closes on outside click.
-              </p>
-              <div className="report-modal-pin">
-                <label>Enter PIN to confirm</label>
-                <PinInput
-                  length={4}
-                  type="numeric"
-                  inputMode="numeric"
-                  inputStyle={{ borderRadius: "0.25em" }}
-                  onChange={() => {}}
-                  onComplete={() => {}}
-                />
-              </div>
-              <div className="report-modal-actions">
-                <button onClick={() => setShowModal(false)}>Cancel</button>
-                <button onClick={() => setShowModal(false)}>Confirm</button>
-              </div>
-            </div>
-          </>
+          <PinConfirmModal
+            title="Confirm action"
+            copy="Demonstration of the modal shape: centered card with shadow, overlay closes on outside click."
+            confirmLabel="Confirm"
+            submittingLabel="Confirming…"
+            onConfirm={() => setShowModal(false)}
+            onCancel={() => setShowModal(false)}
+          />
         )}
       </Section>
 

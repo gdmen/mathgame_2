@@ -195,10 +195,12 @@ completeness:
   There is no separate reward-video list: per-playlist counts plus the drill-down carry everything
   it showed.
 - **`DeleteAccountView`** — the last card in the grid: self-service account deletion, confirmed by
-  a modal that re-asks for the PIN (`DELETE /users/:auth0_id`). It is the only red-button surface
-  on the page, and its hint copy spells out what is deleted, what is retained, and that deletion
-  is irreversible. Semantics — what is purged, what is retained, the server-side PIN check — are owned
-  by [accounts.md](accounts.md); the modal shape is the shared one documented on `/style-guide`.
+  the shared `PinConfirmModal` re-asking for the PIN (`DELETE /users/:auth0_id`). Its hint copy
+  spells out what is deleted, what is retained, and that deletion is irreversible. It is the only
+  red-button surface on the page, which is why this page re-neutralises the shared modal's action
+  row (`.pin-confirm-modal-actions` in `settings.scss`) — the modal lives outside the page's
+  green-button default. Semantics — what is purged, what is retained, the server-side PIN check —
+  are owned by [accounts.md](accounts.md); the modal shape is documented on `/style-guide`.
 
 ## Save feedback
 

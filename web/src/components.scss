@@ -63,3 +63,72 @@ button {
     color: $color-one-contrast;
   }
 }
+
+// The PIN-confirmation modal (`PinConfirmModal`). It lives here rather than with
+// either caller because both the kid-facing play screen and the parent settings
+// page mount it; a per-page copy is how the two drifted before.
+.pin-confirm-modal-overlay {
+  background: rgba(0, 0, 0, 0.4);
+  bottom: 0;
+  left: 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 1000;
+}
+
+.pin-confirm-modal {
+  background: $background-color;
+  border-radius: $base-radius;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  left: 50%;
+  max-width: 90%;
+  padding: 1.5em;
+  position: fixed;
+  text-align: left;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 24em;
+  z-index: 1001;
+
+  h4 {
+    margin-top: 0;
+  }
+
+  .pin-confirm-modal-copy {
+    font-size: 0.95em;
+    margin: 0.5em 0 1em;
+  }
+
+  .pin-confirm-modal-pin {
+    margin-bottom: 1em;
+
+    label {
+      display: block;
+      margin-bottom: 0.25em;
+    }
+  }
+
+  .pin-confirm-modal-error {
+    color: $color-error;
+    font-size: 0.95em;
+    margin: 0.5em 0;
+  }
+
+  .pin-confirm-modal-actions {
+    display: flex;
+    gap: 0.75em;
+    justify-content: flex-end;
+    margin-top: 1em;
+
+    button {
+      cursor: pointer;
+      padding: 0.4em 0.8em;
+
+      &:disabled {
+        cursor: not-allowed;
+        opacity: 0.7;
+      }
+    }
+  }
+}
