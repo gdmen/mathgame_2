@@ -114,12 +114,14 @@ func (a *Api) customUpdateSettings(c *gin.Context) {
 	if BindModelFromForm(logPrefix, c, model) != nil {
 		return
 	}
-	if BindModelFromURI(logPrefix, c, model) != nil {
-		return
-	}
 
 	// Get User
 	user := GetUserFromContext(c)
+	// The row to write is the caller's own. Take its key from the authenticated
+	// identity rather than the path or body: RequireSelf already proves the path
+	// id is theirs, and sourcing it here keeps the UPDATE's WHERE clause out of
+	// client input entirely.
+	model.UserId = user.Id
 
 	// Get Settings
 	settings, status, msg, err := a.settingsManager.Get(user.Id)
@@ -445,12 +447,12 @@ func (a *Api) customListVideo(c *gin.Context) {
 	c.JSON(http.StatusOK, models)
 }
 
-// customUpdateUser updates a user's mutable fields (email, username, pin) by
-// auth0_id. A caller may only update their own row. Privileged/immutable fields
-// are never taken from client input: role and id are forced from the stored
-// row, so this endpoint cannot be used to self-promote to admin or rewrite a
-// user's id (the generated User struct binds every field, including role, from
-// the request body).
+// customUpdateUser updates the caller's own mutable fields (email, username,
+// pin). Privileged/immutable fields are never taken from client input: the row
+// is chosen by the authenticated identity, and role and id are forced from the
+// stored row, so this endpoint cannot touch another account or self-promote to
+// admin (the generated User struct binds every field, including role and
+// auth0_id, from the request body).
 func (a *Api) customUpdateUser(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
@@ -460,17 +462,12 @@ func (a *Api) customUpdateUser(c *gin.Context) {
 	if BindModelFromForm(logPrefix, c, model) != nil {
 		return
 	}
-	if BindModelFromURI(logPrefix, c, model) != nil {
-		return
-	}
 
-	// A caller may only update their own row. The target auth0_id comes from the
-	// URL; reject if it isn't the authenticated user (otherwise any user could
-	// edit another user's email/username/pin).
-	if model.Auth0Id != GetAuth0IdFromContext(c) {
-		c.AbortWithStatusJSON(http.StatusForbidden, common.GetError("Cannot update another user."))
-		return
-	}
+	// The row to write is the caller's own. Take its key from the authenticated
+	// identity rather than the path or body: RequireSelf already proves the path
+	// id is theirs, and sourcing it here keeps the row choice out of client
+	// input entirely.
+	model.Auth0Id = GetAuth0IdFromContext(c)
 
 	// Re-read the stored row and force privileged/immutable fields from it,
 	// regardless of what the client sent.

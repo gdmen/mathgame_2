@@ -95,6 +95,15 @@ momentarily empty a playlist's membership until the next successful sync.
   YouTube's current response (clear-and-rebuild).
 - `syncPlaylistFromYouTube` never writes `user_playlist` or `user_has_video`; the caller owns
   user-pool reconciliation.
+- **A `videos` row is shared, so no client-facing route updates one.** The row is keyed by nothing
+  but its own id and is reachable by every user who has that video, so a per-video update endpoint
+  would let any caller rewrite the title, URL or `disabled` flag for all of them. `POST /videos/:id`
+  is therefore not registered (the generated `updateVideo` handler exists but is unrouted, like
+  `deleteVideo` and `listUser`); the `TestVideoBasic` "Update: not exposed" step pins that. The only
+  mutations are this sync, the server disabling a video it couldn't play
+  (`videoManager.Update` on `ERROR_PLAYING_VIDEO`, see [events.md](events.md)), and
+  `cmd/check_disabled_videos` re-enabling one. Per-user removal targets `user_has_video`, never the
+  `videos` row (`customDeleteVideo`).
 
 ## Gotchas
 

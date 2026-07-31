@@ -57,13 +57,6 @@ func (a *Api) customDeleteAccount(c *gin.Context) {
 		return
 	}
 
-	// You may only delete your own account: the :auth0_id path param must
-	// match the token-authenticated user loaded by userMiddleware.
-	if c.Param("auth0_id") != user.Auth0Id {
-		c.JSON(http.StatusForbidden, common.GetError("You can only delete your own account"))
-		return
-	}
-
 	var body deleteAccountRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, common.GetError("Couldn't parse input JSON body"))
@@ -72,7 +65,7 @@ func (a *Api) customDeleteAccount(c *gin.Context) {
 	// Re-entering the PIN is a deliberate-intent gate (the same one that keeps
 	// a kid out of the Adults section), not a second authentication factor:
 	// the PIN is readable and settable with the caller's own access token. The
-	// authorization boundary is the JWT and the self-only check above.
+	// authorization boundary is the JWT plus RequireSelf on the route.
 	// Require a PIN to actually be set: pin defaults to "" in the schema, and
 	// without this guard a no-PIN account would be deletable with an empty
 	// PIN, defeating the gate entirely.

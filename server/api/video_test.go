@@ -102,7 +102,9 @@ func TestVideoBasic(t *testing.T) {
 		t.Fatal("ERROR: " + string(body))
 	}
 
-	// Update
+	// Update: not exposed. A videos row is shared catalog metadata, so a
+	// per-video update route would let any caller rewrite the title, URL or
+	// disabled flag for every user who has that video. Don't restore it.
 	resp = httptest.NewRecorder()
 
 	video.Title = "unda da sea"
@@ -112,19 +114,11 @@ func TestVideoBasic(t *testing.T) {
 
 	r.ServeHTTP(resp, req)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusOK, resp.Code, resp)
+	if resp.Code != http.StatusNotFound && resp.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("Expected the update route to be absent (%d or %d), got %d. . .\n%+v", http.StatusNotFound, http.StatusMethodNotAllowed, resp.Code, resp)
 	}
 
-	body, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.TrimSpace(string(body)) != `{"id":1,"title":"unda da sea","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","thumbnailurl":"","you_tube_id":"-WcHPFUwd6U","disabled":true}` {
-		t.Fatal("ERROR: " + string(body))
-	}
-
-	// Get
+	// Get: the row is untouched by the attempt above.
 	resp = httptest.NewRecorder()
 
 	req, _ = http.NewRequest("GET", fmt.Sprintf("/api/v1/videos/1?test_auth0_id=%s", user.Auth0Id), nil)
@@ -139,7 +133,7 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `{"id":1,"title":"unda da sea","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","thumbnailurl":"","you_tube_id":"-WcHPFUwd6U","disabled":true}` {
+	if strings.TrimSpace(string(body)) != `{"id":1,"title":"son of man","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","thumbnailurl":"","you_tube_id":"-WcHPFUwd6U","disabled":false}` {
 		t.Fatal("ERROR: " + string(body))
 	}
 

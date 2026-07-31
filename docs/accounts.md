@@ -6,15 +6,17 @@ two client-side gates — Auth0 login and the four-digit parent PIN — that wra
 anchors); `make docs-check BASE=origin/master` flags a PR that touches the owned files without
 touching this doc.
 
-Owned files: `server/api/roles.go`, `web/src/auth0.js`, `web/src/pin.js`, `web/src/setup.js`.
+Owned files: `server/api/roles.go`, `server/api/self_access.go`, `web/src/auth0.js`, `web/src/pin.js`,
+`web/src/setup.js`.
 
 ## The model
 
-Three independent layers, in order of authority:
+Four independent layers, in order of authority:
 
 | Layer | Source of truth | Purpose | Client-bypassable? |
 |---|---|---|---|
 | **Identity** (Auth0) | Auth0-issued JWT, `sub` claim | proves *who* the caller is | no — JWT validated server-side (`auth0.EnsureValidToken` in `init.go`) |
+| **Ownership** (self-only) | the loaded `users` row vs. the path id | keeps one account out of another's data | no — server `RequireSelf` |
 | **Authorization** (role) | `users.role` column | gates operator-only surfaces | no — server `RequireAdmin` |
 | **Parent PIN** | `users.pin` column | keeps a *kid* out of adult settings | yes — client-side gate only (see Gotchas) |
 
@@ -22,6 +24,63 @@ The Auth0 `sub` is the `auth0_id`; every server handler resolves it to a `users`
 `UserMiddleware` (`server/common/middleware.go`) before doing anything else. One Auth0 account =
 one `users` row = one family/operator; there is no per-kid login (kids are distinguished by the PIN
 gate and the companion view, not by identity).
+
+## Self-only access (`server/api/self_access.go`)
+
+Naming a user in a request path entitles you to nothing. `RequireSelf` is a gin middleware that
+compares every user-naming path param against the caller's own identity and 403s on a mismatch:
+
+| Path param | Compared against |
+|---|---|
+| `:auth0_id` | the validated token's `sub` (`GetAuth0IdFromContext`) |
+| `:user_id` | `users.id` of the row `UserMiddleware` loaded from that `sub` |
+
+It reads the loaded user, so like `RequireAdmin` it must be registered after `UserMiddleware`. A
+route carrying neither param passes straight through, which is what makes it safe to register on the
+whole authenticated surface instead of route by route — and registering it on the group rather than
+per handler is the whole point: **a new route is self-only by construction, not by remembering.**
+`init.go` puts every authenticated route inside one
+`authed := v1.Group("", userMiddleware, a.RequireSelf())`. Exactly two routes sit outside it, and
+neither names a user:
+
+| Outside `authed` | Why |
+|---|---|
+| `POST /users`, `POST /users/` | a first-login caller has no `users` row to load yet, so this takes the *lenient* middleware; `customCreateOrUpdateUser` takes the `auth0_id` from the token |
+| `GET /problems/:id` | a problem row belongs to nobody, so no `users` row is needed (the validated JWT still is) |
+
+Because the guard runs ahead of every handler, **handlers do not re-check — and every handler that
+writes sources the row it writes from the token-loaded identity**, never from the path or body
+(`customUpdateSettings` and `customUpdateUser` overwrite the bound model's key from context;
+`customDeleteAccount` and `getStatistics` never bind one). So even a handler mistakenly registered
+outside `authed` could only ever touch the caller's own data. The path id's only job is to be
+checked by `RequireSelf`. That single enforcement point is deliberate: the per-handler version was
+three forgettable lines, three handlers remembered it, and six didn't — which is the bug this
+closes (#331). The `Test*Write_IgnoresClientSupplied*` cases pin the token-sourcing half.
+
+`TestSelfOnly_*` (`self_access_test.go`) is what keeps it true. It enumerates `router.Routes()` for
+the params listed in `selfOnlyPathParams` instead of a hand-maintained list, then asserts every such
+route 403s when the caller asks for another user's id — so a newly registered user-scoped route is
+covered the moment it exists, and one registered *outside* `authed` fails CI. A companion case
+asserts own-id requests still return 200, so a guard that 403'd everything couldn't satisfy it. And
+because all of that keys off `selfOnlyPathParams`, `TestSelfOnly_NoUnknownPathParams` closes the
+remaining gap: a route param in neither `selfOnlyPathParams` nor the known non-user list fails CI,
+so a user-naming param under a new name (`:student_id`, `:target_id`) can't bypass the guard
+unclassified.
+
+**One of the holes was a write, not a read.** `POST /settings/:user_id` binds `user_id` from the URI
+and hands it to `UPDATE settings ... WHERE user_id=?`, so before the guard any signed-in account
+could reshape another account's problem-type bitmap, target difficulty and work percentage.
+`TestSelfOnly_CannotWriteAnotherUsersSettings` pins that the victim's row is left untouched.
+
+### The PIN is still sent to the client, deliberately
+
+`GET /users/:auth0_id` and `GET /pageload/:auth0_id` still serialize `users.pin`, and the client
+gate still compares against `user.pin`. Self-only enforcement means that payload now only ever
+reaches a token for that same account — and such a token can already overwrite the PIN outright via
+`customUpdateUser`. Removing `pin` from the payload alone would therefore buy nothing: it would push
+`RequirePin` into a server-side verify call while leaving the PIN exactly as writable. Hiding the
+PIN only becomes worthwhile together with real re-authentication (an Auth0 `max_age`/`prompt=login`
+round trip), which is the same prerequisite the deletion section below already records.
 
 ## Roles
 
@@ -142,8 +201,9 @@ struct includes a `role` field.
 `DELETE /api/v1/users/:auth0_id` is the only self-service way out. It is immediate and
 irreversible: there is no recovery window and no soft-delete flag.
 
-**Two server-side checks.** The path `auth0_id` must equal the token-authenticated identity (you
-can only delete yourself), and the request body must carry the account's PIN, compared against
+**Two server-side checks.** The path `auth0_id` must equal the token-authenticated identity (you can
+only delete yourself — `RequireSelf` on the route, per the self-only section above), and the request
+body must carry the account's PIN, compared against
 `users.pin` on the server. An account with no PIN set is **not** deletable (`pin` defaults to
 `''`, so an empty submitted PIN would otherwise satisfy an equality check); the caller is told to
 set one first.
@@ -200,10 +260,10 @@ kept, because saying "deletes everything" would be a promise this endpoint does 
 - **Role is never client-settable.** Neither create (`createUserSQL` omits `role`) nor update
   (`customUpdateUser` forces `model.Role` from the stored row) takes the role from request input.
   Promotion is DB-only.
-- **A caller may only mutate their own row.** `customUpdateUser` returns 403 when the URL
-  `auth0_id` isn't the authenticated identity.
-- **`RequireAdmin` runs after `UserMiddleware`.** It depends on the loaded user; registering it
-  earlier always 403s.
+- **A caller may only reach their own row.** Reads and writes alike: a path that names a user is
+  403 unless that user is the caller, enforced once on the route group rather than per handler.
+- **`RequireAdmin` and `RequireSelf` run after `UserMiddleware`.** Both depend on the loaded user;
+  registering either earlier always 403s.
 - **Admin surfaces are double-gated.** Server `RequireAdmin` (authoritative) + client `isAdmin`
   route guard (renders 404 to non-admins).
 - **New rows default to `student` / empty PIN.** The empty PIN is the signal that drives a new
@@ -225,6 +285,11 @@ kept, because saying "deletes everything" would be a promise this endpoint does 
 - **`ClearSessionPin` fires on several routes.** Rendering the 404 page, the home view, or the
   play view clears the session PIN (`index.js`, `home.js`, `play.js`), so leaving a protected area
   drops the gate.
+- **The `/admin` group sits inside `authed`, so admin routes inherit `RequireSelf` too.** Harmless
+  today (no admin route names a user), but an operator route that must read *another* account's data
+  cannot live there: it would 403 for the operator. Such a route has to be registered outside
+  `authed` and gate on `RequireAdmin`, and `selfOnlyRoutes` in `self_access_test.go` has to be taught
+  to skip it — deliberately awkward, so opting a route out of self-only is a visible decision.
 - **Two different enabled-video thresholds.** The setup gate re-shows when `numEnabledVideos < 3`
   even for an already-set-up account, while the wizard's final step only requires ≥ 1 enabled
   playlist/video — 3 to *exit* the gate, 1 to *finish* the wizard.
@@ -232,8 +297,9 @@ kept, because saying "deletes everything" would be a promise this endpoint does 
 ## Related files
 
 - `server/api/roles.go` — `RoleStudent`, `RoleAdmin`, `RequireAdmin`, `adminWhoami`.
+- `server/api/self_access.go` — `RequireSelf`, `selfOnlyPathParams`.
 - `server/api/init.go` — Auth0 JWT + user-middleware wiring (`EnsureValidToken`,
-  `Auth0IdMiddleware`, `UserMiddleware`); the `/admin` group composition.
+  `Auth0IdMiddleware`, `UserMiddleware`); the `authed` and `/admin` group composition.
 - `server/common/middleware.go` — `Auth0IdMiddleware`, `TestAuth0IdMiddleware`, `UserMiddleware`.
 - `server/api/handler_helpers.go` — context accessors (`GetAuth0IdFromContext`,
   `GetUserFromContext`/`Lenient`).
