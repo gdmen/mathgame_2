@@ -43,7 +43,7 @@ gameplay  doc=docs/gameplay.md  type=prose
 settings  doc=docs/settings.md  type=anchored
   globs: web/src/settings.js, web/src/bitmap_validation.js
 accounts  doc=docs/accounts.md  type=prose
-  globs: server/api/roles.go, web/src/auth0.js, web/src/pin.js, web/src/setup.js
+  globs: server/api/roles.go, server/api/self_access.go, web/src/auth0.js, web/src/pin.js, web/src/setup.js
 design-system  doc=web/src/style_guide.js  type=prose
   globs: web/src/styles.scss, web/src/components.scss
 schema  doc=docs/schema.md  type=anchored

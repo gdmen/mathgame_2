@@ -55,18 +55,9 @@ func (a *Api) getStatistics(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
 
+	// RequireSelf has already established that the :user_id in the path is this
+	// user's, so the stats below are read by the loaded id, not the bound one.
 	user := GetUserFromContext(c)
-
-	var params struct {
-		UserId uint32 `uri:"user_id"`
-	}
-	if BindModelFromURI(logPrefix, c, &params) != nil {
-		return
-	}
-	if params.UserId != user.Id {
-		c.JSON(http.StatusForbidden, common.GetError("Forbidden"))
-		return
-	}
 
 	if err := a.UpdateStatisticsForUser(logPrefix, user.Id); err != nil {
 		glog.Errorf("%s update statistics: %v", logPrefix, err)

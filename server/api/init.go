@@ -164,68 +164,86 @@ func (a *Api) GetRouter() *gin.Engine {
 
 	v1 := router.Group("/api/v1")
 	{
-		v1.GET("/pageload/:auth0_id", userMiddleware, a.customGetPageLoadData)
-		v1.GET("/play/:user_id", userMiddleware, a.customGetPlayData)
-		v1.GET("/statistics/:user_id", userMiddleware, a.getStatistics)
-		user := v1.Group("/users")
+		// The two routes that can't take the standard chain below.
+		//
+		// Creating/upserting the caller's own row runs the lenient user
+		// middleware because a first-login caller has no users row to load yet,
+		// and it names no user in its path (customCreateOrUpdateUser takes the
+		// auth0_id from the token).
+		v1.POST("/users", userMiddlewareLenient, a.customCreateOrUpdateUser)
+		v1.POST("/users/", userMiddlewareLenient, a.customCreateOrUpdateUser)
+		// A problem row belongs to no one and is fetched by its own id, so it
+		// needs no users row loaded (the validated JWT is still required).
+		v1.GET("/problems/:id", a.getProblem)
+
+		// Everything else shares one chain: resolve the token to a users row,
+		// then refuse any request whose path names a different user. Carrying
+		// RequireSelf on the group is what makes a route added here self-only by
+		// construction instead of by remembering — see self_access.go.
+		authed := v1.Group("", userMiddleware, a.RequireSelf())
 		{
-			user.POST("", userMiddlewareLenient, a.customCreateOrUpdateUser)
-			user.POST("/", userMiddlewareLenient, a.customCreateOrUpdateUser)
-			user.POST("/:auth0_id", userMiddleware, a.customUpdateUser)
-			user.GET("/:auth0_id", userMiddleware, a.getUser)
-			// Self-service account deletion (Adults section). PIN-gated;
-			// purges per-user state, anonymizes the users row, best-effort
-			// removes the Auth0 identity.
-			user.DELETE("/:auth0_id", userMiddleware, a.customDeleteAccount)
-		}
-		settings := v1.Group("/settings")
-		{
-			settings.POST("/:user_id", userMiddleware, a.customUpdateSettings)
-			settings.GET("/:user_id", userMiddleware, a.getSettings)
-		}
-		gamestate := v1.Group("/gamestates")
-		{
-			gamestate.GET("/:user_id", userMiddleware, a.customGetGamestate)
-		}
-		video := v1.Group("/videos")
-		{
-			video.POST("", userMiddleware, a.customCreateVideo)
-			video.POST("/", userMiddleware, a.customCreateVideo)
-			video.POST("/:id", userMiddleware, a.updateVideo)
-			video.DELETE("/:id", userMiddleware, a.customDeleteVideo)
-			video.GET("/:id", userMiddleware, a.getVideo)
-			video.GET("", userMiddleware, a.customListVideo)
-			video.GET("/", userMiddleware, a.customListVideo)
-		}
-		playlists := v1.Group("/playlists")
-		{
-			playlists.GET("", userMiddleware, a.customListPlaylists)
-			playlists.GET("/", userMiddleware, a.customListPlaylists)
-			playlists.POST("", userMiddleware, a.customAddPlaylist)
-			playlists.POST("/", userMiddleware, a.customAddPlaylist)
-			playlists.GET("/:playlist_id/videos", userMiddleware, a.customListPlaylistVideos)
-			playlists.DELETE("/:playlist_id", userMiddleware, a.customRemovePlaylist)
-		}
-		problem := v1.Group("/problems")
-		{
-			problem.GET("/:id", a.getProblem)
-		}
-		event := v1.Group("/events")
-		{
-			event.GET("/:user_id/:seconds", userMiddleware, a.customListEvent)
-			event.POST("", userMiddleware, a.customCreateEvent)
-			event.POST("/", userMiddleware, a.customCreateEvent)
-		}
-		// Operator-only surfaces. Gated by RequireAdmin (after userMiddleware
-		// loads the user from the validated token's identity).
-		admin := v1.Group("/admin", userMiddleware, a.RequireAdmin())
-		{
-			admin.GET("/whoami", a.adminWhoami)
-			admin.GET("/difficulty-calibration", a.adminDifficultyCalibration)
-			admin.POST("/difficulty-calibration/recompute", a.adminRecomputeCalibration)
-			admin.GET("/bitmap-matrix", a.adminBitmapMatrix)
-			admin.POST("/bitmap-matrix/recompute", a.adminRecomputeBitmapMatrix)
-			admin.GET("/bitmap-matrix/cell", a.adminBitmapMatrixCell)
+			authed.GET("/pageload/:auth0_id", a.customGetPageLoadData)
+			authed.GET("/play/:user_id", a.customGetPlayData)
+			authed.GET("/statistics/:user_id", a.getStatistics)
+			user := authed.Group("/users")
+			{
+				user.POST("/:auth0_id", a.customUpdateUser)
+				user.GET("/:auth0_id", a.getUser)
+				// Self-service account deletion (Adults section). PIN-gated;
+				// purges per-user state, anonymizes the users row, best-effort
+				// removes the Auth0 identity.
+				user.DELETE("/:auth0_id", a.customDeleteAccount)
+			}
+			settings := authed.Group("/settings")
+			{
+				settings.POST("/:user_id", a.customUpdateSettings)
+				settings.GET("/:user_id", a.getSettings)
+			}
+			gamestate := authed.Group("/gamestates")
+			{
+				gamestate.GET("/:user_id", a.customGetGamestate)
+			}
+			video := authed.Group("/videos")
+			{
+				video.POST("", a.customCreateVideo)
+				video.POST("/", a.customCreateVideo)
+				// No client-facing update: a videos row is shared catalog
+				// metadata keyed by nothing but its own id, so an update route
+				// lets any caller rewrite what every user who has that video
+				// plays. The one legitimate mutation is the server disabling a
+				// video it couldn't play (videoManager.Update on
+				// ERROR_PLAYING_VIDEO); cmd/check_disabled_videos re-enables.
+				video.DELETE("/:id", a.customDeleteVideo)
+				video.GET("/:id", a.getVideo)
+				video.GET("", a.customListVideo)
+				video.GET("/", a.customListVideo)
+			}
+			playlists := authed.Group("/playlists")
+			{
+				playlists.GET("", a.customListPlaylists)
+				playlists.GET("/", a.customListPlaylists)
+				playlists.POST("", a.customAddPlaylist)
+				playlists.POST("/", a.customAddPlaylist)
+				playlists.GET("/:playlist_id/videos", a.customListPlaylistVideos)
+				playlists.DELETE("/:playlist_id", a.customRemovePlaylist)
+			}
+			event := authed.Group("/events")
+			{
+				event.GET("/:user_id/:seconds", a.customListEvent)
+				event.POST("", a.customCreateEvent)
+				event.POST("/", a.customCreateEvent)
+			}
+			// Operator-only surfaces. Gated by RequireAdmin (after userMiddleware
+			// loads the user from the validated token's identity).
+			admin := authed.Group("/admin", a.RequireAdmin())
+			{
+				admin.GET("/whoami", a.adminWhoami)
+				admin.GET("/difficulty-calibration", a.adminDifficultyCalibration)
+				admin.POST("/difficulty-calibration/recompute", a.adminRecomputeCalibration)
+				admin.GET("/bitmap-matrix", a.adminBitmapMatrix)
+				admin.POST("/bitmap-matrix/recompute", a.adminRecomputeBitmapMatrix)
+				admin.GET("/bitmap-matrix/cell", a.adminBitmapMatrixCell)
+			}
 		}
 	}
 	return router

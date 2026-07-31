@@ -65,6 +65,11 @@ an adult-only affordance), `getVideo` → `/videos/:video_id`, `getEvents` →
 `RefresherSingleton` re-polls gamestate and events on a fixed interval while the tab is focused;
 access is PIN-gated by `RequirePin(user.pin)` (see [accounts.md](accounts.md)).
 
+`:student_id` has to be the signed-in account's own `users.id`: one Auth0 account is one `users` row,
+and those endpoints are self-only server-side, so a mirror opened on any other id gets 403 (see
+[accounts.md](accounts.md)). Nothing in the app links here — the URL is typed on the adult's device,
+signed in to the same account as the kid's.
+
 ## Event types reported from the client
 
 Every event is POSTed to `/events` as `{ event_type, value }` with `value` stringified

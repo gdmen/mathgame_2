@@ -101,7 +101,9 @@ error — it **breaks the run** so it can't corrupt the sum.
 work minutes, total video minutes — at all-time and per-month (`YYYY-MM`) granularity. It is the
 read-side of `events` for the progress page, served by `GET /api/v1/statistics/:user_id`
 (`getStatistics`), which refreshes the cache for the requesting user and reads it back. A user may
-only request their own stats (403 otherwise — the `params.UserId != user.Id` check in `getStatistics`).
+only request their own stats: the `:user_id` is enforced to be the caller's before the handler runs,
+so `getStatistics` works purely from the loaded user and never binds the path id
+(see [accounts.md](accounts.md) for the guard).
 
 Two write paths, chosen on whether a per-user checkpoint row exists in `statistics_cache_meta`:
 
