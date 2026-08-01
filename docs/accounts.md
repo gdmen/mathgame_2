@@ -168,7 +168,7 @@ keeps a kid from wandering into adult surfaces.
 |---|---|
 | `SetSessionPin` / `GetSessionPin` / `ClearSessionPin` | read/write/clear the `sessionStorage` entry |
 | `RequirePin(correctPin)` | route guard: redirects to `/pin/<encoded current path>` unless the session PIN equals `correctPin`; returns whether access is allowed |
-| `PinView` | four-digit entry component (`react-pin-input`), used in setup (`isSetup`) and at the `/pin/:redirect_pathname` gate route |
+| `PinView` | four-digit entry component (`react-pin-input`), used in setup (`isSetup`) and at the `/pin/:redirect_pathname` gate route. `isSetup` suppresses its prompt heading: at the gate that heading is the page's only prompt and its only error cue, while the wizard step already names the PIN in its own, so rendering it there would restate the title directly beneath itself |
 
 Two-stage gate for a protected surface: a guarded view (`/settings`) calls `RequirePin`, which on a
 missing/invalid session PIN redirects to the `/pin/...` route; that route renders `PinView` in gate
@@ -178,17 +178,53 @@ PIN against `user.pin` by equality.
 
 ### Setup wizard (`setup.js`)
 
-`SetupView` is a four-step tabbed flow (`allTabs`), shown by the main view whenever a logged-in
-account is off an admin path and has `user.pin === ""` **or** `numEnabledVideos < 3`:
+`SetupView` is a four-step tabbed flow (`allTabs`), shown by the main view whenever `useSetupGate`
+says so: a logged-in account off an admin path with `user.pin === ""` **or**
+`numEnabledVideos < MIN_PLAYABLE_VIDEOS`.
 
 1. **Problem Types** — continue gated on a valid bitmap (`problem_type_bitmap >= 1`).
 2. **Add Videos** — playlists (each expandable to its videos); continue gated on
    `MIN_PLAYABLE_VIDEOS` playable videos. The count is reported up by
    `PlaylistsSettingsView`'s `onPlayableCountChange` rather than derived from a second
-   list — see [settings.md](settings.md).
+   list — see [settings.md](settings.md). It is the server's de-duplicated `playable_total`, which
+   is what lets this gate and step 4's agree; a client-side sum of the per-playlist counts would
+   pass a parent whose playlists overlap and then strand them on a blocked step 4.
 3. **Set Parent Pin** — `PinView` in `isSetup` mode; continue POSTs the user with the freshly-set
    session PIN (`PinTabView`).
-4. **Start Playing!** — requires ≥ 1 enabled playlist, then links to `/play`.
+4. **Start Playing!** — a parent who gets here is finished, and the step never argues with that:
+   the button always goes to `/play`. It re-reads `/pageload` on mount (step 2's playlists postdate
+   the count the app booted with) for one purpose — if that fresh count is below
+   `MIN_PLAYABLE_VIDEOS`, it sends the parent back to step 2, where the problem is fixable, instead
+   of explaining a dead end on a step that cannot fix anything.
+
+   **It only acts on an answer it actually got.** The count this step is handed is the boot value —
+   `0` for a new account, since nothing between boot and here refetches it — so bouncing on that
+   would send every new account back to step 2 for the length of a request. A *failed* refresh
+   leaves the same stale count behind, which is why `refreshPageLoadData` resolves to whether the
+   data landed: a check that never arrived leaves the parent where they are. Being wrongly let
+   through costs a trip to `/play` and back; being wrongly bounced costs their place in the flow.
+
+   **`.error` is presentation, not a disable.** It mutes a *continue* and blocks the pointer; it
+   does not set the `disabled` attribute, so the button stays focusable and keyboard-activatable.
+   Every step's `handleSubmitClick` therefore returns early on its own error state rather than
+   trusting the class. On the PIN step that guard is what keeps a half-entered PIN from reaching
+   `customUpdateUser`.
+
+**`useSetupGate` latches for the page load.** The wizard's own steps are what satisfy its
+condition, so a gate that re-read it live would unmount the wizard mid-flow: step 3 writes the PIN
+(`PinTabView` also mutates the in-memory `user`), step 4's refresh lands the new PIN and video
+count, the condition goes false, and the last step vanishes before the parent can press *Start
+Playing*. Once the gate opens it stays open until the next real navigation, which is how every exit
+from the wizard works (`window.location`), so a completed account is re-evaluated on its next load
+and passes.
+
+Latching puts a burden on the condition: it has to be right on **every** render, because one wrong
+pass sticks. `refreshPageLoadData` writes the user, the settings and the video count as three
+separate `setState` calls after an `await`, which this React version does not batch (they land
+outside a synthetic event handler), so the gate is asked to decide while the payload is half in.
+Hence the explicit null check on the count: `null < 3` is `true` in JS, and without the guard a
+returning, fully set-up account would trip the latch on the interim render and be held in the
+wizard for the whole page load. Covered by `web/src/setup.test.js`.
 
 Tabs advance forward only; you may click *back* to an already-visited tab but not skip ahead
 (`handleTabClick`). The PIN reaches the server via POST `/users/:auth0_id` (`customUpdateUser`),
@@ -290,9 +326,10 @@ kept, because saying "deletes everything" would be a promise this endpoint does 
   cannot live there: it would 403 for the operator. Such a route has to be registered outside
   `authed` and gate on `RequireAdmin`, and `selfOnlyRoutes` in `self_access_test.go` has to be taught
   to skip it — deliberately awkward, so opting a route out of self-only is a visible decision.
-- **Two different enabled-video thresholds.** The setup gate re-shows when `numEnabledVideos < 3`
-  even for an already-set-up account, while the wizard's final step only requires ≥ 1 enabled
-  playlist/video — 3 to *exit* the gate, 1 to *finish* the wizard.
+- **One enabled-video threshold, `MIN_PLAYABLE_VIDEOS`.** It is both what re-shows the wizard for
+  an already-set-up account whose playlists shrank, and what enables the final *Start Playing*
+  button. They have to agree: the button leaves with a full page load that re-runs the gate, so a
+  lower bar on the button just bounces the parent back to step 1.
 
 ## Related files
 
@@ -310,5 +347,6 @@ kept, because saying "deletes everything" would be a promise this endpoint does 
 - `server/api/migrations/41.sql` — adds `users.role` (default `student`).
 - `server/api/models.json` (`users` table) — `pin` and `role` fields; regenerate
   `user_model.generated.go` (which holds `createUserSQL`) via `make build-api`, never edit it.
-- `web/src/index.js` — Auth0 provisioning, admin route guards, the setup gate.
+- `web/src/index.js` — Auth0 provisioning, admin route guards, and the `useSetupGate` call that
+  hands the screen to the wizard.
 - `web/src/auth0.js`, `web/src/pin.js`, `web/src/setup.js` — owned files.

@@ -54,15 +54,25 @@
       width: 80%;
       h4 {
         margin-bottom: $base-space;
-        span.error {
-          color: $color-error;
-        }
       }
     }
-    strong {
-      font-style: italic;
-      font-weight: bold;
+    // The last step's one line of prose. Body type, not a heading: as an h3 it
+    // came out three-quarters the size of the step title in the display face,
+    // so a sentence of reassurance read as a second title.
+    //
+    // Emphasis is weight alone. The italic this used to carry was synthesised —
+    // Quicksand ships no italic at all, and the loaded Nunito italic is 400, so
+    // a bold italic would be sheared here too.
+    .setup-pitch {
+      color: $color-ink-soft;
+      margin: 0 auto;
+      max-width: 34em;
+      strong {
+        font-weight: 700;
+      }
     }
+    // The wizard's terminal action. It takes .settings' green like every other
+    // button here; only its size marks it as the one that ends the flow.
     #start-playing-button {
       font-size: 1.5em;
       margin-top: 2em;

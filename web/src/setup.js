@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 import {
   MIN_PLAYABLE_VIDEOS,
@@ -72,14 +72,17 @@ const ProblemTypesTabView = ({
 };
 
 const VideosTabView = ({ token, apiUrl, user, advanceSetup }) => {
-  // The playlists view owns the playable-video tally (it is summed from the
-  // per-playlist counts), so the gate reads it from there rather than
-  // re-deriving it from a second list.
+  // The playlists view owns the playable-video tally, so the gate reads it from
+  // there rather than deriving a second one. What it reports is the server's
+  // de-duplicated total, which is what makes this gate agree with the last
+  // step's — see docs/accounts.md.
   const [playableCount, setPlayableCount] = useState(0);
   const error = playableCount < MIN_PLAYABLE_VIDEOS;
 
   const handleSubmitClick = (e) => {
-    // redirect to next setup step
+    // The .error class only stops the pointer, so a keyboard press lands here
+    // regardless.
+    if (error) return;
     advanceSetup();
   };
 
@@ -131,19 +134,21 @@ const PinTabView = ({ token, apiUrl, user, advanceSetup }) => {
   };
 
   const handleSubmitClick = (e) => {
-    // post updated PIN
+    // Same keyboard hole as the videos step, and here it would write a
+    // half-entered PIN to the server before moving on.
+    if (error) return;
     user.pin = GetSessionPin();
     postUser(user);
-    // redirect to next setup step
     advanceSetup();
   };
 
   return (
     <>
+      <h2>Set a PIN!</h2>
+      <p className="settings-hint">
+        You'll need it to change these settings later.
+      </p>
       <div className="setup-form">
-        <h4>
-          Set a PIN! You'll need to remember this to edit these settings later!
-        </h4>
         <PinView user={user} isSetup={true} errCallback={errCallback} />
         <button
           className={error ? "submit error" : "submit"}
@@ -156,29 +161,57 @@ const PinTabView = ({ token, apiUrl, user, advanceSetup }) => {
   );
 };
 
-const StartPlayingTabView = ({ numEnabledVideos, refreshPageLoadData }) => {
+const StartPlayingTabView = ({
+  numEnabledVideos,
+  refreshPageLoadData,
+  goToVideosStep,
+}) => {
+  // A parent who reaches this step is finished, so it never argues: the button
+  // always goes. What it does instead is check, once, whether the videos are
+  // really there, and hand a parent who is short back to the step that fixes it.
+  //
+  // The count it is handed cannot answer that on its own. It is the one the app
+  // booted with, and nothing between that boot and here refetches it — step 2's
+  // playlists postdate it — so acting on it before the refresh lands would send
+  // every new account back to step 2 for the length of a request. A refresh that
+  // *failed* is not an answer either: it leaves the same stale count behind, and
+  // being bounced on the strength of a request that never arrived is worse than
+  // being let through. Both cases stay put.
+  const [countChecked, setCountChecked] = useState(false);
   useEffect(() => {
-    if (refreshPageLoadData) refreshPageLoadData();
+    if (!refreshPageLoadData) return;
+    let live = true;
+    Promise.resolve(refreshPageLoadData()).then(
+      (landed) => live && landed !== false && setCountChecked(true),
+      () => {}
+    );
+    return () => {
+      live = false;
+    };
   }, [refreshPageLoadData]);
-  const hasEnoughVideos = numEnabledVideos != null && numEnabledVideos >= 1;
+  // Fires once. The tab switch unmounts this view, so a second call could not
+  // land anyway, but the caller passes a fresh closure on every render and an
+  // effect that re-runs on each of them should not be trusted to be harmless.
+  const bounced = useRef(false);
+  useEffect(() => {
+    if (bounced.current || !countChecked || numEnabledVideos == null) return;
+    if (numEnabledVideos < MIN_PLAYABLE_VIDEOS && goToVideosStep) {
+      bounced.current = true;
+      goToVideosStep();
+    }
+  }, [countChecked, numEnabledVideos, goToVideosStep]);
   return (
     <>
       <h2>You're all set!</h2>
       <div className="setup-form">
-        {!hasEnoughVideos && (
-          <p className="settings-hint">
-            Add at least 1 YouTube playlist in the Add Videos step to play.
-          </p>
-        )}
-        <h3>
-          Mikey's Math Game will start <strong>easy</strong> and get harder to
-          match <strong>your child's</strong> math level!
-        </h3>
+        <p className="setup-pitch">
+          Mikey's Math Game starts <strong>easy</strong> and adapts to{" "}
+          <strong>your child's</strong> math level as they play.
+        </p>
         <button
           id="start-playing-button"
-          disabled={!hasEnoughVideos}
           onClick={function (e) {
-            if (hasEnoughVideos) window.location.href = "play";
+            window.location.href = "/play";
           }}
         >
           Start Playing!
@@ -186,6 +219,29 @@ const StartPlayingTabView = ({ numEnabledVideos, refreshPageLoadData }) => {
       </div>
     </>
   );
+};
+
+// Whether the wizard owns the screen instead of the app's routes.
+//
+// It latches on, because the wizard's own steps are what satisfy the underlying
+// condition (step 2 adds the playlists, step 3 sets the PIN). Re-reading it
+// mid-flow would tear the last step off the screen the moment step 4 refreshes
+// the page-load data, before the parent has read it or pressed Start Playing.
+// Every way out of the wizard is a real navigation, which starts a fresh latch.
+//
+// The latch is also why an unknown video count has to read as "no answer yet"
+// rather than as zero: the caller fills the pageload fields in separate updates,
+// so a bare comparison would open the gate on the pass where the count is still
+// null and then hold it there for a fully set-up account.
+const useSetupGate = ({ user, settings, numEnabledVideos, onAdminPath }) => {
+  const latched = useRef(false);
+  const needsSetup =
+    settings != null &&
+    !onAdminPath &&
+    (user.pin === "" ||
+      (numEnabledVideos != null && numEnabledVideos < MIN_PLAYABLE_VIDEOS));
+  if (needsSetup) latched.current = true;
+  return latched.current;
 };
 
 const SetupView = ({
@@ -276,6 +332,7 @@ const SetupView = ({
           <StartPlayingTabView
             numEnabledVideos={numEnabledVideos}
             refreshPageLoadData={refreshPageLoadData}
+            goToVideosStep={() => setActiveTab("Add Videos")}
           />
         </div>
       )}
@@ -283,4 +340,4 @@ const SetupView = ({
   );
 };
 
-export { SetupView };
+export { SetupView, StartPlayingTabView, useSetupGate };

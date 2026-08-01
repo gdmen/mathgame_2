@@ -455,6 +455,20 @@ const StyleGuideView = () => {
           </div>
         </CompoundExample>
         <p>
+          <code>.btn</code> in <code>$color-action</code> blue is the{" "}
+          <strong>landing page&apos;s</strong> call to action, and belongs to
+          that page only. It is defined in <code>styles.scss</code> so this page
+          can show it beside the app&apos;s buttons, not as an invitation to use
+          it in the app: everything a signed-in parent presses is green,
+          including the setup wizard&apos;s <em>Start Playing!</em>, which is an
+          ordinary <code>.settings</code> button at a larger size. Blue in the
+          app would read as a second, competing action colour.
+        </p>
+        <div className="sg-button-row">
+          <button className="btn btn-primary">Get started</button>
+          <button className="btn btn-ghost">Secondary</button>
+        </div>
+        <p>
           <code>$color-error</code> red carries a button only when the action is
           destructive and parent-facing — today just the delete-account flow,
           which uses it twice: the button that opens the confirmation and the
@@ -503,9 +517,7 @@ const StyleGuideView = () => {
           <div id="setup">
             <div className="tab-content sg-no-padding">
               <div className="setup-form">
-                <h4>
-                  Field heading <span className="error">(error hint)</span>
-                </h4>
+                <h4>Field heading</h4>
                 <input type="text" placeholder="field" />
               </div>
             </div>

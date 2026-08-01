@@ -295,12 +295,15 @@ func TestListPlaylists_Empty(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.Bytes())
 	}
 	body, _ := ioutil.ReadAll(resp.Body)
-	var list []Playlist
-	if err := json.Unmarshal(body, &list); err != nil {
+	var mine MyPlaylists
+	if err := json.Unmarshal(body, &mine); err != nil {
 		t.Fatalf("unmarshal playlists: %v", err)
 	}
-	if len(list) != 0 {
-		t.Errorf("expected 0 playlists, got %d", len(list))
+	if len(mine.Playlists) != 0 {
+		t.Errorf("expected 0 playlists, got %d", len(mine.Playlists))
+	}
+	if mine.PlayableTotal != 0 {
+		t.Errorf("expected playable_total=0, got %d", mine.PlayableTotal)
 	}
 }
 
@@ -326,15 +329,15 @@ func TestListPlaylists_ReturnsUserPlaylists(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.Bytes())
 	}
 	body, _ := ioutil.ReadAll(resp.Body)
-	var list []Playlist
-	if err := json.Unmarshal(body, &list); err != nil {
+	var mine MyPlaylists
+	if err := json.Unmarshal(body, &mine); err != nil {
 		t.Fatalf("unmarshal playlists: %v", err)
 	}
-	if len(list) != 1 {
-		t.Fatalf("expected 1 playlist, got %d", len(list))
+	if len(mine.Playlists) != 1 {
+		t.Fatalf("expected 1 playlist, got %d", len(mine.Playlists))
 	}
-	if list[0].Id != playlistID || list[0].YouTubeId != "PLtest123" {
-		t.Errorf("expected playlist id=%d you_tube_id=PLtest123, got %+v", playlistID, list[0])
+	if mine.Playlists[0].Id != playlistID || mine.Playlists[0].YouTubeId != "PLtest123" {
+		t.Errorf("expected playlist id=%d you_tube_id=PLtest123, got %+v", playlistID, mine.Playlists[0])
 	}
 }
 
@@ -389,12 +392,12 @@ func TestAddPlaylist_ByPlaylistID(t *testing.T) {
 	if resp.Code != http.StatusOK {
 		t.Fatalf("GET playlists: expected 200, got %d", resp.Code)
 	}
-	var plist []Playlist
-	if err := json.Unmarshal(resp.Body.Bytes(), &plist); err != nil {
+	var mine MyPlaylists
+	if err := json.Unmarshal(resp.Body.Bytes(), &mine); err != nil {
 		t.Fatalf("unmarshal playlists: %v", err)
 	}
-	if len(plist) != 1 {
-		t.Errorf("expected 1 playlist, got %d", len(plist))
+	if len(mine.Playlists) != 1 {
+		t.Errorf("expected 1 playlist, got %d", len(mine.Playlists))
 	}
 }
 
@@ -440,12 +443,12 @@ func TestRemovePlaylist(t *testing.T) {
 	if resp.Code != http.StatusOK {
 		t.Fatalf("GET playlists: %d", resp.Code)
 	}
-	var plist []Playlist
-	if err := json.Unmarshal(resp.Body.Bytes(), &plist); err != nil {
+	var mine MyPlaylists
+	if err := json.Unmarshal(resp.Body.Bytes(), &mine); err != nil {
 		t.Fatalf("unmarshal playlists: %v", err)
 	}
-	if len(plist) != 0 {
-		t.Errorf("expected 0 playlists after remove, got %d", len(plist))
+	if len(mine.Playlists) != 0 {
+		t.Errorf("expected 0 playlists after remove, got %d", len(mine.Playlists))
 	}
 
 	resp = httptest.NewRecorder()
@@ -460,5 +463,88 @@ func TestRemovePlaylist(t *testing.T) {
 	}
 	if len(videos) != 0 {
 		t.Errorf("expected 0 videos after playlist removed (user_has_video refreshed), got %d", len(videos))
+	}
+}
+
+// Two playlists sharing videos is the case that makes a client-side total wrong:
+// the per-playlist counts sum to more reward videos than exist, because the
+// shared ones are counted once per playlist. playable_total is the count the
+// reward loop actually has, so the setup wizard's video gate and its final step
+// read the same number.
+func TestListPlaylists_PlayableTotalDeduplicates(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("Couldn't read config: %v", err)
+	}
+	api, r, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+	user := createTestUser(t, r, "auth0id|dedupe", "dedupe@test.com", "dedupe")
+
+	// Three videos, split across two playlists that overlap on two of them: the
+	// per-playlist counts are 2 and 2, the union is 3.
+	videoIDs := insertVideosAndUserHasVideo(t, api, user.Id, 3)
+	first := insertPlaylistWithVideos(t, api, "PLdedupeA", videoIDs[:2])
+	second := insertPlaylistWithVideos(t, api, "PLdedupeB", videoIDs[1:])
+	for _, pid := range []uint32{first, second} {
+		if _, err := api.DB.Exec(
+			"INSERT IGNORE INTO user_playlist (user_id, playlist_id) VALUES (?, ?)", user.Id, pid); err != nil {
+			t.Fatalf("insert user_playlist: %v", err)
+		}
+	}
+	if err := api.refreshUserHasVideo(user.Id); err != nil {
+		t.Fatalf("refreshUserHasVideo: %v", err)
+	}
+
+	resp := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/playlists?test_auth0_id=%s", user.Auth0Id), nil)
+	r.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.Bytes())
+	}
+	var mine MyPlaylists
+	if err := json.Unmarshal(resp.Body.Bytes(), &mine); err != nil {
+		t.Fatalf("unmarshal playlists: %v", err)
+	}
+	if len(mine.Playlists) != 2 {
+		t.Fatalf("expected 2 playlists, got %d", len(mine.Playlists))
+	}
+	summed := 0
+	for _, p := range mine.Playlists {
+		summed += p.PlayableCount
+	}
+	if summed != 4 {
+		t.Errorf("expected the per-playlist counts to sum to 4 (the overlap counted twice), got %d", summed)
+	}
+	if mine.PlayableTotal != 3 {
+		t.Errorf("expected playable_total=3, got %d", mine.PlayableTotal)
+	}
+
+	// And it is the same number /pageload reports, which is the invariant the
+	// wizard depends on.
+	resp = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", fmt.Sprintf("/api/v1/pageload/%s?test_auth0_id=%s", user.Auth0Id, user.Auth0Id), nil)
+	r.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("pageload: expected 200, got %d: %s", resp.Code, resp.Body.Bytes())
+	}
+	var page struct {
+		NumVideosEnabled interface{} `json:"num_videos_enabled"`
+	}
+	if err := json.Unmarshal(resp.Body.Bytes(), &page); err != nil {
+		t.Fatalf("unmarshal pageload: %v", err)
+	}
+	// /pageload reports this through an interface{} field, so it arrives as a
+	// string or a number depending on the driver; the client parseInts it.
+	var count int
+	switch v := page.NumVideosEnabled.(type) {
+	case float64:
+		count = int(v)
+	case string:
+		fmt.Sscanf(v, "%d", &count)
+	default:
+		t.Fatalf("num_videos_enabled unexpected type: %T", page.NumVideosEnabled)
+	}
+	if count != mine.PlayableTotal {
+		t.Errorf("pageload says %d enabled videos, playlists say %d", count, mine.PlayableTotal)
 	}
 }

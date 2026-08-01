@@ -174,10 +174,15 @@ completeness:
   Each row is a **disclosure**: opening one lazily fetches
   `GET /playlists/{playlist_id}/videos` and lists that playlist's videos, with unavailable ones
   muted and labelled (never red — unavailable is a status, not a validation error). The card header
-  carries the total playable count, summed from the `playable_count` each playlist row returns;
-  removing a playlist confirms first, and warns when it would drop the total below
-  `MIN_PLAYABLE_VIDEOS`. There is no separate reward-video list: per-playlist counts plus the
-  drill-down carry everything it showed.
+  carries the total playable count, which is **`playable_total` from the server, never the sum of
+  the rows' `playable_count`**: a video in two of the parent's playlists is one reward but two row
+  counts, so a summed total overstates what the reward loop has and can clear
+  `MIN_PLAYABLE_VIDEOS` when the game cannot. `playable_total` comes from the same
+  `countEnabledVideosForUser` helper `/pageload` uses, so every surface that gates on the floor is
+  reading one number. Removing a playlist confirms first, and warns when it would drop the total
+  below the floor — that warning subtracts the row's own count, so it is a lower bound and can
+  warn on a removal that would in fact stay above the line. There is no separate reward-video
+  list: per-playlist counts plus the drill-down carry everything it showed.
 - **`DeleteAccountView`** — the last card in the grid: self-service account deletion, confirmed by
   a modal that re-asks for the PIN (`DELETE /users/:auth0_id`). It is the only red-button surface
   on the page, and its hint copy spells out what is deleted, what is retained, and that deletion

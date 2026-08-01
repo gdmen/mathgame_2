@@ -433,6 +433,9 @@ const PlaylistsSettingsView = ({
   onPlayableCountChange,
 }) => {
   const [myPlaylists, setMyPlaylists] = useState([]);
+  // Server-side and de-duplicated: a video in two of these playlists is one
+  // reward, so the rows' own counts must not be summed into this.
+  const [totalPlayable, setTotalPlayable] = useState(0);
   const [playlistInput, setPlaylistInput] = useState("");
   const [playlistError, setPlaylistError] = useState(null);
   const [addingPlaylist, setAddingPlaylist] = useState(false);
@@ -457,7 +460,10 @@ const PlaylistsSettingsView = ({
       });
       if (req.ok) {
         const json = await req.json();
-        setMyPlaylists(Array.isArray(json) ? json : []);
+        setMyPlaylists(Array.isArray(json.playlists) ? json.playlists : []);
+        setTotalPlayable(
+          Number.isFinite(json.playable_total) ? json.playable_total : 0
+        );
       }
     } catch (e) {
       console.log(e.message);
@@ -468,12 +474,6 @@ const PlaylistsSettingsView = ({
     fetchMyPlaylists();
   }, [fetchMyPlaylists]);
 
-  // The union the reward loop actually draws from, summed from the per-playlist
-  // counts the list endpoint returns.
-  const totalPlayable = myPlaylists.reduce(
-    (sum, p) => sum + (p.playable_count || 0),
-    0
-  );
   const belowMinimum = totalPlayable < MIN_PLAYABLE_VIDEOS;
 
   // The setup wizard gates its "continue" on this count.
@@ -516,6 +516,11 @@ const PlaylistsSettingsView = ({
   // MIN_PLAYABLE_VIDEOS mirrors the floor the reward loop needs; removing a
   // playlist that would breach it warns before it happens rather than leaving
   // the parent to discover it from the video count.
+  //
+  // `remaining` is a floor, not the answer: videos this playlist shares with
+  // another survive its removal but are subtracted here anyway, so the warning
+  // can fire on a removal that in fact stays above the line. Erring toward the
+  // warning is the safe direction, and the server recount lands right after.
   const handleRemovePlaylist = async (playlist) => {
     const remaining = totalPlayable - (playlist.playable_count || 0);
     const warning =

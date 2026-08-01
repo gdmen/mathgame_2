@@ -116,3 +116,36 @@ $shadow-card: 0 0.5em 1.5em rgba(35, 48, 32, 0.1);
   background-color: $color-two;
   border-color: $color-one-contrast;
 }
+
+// The landing's call to action. It lives here rather than in landing.scss so
+// the style guide can render it beside the app's buttons — the two must not
+// drift into looking like the same control, because they are not: blue is the
+// marketing page's, green is what a signed-in parent presses. Nothing in the
+// app should reach for .btn.
+.btn {
+  border: 0.125em solid transparent;
+  border-radius: $base-radius;
+  cursor: pointer;
+  display: inline-block;
+  font-family: $display-font-family;
+  font-size: 1.02rem;
+  font-weight: 600;
+  padding: 0.9375 * $base-space 1.625 * $base-space;
+  text-decoration: none;
+  transition: transform 0.1s ease, background-color 0.1s ease;
+  &:active {
+    transform: scale(0.95);
+  }
+}
+.btn-primary {
+  background-color: $color-action;
+  color: white;
+  &:hover {
+    background-color: $color-action-deep;
+  }
+}
+.btn-ghost {
+  background-color: transparent;
+  border-color: $color-one-contrast;
+  color: $color-one-contrast;
+}
