@@ -624,6 +624,16 @@ type PlaylistWithCounts struct {
 	PlayableCount int `json:"playable_count"`
 }
 
+// MyPlaylists wraps the rows with the one number a caller must not compute
+// itself. Summing PlayableCount across playlists double-counts a video that
+// sits in two of them, so a total derived that way can clear MIN_PLAYABLE_VIDEOS
+// while the reward loop, which draws from the de-duplicated user_has_video, has
+// fewer. PlayableTotal is that same de-duplicated count.
+type MyPlaylists struct {
+	Playlists     []PlaylistWithCounts `json:"playlists"`
+	PlayableTotal int                  `json:"playable_total"`
+}
+
 func (a *Api) customListPlaylists(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	user := GetUserFromContext(c)
@@ -670,7 +680,15 @@ func (a *Api) customListPlaylists(c *gin.Context) {
 	if list == nil {
 		list = []PlaylistWithCounts{}
 	}
-	c.JSON(http.StatusOK, list)
+	// The same count /pageload reports, from the same helper, so the setup
+	// wizard's video gate and its final step can never disagree.
+	total, err := a.countEnabledVideosForUser(user.Id)
+	if err != nil {
+		glog.Errorf("%s count enabled videos: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("Could not list playlists"))
+		return
+	}
+	c.JSON(http.StatusOK, MyPlaylists{Playlists: list, PlayableTotal: total})
 }
 
 // customListPlaylistVideos backs the settings page's per-playlist drill-down.

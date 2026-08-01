@@ -52,11 +52,18 @@ const PinView = ({ user, isSetup = false, errCallback = () => void 0 }) => {
   return (
     <>
       <div className="pin-form">
-        <h4>
-          <span className={error ? "error" : ""}>
-            Enter your four digit PIN code.
-          </span>
-        </h4>
+        {/*
+          At the gate route this is the page's only prompt and its only error
+          cue. The wizard's step already names the PIN in its own heading, so
+          there it would land as a second title restating the first.
+        */}
+        {!isSetup && (
+          <h4>
+            <span className={error ? "error" : ""}>
+              Enter your four digit PIN code.
+            </span>
+          </h4>
+        )}
         <PinInput
           autoSelect={true}
           focus={true}

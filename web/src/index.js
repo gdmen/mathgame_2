@@ -7,7 +7,7 @@ import { useAuth0 } from "@auth0/auth0-react";
 
 import { LoginButton, LogoutButton } from "./auth0.js";
 
-import { SetupView } from "./setup.js";
+import { SetupView, useSetupGate } from "./setup.js";
 import { PinView, ClearSessionPin } from "./pin.js";
 import { SettingsView } from "./settings.js";
 import { PlayView } from "./play.js";
@@ -96,13 +96,15 @@ const MainView = ({
   // rather than the setup wizard or any hint the admin surface exists.
   const isAdmin = user != null && user.role === "admin";
   const onAdminPath = window.location.pathname.startsWith("/admin");
+  const inSetup = useSetupGate({
+    user,
+    settings,
+    numEnabledVideos,
+    onAdminPath,
+  });
   if (isLoading || (isAuthenticated && settings == null)) {
     return <div className="content-loading"></div>;
-  } else if (
-    settings != null &&
-    !onAdminPath &&
-    (user.pin === "" || numEnabledVideos < 3)
-  ) {
+  } else if (inSetup) {
     return (
       <SetupView
         token={token}
@@ -255,10 +257,14 @@ const AppView = () => {
     }
   }, [isAuthenticated, getAccessTokenSilently]);
 
+  // Resolves to whether the refreshed data actually landed. Callers that draw a
+  // conclusion from the counts need to tell a failed read from a real answer:
+  // the state here keeps its previous values either way, and stale values that
+  // look fresh get presented to the user as fact.
   const refreshPageLoadData = useCallback(async () => {
     try {
       if (token == null || user == null) {
-        return;
+        return false;
       }
       var reqParams = {
         method: "GET",
@@ -287,12 +293,20 @@ const AppView = () => {
           reqParams
         );
       }
+      // An error body parses as JSON just as happily as a payload does, and
+      // its missing fields would land as undefined/NaN — overwriting good
+      // state and still reporting that the read succeeded.
+      if (!req.ok) {
+        return false;
+      }
       const json = await req.json();
       setAppUser(json["user"]);
       setSettings(json["settings"]);
       setNumEnabledVideos(parseInt(json["num_videos_enabled"]));
+      return true;
     } catch (e) {
       console.log(e.message);
+      return false;
     }
   }, [token, user]);
 

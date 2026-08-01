@@ -179,34 +179,6 @@ h1 {
   gap: $base-space;
   margin-bottom: 0.75 * $base-space;
 }
-.btn {
-  border: 0.125em solid transparent;
-  border-radius: $base-radius;
-  cursor: pointer;
-  display: inline-block;
-  font-family: $display-font-family;
-  font-size: 1.02rem;
-  font-weight: 600;
-  padding: 0.9375 * $base-space 1.625 * $base-space;
-  text-decoration: none;
-  transition: transform 0.1s ease, background-color 0.1s ease;
-  &:active {
-    transform: scale(0.95);
-  }
-}
-.btn-primary {
-  background-color: $color-action;
-  color: white;
-  &:hover {
-    background-color: $color-action-deep;
-  }
-}
-.btn-ghost {
-  background-color: transparent;
-  border-color: $color-one-contrast;
-  color: $color-one-contrast;
-}
-
 // "try it!" is a drawn annotation, not a link: the demo card is the
 // affordance. Decorative, so it is aria-hidden and ignores the pointer.
 .try-note {
