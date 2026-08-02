@@ -180,11 +180,20 @@ completeness:
   `MIN_PLAYABLE_VIDEOS` when the game cannot. `playable_total` comes from the same
   `countEnabledVideosForUser` helper `/pageload` uses, so every surface that gates on the floor is
   reading one number. When the total is short, the requirement is stated beside the red tally
-  (`.playlist-total-need`) — there is no separate error line for it.
-  Removing a playlist confirms first, and warns when it would drop the total
-  below the floor — that warning subtracts the row's own count, so it is a lower bound and can
-  warn on a removal that would in fact stay above the line. There is no separate reward-video
-  list: per-playlist counts plus the drill-down carry everything it showed.
+  (`.playlist-total-need`) — there is no separate error line for it. **Removing a playlist takes
+  effect immediately and offers an undo** for `UNDO_WINDOW_MS` (30s) in a `.playlist-undo` list
+  item occupying the removed row's slot (so the list does not reflow); nothing is confirmed up
+  front. Removals stack: each gets its own undo entry and its own expiry clock, so removing a
+  second playlist does not shorten the first one's window. Rows and undo entries are slotted by
+  **playlist id**, the order `customListPlaylists` guarantees (`ORDER BY p.id` — load-bearing:
+  without it, GROUP BY order is optimizer-chosen and any refetch could reshuffle the list under
+  the offers).
+  Undo re-adds by `playlist_id` rather than the DELETE being deferred, because a deferred delete is
+  lost outright if the tab closes inside the window, and because re-adding is exact: removal drops
+  only the `user_playlist` row, so `customAddPlaylist`'s `playlist_id` branch re-attaches the same
+  playlist without re-syncing YouTube, and nothing the parent authored lives on that join row.
+  There is no separate reward-video list: per-playlist counts plus the drill-down carry everything
+  it showed.
 - **`DeleteAccountView`** — the last card in the grid: self-service account deletion, confirmed by
   a modal that re-asks for the PIN (`DELETE /users/:auth0_id`). It is the only red-button surface
   on the page, and its hint copy spells out what is deleted, what is retained, and that deletion

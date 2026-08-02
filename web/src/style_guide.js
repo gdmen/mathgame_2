@@ -808,7 +808,9 @@ const StyleGuideView = () => {
           from under the cursor near its left edge and swallows the click.
           Remove sits inside the summary and calls <code>preventDefault()</code>{" "}
           so it does not toggle. Unavailable videos are muted and labelled —{" "}
-          <b>a status, not an error</b>, so never red.
+          <b>a status, not an error</b>, so never red. Removal takes effect at
+          once, with no confirm to click through; <code>.playlist-undo</code>{" "}
+          below is what makes that safe.
         </p>
         <CompoundExample
           name=".playlist-item"
@@ -830,7 +832,7 @@ const StyleGuideView = () => {
                         6 videos · 5 playable
                       </span>
                       <button type="button" className="playlist-remove">
-                        Remove…
+                        Remove
                       </button>
                     </summary>
                     <div className="playlist-videos">
@@ -860,6 +862,56 @@ const StyleGuideView = () => {
                       </div>
                     </div>
                   </details>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </CompoundExample>
+      </Section>
+
+      <Section title="Undo bar">
+        <p>
+          The offer to take back a removal, shown for a short window after the
+          row disappears. It replaces a confirm dialog: the parent acts, sees
+          the result, and reverses it if that was not what they meant, instead
+          of answering a question about something that has not happened yet.
+          <b>
+            {" "}
+            It is a list item in the removed row&#39;s own slot, with the
+            row&#39;s vertical metrics
+          </b>{" "}
+          — appearing and expiring must not reflow the list, and a bar fixed to
+          a page corner can end up far from the list it refers to.{" "}
+          <b>No surface: transience is carried by the type</b> — an italic line
+          of soft ink where a row would have content, with the green-outlined
+          Undo as the slot&#39;s one accent. The italic is real (Nunito ships a
+          400 italic and this line is 400); the display face has none, so
+          headings can never borrow this treatment. Each removal gets its own
+          bar and its own clock — removing a second playlist must not shorten
+          the first one&#39;s window. The removal is already real when this
+          appears, so a closed tab cannot silently undo it;{" "}
+          <b>undo re-adds rather than deferring the delete</b>. It is{" "}
+          <code>role=&#34;status&#34;</code>, not <code>alert</code>: it follows
+          an action the parent took, so it should be announced without cutting
+          off whatever a screen reader is already saying.
+        </p>
+        <CompoundExample
+          name="li.playlist-undo"
+          context=".settings #playlists-settings ul#playlist-list"
+        >
+          <div className="settings">
+            <div id="playlists-settings">
+              <ul id="playlist-list">
+                <li className="playlist-undo" role="status">
+                  <div className="playlist-undo-bar">
+                    <span className="playlist-undo-text">
+                      Removed “A playlist title long enough that it has to
+                      ellipsize before it pushes the action off the end”
+                    </span>
+                    <button type="button" className="playlist-undo-action">
+                      Undo
+                    </button>
+                  </div>
                 </li>
               </ul>
             </div>

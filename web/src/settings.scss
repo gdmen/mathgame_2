@@ -1,5 +1,23 @@
 @import "styles.scss";
 
+// The playlist list's row rhythm. The undo bar takes a removed row's slot and
+// has to measure identically or the list shifts under it, so the numbers that
+// make that true live here once instead of in each selector that needs them.
+$playlist-slot-border: 0.0625em solid $color-divider;
+$playlist-slot-padding: 0.85em 0.125em;
+// The thumbnail defines a row's visible content band.
+$playlist-row-content: 2.125em;
+
+// The quiet buttons at a row's right edge. One size, so a row's Remove and the
+// undo bar's action stay siblings in the same slot; colour is each caller's.
+@mixin playlist-row-button {
+  border-style: solid;
+  border-width: 0.09375em;
+  flex: none;
+  font-size: 0.8em;
+  padding: 0.35em 0.8em;
+}
+
 .settings {
   margin: 0 auto;
   max-width: $max-width;
@@ -415,7 +433,7 @@
       // contributes expand underneath so a half-broken playlist is findable
       // without a second list on the page.
       .playlist-item {
-        border-top: 0.0625em solid $color-divider;
+        border-top: $playlist-slot-border;
         padding: 0;
       }
       // <summary> is the whole trigger, so every part of the row — arrow
@@ -429,7 +447,7 @@
         display: flex;
         gap: 0.625em;
         list-style: none;
-        padding: 0.85em 0.125em;
+        padding: $playlist-slot-padding;
         &::-webkit-details-marker {
           display: none;
         }
@@ -452,7 +470,7 @@
         background-size: cover;
         border-radius: $radius-small;
         flex: 0 0 3.5em;
-        height: 2.125em;
+        height: $playlist-row-content;
       }
       .playlist-title {
         color: inherit;
@@ -467,15 +485,54 @@
         white-space: nowrap;
       }
       .playlist-remove {
+        @include playlist-row-button;
         background: white;
-        border: 0.09375em solid $color-chip-border;
+        border-color: $color-chip-border;
         color: $color-ink-soft;
-        flex: none;
-        font-size: 0.8em;
-        padding: 0.35em 0.8em;
         &:hover {
           border-color: $color-error;
           color: $color-error;
+        }
+      }
+      // The undo offer after a removal, in the removed row's own slot so the
+      // list does not move when it appears or expires — hence the shared slot
+      // metrics rather than its own. No surface: transience is carried by the
+      // type instead, an italic line of soft ink where a row would have
+      // content. The italic is real — Nunito ships a 400 italic and this line
+      // is 400 — where the display face has none.
+      li.playlist-undo {
+        border-top: $playlist-slot-border;
+        padding: $playlist-slot-padding;
+        .playlist-undo-bar {
+          align-items: center;
+          color: $color-ink-soft;
+          display: flex;
+          gap: $base-space;
+          height: $playlist-row-content;
+          justify-content: space-between;
+          padding: 0 0.125em;
+        }
+        .playlist-undo-text {
+          font-size: 0.9em;
+          font-style: italic;
+          // Long YouTube titles must not push Undo off the end.
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        // The one actionable thing in the slot gets the page's action colour.
+        .playlist-undo-action {
+          @include playlist-row-button;
+          background: transparent;
+          border-color: $color-one-contrast;
+          color: $color-one-contrast;
+          &:hover:not(:disabled) {
+            background: $color-two;
+          }
+          &:disabled {
+            cursor: default;
+            opacity: 0.6;
+          }
         }
       }
       .playlist-videos {
