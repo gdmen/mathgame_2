@@ -957,13 +957,17 @@ const StyleGuideView = () => {
           text (the inherited <code>line-height</code> is 1.0, which lets glyphs
           spill out and read as off-centre) and pill corners. Filled outranks
           outlined — the card-header total is filled, the per-row counts are
-          outlined.
+          outlined. When the total runs red, <code>.playlist-total-need</code>{" "}
+          states the floor beside it in plain body text — it explains the
+          chip&#39;s state rather than adding a second alarm, and it is the only
+          place the requirement is written.
         </p>
         <div className="settings">
           <span className="playlist-total">11 playable videos</span>{" "}
           <span className="playlist-total playlist-total-low">
             2 playable videos
-          </span>{" "}
+          </span>
+          <span className="playlist-total-need">needs at least 3</span>{" "}
           <span className="playlist-count">6 videos · 5 playable</span>{" "}
           <span className="playlist-video-state">unavailable</span>
         </div>

@@ -179,7 +179,9 @@ completeness:
   counts, so a summed total overstates what the reward loop has and can clear
   `MIN_PLAYABLE_VIDEOS` when the game cannot. `playable_total` comes from the same
   `countEnabledVideosForUser` helper `/pageload` uses, so every surface that gates on the floor is
-  reading one number. Removing a playlist confirms first, and warns when it would drop the total
+  reading one number. When the total is short, the requirement is stated beside the red tally
+  (`.playlist-total-need`) — there is no separate error line for it.
+  Removing a playlist confirms first, and warns when it would drop the total
   below the floor — that warning subtracts the row's own count, so it is a lower bound and can
   warn on a removal that would in fact stay above the line. There is no separate reward-video
   list: per-playlist counts plus the drill-down carry everything it showed.

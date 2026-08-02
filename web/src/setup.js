@@ -49,7 +49,7 @@ const ProblemTypesTabView = ({
 
   return (
     <>
-      <h2>Hi there! What kinds of math can your child do?</h2>
+      <h2>What kinds of math can your child do?</h2>
       <p className="settings-hint" style={{ textAlign: "center" }}>
         Turn on what your child can do — leave off what they can't yet. You can
         change everything later.
@@ -88,6 +88,7 @@ const VideosTabView = ({ token, apiUrl, user, advanceSetup }) => {
 
   return (
     <>
+      <h2>Add a YouTube playlist for your child!</h2>
       <PlaylistsSettingsView
         token={token}
         apiUrl={apiUrl}
