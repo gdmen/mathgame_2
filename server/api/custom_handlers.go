@@ -643,6 +643,10 @@ func (a *Api) customListPlaylists(c *gin.Context) {
 	}
 	// LEFT JOIN so a playlist YouTube has not been scraped into playlist_video
 	// yet still lists, with zero counts, rather than vanishing from settings.
+	//
+	// The ORDER BY is load-bearing: without it GROUP BY order is whatever the
+	// optimizer picks, so the settings list could reshuffle on any refetch —
+	// and the client's undo offers hold their place in the list by id.
 	rows, err := a.DB.Query(`
 		SELECT p.id, p.you_tube_id, p.title, p.thumbnailurl, p.etag,
 		       COUNT(v.id) AS video_count,
@@ -652,7 +656,8 @@ func (a *Api) customListPlaylists(c *gin.Context) {
 		LEFT JOIN playlist_video pv ON pv.playlist_id = p.id
 		LEFT JOIN videos v ON v.id = pv.video_id
 		WHERE up.user_id = ?
-		GROUP BY p.id, p.you_tube_id, p.title, p.thumbnailurl, p.etag`,
+		GROUP BY p.id, p.you_tube_id, p.title, p.thumbnailurl, p.etag
+		ORDER BY p.id`,
 		user.Id)
 	if err != nil {
 		glog.Errorf("%s list my playlists: %v", logPrefix, err)

@@ -316,6 +316,9 @@ const RECOMMENDED_PLAYLISTS = [];
 // The reward loop needs at least this many playable videos to draw from.
 const MIN_PLAYABLE_VIDEOS = 3;
 
+// How long the undo offer stays up after a removal.
+const UNDO_WINDOW_MS = 30000;
+
 const playlistName = (p) => p.title || p.you_tube_id || "Playlist " + p.id;
 
 // One playlist row, expandable in place to the videos it contributes. Videos
@@ -378,7 +381,7 @@ const PlaylistRow = ({ playlist, apiUrl, authHeaders, onRemove }) => {
             className="playlist-remove"
             onClick={handleRemoveClick}
           >
-            Remove…
+            Remove
           </button>
         </summary>
         <div className="playlist-videos">
@@ -439,6 +442,45 @@ const PlaylistsSettingsView = ({
   const [playlistInput, setPlaylistInput] = useState("");
   const [playlistError, setPlaylistError] = useState(null);
   const [addingPlaylist, setAddingPlaylist] = useState(false);
+  // Just-removed playlists, held only long enough to offer them back. One
+  // entry — and one clock — per removal, so removing a second playlist cannot
+  // shorten the first one's window. No position is stored: rows and offers
+  // share the server's id ordering, which is what puts an offer in its row's
+  // own place however many other removals and refetches land while it is up.
+  const [removedPlaylists, setRemovedPlaylists] = useState([]);
+  const [restoringIds, setRestoringIds] = useState([]);
+  const undoTimers = useRef(new Map());
+  // Orders the un-awaited list refetches; see fetchMyPlaylists.
+  const listSeq = useRef(0);
+
+  useEffect(
+    () => () => {
+      undoTimers.current.forEach((t) => clearTimeout(t));
+    },
+    []
+  );
+
+  const stopUndoClock = (playlistId) => {
+    const timer = undoTimers.current.get(playlistId);
+    if (timer) clearTimeout(timer);
+    undoTimers.current.delete(playlistId);
+  };
+
+  const expireUndo = (playlistId) => {
+    stopUndoClock(playlistId);
+    setRemovedPlaylists((prev) => prev.filter((p) => p.id !== playlistId));
+  };
+
+  // Restarted rather than resumed after a failed restore: the parent has just
+  // been told to try again, and a clock with two seconds left on it is not an
+  // offer.
+  const startUndoClock = (playlistId) => {
+    stopUndoClock(playlistId);
+    undoTimers.current.set(
+      playlistId,
+      setTimeout(() => expireUndo(playlistId), UNDO_WINDOW_MS)
+    );
+  };
 
   // Stable per token: the playlist rows take it as a prop, and fetchMyPlaylists
   // declares it as a dependency.
@@ -453,6 +495,7 @@ const PlaylistsSettingsView = ({
 
   const fetchMyPlaylists = useCallback(async () => {
     if (token == null || apiUrl == null || user == null) return;
+    const seq = ++listSeq.current;
     try {
       const req = await fetch(apiUrl + "/playlists", {
         method: "GET",
@@ -460,6 +503,11 @@ const PlaylistsSettingsView = ({
       });
       if (req.ok) {
         const json = await req.json();
+        // Every mutation fires one of these without awaiting it, so two quick
+        // removals leave two in flight. An older reply still lists the row
+        // the newer one knows is gone, and landing last it would put that row
+        // back; only the newest request may write.
+        if (seq !== listSeq.current) return;
         setMyPlaylists(Array.isArray(json.playlists) ? json.playlists : []);
         setTotalPlayable(
           Number.isFinite(json.playable_total) ? json.playable_total : 0
@@ -513,29 +561,13 @@ const PlaylistsSettingsView = ({
     }
   };
 
-  // MIN_PLAYABLE_VIDEOS mirrors the floor the reward loop needs; removing a
-  // playlist that would breach it warns before it happens rather than leaving
-  // the parent to discover it from the video count.
-  //
-  // `remaining` is a floor, not the answer: videos this playlist shares with
-  // another survive its removal but are subtracted here anyway, so the warning
-  // can fire on a removal that in fact stays above the line. Erring toward the
-  // warning is the safe direction, and the server recount lands right after.
+  // The removal is real immediately; undo re-adds. The alternative — holding
+  // the DELETE until the window closes — loses the removal outright if the tab
+  // goes away first, which is the wrong way for this to fail. Restoring costs
+  // one POST with the id we already have: removal only drops the user_playlist
+  // row, so the playlist and its videos are still there to re-attach, and
+  // nothing the parent authored lives on that row. See docs/settings.md.
   const handleRemovePlaylist = async (playlist) => {
-    const remaining = totalPlayable - (playlist.playable_count || 0);
-    const warning =
-      remaining < MIN_PLAYABLE_VIDEOS
-        ? "Removing “" +
-          playlistName(playlist) +
-          "” leaves " +
-          remaining +
-          " playable video" +
-          (remaining === 1 ? "" : "s") +
-          ", below the " +
-          MIN_PLAYABLE_VIDEOS +
-          " the game needs to hand out rewards. Remove it anyway?"
-        : "Remove “" + playlistName(playlist) + "” from your rewards?";
-    if (!window.confirm(warning)) return;
     setPlaylistError(null);
     try {
       const req = await fetch(apiUrl + "/playlists/" + playlist.id, {
@@ -546,11 +578,103 @@ const PlaylistsSettingsView = ({
         setPlaylistError("Could not remove that playlist. Try again.");
         return;
       }
+      // Drop the row locally in the same task as offering the undo — the two
+      // commits share one paint, so the bar replaces the row cleanly. The
+      // refetch stays authoritative (it carries playable_total), but waiting
+      // for it would leave the row and its own undo bar on screen together
+      // for the length of the request.
+      setMyPlaylists((prev) => prev.filter((p) => p.id !== playlist.id));
       fetchMyPlaylists();
       if (onPlaylistsChange) onPlaylistsChange();
+      // expireUndo first covers remove → undo → remove again: the stale
+      // clock from the first removal must not tick down the new entry.
+      expireUndo(playlist.id);
+      setRemovedPlaylists((prev) => [...prev, playlist]);
+      startUndoClock(playlist.id);
     } catch (e) {
       setPlaylistError("Could not remove that playlist. Try again.");
     }
+  };
+
+  const handleUndoRemove = async (playlist) => {
+    if (restoringIds.includes(playlist.id)) return;
+    // Stop the clock before the request: an expiry firing mid-restore would
+    // tear the bar down and then have the row pop in from nowhere.
+    stopUndoClock(playlist.id);
+    setPlaylistError(null);
+    setRestoringIds((prev) => [...prev, playlist.id]);
+    try {
+      // By id, not by URL: this re-attaches the playlist the parent had rather
+      // than re-syncing it from YouTube, so it comes back as it was.
+      const req = await fetch(apiUrl + "/playlists", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ playlist_id: playlist.id }),
+      });
+      if (!req.ok) {
+        // Keep the offer and give it a fresh window. The failure is usually
+        // transient, and dropping the bar here would leave the parent with
+        // the playlist gone and nothing left to press.
+        setPlaylistError("Could not bring that playlist back. Try again.");
+        startUndoClock(playlist.id);
+        return;
+      }
+      // The mirror of the removal: put the row back in the same task as the
+      // bar's teardown below, so the swap is one paint rather than a collapse
+      // followed by a reappearance. Sorted because this must agree with the
+      // refetch that confirms it, and the server lists by id.
+      setMyPlaylists((prev) => [...prev, playlist].sort((a, b) => a.id - b.id));
+      fetchMyPlaylists();
+      if (onPlaylistsChange) onPlaylistsChange();
+      setRemovedPlaylists((prev) => prev.filter((p) => p.id !== playlist.id));
+    } catch (e) {
+      setPlaylistError("Could not bring that playlist back. Try again.");
+      startUndoClock(playlist.id);
+    } finally {
+      setRestoringIds((prev) => prev.filter((id) => id !== playlist.id));
+    }
+  };
+
+  // Rows and undo offers share one ordering — playlist id, the order the
+  // server lists — so an offer renders exactly where its row would, and
+  // neither another removal, an undo, nor a refetch landing mid-window can
+  // shuffle what is on screen. Captured positions were tried first and go
+  // stale the moment the list changes underneath them.
+  //
+  // A restore writes the row back and drops the offer in two unbatched
+  // updates, so there is one render where the playlist is in both lists;
+  // `live` keeps that frame from drawing the row and its own offer at once.
+  const live = new Set(myPlaylists.map((p) => p.id));
+  const slots = [
+    ...myPlaylists.map((p) => ({ playlist: p, removed: false })),
+    ...removedPlaylists
+      .filter((p) => !live.has(p.id))
+      .map((p) => ({ playlist: p, removed: true })),
+  ].sort((a, b) => a.playlist.id - b.playlist.id);
+
+  const undoBar = (playlist) => {
+    const restoring = restoringIds.includes(playlist.id);
+    return (
+      // role="status" rather than "alert": this follows an action the parent
+      // just took, so it should not interrupt what a screen reader is saying,
+      // only be announced when it finishes.
+      <li key={"undo-" + playlist.id} className="playlist-undo" role="status">
+        <div className="playlist-undo-bar">
+          <span className="playlist-undo-text">
+            Removed “{playlistName(playlist)}”
+          </span>
+          <button
+            type="button"
+            className="playlist-undo-action"
+            onClick={() => handleUndoRemove(playlist)}
+            disabled={restoring}
+            aria-busy={restoring}
+          >
+            {restoring ? "Undoing…" : "Undo"}
+          </button>
+        </div>
+      </li>
+    );
   };
 
   return (
@@ -599,15 +723,19 @@ const PlaylistsSettingsView = ({
           </button>
         </div>
         <ul id="playlist-list">
-          {myPlaylists.map((p) => (
-            <PlaylistRow
-              key={p.id}
-              playlist={p}
-              apiUrl={apiUrl}
-              authHeaders={authHeaders}
-              onRemove={handleRemovePlaylist}
-            />
-          ))}
+          {slots.map(({ playlist, removed }) =>
+            removed ? (
+              undoBar(playlist)
+            ) : (
+              <PlaylistRow
+                key={playlist.id}
+                playlist={playlist}
+                apiUrl={apiUrl}
+                authHeaders={authHeaders}
+                onRemove={handleRemovePlaylist}
+              />
+            )
+          )}
         </ul>
         {RECOMMENDED_PLAYLISTS.length > 0 && (
           <div className="curated-section">
@@ -950,6 +1078,7 @@ const SettingsView = ({ token, apiUrl, user, settings }) => {
 
 export {
   MIN_PLAYABLE_VIDEOS,
+  UNDO_WINDOW_MS,
   ProblemTypesSettingsView,
   PlaylistsSettingsView,
   DeleteAccountView,
