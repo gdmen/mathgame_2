@@ -315,6 +315,10 @@
   // the total for the whole reward pool outranks any single playlist's.
   .playlist-total {
     background: $color-two;
+    // Reserved while invisible so the low state, which colours it in, cannot
+    // change the chip's size — the same colour-only invariant the toggle
+    // pills carry.
+    border: 0.0625em solid transparent;
     border-radius: $radius-pill;
     color: $color-one-contrast;
     display: inline-block;
@@ -329,9 +333,25 @@
     // place red is allowed (see the style guide's colour invariant).
     &.playlist-total-low {
       background: transparent;
-      border: 0.0625em solid $color-error;
+      border-color: $color-error;
       color: $color-error;
     }
+  }
+  // The requirement, stated beside the red tally while the pool is short.
+  // Body face and plain weight where the chip is display-bold: it explains
+  // the chip's state rather than competing with it.
+  .playlist-total-need {
+    color: $color-error;
+    // Inline-block with its own tight line so the span cannot deepen the
+    // heading's line box: left inline, the body face's metrics under the
+    // heading's inherited line-height reach below the chip's bottom edge,
+    // and the whole card shifts by that sliver when the span appears.
+    display: inline-block;
+    font-family: $base-font-family;
+    font-size: 0.7em;
+    font-weight: 400;
+    line-height: 1;
+    margin-left: 0.5em;
   }
   // Outlined counterparts to .playlist-total: quieter, because a single
   // playlist's tally ranks below the whole pool's. Defined at .settings level

@@ -565,18 +565,17 @@ const PlaylistsSettingsView = ({
           >
             {totalPlayable} playable video{totalPlayable === 1 ? "" : "s"}
           </span>
+          {belowMinimum && (
+            <span className="playlist-total-need">
+              needs at least {MIN_PLAYABLE_VIDEOS}
+            </span>
+          )}
         </>
       }
       question="Rewards are drawn only from these."
       wide
     >
       <div id="playlists-settings">
-        {belowMinimum && (
-          <p className="error">
-            The game needs at least {MIN_PLAYABLE_VIDEOS} playable videos to
-            hand out a reward. Add a playlist below.
-          </p>
-        )}
         {playlistError && (
           <p className="error playlist-error">{playlistError}</p>
         )}
@@ -600,12 +599,6 @@ const PlaylistsSettingsView = ({
           </button>
         </div>
         <ul id="playlist-list">
-          {myPlaylists.length === 0 && (
-            <li className="settings-hint">
-              No playlists yet. Add one above to give your child something to
-              earn.
-            </li>
-          )}
           {myPlaylists.map((p) => (
             <PlaylistRow
               key={p.id}
