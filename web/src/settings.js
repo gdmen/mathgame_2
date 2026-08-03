@@ -857,7 +857,7 @@ const DeleteAccountView = ({ token, apiUrl, user }) => {
         <p className="settings-hint">
           This deletes your account, settings, playlists and saved progress,
           then signs you out. Anonymous gameplay data is kept, with nothing left
-          in it that identifies you. It can&rsquo;t be undone.
+          in it that identifies you. Account deletion can&rsquo;t be undone.
         </p>
         <button
           type="button"
