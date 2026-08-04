@@ -1,10 +1,10 @@
 # The gameplay loop (frontend)
 
-The kid-facing play surface and its read-only adult mirror: how a problem is fetched, rendered,
-answered, and how a reward video plays — plus the client-side event reporting that drives the
-server's adaptive loop. **Change this doc in the same PR as any behavior change here**;
+The kid-facing play surface: how a problem is fetched, rendered, answered, and how a reward video
+plays, plus the client-side event reporting that drives the server's adaptive loop.
+**Change this doc in the same PR as any behavior change here**;
 `make docs-check BASE=origin/master` fails when the owned files (`web/src/play.js`,
-`web/src/problem.js`, `web/src/video.js`, `web/src/companion.js`) change without this doc.
+`web/src/problem.js`, `web/src/video.js`) change without this doc.
 
 This area is `type=prose` — it owns React view code, not pinned constants, so there is no doc-sync
 anchor block. The doc stops at the HTTP boundary: what the client sends and what it expects back.
@@ -13,27 +13,21 @@ The server-side counterpart (event processing, gamestate mutation, problem selec
 
 ## The model
 
-Two routes render the same loop from a shared **gamestate** — the server's per-user cursor
+The loop renders from a **gamestate** — the server's per-user cursor
 (`Gamestate`, `server/api/gamestate_model.generated.go`): `{ user_id, problem_id, video_id, solved,
-target }`. The loop's central branch is identical on both surfaces:
+target }`. Its central branch is:
 
 ```
 gamestate.solved >= gamestate.target  ?  show the reward video  :  show the problem
 ```
 
-`solved` / `target` also drive the progress-meter width (`ProblemView`,
-`ProblemCompanionView`) and, one problem out from the reward
-(`target - solved === 1`), the meter's `final` modifier: the bar switches from
+`solved` / `target` also drive the progress-meter width (`ProblemView`) and, one problem out from
+the reward (`target - solved === 1`), the meter's `final` modifier: the bar switches from
 `$color-one-contrast` to `$color-reward` and `ProblemView` shows a
-"1 more until your video" cue above it. Both surfaces compute the flag, so the
-adult mirror never disagrees with the kid's screen about what is coming.
+"1 more until your video" cue above it.
 
-| Route | View | File | Audience |
-|---|---|---|---|
-| `/play` | `PlayView` | `web/src/play.js` | the kid — interactive, mutates state |
-| `/companion/:student_id` | `CompanionView` | `web/src/companion.js` | an adult, PIN-gated — read-only mirror |
-
-Both are mounted by `MainView` in `web/src/index.js`.
+One route renders it: `/play` → `PlayView` (`web/src/play.js`), mounted by `MainView` in
+`web/src/index.js`. It is the kid's surface, and the only one that mutates gameplay state.
 
 ### PlayView data flow (`/play`)
 
@@ -54,21 +48,6 @@ Both are mounted by `MainView` in `web/src/index.js`.
 4. **Advance.** The `answered_problem` response carries a fresh `{ gamestate, problem, video }`,
    which `PlayView` swaps in (the `eventReporter` callback, on the `answered_problem` branch),
    re-rendering the next problem — or the video, once `solved >= target`.
-
-### CompanionView data flow (`/companion/:student_id`)
-
-The mirror reads the same data through the generic GET-only REST endpoints rather than `/play`, so
-it never mutates anything: `getGamestate` → `/gamestates/:student_id`, `getProblem` →
-`/problems/:problem_id` (rendered through the same KaTeX path and exposing the **correct answer** —
-an adult-only affordance), `getVideo` → `/videos/:video_id`, `getEvents` →
-`/events/:student_id/3000` (filtered to the current problem — see Attempt reconstruction). A
-`RefresherSingleton` re-polls gamestate and events on a fixed interval while the tab is focused;
-access is PIN-gated by `RequirePin(user.pin)` (see [accounts.md](accounts.md)).
-
-`:student_id` has to be the signed-in account's own `users.id`: one Auth0 account is one `users` row,
-and those endpoints are self-only server-side, so a mirror opened on any other id gets 403 (see
-[accounts.md](accounts.md)). Nothing in the app links here — the URL is typed on the adult's device,
-signed in to the same account as the kid's.
 
 ## Event types reported from the client
 
@@ -91,19 +70,15 @@ emits.
 reload and a fresh gamestate fetch. The server also defines `logged_in`, `selected_problem`,
 `solved_problem`, and the `set_*` settings events — none are emitted from this area.
 
-## The reporting singletons
+## The reporting singleton
 
-Two focus-gated loops keep traffic off backgrounded tabs:
+**`EventReporterSingleton`** (`web/src/play.js`) holds a `Set` of "sticky" event types re-POSTed
+every `interval` ms (`conf.event_reporting_interval`). `working_on_problem` is the only sticky
+member: `ProblemView` adds it while a problem is shown and `AnswerTracker` removes it on submit, so
+"time on problem" accrues only while the kid is actually looking at one. The ticker is focus-gated —
+a no-op while the window is blurred — which keeps traffic off backgrounded tabs.
 
-- **`EventReporterSingleton`** (`web/src/play.js`) — a `Set` of "sticky" event types re-POSTed
-  every `interval` ms (`conf.event_reporting_interval`). `working_on_problem` is the only sticky
-  member: `ProblemView` adds it while a problem is shown and `AnswerTracker` removes it on submit,
-  so "time on problem" accrues only while the kid is actually looking at one. The ticker is a no-op
-  while the window is blurred.
-- **`RefresherSingleton`** (`web/src/companion.js`) — the companion's read-poll, same focus/blur
-  gating, no event Set.
-
-Each is a true singleton (the constructor returns the existing `_instance`), so a re-render reuses
+It is a true singleton (the constructor returns the existing `_instance`), so a re-render reuses
 the one live loop instead of stacking intervals. Re-construction **hands over** the caller's
 callback (`postEvent` / `eventReporter`) to the existing instance: a remount otherwise leaves the
 singleton posting through the unmounted view's closure.
@@ -162,30 +137,15 @@ once `solved >= target`. Notable behavior:
 - `onProgress` reports the **delta** since the last tick, not cumulative elapsed, so the server can
   sum watch-time correctly.
 
-`VideoCompanionView` (`web/src/video_companion.js`) is the read-only mirror: no events, no keyboard
-handler, click-to-play only.
-
-## Attempt reconstruction
-
-`getEvents` (`web/src/companion.js`) walks the polled events newest-first and rebuilds the attempts
-for the *current* problem only: it buffers `answered_problem` events and, at each
-`selected_problem` boundary, stops once it reaches a selection for a different `problem_id`,
-otherwise flushing the buffer into `attempts`. The result is rendered with relative timestamps by
-`AttemptTime` (`web/src/problem_companion.js`).
-
 ## Invariants
 
-- **The loop branch is `solved >= target` on both surfaces.** Change one, change both (`PlayView`,
-  `CompanionView`).
+- **The loop branch is `solved >= target`** (`PlayView`).
 - **Event-type strings must match `server/api/event_types.go`.** They are bare literals on the client; a
   typo silently drops the event (#279).
-- **`PreprocessExpression` is shared** across play, problem, and companion so the kid view and the
-  adult mirror can never disagree about how an expression looks.
-- **The singletons must stay singletons.** `EventReporterSingleton`, `AnswerTracker`, and
-  `RefresherSingleton` each guard `_instance`; dropping the guard stacks duplicate
-  intervals/handlers on every re-render.
-- **Companion is read-only.** GET-only REST endpoints, no events; the answer is shown only here,
-  never on `/play`.
+- **The singletons must stay singletons.** `EventReporterSingleton` and `AnswerTracker` each guard
+  `_instance`; dropping the guard stacks duplicate intervals/handlers on every re-render.
+- **The answer is never rendered on `/play`.** `problem.answer` reaches the client (the
+  `debug_quickplay` fast-forward reads it), but no kid-facing view displays it.
 
 ## Gotchas / non-obvious behavior
 
@@ -208,9 +168,8 @@ otherwise flushing the buffer into `attempts`. The result is rendered with relat
 - `web/src/index.js` — `genPostEventFcn` (the `/events` POST), `MainView` route table,
   `conf.event_reporting_interval` wiring.
 - `web/src/conf.json` — `event_reporting_interval`, `debug_quickplay`.
-- `web/src/problem_companion.js`, `web/src/video_companion.js` — read-only mirror sub-views.
 - `web/src/problem_reporting.test.js` — pins the `working_on_problem` add/remove lifecycle.
-- `web/src/pin.js` — `RequirePin`, `ClearSessionPin` (companion gate / play PIN clear).
+- `web/src/pin.js` — `RequirePin`, `ClearSessionPin` (the play view clears the session PIN).
 - `server/api/event_types.go` — authoritative event-type constants.
 - `server/api/meta_models.go` — `PlayData`, the `/play` response shape.
 - `server/api/custom_handlers.go` — `customGetPlayData` (the `/play` handler, video-count gate,

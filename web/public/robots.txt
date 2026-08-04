@@ -7,7 +7,6 @@ Allow: /privacy
 Disallow: /play
 Disallow: /settings
 Disallow: /progress
-Disallow: /companion/
 Disallow: /pin/
 Disallow: /login
 Disallow: /admin

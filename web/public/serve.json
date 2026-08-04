@@ -6,7 +6,6 @@
     { "source": "/progress", "destination": "/app.html" },
     { "source": "/admin", "destination": "/app.html" },
     { "source": "/pin/:rest*", "destination": "/app.html" },
-    { "source": "/companion/:rest*", "destination": "/app.html" },
     { "source": "/admin/:rest*", "destination": "/app.html" }
   ]
 }
