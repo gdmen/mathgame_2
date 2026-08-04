@@ -128,36 +128,3 @@
     }
   }
 }
-#problem-companion {
-  display: flex;
-  justify-content: space-between;
-  margin: 0 auto;
-  max-width: $max-width;
-  padding: 0 $base-space;
-
-  #problem-mirror {
-    max-width: 0.7 * $max-width;
-    text-align: center;
-    width: 70%;
-    #problem-answer-companion {
-      font-size: 2em;
-    }
-  }
-
-  #problem-attempts {
-    margin-left: 2em;
-    max-width: 0.3 * $max-width;
-    width: 30%;
-    .problem-attempt {
-    }
-    .attempt-time {
-      float: right;
-      font-size: 0.5em;
-    }
-    #problem-attempts-header {
-      font-size: 1.25em;
-      font-variant: small-caps;
-      text-align: center;
-    }
-  }
-}

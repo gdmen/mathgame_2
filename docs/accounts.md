@@ -22,8 +22,8 @@ Four independent layers, in order of authority:
 
 The Auth0 `sub` is the `auth0_id`; every server handler resolves it to a `users` row via
 `UserMiddleware` (`server/common/middleware.go`) before doing anything else. One Auth0 account =
-one `users` row = one family/operator; there is no per-kid login (kids are distinguished by the PIN
-gate and the companion view, not by identity).
+one `users` row = one family/operator; there is no per-kid login (a kid is kept out of adult
+surfaces by the PIN gate, not by identity).
 
 ## Self-only access (`server/api/self_access.go`)
 
@@ -170,10 +170,10 @@ keeps a kid from wandering into adult surfaces.
 | `RequirePin(correctPin)` | route guard: redirects to `/pin/<encoded current path>` unless the session PIN equals `correctPin`; returns whether access is allowed |
 | `PinView` | four-digit entry component (`react-pin-input`), used in setup (`isSetup`) and at the `/pin/:redirect_pathname` gate route |
 
-Two-stage gate for a protected surface: a guarded view (`/settings`, `/companion/:student_id`)
-calls `RequirePin`, which on a missing/invalid session PIN redirects to the `/pin/...` route; that
-route renders `PinView` in gate mode, which validates length ≥ 4 and `pin === user.pin`, stores the
-session PIN, and redirects back to the originally requested path. Both checks compare the entered
+Two-stage gate for a protected surface: a guarded view (`/settings`) calls `RequirePin`, which on a
+missing/invalid session PIN redirects to the `/pin/...` route; that route renders `PinView` in gate
+mode, which validates length ≥ 4 and `pin === user.pin`, stores the session PIN, and redirects back
+to the originally requested path. Both checks compare the entered
 PIN against `user.pin` by equality.
 
 ### Setup wizard (`setup.js`)
@@ -278,9 +278,9 @@ kept, because saying "deletes everything" would be a promise this endpoint does 
   `user.pin`, which the client already holds (returned in the pageload payload). It exists to stop
   a *kid* from tapping into settings, not to authorize anything. All real authorization is the
   Auth0 JWT + role.
-- **`RequirePin` is the first-stage guard, not `PinView`.** On `/settings` and
-  `/companion/:student_id`, `RequirePin(user.pin)` runs first and redirects to `/pin/...` unless the
-  session PIN already equals `user.pin`; the `PinView` gate-mode check only runs after that redirect.
+- **`RequirePin` is the first-stage guard, not `PinView`.** On `/settings`, `RequirePin(user.pin)`
+  runs first and redirects to `/pin/...` unless the session PIN already equals `user.pin`; the
+  `PinView` gate-mode check only runs after that redirect.
   Both compare against `user.pin` by equality (#274).
 - **`ClearSessionPin` fires on several routes.** Rendering the 404 page, the home view, or the
   play view clears the session PIN (`index.js`, `home.js`, `play.js`), so leaving a protected area

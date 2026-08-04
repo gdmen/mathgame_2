@@ -81,10 +81,10 @@ Three build subtleties worth knowing:
   resolves `/` to whatever `index.html` is, so the only way to put a static page
   at `/` is to *be* `index.html` — hence the two renames at the end of
   `build-web`. `web/public/serve.json` rewrites **an enumerated list of app
-  routes** (`/login`, `/play`, `/settings`, `/progress`, `/pin/*`,
-  `/companion/*`, `/admin/*`) to `app.html`; a new top-level React route must be
-  added there too or its deployed URL 404s (the `Switch` in `web/src/index.js`
-  carries the same warning). A catch-all rewrite cannot coexist with static
+  routes** (`/login`, `/play`, `/settings`, `/progress`, `/pin/*`, `/admin/*`)
+  to `app.html`; a new top-level React route must be added there too or its
+  deployed URL 404s (the `Switch` in `web/src/index.js` carries the same
+  warning). A catch-all rewrite cannot coexist with static
   clean URLs: `serve` 14 checks the filesystem before rewrites only for paths
   with an extension, and its rewrite engine cascades each rule's output through
   the remaining rules, so `/privacy → /privacy.html → catch-all → app.html` no

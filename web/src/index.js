@@ -12,7 +12,6 @@ import { PinView, ClearSessionPin } from "./pin.js";
 import { SettingsView } from "./settings.js";
 import { PlayView } from "./play.js";
 import { ProgressView } from "./progress.js";
-import { CompanionView } from "./companion.js";
 import { AdminHomeView } from "./admin_home.js";
 import { DifficultyCalibrationView } from "./admin_calibration.js";
 import { BitmapMatrixView } from "./admin_bitmap_matrix.js";
@@ -164,11 +163,6 @@ const MainView = ({
           <Route exact path="/progress">
             <RequireAuth isAuthenticated={isAuthenticated}>
               <ProgressView token={token} apiUrl={apiUrl} user={user} />
-            </RequireAuth>
-          </Route>
-          <Route exact path="/companion/:student_id">
-            <RequireAuth isAuthenticated={isAuthenticated}>
-              <CompanionView token={token} apiUrl={apiUrl} user={user} />
             </RequireAuth>
           </Route>
           <Route exact path="/admin">

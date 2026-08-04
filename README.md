@@ -14,7 +14,7 @@ registry's currency against the code with `/audit-project-areas`.
 | Adaptive difficulty & progression | [docs/adaptive-difficulty.md](docs/adaptive-difficulty.md) | ✅ |
 | Events & analytics | [docs/events.md](docs/events.md) | ✅ |
 | Reward videos & playlists | [docs/videos.md](docs/videos.md) | ✅ |
-| Gameplay loop & companion | [docs/gameplay.md](docs/gameplay.md) | ✅ |
+| Gameplay loop | [docs/gameplay.md](docs/gameplay.md) | ✅ |
 | Settings & envelope | [docs/settings.md](docs/settings.md) | ✅ |
 | Accounts, access & onboarding | [docs/accounts.md](docs/accounts.md) | ✅ |
 | Design system | [web/src/style_guide.js](web/src/style_guide.js) | ✅ (the `/style-guide` page is the living reference) |
@@ -39,7 +39,7 @@ events  doc=docs/events.md  type=anchored
 videos  doc=docs/videos.md  type=anchored
   globs: server/api/youtube.go
 gameplay  doc=docs/gameplay.md  type=prose
-  globs: web/src/play.js, web/src/problem.js, web/src/video.js, web/src/companion.js
+  globs: web/src/play.js, web/src/problem.js, web/src/video.js
 settings  doc=docs/settings.md  type=anchored
   globs: web/src/settings.js, web/src/bitmap_validation.js
 accounts  doc=docs/accounts.md  type=prose
