@@ -7,7 +7,7 @@ import { useAuth0 } from "@auth0/auth0-react";
 
 import { LoginButton, LogoutButton } from "./auth0.js";
 
-import { SetupView, useSetupGate } from "./setup.js";
+import { SetupView, VideosRepairView, useTakeover } from "./setup.js";
 import { PinView, ClearSessionPin } from "./pin.js";
 import { SettingsView } from "./settings.js";
 import { PlayView } from "./play.js";
@@ -91,20 +91,33 @@ const MainView = ({
   refreshPageLoadData,
   postEvent,
 }) => {
-  // Admin pages bypass the kid-facing setup gate (an admin can use them
-  // without completing setup), and a non-admin who hits one gets the 404 page
-  // rather than the setup wizard or any hint the admin surface exists.
+  // Admin pages bypass the takeovers (an admin can use them without
+  // completing setup), and a non-admin who hits one gets the 404 page rather
+  // than the setup wizard or any hint the admin surface exists. The /pin
+  // gate route is exempt too: the videos page routes a parent through it,
+  // and a captured pin page would redirect to itself forever.
   const isAdmin = user != null && user.role === "admin";
   const onAdminPath = window.location.pathname.startsWith("/admin");
-  const inSetup = useSetupGate({
+  const onExemptPath =
+    onAdminPath || window.location.pathname.startsWith("/pin/");
+  const takeover = useTakeover({
     user,
     settings,
     numEnabledVideos,
-    onAdminPath,
+    onExemptPath,
   });
-  if (isLoading || (isAuthenticated && settings == null)) {
+  // Hold the routes until the whole pageload payload is in, not just the
+  // settings. It arrives as three unbatched setStates, and on the pass where
+  // the video count is still null the gate rightly refuses to decide — but
+  // routing on that pass mounts PlayView for one render, whose /play fetch
+  // outlives it, 403s on the short pool, and navigates the document to "/"
+  // out from under the wizard that has since taken the screen.
+  if (
+    isLoading ||
+    (isAuthenticated && (settings == null || numEnabledVideos == null))
+  ) {
     return <div className="content-loading"></div>;
-  } else if (inSetup) {
+  } else if (takeover === "setup") {
     return (
       <SetupView
         token={token}
@@ -115,6 +128,8 @@ const MainView = ({
         refreshPageLoadData={refreshPageLoadData}
       />
     );
+  } else if (takeover === "videos") {
+    return <VideosRepairView token={token} apiUrl={apiUrl} user={user} />;
   } else {
     // MainView has already short-circuited to content-loading while isLoading,
     // so within this Switch a false isAuthenticated means genuinely logged out.

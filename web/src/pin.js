@@ -29,7 +29,12 @@ const ClearSessionPin = function () {
   sessionStorage.removeItem(pinSessionStorageName);
 };
 
-const PinView = ({ user, isSetup = false, errCallback = () => void 0 }) => {
+const PinView = ({
+  user,
+  isSetup = false,
+  errCallback = () => void 0,
+  onSuccess = null,
+}) => {
   const [error, setError] = useState(user.pin.length < 4);
   const { redirect_pathname } = useParams();
 
@@ -45,7 +50,14 @@ const PinView = ({ user, isSetup = false, errCallback = () => void 0 }) => {
     }
     SetSessionPin(pin);
     if (!isSetup) {
-      window.location.pathname = decodeURIComponent(redirect_pathname);
+      // Gate mode has two callers: the /pin route, where success navigates
+      // back to the page that redirected here, and an inline gate (the videos
+      // repair page), which stays put and just needs to know.
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        window.location.pathname = decodeURIComponent(redirect_pathname);
+      }
     }
   };
 
@@ -67,6 +79,11 @@ const PinView = ({ user, isSetup = false, errCallback = () => void 0 }) => {
         <PinInput
           autoSelect={true}
           focus={true}
+          // Prefilled only while authoring: a parent who set a code earlier
+          // in this run and stepped back to this step sees it instead of
+          // being asked to invent another. The gate route never prefills —
+          // typing the code is the entire check.
+          initialValue={isSetup ? user.pin : ""}
           inputMode="number"
           inputStyle={{ borderRadius: "0.25em" }}
           length={4}

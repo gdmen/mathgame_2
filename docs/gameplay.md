@@ -34,7 +34,10 @@ One route renders it: `/play` → `PlayView` (`web/src/play.js`), mounted by `Ma
 1. **Fetch.** On mount, GET `/play/:user.id` returns `{ gamestate, problem, video }` (`PlayView`;
    server shape `PlayData`, `server/api/meta_models.go`). A 403 redirects to `/` — the
    "add a video first" gate, where `customGetPlayData` returns Forbidden when the user has no
-   enabled video. Empty / invalid bodies are logged and swallowed.
+   enabled video. Empty / invalid bodies are logged and swallowed. **A response landing after
+   unmount is dropped** (the effect's `cancelled` flag): the 403 branch navigates the whole
+   document, and the view that replaced this one — the setup wizard, when its gate catches up a
+   render later — must not be torn down by its predecessor's answer.
 2. **Render LaTeX.** `problem.expression` is run through `PreprocessExpression` and rendered to an
    HTML string with KaTeX (`PlayView`, the `renderLatex` effect). `PreprocessExpression` wraps
    multi-digit numbers in `\text{}`, splits `\text{}` blocks for word-wrap, and escapes a bare `%`

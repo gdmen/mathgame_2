@@ -105,7 +105,8 @@ difficulty-calibration endpoints (owned by another area).
 things — the "Admin" nav button renders only for an admin; admin routes (`/admin`,
 `/admin/difficulty-calibration`, `/admin/style-guide`) render their view for an admin and the
 **404 page** for everyone else, so a non-admin gets no hint the surface exists; and admin paths
-**bypass the setup-wizard gate** (the `onAdminPath` short-circuit), so an operator reaches admin
+**bypass the setup-wizard gate** (the `onExemptPath` short-circuit, which also exempts the `/pin/`
+gate route — see the setup wizard section), so an operator reaches admin
 tools without completing kid onboarding. The client gate is cosmetic; server `RequireAdmin` is
 authoritative — a forged request to `/api/v1/admin/*` still gets 403. Note `/admin/style-guide`
 is gated only client-side (no server `/admin` data endpoint backs it).
@@ -168,7 +169,7 @@ keeps a kid from wandering into adult surfaces.
 |---|---|
 | `SetSessionPin` / `GetSessionPin` / `ClearSessionPin` | read/write/clear the `sessionStorage` entry |
 | `RequirePin(correctPin)` | route guard: redirects to `/pin/<encoded current path>` unless the session PIN equals `correctPin`; returns whether access is allowed |
-| `PinView` | four-digit entry component (`react-pin-input`), used in setup (`isSetup`) and at the `/pin/:redirect_pathname` gate route. `isSetup` suppresses its prompt heading: at the gate that heading is the page's only prompt and its only error cue, while the wizard step already names the PIN in its own, so rendering it there would restate the title directly beneath itself |
+| `PinView` | four-digit entry component (`react-pin-input`), used in setup (`isSetup`), at the `/pin/:redirect_pathname` gate route, and as the videos repair page's inline gate. `isSetup` suppresses its prompt heading (the wizard step names the PIN in its own heading; everywhere else the prompt is the page's only cue) and prefills the current code (authoring; a gate never prefills). Gate-mode success either navigates back to `redirect_pathname` or, when `onSuccess` is passed (the inline gate), calls it and stays put |
 
 Two-stage gate for a protected surface: a guarded view (`/settings`) calls `RequirePin`, which on a
 missing/invalid session PIN redirects to the `/pin/...` route; that route renders `PinView` in gate
@@ -176,11 +177,33 @@ mode, which validates length ≥ 4 and `pin === user.pin`, stores the session PI
 to the originally requested path. Both checks compare the entered
 PIN against `user.pin` by equality.
 
-### Setup wizard (`setup.js`)
+### Setup wizard & videos repair page (`setup.js`)
 
-`SetupView` is a four-step tabbed flow (`allTabs`), shown by the main view whenever `useSetupGate`
-says so: a logged-in account off an admin path with `user.pin === ""` **or**
-`numEnabledVideos < MIN_PLAYABLE_VIDEOS`.
+`useTakeover` decides who owns the screen for the page load, before the routes get a say:
+
+- **`"setup"`** — an account with `user.pin === ""` gets `SetupView`, the four-step first-run
+  wizard. The PIN is the last thing setup writes, so an empty PIN **is** the first-run test, and
+  the wizard is truly first-run-only: no finished account ever sees it again.
+- **`"videos"`** — a finished account with `numEnabledVideos < MIN_PLAYABLE_VIDEOS` gets
+  `VideosRepairView`, a purpose-built repair page: one heading ("Add videos to keep playing!"),
+  the playlists editor, and a *Start Playing!* button gated on the floor. It carries the **same
+  PIN requirement as `/settings`** — it is the same playlist editor `/settings` keeps behind the
+  PIN, reachable from a kid's `/play`, and the pool can fall below the floor with no one touching
+  anything (YouTube making videos private), so the kid is the likely first visitor. The gate
+  renders **inline under the page's own heading** (`PinView` with `onSuccess`, swapped for the
+  playlists on entry) rather than bouncing through the `/pin` route, so whoever is at the screen
+  reads why they are being asked for a code. It **always starts locked and clears the session PIN
+  on arrival**: this page stands in for `/play`, which is where the device changes hands and
+  which drops the session for that same reason, so honouring a cached one here would hand the
+  playlist editor to whoever picked the tablet up next. The wizard's videos step and this page
+  share one control, `PlaylistsFloorGate`: the playlists editor plus a floor-gated action,
+  differing only in heading, label, and exit.
+- **`null`** — the routes.
+
+Exempt paths (never taken over) are the admin pages (an admin can use them without completing
+setup) and the `/pin/` gate route: the other PIN-gated page (`/settings`) redirects
+there via `RequirePin`, and while the pool is short a captured pin page would render the repair
+takeover instead of the pin entry it was navigated to for.
 
 1. **Problem Types** — continue gated on a valid bitmap (`problem_type_bitmap >= 1`).
 2. **Add Videos** — playlists (each expandable to its videos); continue gated on
@@ -189,8 +212,13 @@ says so: a logged-in account off an admin path with `user.pin === ""` **or**
    list — see [settings.md](settings.md). It is the server's de-duplicated `playable_total`, which
    is what lets this gate and step 4's agree; a client-side sum of the per-playlist counts would
    pass a parent whose playlists overlap and then strand them on a blocked step 4.
-3. **Set Parent Pin** — `PinView` in `isSetup` mode; continue POSTs the user with the freshly-set
-   session PIN (`PinTabView`).
+3. **Set Parent Pin** — `PinView` in `isSetup` mode; first arrival types all four digits. A
+   parent who set the code and then stepped back to this tab sees it **prefilled** (`PinView`'s
+   `initialValue`, setup mode only — the gate route never prefills, since typing the code is the
+   entire check) with continue live. Continue POSTs the user only when the step actually authored
+   a PIN — four digits typed here that differ from `user.pin` (`PinTabView`); a prefilled
+   pass-through writes nothing, which is also what keeps it from overwriting the stored PIN with
+   an empty session value.
 4. **Start Playing!** — a parent who gets here is finished, and the step never argues with that:
    the button always goes to `/play`. It re-reads `/pageload` on mount (step 2's playlists postdate
    the count the app booted with) for one purpose — if that fresh count is below
@@ -210,24 +238,33 @@ says so: a logged-in account off an admin path with `user.pin === ""` **or**
    trusting the class. On the PIN step that guard is what keeps a half-entered PIN from reaching
    `customUpdateUser`.
 
-**`useSetupGate` latches for the page load.** The wizard's own steps are what satisfy its
-condition, so a gate that re-read it live would unmount the wizard mid-flow: step 3 writes the PIN
-(`PinTabView` also mutates the in-memory `user`), step 4's refresh lands the new PIN and video
-count, the condition goes false, and the last step vanishes before the parent can press *Start
-Playing*. Once the gate opens it stays open until the next real navigation, which is how every exit
-from the wizard works (`window.location`), so a completed account is re-evaluated on its next load
-and passes.
+**`useTakeover` latches its decision for the page load.** Each takeover's own edits are what
+satisfy its condition — the wizard's steps write the PIN, the repair page's playlist adds refill
+the pool — so a decision re-read live would unmount either screen mid-use: step 4's refresh lands
+the new PIN and video count, the condition goes false, and the last step vanishes before the
+parent can press *Start Playing*. Once decided it holds until the next real navigation, which is
+how every exit from both screens works (`window.location`), so a completed account is re-evaluated
+on its next load and passes through to the routes.
 
 Latching puts a burden on the condition: it has to be right on **every** render, because one wrong
 pass sticks. `refreshPageLoadData` writes the user, the settings and the video count as three
 separate `setState` calls after an `await`, which this React version does not batch (they land
-outside a synthetic event handler), so the gate is asked to decide while the payload is half in.
-Hence the explicit null check on the count: `null < 3` is `true` in JS, and without the guard a
-returning, fully set-up account would trip the latch on the interim render and be held in the
-wizard for the whole page load. Covered by `web/src/setup.test.js`.
+outside a synthetic event handler), so the takeover is asked to decide while the payload is half
+in. Hence the explicit null check on the count: `null < 3` is `true` in JS, and without the guard
+a returning, fully set-up account would trip the latch on the interim render and be held out of
+the game for the whole page load. Covered by `web/src/setup.test.js`.
 
-Tabs advance forward only; you may click *back* to an already-visited tab but not skip ahead
-(`handleTabClick`). The PIN reaches the server via POST `/users/:auth0_id` (`customUpdateUser`),
+The half-in pass also must not reach the router: `MainView` stays on the loading state until the
+count is in, not just the settings. On the interim render the takeover rightly refuses to decide,
+but routing on it mounted `PlayView` for a single render — whose `/play` fetch outlived it, hit
+the video-floor 403, and navigated the document to `/` out from under the screen that had since
+taken over (the flash-then-bounce). `PlayView` also drops responses that land after unmount, so
+either guard alone closes that path.
+
+The tab bar navigates to any step **already reached** (`maxVisited` in `handleTabClick`): a parent
+who stepped back can click forward again to anywhere they have been, and only genuinely unvisited
+steps stay gated behind their predecessors' continue buttons. The PIN reaches the server via POST
+`/users/:auth0_id` (`customUpdateUser`),
 which lets a caller change their own `email`/`username`/`pin` but force-overwrites `role` and `id`
 from the stored row — so this endpoint can never self-promote to admin even though the bound `User`
 struct includes a `role` field.
@@ -319,8 +356,10 @@ kept, because saying "deletes everything" would be a promise this endpoint does 
   `PinView` gate-mode check only runs after that redirect.
   Both compare against `user.pin` by equality (#274).
 - **`ClearSessionPin` fires on several routes.** Rendering the 404 page, the home view, or the
-  play view clears the session PIN (`index.js`, `home.js`, `play.js`), so leaving a protected area
-  drops the gate.
+  play view clears the session PIN (`index.js`, `play.js`), so leaving a protected area drops the
+  gate. `VideosRepairView` clears it too: it takes over `/play` *instead of* `PlayView`
+  when the pool is short, so without its own clear the one kid-facing surface that matters would
+  be the one that skipped it.
 - **The `/admin` group sits inside `authed`, so admin routes inherit `RequireSelf` too.** Harmless
   today (no admin route names a user), but an operator route that must read *another* account's data
   cannot live there: it would 403 for the operator. Such a route has to be registered outside
@@ -347,6 +386,6 @@ kept, because saying "deletes everything" would be a promise this endpoint does 
 - `server/api/migrations/41.sql` — adds `users.role` (default `student`).
 - `server/api/models.json` (`users` table) — `pin` and `role` fields; regenerate
   `user_model.generated.go` (which holds `createUserSQL`) via `make build-api`, never edit it.
-- `web/src/index.js` — Auth0 provisioning, admin route guards, and the `useSetupGate` call that
-  hands the screen to the wizard.
+- `web/src/index.js` — Auth0 provisioning, admin route guards, and the `useTakeover` call that
+  hands the screen to the wizard or the videos repair page.
 - `web/src/auth0.js`, `web/src/pin.js`, `web/src/setup.js` — owned files.

@@ -109,6 +109,11 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
   ClearSessionPin();
 
   useEffect(() => {
+    // The 403 branch navigates the whole document, so a response landing
+    // after unmount must be dropped: the view that asked is gone, and the
+    // view that replaced it (the setup wizard, when the gate catches up) must
+    // not be torn down by its predecessor's answer.
+    let cancelled = false;
     const getPlayData = async () => {
       try {
         if (token == null || apiUrl == null || user == null) {
@@ -124,6 +129,9 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
         };
         var req = await fetch(apiUrl + "/play/" + user.id, reqParams);
         const text = await req.text();
+        if (cancelled) {
+          return;
+        }
         if (!req.ok) {
           if (req.status === 403) {
             window.location.pathname = "/";
@@ -150,6 +158,9 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
     };
 
     getPlayData();
+    return () => {
+      cancelled = true;
+    };
   }, [token, apiUrl, user]);
 
   useEffect(() => {

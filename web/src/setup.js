@@ -5,7 +5,7 @@ import {
   ProblemTypesSettingsView,
   PlaylistsSettingsView,
 } from "./settings.js";
-import { GetSessionPin, PinView } from "./pin.js";
+import { GetSessionPin, ClearSessionPin, PinView } from "./pin.js";
 import "./settings.scss";
 import "./setup.scss";
 
@@ -71,11 +71,20 @@ const ProblemTypesTabView = ({
   );
 };
 
-const VideosTabView = ({ token, apiUrl, user, advanceSetup }) => {
-  // The playlists view owns the playable-video tally, so the gate reads it from
-  // there rather than deriving a second one. What it reports is the server's
-  // de-duplicated total, which is what makes this gate agree with the last
-  // step's — see docs/accounts.md.
+// The playlists editor plus an action gated on the video floor. The wizard's
+// videos step and the repair page are this one control with different exits.
+//
+// The playlists view owns the playable-video tally, so the gate reads it from
+// there rather than deriving a second one. What it reports is the server's
+// de-duplicated total, which is what makes this gate agree with the wizard's
+// last step — see docs/accounts.md.
+const PlaylistsFloorGate = ({
+  token,
+  apiUrl,
+  user,
+  actionLabel,
+  onContinue,
+}) => {
   const [playableCount, setPlayableCount] = useState(0);
   const error = playableCount < MIN_PLAYABLE_VIDEOS;
 
@@ -83,12 +92,11 @@ const VideosTabView = ({ token, apiUrl, user, advanceSetup }) => {
     // The .error class only stops the pointer, so a keyboard press lands here
     // regardless.
     if (error) return;
-    advanceSetup();
+    onContinue();
   };
 
   return (
     <>
-      <h2>Add a YouTube playlist for your child!</h2>
       <PlaylistsSettingsView
         token={token}
         apiUrl={apiUrl}
@@ -99,14 +107,30 @@ const VideosTabView = ({ token, apiUrl, user, advanceSetup }) => {
         className={error ? "submit error" : "submit"}
         onClick={handleSubmitClick}
       >
-        continue
+        {actionLabel}
       </button>
     </>
   );
 };
 
+const VideosTabView = ({ token, apiUrl, user, advanceSetup }) => (
+  <>
+    <h2>Add a YouTube playlist for your child!</h2>
+    <PlaylistsFloorGate
+      token={token}
+      apiUrl={apiUrl}
+      user={user}
+      actionLabel="continue"
+      onContinue={advanceSetup}
+    />
+  </>
+);
+
 const PinTabView = ({ token, apiUrl, user, advanceSetup }) => {
-  const [error, setError] = useState(true);
+  // Live from the start only when a code already exists — a parent who set
+  // one earlier this run and stepped back sees it prefilled (PinView's
+  // initialValue) and can continue through; first arrival types all four.
+  const [error, setError] = useState(user.pin.length < 4);
 
   const errCallback = (e) => {
     setError(e);
@@ -138,8 +162,15 @@ const PinTabView = ({ token, apiUrl, user, advanceSetup }) => {
     // Same keyboard hole as the videos step, and here it would write a
     // half-entered PIN to the server before moving on.
     if (error) return;
-    user.pin = GetSessionPin();
-    postUser(user);
+    // The session PIN is only set when four digits were actually typed here
+    // (PinView's handlePinChange). A returning parent passing through with
+    // their code prefilled has authored nothing, and writing the session
+    // value blind would overwrite their PIN with null.
+    const pin = GetSessionPin();
+    if (pin != null && pin.length >= 4 && pin !== user.pin) {
+      user.pin = pin;
+      postUser(user);
+    }
     advanceSetup();
   };
 
@@ -222,28 +253,95 @@ const StartPlayingTabView = ({
   );
 };
 
-// Whether the wizard owns the screen instead of the app's routes.
+// Which whole-screen takeover owns this page load, if any: "setup" (the
+// first-run wizard — an account with no PIN yet), "videos" (a finished
+// account whose reward pool fell below the floor, possibly with no one
+// touching anything — YouTube making videos private), or null (the routes).
 //
-// It latches on, because the wizard's own steps are what satisfy the underlying
-// condition (step 2 adds the playlists, step 3 sets the PIN). Re-reading it
-// mid-flow would tear the last step off the screen the moment step 4 refreshes
-// the page-load data, before the parent has read it or pressed Start Playing.
-// Every way out of the wizard is a real navigation, which starts a fresh latch.
+// It latches, because each takeover's own edits are what satisfy the condition
+// that raised it: the wizard's steps write the PIN, the repair page's adds
+// refill the pool. Re-reading live would tear either off the screen mid-use —
+// step 4 refreshes the page-load data, and the last step would vanish before
+// the parent could press Start Playing. Every way out of both is a real
+// navigation, which starts a fresh latch.
 //
 // The latch is also why an unknown video count has to read as "no answer yet"
-// rather than as zero: the caller fills the pageload fields in separate updates,
-// so a bare comparison would open the gate on the pass where the count is still
-// null and then hold it there for a fully set-up account.
-const useSetupGate = ({ user, settings, numEnabledVideos, onAdminPath }) => {
-  const latched = useRef(false);
-  const needsSetup =
+// rather than as zero: the caller fills the pageload fields in separate
+// updates, so a bare comparison would take the screen on the pass where the
+// count is still null and then hold it for a fully set-up account.
+//
+// onExemptPath: admin pages (an admin can use them without completing setup)
+// and the /pin gate route, which the other PIN-gated pages redirect to — while
+// the pool is short, capturing it would render this takeover instead of the
+// entry the redirect was for.
+const useTakeover = ({ user, settings, numEnabledVideos, onExemptPath }) => {
+  const latched = useRef(null);
+  // user is checked alongside settings, not assumed from it: the caller sets
+  // the two in separate updates, so a refresh that fails after writing the
+  // user leaves a render with settings still good and no user to read a pin
+  // from.
+  if (
+    latched.current == null &&
+    user != null &&
     settings != null &&
-    !onAdminPath &&
-    (user.pin === "" ||
-      (numEnabledVideos != null && numEnabledVideos < MIN_PLAYABLE_VIDEOS));
-  if (needsSetup) latched.current = true;
+    !onExemptPath
+  ) {
+    if (user.pin === "") {
+      latched.current = "setup";
+    } else if (
+      numEnabledVideos != null &&
+      numEnabledVideos < MIN_PLAYABLE_VIDEOS
+    ) {
+      latched.current = "videos";
+    }
+  }
   return latched.current;
 };
+
+// The purpose-built repair page for a finished account: just the playlists
+// and the way back into the game. It carries the same PIN requirement as
+// /settings — it is the same playlist editor /settings keeps behind the PIN,
+// and the account holding it finished setup, so the code is already
+// provisioned — but the gate renders inline, under this page's own heading,
+// rather than bouncing through the /pin route: the person at the screen
+// should read why they are suddenly being asked for a code.
+const VideosRepairView = ({ token, apiUrl, user }) => {
+  // sessionStorage is not reactive; entering the code flips this to re-render
+  // past the gate. It always starts locked, and any session left over from an
+  // adult's earlier visit is dropped on arrival — this page stands in for
+  // /play, which is where the device changes hands, and PlayView clears the
+  // session for exactly that reason. Honouring a cached session here would
+  // hand the playlist editor to whoever picked the tablet up next.
+  const [unlocked, setUnlocked] = useState(false);
+  useEffect(() => {
+    ClearSessionPin();
+  }, []);
+  return (
+    <div id="videos-repair" className="settings">
+      <h2>Add videos to keep playing!</h2>
+      {unlocked ? (
+        <PlaylistsFloorGate
+          token={token}
+          apiUrl={apiUrl}
+          user={user}
+          actionLabel="Start Playing!"
+          onContinue={() => {
+            window.location.href = "/play";
+          }}
+        />
+      ) : (
+        <PinView user={user} onSuccess={() => setUnlocked(true)} />
+      )}
+    </div>
+  );
+};
+
+const SETUP_TABS = [
+  "Problem Types",
+  "Add Videos",
+  "Set Parent Pin",
+  "Start Playing!",
+];
 
 const SetupView = ({
   token,
@@ -253,35 +351,33 @@ const SetupView = ({
   numEnabledVideos,
   refreshPageLoadData,
 }) => {
-  const [activeTab, setActiveTab] = useState(null);
+  const [activeTab, setActiveTab] = useState(SETUP_TABS[0]);
 
-  const allTabs = [
-    "Problem Types",
-    "Add Videos",
-    "Set Parent Pin",
-    "Start Playing!",
-  ];
-
-  if (activeTab == null) {
-    setActiveTab("Problem Types");
-  }
+  // The furthest step reached, which is how far the tab bar lets a click
+  // jump. Measured from the furthest step rather than the current one so a
+  // parent who stepped back can click forward again to anywhere they have
+  // already been — only genuinely unvisited steps stay gated behind their
+  // predecessors' continue buttons.
+  const maxVisited = useRef(0);
 
   const advanceSetup = function () {
-    setActiveTab(allTabs[allTabs.indexOf(activeTab) + 1]);
+    const next = SETUP_TABS.indexOf(activeTab) + 1;
+    maxVisited.current = Math.max(maxVisited.current, next);
+    setActiveTab(SETUP_TABS[next]);
   };
 
   const handleTabClick = (e) => {
     let clickedId = parseInt(e.target.id.slice(-1));
-    if (clickedId > allTabs.indexOf(activeTab)) {
+    if (clickedId > maxVisited.current) {
       return;
     }
-    setActiveTab(allTabs[clickedId]);
+    setActiveTab(SETUP_TABS[clickedId]);
   };
 
   return (
     <div id="setup" className="settings">
       <div id="setup-tabs">
-        {allTabs.map(function (tab, i) {
+        {SETUP_TABS.map(function (tab, i) {
           var id = "tab" + i;
           var className = tab === activeTab ? "tab active" : "tab";
           return (
@@ -341,4 +437,4 @@ const SetupView = ({
   );
 };
 
-export { SetupView, StartPlayingTabView, useSetupGate };
+export { SetupView, VideosRepairView, StartPlayingTabView, useTakeover };
