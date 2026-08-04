@@ -1,16 +1,35 @@
 import React from "react";
 import ReactDOM from "react-dom";
 import { act } from "react-dom/test-utils";
+import { MemoryRouter } from "react-router-dom";
 
-import { StartPlayingTabView, useSetupGate } from "./setup.js";
+import { VideosRepairView, StartPlayingTabView, useTakeover } from "./setup.js";
+import { SetSessionPin, GetSessionPin, ClearSessionPin } from "./pin.js";
 
-// The wizard is the only thing standing between a new account and an unplayable
-// game, and its steps are what satisfy the gate that shows it — so the gate has
-// to hold once it opens. Pinned here: it opens for an unfinished account, stays
-// open after the account becomes complete mid-flow (step 4 refreshing the
-// page-load data used to unmount the wizard mid-read), and never opens for an
-// account that arrived complete.
-const Probe = (props) => (useSetupGate(props) ? <i>setup</i> : <i>app</i>);
+// react-pin-input drives its per-digit focus through real timers, which jsdom
+// can't satisfy. Stand in a single input reporting the same thing the widget
+// reports (the concatenated value), as delete_account.test.js does.
+jest.mock("react-pin-input", () => {
+  const mockReact = require("react");
+  return {
+    __esModule: true,
+    default: ({ onChange }) =>
+      mockReact.createElement("input", {
+        className: "mock-pin",
+        onChange: (e) => onChange(e.target.value),
+      }),
+  };
+});
+
+// The takeover decides who owns the screen: the first-run wizard (no PIN
+// yet), the PIN-gated videos repair page (finished account, pool below the
+// floor), or the routes. It has to hold once it decides — the wizard's own
+// steps and the repair page's own edits are what satisfy the underlying
+// condition, so re-reading it live would tear either off the screen
+// mid-use. Pinned here: which takeover each account state gets, that a
+// decision sticks for the page load, and that no decision is made from a
+// half-arrived payload.
+const Probe = (props) => <i>{useTakeover(props) || "app"}</i>;
 
 const NEW_USER = { pin: "" };
 const SET_UP_USER = { pin: "1234" };
@@ -37,7 +56,7 @@ test("opens for an account that has not finished setup", () => {
     user: NEW_USER,
     settings: {},
     numEnabledVideos: 0,
-    onAdminPath: false,
+    onExemptPath: false,
   });
   expect(shown(container)).toBe("setup");
 });
@@ -47,13 +66,13 @@ test("stays open once the wizard's own steps satisfy the gate", () => {
     user: NEW_USER,
     settings: {},
     numEnabledVideos: 0,
-    onAdminPath: false,
+    onExemptPath: false,
   });
   render(container, {
     user: SET_UP_USER,
     settings: {},
     numEnabledVideos: 12,
-    onAdminPath: false,
+    onExemptPath: false,
   });
   expect(shown(container)).toBe("setup");
 });
@@ -63,27 +82,43 @@ test("never opens for an account that is already set up", () => {
     user: SET_UP_USER,
     settings: {},
     numEnabledVideos: 12,
-    onAdminPath: false,
+    onExemptPath: false,
   });
   expect(shown(container)).toBe("app");
 });
 
-test("opens on too few playable videos even with a PIN set", () => {
+test("a finished account short on videos gets the repair page, not the wizard", () => {
   render(container, {
     user: SET_UP_USER,
     settings: {},
     numEnabledVideos: 2,
-    onAdminPath: false,
+    onExemptPath: false,
   });
-  expect(shown(container)).toBe("setup");
+  expect(shown(container)).toBe("videos");
 });
 
-test("stays shut on an admin path with setup unfinished", () => {
+test("the repair takeover holds while its own edits fix the pool", () => {
+  render(container, {
+    user: SET_UP_USER,
+    settings: {},
+    numEnabledVideos: 2,
+    onExemptPath: false,
+  });
+  render(container, {
+    user: SET_UP_USER,
+    settings: {},
+    numEnabledVideos: 12,
+    onExemptPath: false,
+  });
+  expect(shown(container)).toBe("videos");
+});
+
+test("stays shut on an exempt path (admin, /pin) with setup unfinished", () => {
   render(container, {
     user: NEW_USER,
     settings: {},
     numEnabledVideos: 0,
-    onAdminPath: true,
+    onExemptPath: true,
   });
   expect(shown(container)).toBe("app");
 });
@@ -93,7 +128,7 @@ test("stays shut before the page-load data arrives", () => {
     user: null,
     settings: null,
     numEnabledVideos: null,
-    onAdminPath: false,
+    onExemptPath: false,
   });
   expect(shown(container)).toBe("app");
 });
@@ -215,4 +250,87 @@ test("no bounce when the check rejected", async () => {
     );
   });
   expect(goToVideosStep).not.toHaveBeenCalled();
+});
+
+// The repair page is the wizard's videos step behind the same PIN /settings
+// requires (PlaylistsFloorGate is the shared control): same floor, same
+// server tally, different exit. The gate renders inline here, so unlocking
+// means typing the code.
+const renderRepair = async (container, playableTotal) => {
+  global.fetch = jest.fn(() =>
+    Promise.resolve({
+      ok: true,
+      json: () =>
+        Promise.resolve({ playlists: [], playable_total: playableTotal }),
+    })
+  );
+  await act(async () => {
+    ReactDOM.render(
+      // The router context is for PinView's useParams: the inline gate never
+      // reads a route param, but the hook still needs a router above it.
+      <MemoryRouter>
+        <VideosRepairView token="t" apiUrl="/api/v1" user={SET_UP_USER} />
+      </MemoryRouter>,
+      container
+    );
+  });
+};
+
+const repairButton = (container) =>
+  [...container.querySelectorAll("button")].find(
+    (b) => b.textContent === "Start Playing!"
+  );
+
+const typePin = async (container, pin) => {
+  const input = container.querySelector("input.mock-pin");
+  const setValue = Object.getOwnPropertyDescriptor(
+    window.HTMLInputElement.prototype,
+    "value"
+  ).set;
+  await act(async () => {
+    setValue.call(input, pin);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+};
+
+afterEach(() => {
+  ClearSessionPin();
+  delete global.fetch;
+});
+
+test("the repair page asks for the PIN under its own heading", async () => {
+  await renderRepair(container, 0);
+  expect(container.querySelector("h2").textContent).toBe(
+    "Add videos to keep playing!"
+  );
+  expect(container.textContent).toMatch(/Enter your four digit PIN code/);
+  expect(repairButton(container)).toBeUndefined();
+});
+
+// This page stands in for /play, where the device changes hands, so an adult
+// session left over from an earlier visit must not carry into it.
+test("a leftover adult session neither unlocks the page nor survives it", async () => {
+  SetSessionPin(SET_UP_USER.pin);
+  await renderRepair(container, 0);
+  expect(container.textContent).toMatch(/Enter your four digit PIN code/);
+  expect(repairButton(container)).toBeUndefined();
+  expect(GetSessionPin()).toBe(null);
+});
+
+test("a wrong PIN leaves the page locked", async () => {
+  await renderRepair(container, 3);
+  await typePin(container, "9999");
+  expect(repairButton(container)).toBeUndefined();
+});
+
+test("the repair page gates Start Playing on the video floor", async () => {
+  await renderRepair(container, 2);
+  await typePin(container, SET_UP_USER.pin);
+  expect(repairButton(container).className).toMatch(/error/);
+});
+
+test("the repair page releases the gate at the floor", async () => {
+  await renderRepair(container, 3);
+  await typePin(container, SET_UP_USER.pin);
+  expect(repairButton(container).className).not.toMatch(/error/);
 });
