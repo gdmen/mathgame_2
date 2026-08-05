@@ -72,15 +72,21 @@ const RequireAuth = ({ isAuthenticated, children }) =>
 // PinView proves the code; this route decides where proving it lands you. The
 // redirect lives here rather than in the component so PinView stays usable by
 // callers that aren't routes at all (the videos repair page's inline gate).
+// It also supplies the page: this is the only surface where PinView is the
+// whole screen rather than a section of one, so it is the only place that has
+// to clear the menu band itself. The wizard step and the videos repair page
+// both sit inside pages that already carry that padding.
 const PinGateRoute = ({ user }) => {
   const { redirect_pathname } = useParams();
   return (
-    <PinView
-      verifyAgainst={user.pin}
-      onValid={() => {
-        window.location.pathname = decodeURIComponent(redirect_pathname);
-      }}
-    />
+    <div className="pin-page">
+      <PinView
+        verifyAgainst={user.pin}
+        onValid={() => {
+          window.location.pathname = decodeURIComponent(redirect_pathname);
+        }}
+      />
+    </div>
   );
 };
 

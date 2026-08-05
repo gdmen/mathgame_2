@@ -64,6 +64,32 @@ button {
   }
 }
 
+// Four-digit PIN entry (`PinView`). Here rather than in a page stylesheet for
+// the same reason as the modal below: three hosts mount it — the gate route,
+// the wizard's PIN step, and the videos repair page — and none of them owns it.
+.pin-form {
+  display: inline-block;
+  text-align: center;
+  width: 100%;
+
+  // The reset zeroes heading margins, and the two hosts that render the prompt
+  // supply none of their own, so it sat flush against the boxes. The component
+  // owns the gap for the same reason it owns the rest of its look: a host that
+  // happens to have a form wrapper shouldn't be the reason it reads correctly.
+  h4 {
+    margin-bottom: $base-space;
+  }
+}
+
+// Inline error text. `PinView`'s prompt is the only one in the app — turning it
+// red is the whole wrong-code cue — and each of those three hosts used to reach
+// the same span down its own selector chain. Element-qualified on purpose:
+// `p.error` carries its own spacing where it appears, and `button.submit.error`
+// is a disabled state, not red text.
+span.error {
+  color: $color-error;
+}
+
 // The PIN-confirmation modal (`PinConfirmModal`). It lives here rather than with
 // either caller because both the kid-facing play screen and the parent settings
 // page mount it; a per-page copy is how the two drifted before.

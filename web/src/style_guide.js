@@ -4,10 +4,10 @@ import PinInput from "react-pin-input";
 import "./style_guide.scss";
 // Import the SCSS files for the compound components we render below, so
 // every example uses the same styles users actually see. Adding a new
-// compound here means adding the corresponding @import.
+// compound here means adding the corresponding @import — unless it is a shared
+// component, whose styles are in components.scss and already global.
 import "./setup.scss";
 import "./settings.scss";
-import "./pin.scss";
 import "./play.scss";
 import "./progress.scss";
 
@@ -186,9 +186,14 @@ const StyleGuideView = () => {
         <h1>Style Guide</h1>
         <p>
           Source of truth for the design-system area. Token definitions live in{" "}
-          <code>web/src/styles.scss</code> and the bare-element reset in{" "}
-          <code>web/src/components.scss</code>; compound components are rendered
-          here using the production SCSS, so what you see is what users see.
+          <code>web/src/styles.scss</code>; the bare-element reset and the
+          styles for components mounted by more than one page — the PIN form,
+          the PIN-confirmation modal, inline error text — live in{" "}
+          <code>web/src/components.scss</code>. A page stylesheet is for what
+          that page alone renders; anything a second page mounts belongs here,
+          because a per-page copy is how the two drift. Compound components are
+          rendered on this page using the production SCSS, so what you see is
+          what users see.
         </p>
         <p>
           <strong>
@@ -664,11 +669,34 @@ const StyleGuideView = () => {
           passes <code>ariaLabel</code>, or the widget names each box after the
           digit inside it and reads a masked PIN aloud.
         </p>
+        <p>
+          The prompt above it turning red is the whole wrong-code cue, and it is
+          the app&rsquo;s only <code>span.error</code>. That declaration lives
+          in <code>components.scss</code> because <code>PinView</code> renders
+          in three hosts, each of which used to reach the same span down its own
+          selector chain. It is element-qualified deliberately:{" "}
+          <code>p.error</code> carries its own spacing where it appears, and{" "}
+          <code>button.submit.error</code> above is a disabled state, not red
+          text — a bare <code>.error</code> would repaint both.
+        </p>
+        <CompoundExample name="span.error" context="any">
+          <h4>
+            <span className="error">Enter your four digit PIN code.</span>
+          </h4>
+        </CompoundExample>
+        <p>
+          <code>.pin-form</code> owns the gap under that prompt. The reset
+          zeroes heading margins and the hosts that render the prompt supply
+          none of their own, so without it the question sits flush on the boxes.
+        </p>
         <CompoundExample
-          name="PinInput"
-          context='length=4, secret, ariaLabel, inputStyle={{ borderRadius: "0.25em" }}'
+          name=".pin-form"
+          context='components.scss; length=4, secret, ariaLabel, inputStyle={{ borderRadius: "0.25em" }}'
         >
           <div className="pin-form sg-pin-frame">
+            <h4>
+              <span>Enter your four digit PIN code.</span>
+            </h4>
             <PinInput
               length={4}
               initialValue={demoPin}
