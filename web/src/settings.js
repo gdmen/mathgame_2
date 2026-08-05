@@ -100,9 +100,9 @@ const SettingsCard = ({ title, question, wide, saveState, children }) => (
 // verb / noun-kind / noun-size / framing. Labels are parent vocabulary;
 // internal constants are feature-named (see server/api/enums.go).
 // Dependent entries (dependsOn) always render on their own row directly
-// below their parent and are disabled until the parent is on; parents with
-// dependents (hasDependent) sit at the bottom of their card. Toggle chips
-// never change size on any state change (selection is color-only).
+// below their parent and are disabled until the parent is on; a parent sits
+// at the bottom of its card so that row falls directly beneath it. Toggle
+// chips never change size on any state change (selection is color-only).
 const PROBLEM_TYPE_GROUPS = [
   {
     title: "Operations",
@@ -111,11 +111,7 @@ const PROBLEM_TYPE_GROUPS = [
       { bit: ProblemTypes.ADDITION, label: "Addition" },
       { bit: ProblemTypes.SUBTRACTION, label: "Subtraction" },
       { bit: ProblemTypes.DIVISION, label: "Division" },
-      {
-        bit: ProblemTypes.MULTIPLICATION,
-        label: "Multiplication",
-        hasDependent: true,
-      },
+      { bit: ProblemTypes.MULTIPLICATION, label: "Multiplication" },
       {
         bit: ProblemTypes.PERCENTAGES,
         label: "Percentages",
@@ -129,9 +125,9 @@ const PROBLEM_TYPE_GROUPS = [
     entries: [
       { bit: ProblemTypes.DECIMALS, label: "Decimals" },
       { bit: ProblemTypes.NEGATIVES, label: "Negative numbers" },
-      // Parents with dependents sit at the bottom of the card; the
-      // dependent renders on its own row directly below.
-      { bit: ProblemTypes.FRACTIONS, label: "Fractions", hasDependent: true },
+      // A parent sits at the bottom of the card; the dependent renders on its
+      // own row directly below.
+      { bit: ProblemTypes.FRACTIONS, label: "Fractions" },
       {
         bit: ProblemTypes.MISMATCHED_DENOMINATORS,
         label: "Different denominators",
@@ -161,7 +157,6 @@ const PROBLEM_TYPE_GROUPS = [
       {
         bit: ProblemTypes.CHAINED_OPERATIONS,
         label: "Multi-step (2+ operations)",
-        hasDependent: true,
       },
       {
         bit: ProblemTypes.PEMDAS,
@@ -172,31 +167,66 @@ const PROBLEM_TYPE_GROUPS = [
   },
 ];
 
-// applyToggleRules keeps dependent bits coherent when one toggles:
-// enabling LARGE auto-enables MEDIUM (no size gap), disabling a parent
-// auto-clears its dependents.
-const applyToggleRules = (bitmap, bit, enabled) => {
-  let b = enabled ? bitmap | bit : bitmap & ~bit;
-  if (enabled && bit === ProblemTypes.LARGE_NUMBERS) {
-    b |= ProblemTypes.MEDIUM_NUMBERS;
+const PROBLEM_TYPE_ENTRIES = PROBLEM_TYPE_GROUPS.reduce(
+  (all, group) => all.concat(group.entries),
+  []
+);
+
+// Requirement edges — { bit, requires } — mirroring validateBitmap's rules.
+// A dependent declares its edge as the `dependsOn` that also places and gates
+// its row; these are the rules whose two bits sit on different cards, so the
+// taxonomy has nowhere to say them.
+const CROSS_CARD_REQUIREMENTS = [
+  { bit: ProblemTypes.LARGE_NUMBERS, requires: ProblemTypes.MEDIUM_NUMBERS },
+  { bit: ProblemTypes.PERCENTAGES, requires: ProblemTypes.MEDIUM_NUMBERS },
+];
+
+const REQUIREMENTS = PROBLEM_TYPE_ENTRIES.filter(
+  (entry) => entry.dependsOn != null
+)
+  .map((entry) => ({ bit: entry.bit, requires: entry.dependsOn }))
+  .concat(CROSS_CARD_REQUIREMENTS);
+
+const isParent = (bit) =>
+  PROBLEM_TYPE_ENTRIES.some((entry) => entry.dependsOn === bit);
+
+// Walks REQUIREMENTS from `bit` in the given direction and returns it plus
+// every bit reached, transitively: a bit that gets cleared takes whatever
+// required it with it.
+const closure = (bit, from, to) => {
+  let reached = bit;
+  let grew = true;
+  while (grew) {
+    grew = false;
+    REQUIREMENTS.forEach((rule) => {
+      if ((reached & rule[from]) !== 0 && (reached & rule[to]) !== rule[to]) {
+        reached |= rule[to];
+        grew = true;
+      }
+    });
   }
-  if (enabled && bit === ProblemTypes.PERCENTAGES) {
-    b |= ProblemTypes.MEDIUM_NUMBERS;
-  }
-  if (!enabled && bit === ProblemTypes.MEDIUM_NUMBERS) {
-    b &= ~ProblemTypes.LARGE_NUMBERS;
-    b &= ~ProblemTypes.PERCENTAGES;
-  }
-  if (!enabled && bit === ProblemTypes.FRACTIONS) {
-    b &= ~ProblemTypes.MISMATCHED_DENOMINATORS;
-  }
-  if (!enabled && bit === ProblemTypes.CHAINED_OPERATIONS) {
-    b &= ~ProblemTypes.PEMDAS;
-  }
-  if (!enabled && bit === ProblemTypes.MULTIPLICATION) {
-    b &= ~ProblemTypes.PERCENTAGES;
-  }
-  return b;
+  return reached;
+};
+
+// applyToggleRules keeps the bitmap coherent when a chip toggles: enabling a
+// bit pulls in everything it requires (enabling LARGE pulls in MEDIUM — no
+// size gap), disabling one clears everything that required it.
+const applyToggleRules = (bitmap, bit, enabled) =>
+  enabled
+    ? bitmap | closure(bit, "bit", "requires")
+    : bitmap & ~closure(bit, "requires", "bit");
+
+// Errors render in the card holding the bits they concern, so a new error
+// code needs no placement list of its own. One whose bits belong to no card
+// (or that names none) falls back to the first, which beats computing an
+// error and never showing it — or throwing mid-render and taking the whole
+// screen with it, leaving nothing on screen to fix.
+const errorCardTitle = (err) => {
+  const bits = err.bits || [];
+  const group = PROBLEM_TYPE_GROUPS.find((g) =>
+    g.entries.some((entry) => bits.some((b) => (entry.bit & b) !== 0))
+  );
+  return (group || PROBLEM_TYPE_GROUPS[0]).title;
 };
 
 const ProblemTypesSettingsView = ({
@@ -232,21 +262,10 @@ const ProblemTypesSettingsView = ({
     commit(applyToggleRules(problemTypeBitmap, entry.bit, checked));
   };
 
-  // Anchor each validation error to the card it concerns.
-  const ERROR_GROUPS = {
-    NO_CORE_OP: "Operations",
-    LARGE_REQUIRES_MEDIUM: "Number size",
-    MISMATCHED_REQUIRES_FRACTIONS: "Number types",
-    PEMDAS_REQUIRES_CHAINED: "Problem format",
-    PERCENTAGES_REQUIRE_MULTIPLICATION: "Operations",
-    PERCENTAGES_REQUIRE_MEDIUM: "Operations",
-  };
   const errorsFor = (groupTitle) =>
     validation.valid
       ? []
-      : validation.errors.filter(
-          (err) => ERROR_GROUPS[err.code] === groupTitle
-        );
+      : validation.errors.filter((err) => errorCardTitle(err) === groupTitle);
 
   return (
     <SettingsCard
@@ -270,7 +289,7 @@ const ProblemTypesSettingsView = ({
                   const cls =
                     entry.dependsOn != null
                       ? "dep" + (parentOff ? " parent-off" : "")
-                      : entry.hasDependent
+                      : isParent(entry.bit)
                       ? "has-dep"
                       : "";
                   return (
@@ -1048,6 +1067,9 @@ const SettingsView = ({ token, apiUrl, user, settings }) => {
 export {
   MIN_PLAYABLE_VIDEOS,
   UNDO_WINDOW_MS,
+  PROBLEM_TYPE_GROUPS,
+  applyToggleRules,
+  errorCardTitle,
   ProblemTypesSettingsView,
   PlaylistsSettingsView,
   DeleteAccountView,

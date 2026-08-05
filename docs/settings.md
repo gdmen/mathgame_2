@@ -55,11 +55,12 @@ problem-generation.md "Bit reference").
 | Number size | How big can the numbers be? | MEDIUM_NUMBERS, LARGE_NUMBERS |
 | Problem format | How can problems be posed? | WORD, MISSING_NUMBER, SINGLE_VARIABLE, CHAINED_OPERATIONS → PEMDAS |
 
-`→` marks a **dependent** (`dependsOn`) rendered on its own row directly below its **parent**
-(`hasDependent`). Three dependent pairs exist: FRACTIONS→MISMATCHED_DENOMINATORS,
-CHAINED_OPERATIONS→PEMDAS, and MULTIPLICATION→PERCENTAGES (a percent problem asks for a percent OF
-a quantity — `n% of X` is a multiplication, so PERCENTAGES lives under its parent in Operations
-rather than in Number types). A parent with dependents sits at the bottom of its card so the
+`→` marks a **dependent** (`dependsOn`) rendered on its own row directly below its **parent**.
+Three dependent pairs exist: FRACTIONS→MISMATCHED_DENOMINATORS, CHAINED_OPERATIONS→PEMDAS, and
+MULTIPLICATION→PERCENTAGES (a percent problem asks for a percent OF a quantity — `n% of X` is a
+multiplication, so PERCENTAGES lives under its parent in Operations rather than in Number types).
+`dependsOn` is the **only** place a pair is declared: parenthood (`isParent`, the `has-dep` class),
+render-time gating, and the toggle math all read it. A parent sits at the bottom of its card so the
 dependent row falls directly beneath it. The Number size card also carries a `hint`.
 
 Card-to-bit placement is hand-maintained and NOT enforced by a test: every `ProblemTypes` bit
@@ -75,28 +76,38 @@ bit is off (`parentOff`) and styled `dep parent-off`; parents carry `has-dep`. T
 checked iff the bit is set in the current bitmap.
 
 **`applyToggleRules`** — the bit-math run on every toggle, mirroring the dependency rules so the
-saved bitmap is always valid:
+saved bitmap is always valid. It is **derived**, not a clause per pair: `REQUIREMENTS` is one list
+of `{ bit, requires }` edges, and a toggle walks it (`closure`) transitively in one direction or the
+other:
 
-| Action | Side effect | Why |
-|---|---|---|
-| enable LARGE_NUMBERS | also sets MEDIUM_NUMBERS | no size gap (mirrors LARGE ⇒ MEDIUM) |
-| disable MEDIUM_NUMBERS | also clears LARGE_NUMBERS | keeps LARGE ⇒ MEDIUM |
-| disable FRACTIONS | also clears MISMATCHED_DENOMINATORS | clears orphaned dependent |
-| disable CHAINED_OPERATIONS | also clears PEMDAS | clears orphaned dependent |
-| disable MULTIPLICATION | also clears PERCENTAGES | clears orphaned dependent |
-| enable PERCENTAGES | also sets MEDIUM_NUMBERS | percent literals are two-digit values (mirrors PERCENTAGES ⇒ MEDIUM) |
-| disable MEDIUM_NUMBERS | also clears PERCENTAGES | keeps PERCENTAGES ⇒ MEDIUM |
+| Toggle | Effect |
+|---|---|
+| enable | also sets everything the bit requires, and what those require |
+| disable | also clears everything that required the bit, and their dependents in turn |
 
-These cover the up-front-fixable rules. `NO_CORE_OP` and `MISMATCHED_REQUIRES_FRACTIONS` are not
-auto-fixed by toggling (you can't auto-pick an operation for the parent; enabling MISMATCHED without
-FRACTIONS is prevented by render-time gating since MISMATCHED depends on FRACTIONS), so they surface
-as validation errors instead.
+The edges come from two places, neither of them a hand-kept mirror of the other:
+
+- every `dependsOn` in `PROBLEM_TYPE_GROUPS` (MISMATCHED⇒FRACTIONS, PEMDAS⇒CHAINED,
+  PERCENTAGES⇒MULTIPLICATION), and
+- `CROSS_CARD_REQUIREMENTS` — the rules whose two bits sit on **different** cards, so the taxonomy
+  has nowhere to say them: LARGE⇒MEDIUM (no size gap) and PERCENTAGES⇒MEDIUM (percent literals are
+  two-digit values).
+
+So enabling LARGE or PERCENTAGES pulls MEDIUM in; disabling MEDIUM clears both; disabling a parent
+clears its dependent. Adding a `dependsOn` is enough to get the clearing — the failure mode this
+replaces was a pair declared in the taxonomy but forgotten in the toggle math, which left an orphan
+bit that `validateBitmap` rejects and the screen then silently refuses to save.
+`settings_toggle_rules.test.js` pins the invariant over the taxonomy rather than over today's bits:
+**every single toggle from a valid bitmap leaves a valid bitmap**.
+
+`NO_CORE_OP` is the one rule with nothing to derive from (you can't auto-pick an operation for the
+parent), so it surfaces as a validation error instead.
 
 ## Validation — `validateBitmap`
 
-`validateBitmap` returns `{ valid: true }` or `{ valid: false, errors: [{ code, message,
-offendingBits }] }`. It encodes the settings-level dependency rules from problem-generation.md
-("Settings-level dependency rules"):
+`validateBitmap` returns `{ valid: true }` or `{ valid: false, errors: [{ code, message, bits }] }`,
+where `bits` names the bits the error is about. It encodes the settings-level dependency rules from
+problem-generation.md ("Settings-level dependency rules"):
 
 | Code | Fires when | Anchored to card |
 |---|---|---|
@@ -107,9 +118,12 @@ offendingBits }] }`. It encodes the settings-level dependency rules from problem
 | `PERCENTAGES_REQUIRE_MULTIPLICATION` | PERCENTAGES set, MULTIPLICATION clear | Operations |
 | `PERCENTAGES_REQUIRE_MEDIUM` | PERCENTAGES set, MEDIUM_NUMBERS clear | Operations |
 
-Errors render inside the card they concern: `ERROR_GROUPS` maps each `code` to a card `title`, and
-`errorsFor` filters the error list per card. A new error code with no `ERROR_GROUPS` entry would be
-computed but never displayed. `errCallback` propagates `!valid` so the host screen can block save.
+Errors render inside the card they concern, and that placement is **derived**: `errorCardTitle`
+finds the card holding the error's `bits` (`NO_CORE_OP` carries the core-op mask, which is why it
+lands on Operations), and `errorsFor` filters the error list per card. An error whose bits belong to
+no card falls back to the first card rather than going unrendered — a computed-but-invisible error
+means the screen refuses to save with nothing on screen to fix. `errCallback` propagates `!valid` so
+the host screen can block save.
 
 ## The target-difficulty meter — `targetDifficultyRange`
 
@@ -225,8 +239,9 @@ on the card that changed, so a failure is attached to the control that caused it
    test until the mirror follows.
 3. **The saved bitmap is always valid OR not saved.** `commit` POSTs only when `validateBitmap`
    passes.
-4. **Dependent bits never outlive their parent.** Render-time gating plus the `applyToggleRules`
-   clears guarantee MISMATCHED ⇒ FRACTIONS and PEMDAS ⇒ CHAINED hold in the composed bitmap.
+4. **Dependent bits never outlive their parent.** Render-time gating plus `applyToggleRules`
+   guarantee every `dependsOn` edge holds in the composed bitmap. Both halves read the same
+   `dependsOn` declaration, so a pair cannot be gated on screen but unenforced in the bit math.
 
 ## Gotchas
 
@@ -235,14 +250,15 @@ on the card that changed, so a failure is attached to the control that caused it
   invert the band (mirroring the server), which keeps the clamp safe but would make the denominator
   0 in that (currently unreachable) case; every valid envelope's floor sits strictly below its
   ceiling (property-tested server-side in `TestTargetDifficultyRange`).
-- **Card and error placement are hand-maintained.** `PROBLEM_TYPE_GROUPS` and `ERROR_GROUPS` are not
-  derived from the enum; a new bit or error code can be computed but invisible until added to these
-  maps.
+- **Card placement is hand-maintained.** `PROBLEM_TYPE_GROUPS` is not derived from the enum; a new
+  bit can be computed but invisible until placed. Error placement and the toggle math are derived
+  from it, so those follow on their own once the bit is placed.
 
 ## Related files
 
-- `web/src/settings.js` — `PROBLEM_TYPE_GROUPS`, `applyToggleRules`, `ProblemTypesSettingsView`,
-  `ERROR_GROUPS`, `TargetDifficultySettingsView`, `PlaylistsSettingsView`, `PlaylistRow`,
+- `web/src/settings.js` — `PROBLEM_TYPE_GROUPS`, `CROSS_CARD_REQUIREMENTS`, `REQUIREMENTS`,
+  `closure`, `applyToggleRules`, `isParent`, `errorCardTitle`, `ProblemTypesSettingsView`,
+  `TargetDifficultySettingsView`, `PlaylistsSettingsView`, `PlaylistRow`,
   `SettingsCard`, `useSaveState`, `MIN_PLAYABLE_VIDEOS`, `SettingsView`, `postSettings`,
   `DeleteAccountView`.
 - `server/api/custom_handlers.go` — `customListPlaylists` (returns `PlaylistWithCounts`),
@@ -264,9 +280,11 @@ Walk the full new-bit checklist in problem-generation.md; the settings-screen to
 
 1. Add the bit to `web/src/enums.js` `ProblemTypes` (matches `server/mathcore/problem_type.go`).
 2. Place it in `PROBLEM_TYPE_GROUPS` — pick the card (verb / noun-kind / noun-size / framing), label
-   (parent vocabulary), and `dependsOn`/`hasDependent` if it's part of a dependency pair.
-3. If it adds a dependency rule: add a check + error code to `validateBitmap`, an `ERROR_GROUPS`
-   entry mapping the code to its card, and (if up-front fixable) an `applyToggleRules` clause.
+   (parent vocabulary), and `dependsOn` if it's part of a dependency pair (that one field gets the
+   row placement, the gating, and the toggle math).
+3. If it adds a dependency rule: add a check + error code to `validateBitmap` with the `bits` the
+   error concerns. Placement and toggle clearing are derived — a rule whose two bits sit on
+   different cards needs a `CROSS_CARD_REQUIREMENTS` edge, since `dependsOn` can't express it.
 4. If it changes the difficulty formula: update `maxDiffForBitmap` in lockstep with the server
    `MaxDiffForBitmap`.
 5. Update this doc and its anchor block (the doc-sync test fails CI otherwise).
