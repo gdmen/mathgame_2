@@ -3,7 +3,12 @@ import ReactDOM from "react-dom";
 import { act } from "react-dom/test-utils";
 import { MemoryRouter } from "react-router-dom";
 
-import { VideosRepairView, StartPlayingTabView, useTakeover } from "./setup.js";
+import {
+  VideosRepairView,
+  PinTabView,
+  StartPlayingTabView,
+  useTakeover,
+} from "./setup.js";
 import { SetSessionPin, GetSessionPin, ClearSessionPin } from "./pin.js";
 
 // react-pin-input drives its per-digit focus through real timers, which jsdom
@@ -307,14 +312,15 @@ test("the repair page asks for the PIN under its own heading", async () => {
   expect(repairButton(container)).toBeUndefined();
 });
 
-// This page stands in for /play, where the device changes hands, so an adult
-// session left over from an earlier visit must not carry into it.
-test("a leftover adult session neither unlocks the page nor survives it", async () => {
+// This page stands in for /play, where the device changes hands, so it never
+// reads the session: the code has to be typed here. Dropping that leftover
+// session is no longer this view's job — one rule in pin.js clears it for any
+// takeover, and pin_gate.test.js pins that half.
+test("a leftover adult session does not unlock the page", async () => {
   SetSessionPin(SET_UP_USER.pin);
   await renderRepair(container, 0);
   expect(container.textContent).toMatch(/Enter your four digit PIN code/);
   expect(repairButton(container)).toBeUndefined();
-  expect(GetSessionPin()).toBe(null);
 });
 
 test("a wrong PIN leaves the page locked", async () => {
@@ -333,4 +339,70 @@ test("the repair page releases the gate at the floor", async () => {
   await renderRepair(container, 3);
   await typePin(container, SET_UP_USER.pin);
   expect(repairButton(container).className).not.toMatch(/error/);
+});
+
+// The wizard's PIN step is the one caller that authors a code instead of
+// proving one, so it is the one place PinView's verification is switched off.
+// Untested until now, and the failure it guards against is total: a step that
+// verified against a PIN the account does not have yet would reject every
+// entry, and a first-run parent could never finish onboarding.
+const renderPinTab = (container, user, advanceSetup = () => {}) =>
+  act(() => {
+    ReactDOM.render(
+      <PinTabView
+        token="t"
+        apiUrl="/api/v1"
+        user={user}
+        advanceSetup={advanceSetup}
+      />,
+      container
+    );
+  });
+
+const continueButton = (container) => container.querySelector("button.submit");
+
+test("the wizard's PIN step accepts a code the account does not have yet", async () => {
+  global.fetch = jest.fn(() => Promise.resolve({ json: () => ({}) }));
+  const user = { auth0_id: "auth0|abc", pin: "" };
+  renderPinTab(container, user);
+
+  expect(continueButton(container).className).toMatch(/error/);
+
+  await typePin(container, "8080");
+  expect(continueButton(container).className).not.toMatch(/error/);
+  expect(GetSessionPin()).toBe("8080");
+});
+
+test("the wizard's PIN step writes the authored code and advances", async () => {
+  global.fetch = jest.fn(() => Promise.resolve({ json: () => ({}) }));
+  const advanceSetup = jest.fn();
+  const user = { auth0_id: "auth0|abc", pin: "" };
+  renderPinTab(container, user, advanceSetup);
+
+  await typePin(container, "8080");
+  await act(async () => {
+    continueButton(container).dispatchEvent(
+      new MouseEvent("click", { bubbles: true })
+    );
+  });
+
+  expect(user.pin).toBe("8080");
+  expect(global.fetch).toHaveBeenCalled();
+  expect(advanceSetup).toHaveBeenCalled();
+});
+
+test("the wizard's PIN step does not rewrite an unchanged prefilled code", async () => {
+  global.fetch = jest.fn(() => Promise.resolve({ json: () => ({}) }));
+  const advanceSetup = jest.fn();
+  SetSessionPin("1234");
+  renderPinTab(container, { auth0_id: "auth0|abc", pin: "1234" }, advanceSetup);
+
+  await act(async () => {
+    continueButton(container).dispatchEvent(
+      new MouseEvent("click", { bubbles: true })
+    );
+  });
+
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(advanceSetup).toHaveBeenCalled();
 });

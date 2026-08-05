@@ -1,9 +1,7 @@
 import React, { useState } from "react";
 import PinInput from "react-pin-input";
 
-import { PIN_DIGIT_LABEL } from "./pin.js";
-
-const PIN_LENGTH = 4;
+import { PIN_DIGIT_LABEL, PIN_LENGTH } from "./pin.js";
 
 // The PIN re-entry gate an adult passes before an action a kid must not be able
 // to trigger: reporting a problem, deleting the account. It owns the typed PIN

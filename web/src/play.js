@@ -5,7 +5,6 @@ import "katex/dist/katex.min.css";
 
 import { ProblemView, PreprocessExpression } from "./problem.js";
 import { VideoView } from "./video.js";
-import { ClearSessionPin } from "./pin.js";
 import { PinConfirmModal } from "./pin_confirm_modal.js";
 
 import "./play.scss";
@@ -104,8 +103,6 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
   const [reportExplanation, setReportExplanation] = useState("");
   const [reportError, setReportError] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
-
-  ClearSessionPin();
 
   useEffect(() => {
     // The 403 branch navigates the whole document, so a response landing

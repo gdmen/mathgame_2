@@ -5,7 +5,7 @@ import {
   ProblemTypesSettingsView,
   PlaylistsSettingsView,
 } from "./settings.js";
-import { GetSessionPin, ClearSessionPin, PinView } from "./pin.js";
+import { GetSessionPin, PinView } from "./pin.js";
 import "./settings.scss";
 import "./setup.scss";
 
@@ -181,7 +181,20 @@ const PinTabView = ({ token, apiUrl, user, advanceSetup }) => {
         You'll need it to change these settings later.
       </p>
       <div className="setup-form">
-        <PinView user={user} isSetup={true} errCallback={errCallback} />
+        {/*
+          The one caller that authors a code rather than proving one, so it
+          opts out of every gate default: nothing to verify against, the
+          existing code prefilled for a parent who stepped back to this step,
+          and unmasked because they have to read back what they are choosing.
+          The step's own heading already names the PIN, so no second prompt.
+        */}
+        <PinView
+          authoring
+          prompt={null}
+          initialValue={user.pin}
+          secret={false}
+          errCallback={errCallback}
+        />
         <button
           className={error ? "submit error" : "submit"}
           onClick={handleSubmitClick}
@@ -307,15 +320,9 @@ const useTakeover = ({ user, settings, numEnabledVideos, onExemptPath }) => {
 // should read why they are suddenly being asked for a code.
 const VideosRepairView = ({ token, apiUrl, user }) => {
   // sessionStorage is not reactive; entering the code flips this to re-render
-  // past the gate. It always starts locked, and any session left over from an
-  // adult's earlier visit is dropped on arrival — this page stands in for
-  // /play, which is where the device changes hands, and PlayView clears the
-  // session for exactly that reason. Honouring a cached session here would
-  // hand the playlist editor to whoever picked the tablet up next.
+  // past the gate. It always starts locked regardless of any cached session:
+  // this page stands in for /play, which is where the device changes hands.
   const [unlocked, setUnlocked] = useState(false);
-  useEffect(() => {
-    ClearSessionPin();
-  }, []);
   return (
     <div id="videos-repair" className="settings">
       <h2>Add videos to keep playing!</h2>
@@ -330,7 +337,7 @@ const VideosRepairView = ({ token, apiUrl, user }) => {
           }}
         />
       ) : (
-        <PinView user={user} onSuccess={() => setUnlocked(true)} />
+        <PinView verifyAgainst={user.pin} onValid={() => setUnlocked(true)} />
       )}
     </div>
   );
@@ -437,4 +444,10 @@ const SetupView = ({
   );
 };
 
-export { SetupView, VideosRepairView, StartPlayingTabView, useTakeover };
+export {
+  SetupView,
+  VideosRepairView,
+  PinTabView,
+  StartPlayingTabView,
+  useTakeover,
+};
