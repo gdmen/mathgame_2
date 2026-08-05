@@ -19,11 +19,7 @@ $playlist-row-content: 2.125em;
 }
 
 .settings {
-  margin: 0 auto;
-  max-width: $max-width;
-  // Top padding balances the space the header puts below itself, and gives the
-  // title room to clear the full-bleed menu band (same shape as #problem).
-  padding: 1.75 * $base-space $base-space 0;
+  @include page-under-band;
   text-align: center;
 
   // The page title. Every other page uses an h1 for this; settings was the one

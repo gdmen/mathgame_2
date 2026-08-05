@@ -30,9 +30,7 @@
 }
 
 #problem {
-  margin: 0 auto;
-  max-width: $max-width;
-  padding: $base-space $base-space 0;
+  @include page-under-band;
   text-align: center;
   &.submitting {
     #problem-answer-input {

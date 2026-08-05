@@ -81,6 +81,19 @@ p {
 $base-space: 1em;
 $max-width: 1200px;
 
+// Every in-app page sits directly under the full-bleed green menu band, and
+// #content carries no padding of its own — so each page owns the gutter that
+// centres it and the clearance that keeps its first line off the band. That was
+// four separate answers before it was one mixin (1.75em, 1.75em, 1em, and none
+// at all, which left the progress heading flush against the green), so use this
+// rather than restating the numbers: a page that opts out is opting out
+// visibly.
+@mixin page-under-band {
+  margin: 0 auto;
+  max-width: $max-width;
+  padding: 1.75 * $base-space $base-space 0;
+}
+
 // shape
 $base-radius: 0.5em;
 $radius-small: 0.25em;
