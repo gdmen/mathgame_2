@@ -275,7 +275,6 @@ inverts the convention and is dry-run **by default**, writing only under
 |---|---|---|
 | `recompute_problem_type_bitmap` | `-dry-run`, `-limit` | restamps `problem_type_bitmap` via the admission pipeline; SET (re-runnable); WORD rows with a `symbolic_expression` restamp from the skeleton (`WordFormBitmap`, matching the insert path); applies the lone-letter `?` rewrite; prints lexer/zero-bitmap/unknown-rule/skeleton-reject reports. Run **before** the difficulty tool. |
 | `recompute_problem_difficulty` | `-dry-run`, `-limit` | restamps the `difficulty` column from `ComputeProblemDifficulty`; idempotent; skips rows already at `DifficultyVersion`. Run **after** the bitmap tool. |
-| `migrate_division_notation` | `-dry-run`, `-limit` | one-time obelus cutover: rewrites legacy spaced-slash division (` / ` → ` ÷ `) in non-WORD `expression` and WORD `symbolic_expression`; re-run-safe; purely notational (no `recompute_*`, no `DifficultyVersion` bump). Run it during the `llm_0.6` deploy **before** the server serves or any `recompute_*` re-lexes a row (an un-migrated spaced slash would mis-lex as a fraction). |
 
 ### Manual cleanup (not scheduled)
 
@@ -295,7 +294,6 @@ only — nothing on the host runs it.
 | Tool | Flags | Purpose |
 |---|---|---|
 | `compare_generators` | `-cells`, `-samples`, `-seed`, `-mode` | informational heuristic_2.0 review (#283): reads the pool from a snapshot and reports LLM-offload + coverage gaps. `-mode=samples` (default) puts fresh heuristic_2.0 output beside stored heuristic_1.0/llm rows in the highest-volume cells; `-mode=matrix` instead prints a complete per-bitmap difficulty-coverage grid over every distinct symbolic bitmap (not just the volume-ranked top). Writes nothing; needs MySQL creds in `conf.json`. Counts only `status = 'active'` rows (the post-migration-46 successor to `disabled = 0`). NOT a merge gate (the CI B-gate is). |
-| `verify_migrations` | `-before-config`, `-after-config` | one-off consistency check across the video de-dup/remap migrations (a pre-migration DB vs. a migrated one); does not run migrations. |
 | `clean_test_dbs` | `-config` (default `test_conf.json`) | drops `mathgame_test_*` databases; invoked by `make clean`. |
 
 ## The watchdog (`deploy/watchdog.sh`)
@@ -341,9 +339,8 @@ watchdog a quiet no-op. To add a watch, append a
 - `.github/workflows/web-bundle-secrets.yml` — CI: the bundle secret scan.
 - `cmd/apiserver/main.go` — `main` runs `api.RunMigrations` on API startup.
 - `cmd/maintenance_server/main.go` — `Handler` (503 page), `main` (TLS guard).
-- `cmd/recompute_problem_type_bitmap/main.go`, `cmd/recompute_problem_difficulty/main.go`,
-  `cmd/migrate_division_notation/main.go` — generation
-  backfills (contract in `docs/problem-generation.md`).
+- `cmd/recompute_problem_type_bitmap/main.go`, `cmd/recompute_problem_difficulty/main.go` —
+  generation backfills (contract in `docs/problem-generation.md`).
 - `cmd/compare_generators/main.go` — heuristic_2.0 vs heuristic_1.0/llm pool comparison (#283).
 
 ## Extension checklists

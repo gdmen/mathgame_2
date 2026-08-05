@@ -129,8 +129,7 @@ The orchestration lives in
 `DifficultyVersion` bump**.
 
 `llm_0.6` also lands the **obelus cutover**: division is written `÷` everywhere (a bare `/` is a
-fraction), so the narrator prompt and validator form use `÷`, and a one-time
-`cmd/migrate_division_notation` rewrites legacy spaced-slash rows. Purely notational — no
+fraction), so the narrator prompt and validator form use `÷`. Purely notational — no
 `recompute_*`. The notation rule is owned by [problem-generation.md](problem-generation.md).
 
 ### `llm_0.7` — word narratability policy
