@@ -403,6 +403,24 @@ const StyleGuideView = () => {
             />
           ))}
         </div>
+        <h3>Page layout</h3>
+        <p>
+          Every in-app page sits directly under the full-bleed menu band, and{" "}
+          <code>#content</code> has no padding of its own, so each page owns the
+          gutter that centres it and the clearance that keeps its first line off
+          the green. That is one mixin — <code>@include page-under-band</code>{" "}
+          in <code>styles.scss</code>: <code>margin: 0 auto</code>,{" "}
+          <code>max-width: $max-width</code>,{" "}
+          <code>padding: 1.75 * $base-space $base-space 0</code>. Used by{" "}
+          <code>.settings</code>, <code>#problem</code>,{" "}
+          <code>.progress-page</code> and <code>.pin-page</code>.
+        </p>
+        <p>
+          Reach for it on any new page rather than restating the numbers. Left
+          to each page these had drifted to four different answers, and the one
+          that had drifted to nothing put the Progress heading flush against the
+          band.
+        </p>
       </Section>
 
       <Section title="Shape">

@@ -1,9 +1,7 @@
 @import "styles.scss";
 
 .progress-page {
-  max-width: $max-width;
-  margin: 0 auto;
-  padding: 0 $base-space;
+  @include page-under-band;
 }
 
 .progress-header {
