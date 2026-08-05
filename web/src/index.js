@@ -1,6 +1,12 @@
 import React, { useCallback, useEffect, useState } from "react";
 import ReactDOM from "react-dom";
-import { BrowserRouter, Redirect, Route, Switch } from "react-router-dom";
+import {
+  BrowserRouter,
+  Redirect,
+  Route,
+  Switch,
+  useParams,
+} from "react-router-dom";
 
 import { Auth0Provider } from "@auth0/auth0-react";
 import { useAuth0 } from "@auth0/auth0-react";
@@ -8,7 +14,7 @@ import { useAuth0 } from "@auth0/auth0-react";
 import { LoginButton, LogoutButton } from "./auth0.js";
 
 import { SetupView, VideosRepairView, useTakeover } from "./setup.js";
-import { PinView, ClearSessionPin } from "./pin.js";
+import { PinView, usePinSessionPolicy } from "./pin.js";
 import { SettingsView } from "./settings.js";
 import { PlayView } from "./play.js";
 import { ProgressView } from "./progress.js";
@@ -34,7 +40,6 @@ const conf = require("./conf");
 const ApiUrl = conf.api_host + ":" + conf.api_port + "/api/v1";
 
 const NotFound = () => {
-  ClearSessionPin();
   return (
     <div className="not-found">
       <h1>404</h1>
@@ -63,6 +68,21 @@ const ToLanding = () => {
 // blank screen; send them to the landing page (which offers Login/Signup).
 const RequireAuth = ({ isAuthenticated, children }) =>
   isAuthenticated ? children : <ToLanding />;
+
+// PinView proves the code; this route decides where proving it lands you. The
+// redirect lives here rather than in the component so PinView stays usable by
+// callers that aren't routes at all (the videos repair page's inline gate).
+const PinGateRoute = ({ user }) => {
+  const { redirect_pathname } = useParams();
+  return (
+    <PinView
+      verifyAgainst={user.pin}
+      onValid={() => {
+        window.location.pathname = decodeURIComponent(redirect_pathname);
+      }}
+    />
+  );
+};
 
 // The marketing page at "/" is static HTML outside the React app (#329), so it
 // cannot call Auth0 itself. Its CTAs point here instead: this route exists only
@@ -106,6 +126,7 @@ const MainView = ({
     numEnabledVideos,
     onExemptPath,
   });
+  usePinSessionPolicy(takeover);
   // Hold the routes until the whole pageload payload is in, not just the
   // settings. It arrives as three unbatched setStates, and on the pass where
   // the video count is still null the gate rightly refuses to decide — but
@@ -153,7 +174,7 @@ const MainView = ({
           </Route>
           <Route exact path="/pin/:redirect_pathname">
             <RequireAuth isAuthenticated={isAuthenticated}>
-              <PinView user={user} />
+              <PinGateRoute user={user} />
             </RequireAuth>
           </Route>
           <Route exact path="/play">

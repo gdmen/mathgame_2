@@ -176,7 +176,8 @@ once `solved >= target`. Notable behavior:
   `conf.event_reporting_interval` wiring.
 - `web/src/conf.json` — `event_reporting_interval`, `debug_quickplay`.
 - `web/src/problem_reporting.test.js` — pins the `working_on_problem` add/remove lifecycle.
-- `web/src/pin.js` — `RequirePin`, `ClearSessionPin` (the play view clears the session PIN).
+- `web/src/pin.js` — `RequirePin`. The play view no longer clears the session PIN itself; one
+  pathname-keyed rule in `index.js` owns that (see [accounts.md](accounts.md)).
 - `web/src/pin_confirm_modal.js` — the shared PIN-confirmation modal the report flow renders;
   shape and styles are the design system's (`/style-guide`, `components.scss`).
 - `server/api/event_types.go` — authoritative event-type constants.

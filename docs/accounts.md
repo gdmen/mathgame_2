@@ -169,7 +169,29 @@ keeps a kid from wandering into adult surfaces.
 |---|---|
 | `SetSessionPin` / `GetSessionPin` / `ClearSessionPin` | read/write/clear the `sessionStorage` entry |
 | `RequirePin(correctPin)` | route guard: redirects to `/pin/<encoded current path>` unless the session PIN equals `correctPin`; returns whether access is allowed |
-| `PinView` | four-digit entry component (`react-pin-input`), used in setup (`isSetup`), at the `/pin/:redirect_pathname` gate route, and as the videos repair page's inline gate. `isSetup` suppresses its prompt heading (the wizard step names the PIN in its own heading; everywhere else the prompt is the page's only cue) and prefills the current code (authoring; a gate never prefills). Gate-mode success either navigates back to `redirect_pathname` or, when `onSuccess` is passed (the inline gate), calls it and stays put |
+| `PinView` | four-digit entry component (`react-pin-input`). Takes no router: `verifyAgainst`, `authoring`, `initialValue`, `secret`, `prompt`, `onValid`, `errCallback` |
+| `usePinSessionPolicy(takeover)` | the one rule that drops the session PIN (see Gotchas) |
+
+**`PinView` has no modes.** Every prop defaults to gate behaviour — start empty, mask, show the
+prompt, and verify — so a new caller is gated by construction. Its three callers differ only in
+which defaults they override:
+
+| Caller | Overrides | Why |
+|---|---|---|
+| `PinGateRoute` (`index.js`, `/pin/:redirect_pathname`) | `verifyAgainst`, `onValid` | the route reads `redirect_pathname` and navigates; `PinView` never touches the router |
+| `VideosRepairView` (`setup.js`) | `verifyAgainst`, `onValid` | inline gate — stays put and flips its own `unlocked` state |
+| `PinTabView` (`setup.js`) | `authoring`, `prompt={null}`, `initialValue`, `secret={false}` | the only caller *authoring* a code: nothing to verify against, the existing code prefilled for a parent who stepped back, and readable because they are choosing it |
+
+A valid entry always stores the session PIN and then calls `onValid`; where that lands you is the
+caller's business. This is why the inline gate no longer needs a `MemoryRouter` around it in tests —
+the component used to call `useParams()` for a value two of its three callers never read.
+
+**Skipping verification has to be asked for, and `verifyAgainst` has no default.** A gate written
+without it compares against `undefined`, so it rejects every entry instead of accepting every entry
+— the failure mode of forgetting a prop here is a gate that won't open, never one that always does.
+That direction is the whole reason `authoring` is a separate prop rather than "no `verifyAgainst`
+means don't verify", which is what the first cut of this refactor did. `pin_gate.test.js` pins it
+for `undefined`, `null` and `""`.
 
 Every PIN field in the app — this gate and the shared `PinConfirmModal` — passes
 `inputMode="numeric"` to `react-pin-input`. `"number"` is not a value the spec defines: browsers
@@ -366,11 +388,21 @@ kept, because saying "deletes everything" would be a promise this endpoint does 
   runs first and redirects to `/pin/...` unless the session PIN already equals `user.pin`; the
   `PinView` gate-mode check only runs after that redirect.
   Both compare against `user.pin` by equality (#274).
-- **`ClearSessionPin` fires on several routes.** Rendering the 404 page, the home view, or the
-  play view clears the session PIN (`index.js`, `play.js`), so leaving a protected area drops the
-  gate. `VideosRepairView` clears it too: it takes over `/play` *instead of* `PlayView`
-  when the pool is short, so without its own clear the one kid-facing surface that matters would
-  be the one that skipped it.
+- **One rule drops the session PIN, and it is stated positively.** `usePinSessionPolicy(takeover)`
+  (`pin.js`, called once from `MainView`) clears the session unless a protected surface is actually
+  on screen — the **router** matches the location against `PIN_PROTECTED_PATHS` (today just
+  `/settings`) **and** no takeover is holding the screen. The entries are route patterns, matched
+  with `useRouteMatch`, not URLs compared as strings: `<Route exact path="/settings">` is neither
+  strict nor case-sensitive, so it renders the settings page for `/settings/` and `/SETTINGS` too,
+  and a string compare called those unprotected — clearing the session on the one page the rule
+  exists to protect and leaving the gate redirecting to itself. Both halves matter: a takeover replaces whatever the path would have
+  rendered, so the videos repair page intercepting `/settings` is not the settings page, and that
+  page stands in for `/play`, where the device changes hands. A screen is therefore gated by
+  *default* — the earlier shape had `NotFound`, `PlayView` and `VideosRepairView` each remembering
+  their own `ClearSessionPin`, in two different idioms, and the third only got its call because a
+  reviewer asked. Adding a protected surface means adding it to that list; adding any other screen
+  needs nothing. `pin_gate.test.js` pins both halves. The delete-account clear in `settings.js`
+  stays separate: it means "this account is gone", not "you left the area".
 - **The `/admin` group sits inside `authed`, so admin routes inherit `RequireSelf` too.** Harmless
   today (no admin route names a user), but an operator route that must read *another* account's data
   cannot live there: it would 403 for the operator. Such a route has to be registered outside
