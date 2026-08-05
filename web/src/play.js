@@ -94,7 +94,14 @@ class EventReporterSingleton {
   }
 }
 
-const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
+const PlayView = ({
+  token,
+  apiUrl,
+  user,
+  postEvent,
+  interval,
+  refreshPageLoadData,
+}) => {
   const [gamestate, setGamestate] = useState(null);
   const [problem, setProblem] = useState(null);
   const [latex, setLatex] = useState(null);
@@ -103,15 +110,21 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
   const [reportExplanation, setReportExplanation] = useState("");
   const [reportError, setReportError] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [blocked, setBlocked] = useState(false);
 
+  // The id, not the user object: the 403 branch refetches `/pageload`, which
+  // hands down a fresh object every time, and an effect keyed on the object
+  // would answer its own 403 with another /play request.
+  const userId = user == null ? null : user.id;
   useEffect(() => {
-    // The 403 branch navigates the whole document, so a response landing
-    // after unmount must be dropped: the view that asked is gone, and
-    // whatever replaced it must not be torn down by its predecessor's answer.
+    // The 403 branch writes app-wide state, so a response landing after
+    // unmount must be dropped: the view that asked is gone, and whatever
+    // replaced it must not have the payload it is reading rewritten by its
+    // predecessor's answer.
     let cancelled = false;
     const getPlayData = async () => {
       try {
-        if (token == null || apiUrl == null || user == null) {
+        if (token == null || apiUrl == null || userId == null) {
           return;
         }
         var reqParams = {
@@ -122,14 +135,23 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
             Authorization: "Bearer " + token,
           },
         };
-        var req = await fetch(apiUrl + "/play/" + user.id, reqParams);
+        var req = await fetch(apiUrl + "/play/" + userId, reqParams);
         const text = await req.text();
         if (cancelled) {
           return;
         }
         if (!req.ok) {
           if (req.status === 403) {
-            window.location.pathname = "/";
+            // Most likely the pool is below the floor, so re-read the count:
+            // the takeover hands the screen to the videos repair page, which
+            // is where a signed-in parent can fix it. Reaching the line after
+            // means it didn't — a failed read, or a 403 this view can't name
+            // (RequireSelf raises one too) — and a spinner that never resolves
+            // is not an answer.
+            await refreshPageLoadData();
+            if (!cancelled) {
+              setBlocked(true);
+            }
           }
           return;
         }
@@ -156,7 +178,7 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
     return () => {
       cancelled = true;
     };
-  }, [token, apiUrl, user]);
+  }, [token, apiUrl, userId, refreshPageLoadData]);
 
   useEffect(() => {
     const renderLatex = async () => {
@@ -245,6 +267,19 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
       cancelled = true;
     };
   }, [solved, target, quickplayVideoId, correctAnswer]);
+
+  // The stock message block (`.not-found`, see /style-guide): centred text and
+  // a way out, which is the whole point here — whoever is at the screen is not
+  // getting a game this load.
+  if (blocked) {
+    return (
+      <div className="not-found">
+        <h1>Hold on</h1>
+        <p>We couldn't start the game.</p>
+        <a href="/settings">Ask a grown-up to check Settings</a>
+      </div>
+    );
+  }
 
   if (!gamestate || !problem || !eventReporter) {
     return <div className="content-loading"></div>;

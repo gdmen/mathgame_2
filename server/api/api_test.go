@@ -168,7 +168,10 @@ func insertPlaylistWithVideos(t *testing.T, api *Api, youTubeID string, videoIDs
 	return uint32(pid)
 }
 
-func TestPlay_RequiresAtLeastOneVideo(t *testing.T) {
+// The floor the client gates on (MIN_PLAYABLE_VIDEOS) is the floor /play
+// enforces: an account the wizard would hold back must not be playable by
+// asking the API directly.
+func TestPlay_RequiresPlayableVideoFloor(t *testing.T) {
 	c, err := common.ReadConfig("../../test_conf.json")
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
@@ -186,14 +189,14 @@ func TestPlay_RequiresAtLeastOneVideo(t *testing.T) {
 		}
 	})
 
-	t.Run("SuccessWhenOneOrMore", func(t *testing.T) {
+	t.Run("SuccessAtTheFloor", func(t *testing.T) {
 		user2 := createTestUser(t, r, "auth0id|playtest2", "play2@test.com", "playtest2")
-		insertVideosAndUserHasVideo(t, api, user2.Id, 1)
+		insertVideosAndUserHasVideo(t, api, user2.Id, minPlayableVideos)
 		resp := httptest.NewRecorder()
 		req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/play/%d?test_auth0_id=%s", user2.Id, user2.Auth0Id), nil)
 		r.ServeHTTP(resp, req)
 		if resp.Code != http.StatusOK {
-			t.Errorf("expected 200 when user has 1 video, got %d: %s", resp.Code, resp.Body.Bytes())
+			t.Errorf("expected 200 when user has %d videos, got %d: %s", minPlayableVideos, resp.Code, resp.Body.Bytes())
 		}
 		body, _ := ioutil.ReadAll(resp.Body)
 		var pd struct {
@@ -206,6 +209,57 @@ func TestPlay_RequiresAtLeastOneVideo(t *testing.T) {
 		}
 		if pd.Gamestate == nil || pd.Problem == nil || pd.Video == nil {
 			t.Errorf("expected gamestate, problem, video in response; got %+v", pd)
+		}
+	})
+}
+
+// The reward rotates away from the video just watched when the pool can spare
+// another, and repeats it when it can't. A one-video pool is the case that
+// makes the floor of 1 mean anything: the exclusion has to yield, or every
+// reward cycle hands back the null sentinel instead of the kid's video.
+func TestSelectVideo_ExclusionsAreAPreference(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("Couldn't read config: %v", err)
+	}
+	api, r, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+
+	t.Run("RepeatsTheOnlyVideo", func(t *testing.T) {
+		user := createTestUser(t, r, "auth0id|selvid-one", "selvid1@test.com", "selvid1")
+		ids := insertVideosAndUserHasVideo(t, api, user.Id, 1)
+		got, err := api.selectVideo("test", nil, user.Id, map[uint32]bool{ids[0]: true})
+		if err != nil {
+			t.Fatalf("selectVideo: %v", err)
+		}
+		if got != ids[0] {
+			t.Errorf("expected the only video (%d) back, got %d", ids[0], got)
+		}
+	})
+
+	t.Run("RotatesWhenThePoolCanSpareOne", func(t *testing.T) {
+		user := createTestUser(t, r, "auth0id|selvid-many", "selvid2@test.com", "selvid2")
+		ids := insertVideosAndUserHasVideo(t, api, user.Id, 3)
+		// Random pick, so draw enough times that an ignored exclusion shows up.
+		for i := 0; i < 20; i++ {
+			got, err := api.selectVideo("test", nil, user.Id, map[uint32]bool{ids[0]: true})
+			if err != nil {
+				t.Fatalf("selectVideo: %v", err)
+			}
+			if got == ids[0] {
+				t.Fatalf("draw %d returned the excluded video %d with 2 others available", i, ids[0])
+			}
+		}
+	})
+
+	t.Run("NullSentinelWhenThePoolIsEmpty", func(t *testing.T) {
+		user := createTestUser(t, r, "auth0id|selvid-none", "selvid3@test.com", "selvid3")
+		got, err := api.selectVideo("test", nil, user.Id, map[uint32]bool{})
+		if err != nil {
+			t.Fatalf("selectVideo: %v", err)
+		}
+		if got != nullVideoId {
+			t.Errorf("expected the null sentinel for an empty pool, got %d", got)
 		}
 	})
 }

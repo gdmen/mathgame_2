@@ -32,11 +32,19 @@ One route renders it: `/play` → `PlayView` (`web/src/play.js`), mounted by `Ma
 ### PlayView data flow (`/play`)
 
 1. **Fetch.** On mount, GET `/play/:user.id` returns `{ gamestate, problem, video }` (`PlayView`;
-   server shape `PlayData`, `server/api/meta_models.go`). A 403 redirects to `/` — the
-   "add a video first" gate, where `customGetPlayData` returns Forbidden when the user has no
-   enabled video. Empty / invalid bodies are logged and swallowed. **A response landing after
-   unmount is dropped** (the effect's `cancelled` flag): the 403 branch navigates the whole
-   document, and whatever replaced this view must not be torn down by its predecessor's answer.
+   server shape `PlayData`, `server/api/meta_models.go`). A **403 calls `refreshPageLoadData`** —
+   `customGetPlayData` returns Forbidden below the playable-video floor (`minPlayableVideos`, the
+   same floor the client gates on; see [accounts.md](accounts.md)), and the fresh count is what
+   lets `useTakeover` put the videos repair page on the screen — the person at a 403 is signed in
+   and a playlist away from playing, and that page is where they fix it. **If nothing takes the
+   screen, this view says why**: still being mounted after that refresh means the read failed, or
+   the 403 was not the video floor at all (`RequireSelf` raises one too), so `PlayView` renders the
+   stock message block (`.not-found`, see `/style-guide`) pointing at Settings rather than a
+   spinner that never resolves.
+   Empty / invalid bodies are logged and swallowed. **A response landing after unmount is
+   dropped** (the effect's `cancelled` flag): that refresh rewrites app-wide state, and whatever
+   replaced this view must not read a payload its predecessor's answer overwrote. Pinned by
+   `play.test.js`.
 2. **Render LaTeX.** `problem.expression` is run through `PreprocessExpression` and rendered to an
    HTML string with KaTeX (`PlayView`, the `renderLatex` effect). `PreprocessExpression` wraps
    multi-digit numbers in `\text{}`, splits `\text{}` blocks for word-wrap, and escapes a bare `%`
@@ -134,6 +142,14 @@ carries a fresh gamestate, the problem is swapped out.
 
 `VideoView` (`web/src/video.js`) wraps `react-player`. The reward video is the gate-clear: it shows
 once `solved >= target`. Notable behavior:
+
+- **Rotation is a preference, not a rule.** `selectVideo` (`server/api/custom_handlers.go`) is
+  called with the just-watched video excluded, so the reward does not repeat back-to-back when
+  the pool can spare another video — and the exclusion **yields when it can't**, handing the same
+  video back rather than the `nullVideoId` sentinel. That is what makes a one-video pool a
+  supported setup rather than a per-cycle error: see the floor in [accounts.md](accounts.md).
+  Yielding cannot resurrect a broken video, because `error_playing_video` disables it and
+  disabled videos never reach the candidate list.
 
 - The `list` query param is stripped from the URL so a single video plays instead of an embedded
   playlist.

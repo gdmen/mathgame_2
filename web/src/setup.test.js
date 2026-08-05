@@ -92,7 +92,7 @@ test("never opens for an account that is already set up", () => {
 
 test("a finished account short on videos gets the repair page, not the wizard", () => {
   render(container, {
-    pageLoad: pageLoadFor(SET_UP_USER, 2),
+    pageLoad: pageLoadFor(SET_UP_USER, 0),
     onExemptPath: false,
   });
   expect(shown(container)).toBe("videos");
@@ -100,7 +100,7 @@ test("a finished account short on videos gets the repair page, not the wizard", 
 
 test("the repair takeover holds while its own edits fix the pool", () => {
   render(container, {
-    pageLoad: pageLoadFor(SET_UP_USER, 2),
+    pageLoad: pageLoadFor(SET_UP_USER, 0),
     onExemptPath: false,
   });
   render(container, {
@@ -124,7 +124,7 @@ test("no decision is made before the page-load data arrives", () => {
   render(container, { pageLoad: null, onExemptPath: false });
   expect(shown(container)).toBe("app");
   render(container, {
-    pageLoad: pageLoadFor(SET_UP_USER, 2),
+    pageLoad: pageLoadFor(SET_UP_USER, 0),
     onExemptPath: false,
   });
   expect(shown(container)).toBe("videos");
@@ -193,7 +193,7 @@ test("a refreshed count below the floor sends the parent back to the videos step
   await renderRefreshed(
     container,
     pageLoadFor(SET_UP_USER, 0),
-    pageLoadFor(SET_UP_USER, 2),
+    pageLoadFor(SET_UP_USER, 0),
     goToVideosStep
   );
   expect(goToVideosStep).toHaveBeenCalled();
@@ -204,7 +204,7 @@ test("a refreshed count at the floor keeps the parent here", async () => {
   await renderRefreshed(
     container,
     pageLoadFor(SET_UP_USER, 0),
-    pageLoadFor(SET_UP_USER, 3),
+    pageLoadFor(SET_UP_USER, 1),
     goToVideosStep
   );
   expect(goToVideosStep).not.toHaveBeenCalled();
@@ -308,13 +308,13 @@ test("a wrong PIN leaves the page locked", async () => {
 });
 
 test("the repair page gates Start Playing on the video floor", async () => {
-  await renderRepair(container, 2);
+  await renderRepair(container, 0);
   await typePin(container, SET_UP_USER.pin);
   expect(repairButton(container).className).toMatch(/error/);
 });
 
 test("the repair page releases the gate at the floor", async () => {
-  await renderRepair(container, 3);
+  await renderRepair(container, 1);
   await typePin(container, SET_UP_USER.pin);
   expect(repairButton(container).className).not.toMatch(/error/);
 });

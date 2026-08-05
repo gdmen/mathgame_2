@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"sort"
 	"strconv"
@@ -264,6 +265,15 @@ func TestDocsSyncSettings(t *testing.T) {
 		if !strings.Contains(jsSrc, code) {
 			t.Errorf("%s lists validation error code %q, but web/src/bitmap_validation.js never defines it", doc, code)
 		}
+	}
+
+	// The playable-video floor is enforced on both sides, so the anchor is
+	// pinned to both: the server constant, and the client's own copy.
+	assertIntAnchor(t, doc, "min_playable_videos", anchors["min_playable_videos"], minPlayableVideos)
+	settingsSrc := readFileForTest(t, "../../web/src/settings.js")
+	wantJS := fmt.Sprintf("MIN_PLAYABLE_VIDEOS = %d;", minPlayableVideos)
+	if !strings.Contains(settingsSrc, wantJS) {
+		t.Errorf("web/src/settings.js does not define %q - the client floor must match the server's minPlayableVideos", wantJS)
 	}
 }
 

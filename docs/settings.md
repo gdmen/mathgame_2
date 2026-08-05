@@ -23,6 +23,7 @@ ceiling_large_max_operand: 9999
 ceiling_small_max_operand: 12
 ceiling_medium_max_operand: 99
 floor_min_constructible_operand: 2
+min_playable_videos: 1
 validation_error_codes: NO_CORE_OP, LARGE_REQUIRES_MEDIUM, MISMATCHED_REQUIRES_FRACTIONS, PEMDAS_REQUIRES_CHAINED, PERCENTAGES_REQUIRE_MULTIPLICATION, PERCENTAGES_REQUIRE_MEDIUM
 ```
 <!-- END DOC-SYNC ANCHORS -->
@@ -192,8 +193,12 @@ completeness:
   the rows' `playable_count`**: a video in two of the parent's playlists is one reward but two row
   counts, so a summed total overstates what the reward loop has and can clear
   `MIN_PLAYABLE_VIDEOS` when the game cannot. `playable_total` comes from the same
-  `countEnabledVideosForUser` helper `/pageload` uses, so every surface that gates on the floor is
-  reading one number. When the total is short, the requirement is stated beside the red tally
+  `countEnabledVideosForUser` helper `/pageload` and `/play` use, so every surface that gates on
+  the floor is reading one number — and one floor: `MIN_PLAYABLE_VIDEOS` and the server's
+  `minPlayableVideos` are the same value, held together by the `min_playable_videos` anchor
+  above, so an account the client calls unplayable cannot get a game by asking `/play` directly
+  (see [accounts.md](accounts.md) and [gameplay.md](gameplay.md)).
+  When the total is short, the requirement is stated beside the red tally
   (`.playlist-total-need`) — there is no separate error line for it. **Removing a playlist takes
   effect immediately and offers an undo** for `UNDO_WINDOW_MS` (30s) in a `.playlist-undo` list
   item occupying the removed row's slot (so the list does not reflow); nothing is confirmed up
