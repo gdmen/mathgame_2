@@ -14,7 +14,9 @@ const T = ProblemTypes;
 const MIN_TARGET_DIFFICULTY = 3;
 
 // validateBitmap checks the settings-level dependency rules. Returns
-// { valid: true } or { valid: false, errors: [{ code, message, offendingBits }] }.
+// { valid: true } or { valid: false, errors: [{ code, message, bits }] }.
+// `bits` names the bits the error is about; the settings screen anchors the
+// message to the card holding them.
 const validateBitmap = (bitmap) => {
   const errors = [];
   const coreOps = T.ADDITION | T.SUBTRACTION | T.MULTIPLICATION | T.DIVISION;
@@ -23,7 +25,7 @@ const validateBitmap = (bitmap) => {
       code: "NO_CORE_OP",
       message:
         "Pick at least one operation (addition, subtraction, multiplication, or division).",
-      offendingBits: [],
+      bits: [coreOps],
     });
   }
   if ((bitmap & T.LARGE_NUMBERS) !== 0 && (bitmap & T.MEDIUM_NUMBERS) === 0) {
@@ -31,7 +33,7 @@ const validateBitmap = (bitmap) => {
       code: "LARGE_REQUIRES_MEDIUM",
       message:
         "Numbers 100 and up need numbers up to 99 enabled too (no gap in sizes).",
-      offendingBits: [T.LARGE_NUMBERS],
+      bits: [T.LARGE_NUMBERS],
     });
   }
   if (
@@ -41,7 +43,7 @@ const validateBitmap = (bitmap) => {
     errors.push({
       code: "MISMATCHED_REQUIRES_FRACTIONS",
       message: "Different denominators need fractions enabled.",
-      offendingBits: [T.MISMATCHED_DENOMINATORS],
+      bits: [T.MISMATCHED_DENOMINATORS],
     });
   }
   if ((bitmap & T.PEMDAS) !== 0 && (bitmap & T.CHAINED_OPERATIONS) === 0) {
@@ -49,7 +51,7 @@ const validateBitmap = (bitmap) => {
       code: "PEMDAS_REQUIRES_CHAINED",
       message:
         "Order of operations needs multi-step problems enabled (it takes two or more steps to matter).",
-      offendingBits: [T.PEMDAS],
+      bits: [T.PEMDAS],
     });
   }
   if ((bitmap & T.PERCENTAGES) !== 0 && (bitmap & T.MULTIPLICATION) === 0) {
@@ -57,7 +59,7 @@ const validateBitmap = (bitmap) => {
       code: "PERCENTAGES_REQUIRE_MULTIPLICATION",
       message:
         "Percentages need multiplication enabled (a percent problem asks for a percent OF a quantity).",
-      offendingBits: [T.PERCENTAGES],
+      bits: [T.PERCENTAGES],
     });
   }
   if ((bitmap & T.PERCENTAGES) !== 0 && (bitmap & T.MEDIUM_NUMBERS) === 0) {
@@ -65,7 +67,7 @@ const validateBitmap = (bitmap) => {
       code: "PERCENTAGES_REQUIRE_MEDIUM",
       message:
         "Percentages need numbers up to 99 enabled (percent problems use two-digit values like 25% of 80).",
-      offendingBits: [T.PERCENTAGES],
+      bits: [T.PERCENTAGES],
     });
   }
   if (errors.length > 0) {
