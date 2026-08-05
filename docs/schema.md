@@ -226,9 +226,6 @@ shape) are what keep both DBs converging. `cmd/compress_events` and
   not just its `CREATE`. A half-check is worse than none.
 - **No down-migrations.** The runner is forward-only. To undo, write a new
   higher-numbered migration.
-- **`verify_migrations`** (`cmd/verify_migrations`) is a one-off
-  before/after consistency checker for the video de-dup migration (25); it
-  does **not** run migrations.
 
 ## Related files
 
