@@ -32,8 +32,8 @@ jest.mock("react-pin-input", () => {
 // steps and the repair page's own edits are what satisfy the underlying
 // condition, so re-reading it live would tear either off the screen
 // mid-use. Pinned here: which takeover each account state gets, that a
-// decision sticks for the page load, and that no decision is made from a
-// half-arrived payload.
+// decision sticks for the page load, and that none is made before the payload
+// arrives.
 const Probe = (props) => <i>{useTakeover(props) || "app"}</i>;
 
 const NEW_USER = { pin: "" };
@@ -56,11 +56,15 @@ afterEach(() => {
   container.remove();
 });
 
+const pageLoadFor = (user, numEnabledVideos) => ({
+  user,
+  settings: {},
+  numEnabledVideos,
+});
+
 test("opens for an account that has not finished setup", () => {
   render(container, {
-    user: NEW_USER,
-    settings: {},
-    numEnabledVideos: 0,
+    pageLoad: pageLoadFor(NEW_USER, 0),
     onExemptPath: false,
   });
   expect(shown(container)).toBe("setup");
@@ -68,15 +72,11 @@ test("opens for an account that has not finished setup", () => {
 
 test("stays open once the wizard's own steps satisfy the gate", () => {
   render(container, {
-    user: NEW_USER,
-    settings: {},
-    numEnabledVideos: 0,
+    pageLoad: pageLoadFor(NEW_USER, 0),
     onExemptPath: false,
   });
   render(container, {
-    user: SET_UP_USER,
-    settings: {},
-    numEnabledVideos: 12,
+    pageLoad: pageLoadFor(SET_UP_USER, 12),
     onExemptPath: false,
   });
   expect(shown(container)).toBe("setup");
@@ -84,9 +84,7 @@ test("stays open once the wizard's own steps satisfy the gate", () => {
 
 test("never opens for an account that is already set up", () => {
   render(container, {
-    user: SET_UP_USER,
-    settings: {},
-    numEnabledVideos: 12,
+    pageLoad: pageLoadFor(SET_UP_USER, 12),
     onExemptPath: false,
   });
   expect(shown(container)).toBe("app");
@@ -94,9 +92,7 @@ test("never opens for an account that is already set up", () => {
 
 test("a finished account short on videos gets the repair page, not the wizard", () => {
   render(container, {
-    user: SET_UP_USER,
-    settings: {},
-    numEnabledVideos: 2,
+    pageLoad: pageLoadFor(SET_UP_USER, 2),
     onExemptPath: false,
   });
   expect(shown(container)).toBe("videos");
@@ -104,15 +100,11 @@ test("a finished account short on videos gets the repair page, not the wizard", 
 
 test("the repair takeover holds while its own edits fix the pool", () => {
   render(container, {
-    user: SET_UP_USER,
-    settings: {},
-    numEnabledVideos: 2,
+    pageLoad: pageLoadFor(SET_UP_USER, 2),
     onExemptPath: false,
   });
   render(container, {
-    user: SET_UP_USER,
-    settings: {},
-    numEnabledVideos: 12,
+    pageLoad: pageLoadFor(SET_UP_USER, 12),
     onExemptPath: false,
   });
   expect(shown(container)).toBe("videos");
@@ -120,49 +112,29 @@ test("the repair takeover holds while its own edits fix the pool", () => {
 
 test("stays shut on an exempt path (admin, /pin) with setup unfinished", () => {
   render(container, {
-    user: NEW_USER,
-    settings: {},
-    numEnabledVideos: 0,
+    pageLoad: pageLoadFor(NEW_USER, 0),
     onExemptPath: true,
   });
   expect(shown(container)).toBe("app");
 });
 
-test("stays shut before the page-load data arrives", () => {
+// The pass before the payload arrives decides nothing — and, because the latch
+// makes a wrong answer permanent, must not spend the decision either.
+test("no decision is made before the page-load data arrives", () => {
+  render(container, { pageLoad: null, onExemptPath: false });
+  expect(shown(container)).toBe("app");
   render(container, {
-    user: null,
-    settings: null,
-    numEnabledVideos: null,
+    pageLoad: pageLoadFor(SET_UP_USER, 2),
     onExemptPath: false,
   });
-  expect(shown(container)).toBe("app");
-});
-
-// `refreshPageLoadData` sets the user, the settings and the video count as three
-// separate updates after an await, and this React version does not batch those,
-// so the gate is asked to decide on each half-filled pass. The latch makes any
-// wrong answer permanent for the page load.
-test("stays shut through the renders where the page-load data is half in", () => {
-  const SET_UP = { user: SET_UP_USER, settings: {}, numEnabledVideos: 12 };
-  render(container, { user: null, settings: null, numEnabledVideos: null });
-  render(container, {
-    user: SET_UP.user,
-    settings: null,
-    numEnabledVideos: null,
-  });
-  render(container, {
-    user: SET_UP.user,
-    settings: {},
-    numEnabledVideos: null,
-  });
-  render(container, SET_UP);
-  expect(shown(container)).toBe("app");
+  expect(shown(container)).toBe("videos");
 });
 
 // The last step never argues: a parent who reaches it gets through. What it
 // does do is check the videos once and, if they are genuinely short, hand them
 // back to the step that fixes it — but only on an answer it actually got. The
-// count it starts with is the app's boot value, taken before step 2 ran.
+// payload it mounts with is the app's boot value, taken before step 2 ran, so
+// what it waits for is a *different* payload object.
 const renderLastStep = (container, props) =>
   act(() => {
     ReactDOM.render(<StartPlayingTabView {...props} />, container);
@@ -171,89 +143,95 @@ const renderLastStep = (container, props) =>
 const startButton = (container) =>
   container.querySelector("#start-playing-button");
 
+// The wizard's own caller re-renders the step with whatever payload the refresh
+// landed; these stand in for that by rendering the second one themselves.
+const renderRefreshed = async (container, boot, refreshed, goToVideosStep) => {
+  const refreshPageLoadData = () =>
+    Promise.resolve().then(() => {
+      if (refreshed) {
+        ReactDOM.render(
+          <StartPlayingTabView
+            pageLoad={refreshed}
+            refreshPageLoadData={refreshPageLoadData}
+            goToVideosStep={goToVideosStep}
+          />,
+          container
+        );
+      }
+    });
+  await act(async () => {
+    ReactDOM.render(
+      <StartPlayingTabView
+        pageLoad={boot}
+        refreshPageLoadData={refreshPageLoadData}
+        goToVideosStep={goToVideosStep}
+      />,
+      container
+    );
+  });
+};
+
 test("last step lets the parent through", () => {
-  renderLastStep(container, { numEnabledVideos: 12 });
+  renderLastStep(container, {
+    pageLoad: pageLoadFor(SET_UP_USER, 12),
+    refreshPageLoadData: () => new Promise(() => {}),
+  });
   expect(startButton(container).disabled).toBe(false);
   expect(container.querySelector("h2").textContent).toBe("You're all set!");
 });
 
 test("the button is live even before the count is known", () => {
   renderLastStep(container, {
-    numEnabledVideos: 0,
+    pageLoad: pageLoadFor(SET_UP_USER, 0),
     refreshPageLoadData: () => new Promise(() => {}),
   });
   expect(startButton(container).disabled).toBe(false);
 });
 
-test("a checked count below the floor sends the parent back to the videos step", async () => {
+test("a refreshed count below the floor sends the parent back to the videos step", async () => {
   const goToVideosStep = jest.fn();
-  await act(async () => {
-    ReactDOM.render(
-      <StartPlayingTabView
-        numEnabledVideos={2}
-        refreshPageLoadData={() => Promise.resolve(true)}
-        goToVideosStep={goToVideosStep}
-      />,
-      container
-    );
-  });
+  await renderRefreshed(
+    container,
+    pageLoadFor(SET_UP_USER, 0),
+    pageLoadFor(SET_UP_USER, 2),
+    goToVideosStep
+  );
   expect(goToVideosStep).toHaveBeenCalled();
 });
 
-test("a checked count at the floor keeps the parent here", async () => {
+test("a refreshed count at the floor keeps the parent here", async () => {
   const goToVideosStep = jest.fn();
-  await act(async () => {
-    ReactDOM.render(
-      <StartPlayingTabView
-        numEnabledVideos={3}
-        refreshPageLoadData={() => Promise.resolve(true)}
-        goToVideosStep={goToVideosStep}
-      />,
-      container
-    );
-  });
+  await renderRefreshed(
+    container,
+    pageLoadFor(SET_UP_USER, 0),
+    pageLoadFor(SET_UP_USER, 3),
+    goToVideosStep
+  );
   expect(goToVideosStep).not.toHaveBeenCalled();
 });
 
 // The boot count is 0 for a new account, so acting on it before the refresh
 // lands would bounce everyone who just added playlists in step 2.
-test("no bounce while the check is still in flight", () => {
+test("no bounce while the refresh is still in flight", () => {
   const goToVideosStep = jest.fn();
   renderLastStep(container, {
-    numEnabledVideos: 0,
+    pageLoad: pageLoadFor(SET_UP_USER, 0),
     refreshPageLoadData: () => new Promise(() => {}),
     goToVideosStep,
   });
   expect(goToVideosStep).not.toHaveBeenCalled();
 });
 
-test("no bounce when the check itself failed", async () => {
+// A failed read leaves the boot payload in place, identity and all, which is
+// exactly the "no answer yet" state — the same one as still-in-flight.
+test("no bounce when the refresh itself failed", async () => {
   const goToVideosStep = jest.fn();
-  await act(async () => {
-    ReactDOM.render(
-      <StartPlayingTabView
-        numEnabledVideos={0}
-        refreshPageLoadData={() => Promise.resolve(false)}
-        goToVideosStep={goToVideosStep}
-      />,
-      container
-    );
-  });
-  expect(goToVideosStep).not.toHaveBeenCalled();
-});
-
-test("no bounce when the check rejected", async () => {
-  const goToVideosStep = jest.fn();
-  await act(async () => {
-    ReactDOM.render(
-      <StartPlayingTabView
-        numEnabledVideos={0}
-        refreshPageLoadData={() => Promise.reject(new Error("offline"))}
-        goToVideosStep={goToVideosStep}
-      />,
-      container
-    );
-  });
+  await renderRefreshed(
+    container,
+    pageLoadFor(SET_UP_USER, 0),
+    null,
+    goToVideosStep
+  );
   expect(goToVideosStep).not.toHaveBeenCalled();
 });
 

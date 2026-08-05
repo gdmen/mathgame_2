@@ -111,12 +111,11 @@ const MainView = ({
   apiUrl,
   isLoading,
   isAuthenticated,
-  user,
-  settings,
-  numEnabledVideos,
+  pageLoad,
   refreshPageLoadData,
   postEvent,
 }) => {
+  const { user, settings } = pageLoad || {};
   // Admin pages bypass the takeovers (an admin can use them without
   // completing setup), and a non-admin who hits one gets the 404 page rather
   // than the setup wizard or any hint the admin surface exists. The /pin
@@ -126,32 +125,16 @@ const MainView = ({
   const onAdminPath = window.location.pathname.startsWith("/admin");
   const onExemptPath =
     onAdminPath || window.location.pathname.startsWith("/pin/");
-  const takeover = useTakeover({
-    user,
-    settings,
-    numEnabledVideos,
-    onExemptPath,
-  });
+  const takeover = useTakeover({ pageLoad, onExemptPath });
   usePinSessionPolicy(takeover);
-  // Hold the routes until the whole pageload payload is in, not just the
-  // settings. It arrives as three unbatched setStates, and on the pass where
-  // the video count is still null the gate rightly refuses to decide — but
-  // routing on that pass mounts PlayView for one render, whose /play fetch
-  // outlives it, 403s on the short pool, and navigates the document to "/"
-  // out from under the wizard that has since taken the screen.
-  if (
-    isLoading ||
-    (isAuthenticated && (settings == null || numEnabledVideos == null))
-  ) {
+  if (isLoading || (isAuthenticated && pageLoad == null)) {
     return <div className="content-loading"></div>;
   } else if (takeover === "setup") {
     return (
       <SetupView
         token={token}
         apiUrl={apiUrl}
-        user={user}
-        settings={settings}
-        numEnabledVideos={numEnabledVideos}
+        pageLoad={pageLoad}
         refreshPageLoadData={refreshPageLoadData}
       />
     );
@@ -244,9 +227,10 @@ const AppView = () => {
   const { user, isLoading, isAuthenticated, getAccessTokenSilently } =
     useAuth0();
   const [token, setToken] = useState(null);
-  const [appUser, setAppUser] = useState(null);
-  const [settings, setSettings] = useState(null);
-  const [numEnabledVideos, setNumEnabledVideos] = useState(null);
+  // One object, so the payload is never half-applied: React 16 does not batch
+  // the updates an await lands on, and every consumer of a field here would
+  // otherwise have to survive the renders where the rest is still missing.
+  const [pageLoad, setPageLoad] = useState(null);
   // Phone-only nav disclosure. Above the breakpoint the nav is always inline
   // and this flag is inert.
   const [navOpen, setNavOpen] = useState(false);
@@ -299,14 +283,12 @@ const AppView = () => {
     }
   }, [isAuthenticated, getAccessTokenSilently]);
 
-  // Resolves to whether the refreshed data actually landed. Callers that draw a
-  // conclusion from the counts need to tell a failed read from a real answer:
-  // the state here keeps its previous values either way, and stale values that
-  // look fresh get presented to the user as fact.
+  // A read that fails leaves the previous payload in place, identity and all,
+  // so a caller waiting on fresh data simply never sees it arrive.
   const refreshPageLoadData = useCallback(async () => {
     try {
       if (token == null || user == null) {
-        return false;
+        return;
       }
       var reqParams = {
         method: "GET",
@@ -336,19 +318,18 @@ const AppView = () => {
         );
       }
       // An error body parses as JSON just as happily as a payload does, and
-      // its missing fields would land as undefined/NaN — overwriting good
-      // state and still reporting that the read succeeded.
+      // its missing fields would land as undefined/NaN, overwriting good state.
       if (!req.ok) {
-        return false;
+        return;
       }
       const json = await req.json();
-      setAppUser(json["user"]);
-      setSettings(json["settings"]);
-      setNumEnabledVideos(parseInt(json["num_videos_enabled"]));
-      return true;
+      setPageLoad({
+        user: json["user"],
+        settings: json["settings"],
+        numEnabledVideos: parseInt(json["num_videos_enabled"]),
+      });
     } catch (e) {
       console.log(e.message);
-      return false;
     }
   }, [token, user]);
 
@@ -398,7 +379,7 @@ const AppView = () => {
               ) : (
                 <></>
               )}
-              {isAuthenticated && appUser && appUser.role === "admin" ? (
+              {isAuthenticated && pageLoad && pageLoad.user.role === "admin" ? (
                 <button onClick={() => (window.location.pathname = "/admin")}>
                   Admin
                 </button>
@@ -417,9 +398,7 @@ const AppView = () => {
           apiUrl={ApiUrl}
           isLoading={isLoading}
           isAuthenticated={isAuthenticated}
-          user={appUser}
-          settings={settings}
-          numEnabledVideos={numEnabledVideos}
+          pageLoad={pageLoad}
           refreshPageLoadData={refreshPageLoadData}
           postEvent={genPostEventFcn()}
         />
