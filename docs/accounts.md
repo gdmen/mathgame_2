@@ -258,12 +258,14 @@ takeover instead of the pin entry it was navigated to for.
    `MIN_PLAYABLE_VIDEOS`, it sends the parent back to step 2, where the problem is fixable, instead
    of explaining a dead end on a step that cannot fix anything.
 
-   **It only acts on an answer it actually got.** The count this step is handed is the boot value —
-   `0` for a new account, since nothing between boot and here refetches it — so bouncing on that
-   would send every new account back to step 2 for the length of a request. A *failed* refresh
-   leaves the same stale count behind, which is why `refreshPageLoadData` resolves to whether the
-   data landed: a check that never arrived leaves the parent where they are. Being wrongly let
-   through costs a trip to `/play` and back; being wrongly bounced costs their place in the flow.
+   **It only acts on an answer it actually got.** The payload this step is handed is the boot one —
+   count `0` for a new account, since nothing between boot and here refetches it — so bouncing on
+   that would send every new account back to step 2 for the length of a request. So the step keeps
+   the payload object it mounted with and acts only once a *different* one arrives: every landed
+   read replaces the object, and a read that failed leaves the old one in place, so a check that
+   never arrived is indistinguishable from one still in flight and leaves the parent where they
+   are. Being wrongly let through costs a trip to `/play` and back; being wrongly bounced costs
+   their place in the flow.
 
    **`.error` is presentation, not a disable.** It mutes a *continue* and blocks the pointer; it
    does not set the `disabled` attribute, so the button stays focusable and keyboard-activatable.
@@ -280,19 +282,21 @@ how every exit from both screens works (`window.location`), so a completed accou
 on its next load and passes through to the routes.
 
 Latching puts a burden on the condition: it has to be right on **every** render, because one wrong
-pass sticks. `refreshPageLoadData` writes the user, the settings and the video count as three
-separate `setState` calls after an `await`, which this React version does not batch (they land
-outside a synthetic event handler), so the takeover is asked to decide while the payload is half
-in. Hence the explicit null check on the count: `null < 3` is `true` in JS, and without the guard
-a returning, fully set-up account would trip the latch on the interim render and be held out of
-the game for the whole page load. Covered by `web/src/setup.test.js`.
+pass sticks. **This is why the pageload payload is one state object** (`pageLoad` in `AppView`,
+`{user, settings, numEnabledVideos}`) rather than three `useState`s. This React version does not
+batch updates that land after an `await` (they are outside a synthetic event handler), so three
+writes are three renders, and on the two interim ones the takeover would be asked to decide from a
+payload that is part old and part new — `null < 3` is `true` in JS, so a returning, fully set-up
+account trips the latch and is held out of the game for the whole page load. One object has no
+interim render, so the whole condition is a single `pageLoad != null`. Covered by
+`web/src/setup.test.js`.
 
-The half-in pass also must not reach the router: `MainView` stays on the loading state until the
-count is in, not just the settings. On the interim render the takeover rightly refuses to decide,
-but routing on it mounted `PlayView` for a single render — whose `/play` fetch outlived it, hit
-the video-floor 403, and navigated the document to `/` out from under the screen that had since
-taken over (the flash-then-bounce). `PlayView` also drops responses that land after unmount, so
-either guard alone closes that path.
+The same shape is what keeps a half-arrived payload away from the router: `MainView` holds the
+loading state on `pageLoad == null`, one field to check rather than an enumeration of them. Routing
+on an interim pass used to mount `PlayView` for a single render — whose `/play` fetch outlived it,
+hit the video-floor 403, and navigated the document to `/` out from under the screen that had since
+taken over (the flash-then-bounce). `PlayView` drops responses that land after unmount, which is
+correct effect hygiene on its own terms and no longer the only thing closing that path.
 
 The tab bar navigates to any step **already reached** (`maxVisited` in `handleTabClick`): a parent
 who stepped back can click forward again to anywhere they have been, and only genuinely unvisited

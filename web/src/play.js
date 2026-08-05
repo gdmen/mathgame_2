@@ -106,9 +106,8 @@ const PlayView = ({ token, apiUrl, user, postEvent, interval }) => {
 
   useEffect(() => {
     // The 403 branch navigates the whole document, so a response landing
-    // after unmount must be dropped: the view that asked is gone, and the
-    // view that replaced it (the setup wizard, when the gate catches up) must
-    // not be torn down by its predecessor's answer.
+    // after unmount must be dropped: the view that asked is gone, and
+    // whatever replaced it must not be torn down by its predecessor's answer.
     let cancelled = false;
     const getPlayData = async () => {
       try {

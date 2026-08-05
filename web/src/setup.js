@@ -207,7 +207,7 @@ const PinTabView = ({ token, apiUrl, user, advanceSetup }) => {
 };
 
 const StartPlayingTabView = ({
-  numEnabledVideos,
+  pageLoad,
   refreshPageLoadData,
   goToVideosStep,
 }) => {
@@ -215,36 +215,25 @@ const StartPlayingTabView = ({
   // always goes. What it does instead is check, once, whether the videos are
   // really there, and hand a parent who is short back to the step that fixes it.
   //
-  // The count it is handed cannot answer that on its own. It is the one the app
-  // booted with, and nothing between that boot and here refetches it — step 2's
-  // playlists postdate it — so acting on it before the refresh lands would send
-  // every new account back to step 2 for the length of a request. A refresh that
-  // *failed* is not an answer either: it leaves the same stale count behind, and
-  // being bounced on the strength of a request that never arrived is worse than
-  // being let through. Both cases stay put.
-  const [countChecked, setCountChecked] = useState(false);
+  // The payload it mounts with cannot answer that: it is the one the app booted
+  // with, and step 2's playlists postdate it. So the answer is whatever payload
+  // replaces it — a fresh object every time a read lands, which is also why a
+  // read that failed reads as "no answer yet" rather than as the stale count.
+  const booted = useRef(pageLoad);
   useEffect(() => {
-    if (!refreshPageLoadData) return;
-    let live = true;
-    Promise.resolve(refreshPageLoadData()).then(
-      (landed) => live && landed !== false && setCountChecked(true),
-      () => {}
-    );
-    return () => {
-      live = false;
-    };
+    refreshPageLoadData();
   }, [refreshPageLoadData]);
   // Fires once. The tab switch unmounts this view, so a second call could not
   // land anyway, but the caller passes a fresh closure on every render and an
   // effect that re-runs on each of them should not be trusted to be harmless.
   const bounced = useRef(false);
   useEffect(() => {
-    if (bounced.current || !countChecked || numEnabledVideos == null) return;
-    if (numEnabledVideos < MIN_PLAYABLE_VIDEOS && goToVideosStep) {
+    if (bounced.current || pageLoad === booted.current) return;
+    if (pageLoad.numEnabledVideos < MIN_PLAYABLE_VIDEOS && goToVideosStep) {
       bounced.current = true;
       goToVideosStep();
     }
-  }, [countChecked, numEnabledVideos, goToVideosStep]);
+  }, [pageLoad, goToVideosStep]);
   return (
     <>
       <h2>You're all set!</h2>
@@ -278,33 +267,19 @@ const StartPlayingTabView = ({
 // the parent could press Start Playing. Every way out of both is a real
 // navigation, which starts a fresh latch.
 //
-// The latch is also why an unknown video count has to read as "no answer yet"
-// rather than as zero: the caller fills the pageload fields in separate
-// updates, so a bare comparison would take the screen on the pass where the
-// count is still null and then hold it for a fully set-up account.
+// The latch is why the payload arrives as one object: a decision made from a
+// half-filled one would stick for the whole page load.
 //
 // onExemptPath: admin pages (an admin can use them without completing setup)
 // and the /pin gate route, which the other PIN-gated pages redirect to — while
 // the pool is short, capturing it would render this takeover instead of the
 // entry the redirect was for.
-const useTakeover = ({ user, settings, numEnabledVideos, onExemptPath }) => {
+const useTakeover = ({ pageLoad, onExemptPath }) => {
   const latched = useRef(null);
-  // user is checked alongside settings, not assumed from it: the caller sets
-  // the two in separate updates, so a refresh that fails after writing the
-  // user leaves a render with settings still good and no user to read a pin
-  // from.
-  if (
-    latched.current == null &&
-    user != null &&
-    settings != null &&
-    !onExemptPath
-  ) {
-    if (user.pin === "") {
+  if (latched.current == null && pageLoad != null && !onExemptPath) {
+    if (pageLoad.user.pin === "") {
       latched.current = "setup";
-    } else if (
-      numEnabledVideos != null &&
-      numEnabledVideos < MIN_PLAYABLE_VIDEOS
-    ) {
+    } else if (pageLoad.numEnabledVideos < MIN_PLAYABLE_VIDEOS) {
       latched.current = "videos";
     }
   }
@@ -350,14 +325,8 @@ const SETUP_TABS = [
   "Start Playing!",
 ];
 
-const SetupView = ({
-  token,
-  apiUrl,
-  user,
-  settings,
-  numEnabledVideos,
-  refreshPageLoadData,
-}) => {
+const SetupView = ({ token, apiUrl, pageLoad, refreshPageLoadData }) => {
+  const { user, settings } = pageLoad;
   const [activeTab, setActiveTab] = useState(SETUP_TABS[0]);
 
   // The furthest step reached, which is how far the tab bar lets a click
@@ -434,7 +403,7 @@ const SetupView = ({
       {activeTab === "Start Playing!" && (
         <div className="tab-content">
           <StartPlayingTabView
-            numEnabledVideos={numEnabledVideos}
+            pageLoad={pageLoad}
             refreshPageLoadData={refreshPageLoadData}
             goToVideosStep={() => setActiveTab("Add Videos")}
           />
