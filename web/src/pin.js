@@ -2,8 +2,6 @@ import React, { useEffect, useState } from "react";
 import { useRouteMatch } from "react-router-dom";
 import PinInput from "react-pin-input";
 
-import "./pin.scss";
-
 const pinSessionStorageName = "math-game-pin";
 
 const PIN_LENGTH = 4;

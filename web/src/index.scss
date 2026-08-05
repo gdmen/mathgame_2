@@ -167,6 +167,17 @@ $band-pad-x: 1.5 * $base-space;
   flex: 1 0 auto;
 }
 
+// The /pin gate route's page. #content carries no padding of its own, so every
+// page clears the full-bleed menu band itself — same top value as .settings and
+// #problem. Without it the prompt butts straight against the green band, which
+// is what this route did for as long as it has existed: it renders PinView
+// directly into <main>, where the other two PinView hosts bring their own page.
+.pin-page {
+  margin: 0 auto;
+  max-width: $max-width;
+  padding: 1.75 * $base-space $base-space 0;
+}
+
 // Matches the landing footer (landing.scss footer): same links, same muted
 // ink, same size, so the two surfaces read as one footer.
 #footer {
