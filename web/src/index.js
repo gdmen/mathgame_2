@@ -174,6 +174,7 @@ const MainView = ({
                 user={user}
                 postEvent={postEvent}
                 interval={conf.event_reporting_interval}
+                refreshPageLoadData={refreshPageLoadData}
               />
             </RequireAuth>
           </Route>

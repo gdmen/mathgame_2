@@ -1045,9 +1045,9 @@ const StyleGuideView = () => {
         <div className="settings">
           <span className="playlist-total">11 playable videos</span>{" "}
           <span className="playlist-total playlist-total-low">
-            2 playable videos
+            0 playable videos
           </span>
-          <span className="playlist-total-need">needs at least 3</span>{" "}
+          <span className="playlist-total-need">needs at least 1</span>{" "}
           <span className="playlist-count">6 videos · 5 playable</span>{" "}
           <span className="playlist-video-state">unavailable</span>
         </div>
@@ -1056,6 +1056,17 @@ const StyleGuideView = () => {
       <Section title="States">
         <p>The site's stock loading state:</p>
         <div className="content-loading" />
+        <p>
+          The stock message block, <code>.not-found</code>: centred heading, one
+          line of prose, and a way out. The 404 page names it; any screen that
+          has to stop and say why uses it too, rather than inventing a second
+          dead-end layout.
+        </p>
+        <div className="not-found">
+          <h1>Hold on</h1>
+          <p>We couldn't start the game.</p>
+          <a href="/settings">Ask a grown-up to check Settings</a>
+        </div>
         <h3>Keyboard focus</h3>
         <p>
           A shared <code>:focus-visible</code> ring (defined in{" "}

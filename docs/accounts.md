@@ -286,7 +286,7 @@ pass sticks. **This is why the pageload payload is one state object** (`pageLoad
 `{user, settings, numEnabledVideos}`) rather than three `useState`s. This React version does not
 batch updates that land after an `await` (they are outside a synthetic event handler), so three
 writes are three renders, and on the two interim ones the takeover would be asked to decide from a
-payload that is part old and part new — `null < 3` is `true` in JS, so a returning, fully set-up
+payload that is part old and part new — `null < 1` is `true` in JS, so a returning, fully set-up
 account trips the latch and is held out of the game for the whole page load. One object has no
 interim render, so the whole condition is a single `pageLoad != null`. Covered by
 `web/src/setup.test.js`.
@@ -294,9 +294,9 @@ interim render, so the whole condition is a single `pageLoad != null`. Covered b
 The same shape is what keeps a half-arrived payload away from the router: `MainView` holds the
 loading state on `pageLoad == null`, one field to check rather than an enumeration of them. Routing
 on an interim pass used to mount `PlayView` for a single render — whose `/play` fetch outlived it,
-hit the video-floor 403, and navigated the document to `/` out from under the screen that had since
-taken over (the flash-then-bounce). `PlayView` drops responses that land after unmount, which is
-correct effect hygiene on its own terms and no longer the only thing closing that path.
+hit the video-floor 403, and acted on it under the screen that had since taken over. `PlayView`
+drops responses that land after unmount, which is correct effect hygiene on its own terms and no
+longer the only thing closing that path.
 
 The tab bar navigates to any step **already reached** (`maxVisited` in `handleTabClick`): a parent
 who stepped back can click forward again to anywhere they have been, and only genuinely unvisited
@@ -412,10 +412,20 @@ kept, because saying "deletes everything" would be a promise this endpoint does 
   cannot live there: it would 403 for the operator. Such a route has to be registered outside
   `authed` and gate on `RequireAdmin`, and `selfOnlyRoutes` in `self_access_test.go` has to be taught
   to skip it — deliberately awkward, so opting a route out of self-only is a visible decision.
-- **One enabled-video threshold, `MIN_PLAYABLE_VIDEOS`.** It is both what re-shows the wizard for
-  an already-set-up account whose playlists shrank, and what enables the final *Start Playing*
-  button. They have to agree: the button leaves with a full page load that re-runs the gate, so a
-  lower bar on the button just bounces the parent back to step 1.
+- **One enabled-video threshold, `MIN_PLAYABLE_VIDEOS`.** It is what re-shows the wizard for
+  an already-set-up account whose playlists shrank, what enables the final *Start Playing*
+  button, and what `/play` itself enforces (`minPlayableVideos` in `custom_handlers.go`). They
+  have to agree: the button leaves with a full page load that re-runs the gate, so a lower bar on
+  the button just bounces the parent back to step 1, and a lower bar on the server would hand a
+  playable game to an account every client surface calls unplayable. The two constants are pinned
+  to each other by `docs/settings.md`'s `min_playable_videos` anchor.
+- **The floor is 1, the pool size at which a reward still exists.** One video on repeat is a
+  supported setup, not a degraded one: a kid who wants the same video every time is being given
+  the reward they actually want, and the reward loop's rotation yields to a pool that cannot
+  spare a second video (see [gameplay.md](gameplay.md)). A higher floor would also stop the game
+  on ordinary attrition — YouTube makes videos private, and a pool that shrinks to two working
+  videos is still a working pool. So the repair takeover means exactly one thing: **zero**
+  playable videos.
 
 ## Related files
 

@@ -332,8 +332,10 @@ const ProblemTypesSettingsView = ({
 // Add public YouTube playlist links to show as "Recommended playlists" (UI only).
 const RECOMMENDED_PLAYLISTS = [];
 
-// The reward loop needs at least this many playable videos to draw from.
-const MIN_PLAYABLE_VIDEOS = 3;
+// The reward loop needs at least this many playable videos to draw from. The
+// server enforces the same floor on /play (minPlayableVideos); docs/settings.md's
+// min_playable_videos anchor keeps the two honest.
+const MIN_PLAYABLE_VIDEOS = 1;
 
 // How long the undo offer stays up after a removal.
 const UNDO_WINDOW_MS = 30000;

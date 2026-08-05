@@ -20,6 +20,11 @@ import (
 
 const (
 	nullVideoId = math.MaxUint32
+	// The reward loop needs at least this many playable videos to draw from —
+	// one, the pool size at which a reward still exists. The client's
+	// MIN_PLAYABLE_VIDEOS (web/src/settings.js) is the same floor;
+	// docs/settings.md's min_playable_videos anchor keeps the two honest.
+	minPlayableVideos = 1
 )
 
 func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32, exclusions map[uint32]bool) (uint32, error) {
@@ -33,16 +38,17 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32, exclu
 	}
 	defer rows.Close()
 	var videoIds []uint32
+	var unexcluded []uint32
 	for rows.Next() {
 		var id uint32
 		if err := rows.Scan(&id); err != nil {
 			glog.Errorf("%s selectVideo scan: %v", logPrefix, err)
 			return 0, err
 		}
-		if _, ok := exclusions[id]; ok {
-			continue
-		}
 		videoIds = append(videoIds, id)
+		if _, ok := exclusions[id]; !ok {
+			unexcluded = append(unexcluded, id)
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return 0, err
@@ -53,6 +59,17 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32, exclu
 		msg := fmt.Sprintf("Couldn't find any videos for this user (%d): silently do nothing.", userId)
 		glog.Errorf("%s %s", logPrefix, msg)
 		return nullVideoId, nil
+	}
+
+	// The exclusions are a preference, not a requirement: they keep the reward
+	// from repeating back-to-back when the pool can spare another video, and
+	// yield when it can't. A one-video pool is a legitimate setup — a kid who
+	// wants the same video every time is why the floor is 1 — and the
+	// alternative there is handing back no reward at all. Note this cannot
+	// resurrect a broken video: error_playing_video disables it, and disabled
+	// videos never reach this list.
+	if len(unexcluded) > 0 {
+		videoIds = unexcluded
 	}
 
 	// Select video
@@ -195,9 +212,10 @@ func (a *Api) customGetPageLoadData(c *gin.Context) {
 	}
 
 	// Get a count of enabled videos for this user (from user_has_video / playlists)
-	sql := fmt.Sprintf("SELECT COUNT(*) FROM user_has_video uhv INNER JOIN videos v ON v.id = uhv.video_id AND v.disabled = 0 WHERE uhv.user_id = %d;", user.Id)
-	value, status, msg, err := a.CustomValueQuery(sql)
-	if HandleMngrResp(logPrefix, c, status, msg, err, value) != nil {
+	count, err := a.countEnabledVideosForUser(user.Id)
+	if err != nil {
+		glog.Errorf("%s countEnabledVideosForUser: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("Could not check video count"))
 		return
 	}
 
@@ -205,7 +223,7 @@ func (a *Api) customGetPageLoadData(c *gin.Context) {
 	data := PageLoadData{
 		User:             user,
 		Settings:         settings,
-		NumVideosEnabled: value,
+		NumVideosEnabled: count,
 	}
 	HandleMngrRespWriteCtx(logPrefix, c, http.StatusOK, "", nil, data)
 }
@@ -230,15 +248,15 @@ func (a *Api) customGetPlayData(c *gin.Context) {
 		return
 	}
 
-	// Require at least 1 video to play
+	// Require a pool the reward loop can draw from
 	count, err := a.countEnabledVideosForUser(gamestate.UserId)
 	if err != nil {
 		glog.Errorf("%s countEnabledVideosForUser: %v", logPrefix, err)
 		c.JSON(http.StatusInternalServerError, common.GetError("Could not check video count"))
 		return
 	}
-	if count < 1 {
-		c.JSON(http.StatusForbidden, common.GetError("Add at least 1 YouTube playlist in Settings to play."))
+	if count < minPlayableVideos {
+		c.JSON(http.StatusForbidden, common.GetError(fmt.Sprintf("Add at least %d playable videos in Settings to play.", minPlayableVideos)))
 		return
 	}
 
@@ -626,7 +644,7 @@ type PlaylistWithCounts struct {
 
 // MyPlaylists wraps the rows with the one number a caller must not compute
 // itself. Summing PlayableCount across playlists double-counts a video that
-// sits in two of them, so a total derived that way can clear MIN_PLAYABLE_VIDEOS
+// sits in two of them, so a total derived that way can clear minPlayableVideos
 // while the reward loop, which draws from the de-duplicated user_has_video, has
 // fewer. PlayableTotal is that same de-duplicated count.
 type MyPlaylists struct {
