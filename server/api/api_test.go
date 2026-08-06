@@ -10,7 +10,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"os/exec"
 	"sync/atomic"
 	"testing"
 
@@ -18,11 +17,6 @@ import (
 
 	"garydmenezes.com/mathgame/server/common"
 	"garydmenezes.com/mathgame/server/common/testdb"
-)
-
-const (
-	TestDataDir          = "./test_data/"
-	TestDataInsertScript = "insert_data.sh"
 )
 
 var testVideoIDCounter uint64
@@ -52,17 +46,6 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 	ret := m.Run()
 	os.Exit(ret)
-}
-
-func insertTestData(c *common.Config, tableName string) {
-	cmd := exec.Command(
-		TestDataDir+TestDataInsertScript, c.MySQLUser, c.MySQLPass, c.MySQLDatabase,
-		TestDataDir+tableName+".sql")
-	err := cmd.Run()
-	if err != nil {
-		fmt.Printf("Couldn't populate %s in db: %v", tableName, err)
-		os.Exit(1)
-	}
 }
 
 // createTestUser creates a user via the API and returns it. Used by tests that need a valid user in the DB.
