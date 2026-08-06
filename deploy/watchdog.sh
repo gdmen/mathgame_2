@@ -1,11 +1,11 @@
 #!/bin/bash
-# Watchdog: alert via ntfy.sh on sustained error patterns in the journal.
+# Watchdog: alert via ntfy.sh on error patterns in the journal.
 #
 # Run every 5 minutes by mathgame-watchdog.timer. For each entry in WATCHES, it
 # greps the last hour of the UNIT journal and pushes a phone notification if the
 # match count crosses that entry's threshold. The retry / self-heal layers
-# already absorb transient blips, so a sustained count (not a single hit) is the
-# real signal. See issue #200.
+# already absorb transient blips, so for most watches a sustained count (not a
+# single hit) is the real signal. See issue #200.
 #
 # To watch another error, add a line to WATCHES:
 #     "slug|threshold|label|grep pattern"
@@ -22,13 +22,18 @@
 # topic can push to it. Empty/absent -> the watchdog quietly no-ops.
 set -euo pipefail
 
-UNIT=mathgame-api
+# UNIT and STATE_DIR are overridable so a smoke test can point the whole script
+# at a throwaway unit without touching prod cooldown state.
+UNIT="${UNIT:-mathgame-api}"
 COOLDOWN=3600  # seconds; at most one notification per watch per hour
 CONF="${1:-/home/ubuntu/mathgame_2/conf.json}"
 STATE_DIR="${STATE_DIR:-/run}"
 
+# Quota is the exception to the sustained-count rule above: a single hit means
+# billing is dead, not a blip. See docs/ops-runbook.md.
 WATCHES=(
-    "openai|5|OpenAI errors|OpenAI error"
+    "openai|5|OpenAI errors|OpenAI.*error.*after retries"
+    "openai-quota|1|OpenAI quota exhausted (BILLING)|You exceeded your current quota"
 )
 
 if [ ! -f "$CONF" ]; then

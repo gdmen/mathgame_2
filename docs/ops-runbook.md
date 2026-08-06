@@ -44,7 +44,7 @@ Five scheduled `oneshot` jobs, each a `bin/*` tool fired by a `.timer`:
 | `mathgame-check-disabled-videos` | daily 03:30 | `check_disabled_videos --enable` | re-enables videos that became playable again |
 | `mathgame-update-statistics` | daily 04:00 | `update_statistics_cache` | rebuilds the per-user statistics cache |
 | `mathgame-trim-recently-shown-problems` | daily 04:00 | `trim_recently_shown_problems` | caps each user's `recently_shown_problems` rows |
-| `mathgame-watchdog` | every 5 min (`*:0/5`) | `deploy/watchdog.sh` | pages on sustained error patterns in the journal |
+| `mathgame-watchdog` | every 5 min (`*:0/5`) | `deploy/watchdog.sh` | pages on error patterns in the journal |
 
 Timers are `Persistent=true` (a missed run while the box was down fires on
 boot). The three jobs that must not overlap a manual run hold a `flock`
@@ -300,10 +300,19 @@ only — nothing on the host runs it.
 
 Fires every 5 minutes (`mathgame-watchdog.timer`). For each entry in `WATCHES`
 it greps the last hour of the `mathgame-api` journal and pushes a phone
-notification via `ntfy.sh` if the count crosses the entry's threshold — a
-*sustained* count, because the retry/self-heal layers absorb transient blips
-(#200). Currently one watch: the `OpenAI error` pattern, threshold 5
-(`deploy/watchdog.sh` `WATCHES`).
+notification via `ntfy.sh` if the count crosses the entry's threshold. Usually
+that means a *sustained* count, because the retry/self-heal layers absorb
+transient blips (#200). Two watches (`deploy/watchdog.sh` `WATCHES`):
+
+| Slug | Threshold | Pattern | Catches |
+|---|---|---|---|
+| `openai` | 5/hour | `OpenAI.*error.*after retries` | any OpenAI call that exhausted its retries, on either the narration or the validation path. Deliberately excludes the per-attempt `OpenAI transient error` warnings, which self-heal. |
+| `openai-quota` | 1/hour | `You exceeded your current quota` | the 429 sub-type that does *not* self-heal: out of credits, spending cap, or a dead payment method. Every LLM call falls back to the heuristic generator until billing is fixed, so no word problems are served. The system is degraded rather than broken, which is exactly why it needs its own page. Titled `BILLING` to be scannable on a lockscreen. |
+
+A quota outage trips both watches, since the generic pattern also matches those
+lines; the quota one crosses its threshold sooner (1 vs 5). Both send
+`Priority: high`; the `BILLING` title, not the ntfy priority, is what
+separates them on the lockscreen.
 
 Each watch is rate-limited to one page per hour via a stamp file in
 `$STATE_DIR` (`/run` by default); the stamp is written only on a successful
@@ -311,6 +320,39 @@ Each watch is rate-limited to one page per hour via a stamp file in
 `conf.json` and is effectively a shared secret — empty/absent makes the
 watchdog a quiet no-op. To add a watch, append a
 `slug|threshold|label|pattern` line (pattern may contain spaces, not `|`).
+
+Smoke-test a watch on the host without waiting for a real failure. `journalctl
+-u` matches the *unit* a message came from, not a `logger` tag, so a synthetic
+line has to be logged by a real unit. `UNIT` and `STATE_DIR` are overridable
+for exactly this, which keeps the test off `mathgame-api` and off the live
+cooldown stamps in `/run`:
+
+```
+sudo systemd-run --unit=mathgame-smoke --collect /bin/echo \
+  "OpenAI narrate error after retries: error, status code: 429, status: Too Many Requests, message: You exceeded your current quota, please check your plan and billing details."
+sudo env UNIT=mathgame-smoke STATE_DIR=/tmp deploy/watchdog.sh /home/ubuntu/mathgame_2/conf.json
+```
+
+That pages for real, so expect the notification on your phone. To check a
+pattern without sending anything, count it against the live journal instead:
+
+```
+journalctl -u mathgame-api --since "1 hour ago" --no-pager | grep -c "You exceeded your current quota"
+```
+
+Both patterns are matched against log *text*, which drifts from two directions.
+A reworded `glog` line in `server/llm_generator` breaks the `openai` watch, and
+that one is at least visible in our own diffs. The quota watch is matched
+against OpenAI's wording: the Go client's error string carries only
+`status code` / `status` / `message`, not the machine-readable
+`insufficient_quota` code, so the English sentence is the only quota signal
+that reaches the journal. Nothing in CI can catch OpenAI rewording it.
+
+Note the quota count overstates distinct failures: 429s are retryable, so one
+failed call logs three per-attempt warnings plus the final error, all four
+carrying the quota sentence. The pattern is deliberately left broad rather than
+anchored to the final error, because at threshold 1 a missed match costs more
+than an inflated count.
 
 ## Operating notes
 
