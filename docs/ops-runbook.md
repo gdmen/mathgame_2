@@ -234,8 +234,12 @@ start — see `docs/schema.md`.
 
 ```
 sudo ln -s /snap/bin/certbot /usr/bin/certbot
-sudo certbot certonly --standalone
+sudo certbot certonly --standalone -d mikeymath.org -d www.mikeymath.org
 ```
+
+The cert must cover both names: DNS points `www.mikeymath.org` at this host, so
+a bare-domain-only cert leaves `www` visitors on a browser trust warning. When
+expanding an existing cert to add a name, append `--expand`.
 
 **Clone, build, install units:**
 
