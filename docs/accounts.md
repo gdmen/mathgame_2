@@ -143,6 +143,15 @@ React landing page — it was byte-identical to `LoginButton` apart from styling
 `cacheLocation: "localstorage"`); after login the app pulls an access token with
 `getAccessTokenSilently` and sends it as a `Bearer` token on every API call.
 
+**Every API call goes through one function**, `apiFetch(apiUrl, path, token, opts)`
+(`web/src/api.js`): it joins `apiUrl + path` and attaches the JSON + bearer-token headers, then
+returns the raw `Response`. It deliberately stops there. What a non-2xx means and how to say so is
+the caller's, because the pages genuinely differ — `/play` answers a 403 by re-reading the page load
+data, `/pageload` treats a 404 as "provision this user," account deletion reads a 204 with no body —
+and a shared
+`res.ok` + `.json()` step would flatten those into a single failure mode. Pass method and body
+through `opts`; it defaults to GET.
+
 **Entry point.** The marketing page at `/` is static HTML outside the React app, so it cannot call
 Auth0 itself; its CTAs link to `/login`, a route whose only job is to fire `loginWithRedirect` (and
 to bounce an already-signed-in visitor to `/play`). Auth0 then redirects back to the registered

@@ -1,7 +1,7 @@
 // Shared building blocks for the admin report pages (difficulty-calibration and
-// bitmap-matrix): they render stored expressions the same way, authenticate the
-// same way, and poll the same way while a background rebuild runs.
-import React, { useCallback, useEffect } from "react";
+// bitmap-matrix): they render stored expressions the same way, and poll the
+// same way while a background rebuild runs.
+import React, { useEffect } from "react";
 import parse from "html-react-parser";
 import katex from "katex";
 import "katex/dist/katex.min.css";
@@ -30,18 +30,6 @@ const renderMath = (expr) => {
   return html === null ? <code>{expr}</code> : parse(html);
 };
 
-// useAuthHeaders returns a memoized builder for the JSON + bearer-token headers
-// every admin API call sends.
-const useAuthHeaders = (token) =>
-  useCallback(
-    () => ({
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + token,
-    }),
-    [token]
-  );
-
 // usePollWhileComputing calls fn every 3s while computing is true, so a report
 // (and its progress) refresh in place as a background rebuild lands.
 const usePollWhileComputing = (computing, fn) => {
@@ -54,4 +42,4 @@ const usePollWhileComputing = (computing, fn) => {
   }, [computing, fn]);
 };
 
-export { renderMath, useAuthHeaders, usePollWhileComputing };
+export { renderMath, usePollWhileComputing };

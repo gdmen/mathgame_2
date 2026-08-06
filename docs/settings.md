@@ -266,6 +266,9 @@ on the card that changed, so a failure is attached to the control that caused it
   `TargetDifficultySettingsView`, `PlaylistsSettingsView`, `PlaylistRow`,
   `SettingsCard`, `useSaveState`, `MIN_PLAYABLE_VIDEOS`, `SettingsView`, `postSettings`,
   `DeleteAccountView`.
+- `web/src/api.js` — `apiFetch`, which issues every call on this screen (settings save, the
+  playlist list/add/remove/undo, account deletion). `PlaylistRow` takes `token` and calls it
+  directly rather than being handed a header builder. See [accounts.md](accounts.md).
 - `server/api/custom_handlers.go` — `customListPlaylists` (returns `PlaylistWithCounts`),
   `customListPlaylistVideos` (the drill-down; the `user_playlist` join is its authorization).
 - `web/src/bitmap_validation.js` — `validateBitmap`, `maxDiffForBitmap`, `minDiffForBitmap`,

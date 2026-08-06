@@ -1,10 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 
-import {
-  renderMath,
-  useAuthHeaders,
-  usePollWhileComputing,
-} from "./admin_common.js";
+import { renderMath, usePollWhileComputing } from "./admin_common.js";
+import { apiFetch } from "./api.js";
 import "./admin_calibration.scss";
 
 const fmt = (n) => (n == null ? "—" : Number(n).toFixed(2));
@@ -78,17 +75,16 @@ const DifficultyCalibrationView = ({ token, apiUrl, user }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const authHeaders = useAuthHeaders(token);
-
   const fetchReport = useCallback(async () => {
     if (!token || !apiUrl || !user) {
       return;
     }
     try {
-      const res = await fetch(apiUrl + "/admin/difficulty-calibration", {
-        method: "GET",
-        headers: authHeaders(),
-      });
+      const res = await apiFetch(
+        apiUrl,
+        "/admin/difficulty-calibration",
+        token
+      );
       if (!res.ok) {
         setError("Could not load calibration data");
         return;
@@ -100,7 +96,7 @@ const DifficultyCalibrationView = ({ token, apiUrl, user }) => {
     } finally {
       setLoading(false);
     }
-  }, [token, apiUrl, user, authHeaders]);
+  }, [token, apiUrl, user]);
 
   useEffect(() => {
     fetchReport();
@@ -111,9 +107,8 @@ const DifficultyCalibrationView = ({ token, apiUrl, user }) => {
 
   const recompute = async () => {
     try {
-      await fetch(apiUrl + "/admin/difficulty-calibration/recompute", {
+      await apiFetch(apiUrl, "/admin/difficulty-calibration/recompute", token, {
         method: "POST",
-        headers: authHeaders(),
       });
     } catch (e) {
       // The next fetch reflects the real state.

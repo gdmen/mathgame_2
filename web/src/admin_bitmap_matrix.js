@@ -8,11 +8,8 @@ import React, {
 } from "react";
 import { FixedSizeGrid } from "react-window";
 
-import {
-  renderMath,
-  useAuthHeaders,
-  usePollWhileComputing,
-} from "./admin_common.js";
+import { renderMath, usePollWhileComputing } from "./admin_common.js";
+import { apiFetch } from "./api.js";
 import "./admin_bitmap_matrix.scss";
 
 // Grid geometry (px). Cells are wide enough for a small rendered expression;
@@ -78,17 +75,12 @@ const BitmapMatrixView = ({ token, apiUrl, user }) => {
   // Per-cell reroll results keyed "bitmap:bucket"; overlaid on the cached cell.
   const [overrides, setOverrides] = useState({});
 
-  const authHeaders = useAuthHeaders(token);
-
   const fetchReport = useCallback(async () => {
     if (!token || !apiUrl || !user) {
       return;
     }
     try {
-      const res = await fetch(apiUrl + "/admin/bitmap-matrix", {
-        method: "GET",
-        headers: authHeaders(),
-      });
+      const res = await apiFetch(apiUrl, "/admin/bitmap-matrix", token);
       if (!res.ok) {
         setError("Could not load the bitmap matrix");
         return;
@@ -111,7 +103,7 @@ const BitmapMatrixView = ({ token, apiUrl, user }) => {
     } finally {
       setLoading(false);
     }
-  }, [token, apiUrl, user, authHeaders]);
+  }, [token, apiUrl, user]);
 
   useEffect(() => {
     fetchReport();
@@ -122,9 +114,8 @@ const BitmapMatrixView = ({ token, apiUrl, user }) => {
 
   const recompute = async () => {
     try {
-      await fetch(apiUrl + "/admin/bitmap-matrix/recompute", {
+      await apiFetch(apiUrl, "/admin/bitmap-matrix/recompute", token, {
         method: "POST",
-        headers: authHeaders(),
       });
     } catch (e) {
       // The next fetch reflects the real state.
@@ -135,13 +126,10 @@ const BitmapMatrixView = ({ token, apiUrl, user }) => {
 
   const reroll = async (bitmap, bucket) => {
     try {
-      const res = await fetch(
-        apiUrl +
-          "/admin/bitmap-matrix/cell?bitmap=" +
-          bitmap +
-          "&bucket=" +
-          bucket,
-        { method: "GET", headers: authHeaders() }
+      const res = await apiFetch(
+        apiUrl,
+        "/admin/bitmap-matrix/cell?bitmap=" + bitmap + "&bucket=" + bucket,
+        token
       );
       if (!res.ok) {
         return;
