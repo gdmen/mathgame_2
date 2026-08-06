@@ -190,11 +190,20 @@ bootstrap unless it is run inside the repo, so read a built binary with
 `go version -m bin/apiserver` instead; and `GOTOOLCHAIN=local` on the host
 breaks deploys outright.
 
+Node is the opposite case: nothing in the repo constrains it, so the host runs
+whatever provisioning installed, and 22.04's `apt` default is several majors
+behind. Pin it deliberately. `deploy/update.sh` reaches `build-web` through a
+bare `make`, so this host compiles the same bundle CI does and must not lag the
+`node-version` in the CI workflows; when they disagree, a green merge becomes a
+failed deploy. The floor is 22.12, where `require()` of an ES module starts
+working, which newer releases of the web toolchain depend on.
+
 ```
 wget -c https://go.dev/dl/go<version>.linux-amd64.tar.gz          # any recent release, see go.dev/dl
 sudo tar -C /usr/local -xzf go<version>.linux-amd64.tar.gz        # put /usr/local/go/bin on PATH
 sudo apt install make
-sudo apt-get install nodejs npm
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - # apt's own nodejs is far older
+sudo apt-get install -y nodejs
 sudo npm install -g serve
 ```
 
