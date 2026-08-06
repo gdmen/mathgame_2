@@ -254,8 +254,10 @@ inverts the convention and is dry-run **by default**, writing only under
 A tool's DB-backed test gets its database from `apitest.SetupTestDB`
 (`server/api/apitest`): a throwaway `mathgame_test_<label>_N` database migrated
 to the current schema, dropped on cleanup, and swept by `clean_test_dbs` if a run
-dies first. `make test-cmds` covers these suites locally and in CI, so a tool
-regression fails the merge gate.
+dies first. It returns a copy of the config naming that database alongside the
+handle: a test that feeds a config to tool code must pass the copy, since the one
+it read from `test_conf.json` still names the base database. `make test-cmds`
+covers these suites locally and in CI, so a tool regression fails the merge gate.
 
 ### Servers / build artifacts
 

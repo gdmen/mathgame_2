@@ -17,7 +17,8 @@ func setupCleanupTestDB(t *testing.T) (*sql.DB, func()) {
 	if err != nil {
 		t.Fatalf("read config: %v", err)
 	}
-	return apitest.SetupTestDB(t, c, "cleanup")
+	db, _, cleanup := apitest.SetupTestDB(t, c, "cleanup")
+	return db, cleanup
 }
 
 func seedProblemRow(t *testing.T, db *sql.DB, p problemRow) {
