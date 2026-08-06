@@ -3,8 +3,9 @@
 Source of truth for keeping the append-only `events` table compact (run-length compression of
 duration events) and rolling it up into the per-user statistics cache behind the progress page.
 **Change this doc in the same PR as any behavior change here.** `docs_sync_test` (`TestDocsSyncEvents`)
-pins the anchor block below to the code and fails CI on drift, so an event-type rename or a new
-summable / counted type cannot land undocumented.
+pins the anchor block below to the code and fails CI on drift: `event_types` is compared against the
+const block in `event_types.go` and `summable_event_types` against the `summableEventTypes` map, so an
+event-type rename or a new summable type cannot land undocumented.
 
 This area owns `event_types.go` (the event-type vocabulary), `event_compress.go`,
 `statistics_handlers.go`, and their two job commands
@@ -166,7 +167,8 @@ runs.
 - `server/api/statistics_handlers.go` — `UpdateStatisticsForUser`, `getStatistics`, `fullProgressBackfill`, `mergeProgressEventsIntoCache`, `readStatisticsFromCache`.
 - `server/api/event_types.go` — event-type constants, `recordOnlyEventTypes`.
 - `server/api/event_types_js_sync_test.go` — `TestEventTypesMatchJS`, which pins `EventTypes` in
-  `web/src/enums.generated.js` to the constants here. The client's use of them is
+  `web/src/enums.generated.js` to the constants here. Also hosts `declaredValues` / `goEventTypes`,
+  the const-block extraction `TestDocsSyncEvents` reuses. The client's use of them is
   [gameplay.md](gameplay.md)'s.
 - `server/api/event_model.generated.go` — the `Event` struct (generated from `models.json`; never hand-edit).
 - `server/api/migrations/16.sql` — `statistics_cache_meta`, `statistics_totals`, `statistics_monthly`; `migrations/28.sql` — `compress_events_meta`.
@@ -183,4 +185,6 @@ runs.
 3. **Counted by stats?** → add it to the `event_type IN (...)` lists in BOTH `fullProgressBackfill`
    and `mergeProgressEventsIntoCache`, to their per-type accumulation switches, and to the
    `stats_counted_event_types` anchor. Confirm the sum-then-divide rule still holds for a duration.
+   No symbol enumerates the counted set, so that anchor is hand-maintained: adding a type to the
+   switches without updating it leaves this doc stale and CI green. Update it by hand.
 4. Update this document and the anchors — CI fails on anchor drift.
