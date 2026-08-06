@@ -40,7 +40,22 @@ import "./index.scss";
 const conf = require("./conf");
 const ApiUrl = conf.api_host + ":" + conf.api_port + "/api/v1";
 
+const SiteName = "Mikey's Math Game";
+
+const useDocumentTitle = (title) => {
+  useEffect(() => {
+    document.title = title + " · " + SiteName;
+  }, [title]);
+};
+
+const Titled = ({ title, children }) => {
+  useDocumentTitle(title);
+  return <>{children}</>;
+};
+
+// Several routes render this, so the title comes with it rather than from them.
 const NotFound = () => {
+  useDocumentTitle("Page not found");
   return (
     <div className="not-found">
       <h1>404</h1>
@@ -132,15 +147,21 @@ const MainView = ({
     return <div className="content-loading"></div>;
   } else if (takeover === "setup") {
     return (
-      <SetupView
-        token={token}
-        apiUrl={apiUrl}
-        pageLoad={pageLoad}
-        refreshPageLoadData={refreshPageLoadData}
-      />
+      <Titled title="Set up">
+        <SetupView
+          token={token}
+          apiUrl={apiUrl}
+          pageLoad={pageLoad}
+          refreshPageLoadData={refreshPageLoadData}
+        />
+      </Titled>
     );
   } else if (takeover === "videos") {
-    return <VideosRepairView token={token} apiUrl={apiUrl} user={user} />;
+    return (
+      <Titled title="Add videos">
+        <VideosRepairView token={token} apiUrl={apiUrl} user={user} />
+      </Titled>
+    );
   } else {
     // MainView has already short-circuited to content-loading while isLoading,
     // so within this Switch a false isAuthenticated means genuinely logged out.
@@ -164,59 +185,83 @@ const MainView = ({
           </Route>
           <Route exact path="/pin/:redirect_pathname">
             <RequireAuth isAuthenticated={isAuthenticated}>
-              <PinGateRoute user={user} />
+              <Titled title="Enter PIN">
+                <PinGateRoute user={user} />
+              </Titled>
             </RequireAuth>
           </Route>
           <Route exact path="/play">
             <RequireAuth isAuthenticated={isAuthenticated}>
-              <PlayView
-                token={token}
-                apiUrl={apiUrl}
-                user={user}
-                postEvent={postEvent}
-                interval={conf.event_reporting_interval}
-                refreshPageLoadData={refreshPageLoadData}
-              />
+              <Titled title="Play">
+                <PlayView
+                  token={token}
+                  apiUrl={apiUrl}
+                  user={user}
+                  postEvent={postEvent}
+                  interval={conf.event_reporting_interval}
+                  refreshPageLoadData={refreshPageLoadData}
+                />
+              </Titled>
             </RequireAuth>
           </Route>
           <Route exact path="/settings">
             <RequireAuth isAuthenticated={isAuthenticated}>
-              <SettingsView
-                token={token}
-                apiUrl={apiUrl}
-                user={user}
-                settings={settings}
-              />
+              <Titled title="Settings">
+                <SettingsView
+                  token={token}
+                  apiUrl={apiUrl}
+                  user={user}
+                  settings={settings}
+                />
+              </Titled>
             </RequireAuth>
           </Route>
           <Route exact path="/progress">
             <RequireAuth isAuthenticated={isAuthenticated}>
-              <ProgressView token={token} apiUrl={apiUrl} user={user} />
+              <Titled title="Progress">
+                <ProgressView token={token} apiUrl={apiUrl} user={user} />
+              </Titled>
             </RequireAuth>
           </Route>
           <Route exact path="/admin">
-            {isAdmin ? <AdminHomeView /> : <NotFound />}
+            {isAdmin ? (
+              <Titled title="Admin">
+                <AdminHomeView />
+              </Titled>
+            ) : (
+              <NotFound />
+            )}
           </Route>
           <Route exact path="/admin/difficulty-calibration">
             {isAdmin ? (
-              <DifficultyCalibrationView
-                token={token}
-                apiUrl={apiUrl}
-                user={user}
-              />
+              <Titled title="Difficulty calibration">
+                <DifficultyCalibrationView
+                  token={token}
+                  apiUrl={apiUrl}
+                  user={user}
+                />
+              </Titled>
             ) : (
               <NotFound />
             )}
           </Route>
           <Route exact path="/admin/bitmap-matrix">
             {isAdmin ? (
-              <BitmapMatrixView token={token} apiUrl={apiUrl} user={user} />
+              <Titled title="Bitmap matrix">
+                <BitmapMatrixView token={token} apiUrl={apiUrl} user={user} />
+              </Titled>
             ) : (
               <NotFound />
             )}
           </Route>
           <Route exact path="/admin/style-guide">
-            {isAdmin ? <StyleGuideView /> : <NotFound />}
+            {isAdmin ? (
+              <Titled title="Style Guide">
+                <StyleGuideView />
+              </Titled>
+            ) : (
+              <NotFound />
+            )}
           </Route>
           <Route path="*" component={NotFound} />
         </Switch>
