@@ -97,7 +97,8 @@ check-swagger:
 	fi
 
 build-docs: check-swagger
-	$(SWAGGER) generate spec -o ./swagger.yaml --scan-models
+	$(SWAGGER) generate spec -i ./server/docs/swagger_base.yml -o ./swagger.yaml --scan-models
+	$(SWAGGER) validate ./swagger.yaml
 
 dev-docs: check-swagger
 	$(SWAGGER) serve -F=swagger swagger.yaml
