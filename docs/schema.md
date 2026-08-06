@@ -14,7 +14,7 @@ drift undocumented.
 
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
-latest_migration: 48
+latest_migration: 49
 model_tables: users, problems, playlists, videos, settings, gamestates, events
 ```
 <!-- END DOC-SYNC ANCHORS -->
@@ -79,7 +79,7 @@ Modelled tables (defined by `models.json`, full field list there):
 | Table | Model | Key | Purpose |
 |---|---|---|---|
 | `users` | `user` | `auth0_id` (PK), `id` (auto, unique) | account; `role` defaults `'student'` (migration 41) |
-| `problems` | `problem` | `id` | the generated problem pool; bitmap, expression, answer, difficulty, `symbolic_expression` (migration 43), `generator`, `difficulty_version` (migration 38), `status` ENUM (migration 46, replaced the old `disabled` boolean; migration 47 retired every pre-current generator version to `deprecated`; migration 48 rewrote percent rows to the `n% of X` connective and retired out-of-grammar percent shapes) — see `docs/problem-generation.md` |
+| `problems` | `problem` | `id` | the generated problem pool; bitmap, expression, answer, difficulty, `symbolic_expression` (migration 43), `generator`, `difficulty_version` (migration 38), `status` ENUM (migration 46, replaced the old `disabled` boolean; migration 47 retired every pre-current generator version to `deprecated`; migration 48 rewrote percent rows to the `n% of X` connective and retired out-of-grammar percent shapes), `created_at` (migration 49) — see `docs/problem-generation.md` |
 | `settings` | `settings` | `user_id` | per-user envelope: `problem_type_bitmap`, `target_difficulty`, `target_work_percentage` |
 | `gamestates` | `gamestate` | `user_id` | current served problem/video + solved/target counters |
 | `events` | `event` | `id` (auto) | append-only event log; `event_type` + `value` |
@@ -219,6 +219,13 @@ NewApi-first ordering on every other test.
   pattern governs `problem.DifficultyVersion` (migration 38). The `_note`
   on each field records the reasoning. Adding a `DEFAULT` to a `models.json`
   field silently drops it from the INSERT column list.
+- **Column *order* is load-bearing.** `getXSQL`/`listXSQL`/`CustomList` are
+  `SELECT *` scanned positionally into the `models.json` field order, so a
+  migrated DB and a fresh DB must agree on column *position*, not just
+  membership. Match the migration's placement to the field's index in
+  `models.json`: mid-list fields need an explicit `AFTER <col>` (migrations 43,
+  46), a last field is appended with no `AFTER` (migration 49). Get this wrong
+  and prod silently scans values into the wrong struct fields.
 - **`id` types are uneven.** Most models declare `Id uint32` over a
   `BIGINT UNSIGNED` column. Don't assume the Go width matches the SQL width.
 - **Know the true current shape before destructive prod SQL.** Because the
@@ -237,7 +244,7 @@ NewApi-first ordering on every other test.
 - `server/api/*_model.generated.go` — generated tables/CRUD (do not edit).
 - `server/api/init.go` `createTables`, `NewApi`, `CREATE_TABLES_SQL` — base-table creation + join tables.
 - `server/api/migrate.go` `RunMigrations`, `splitStatements` — the runner.
-- `server/api/migrations/<N>.sql` — the diff history (latest: 47).
+- `server/api/migrations/<N>.sql` — the diff history (latest: 49).
 - `server/api/docs_sync_test.go` `TestDocsSyncSchema` — anchor enforcement.
 - `server/api/bootstrap_order_test.go` — fresh-DB bootstrap in the production startup order.
 - `server/api/migration_rerun_test.go` — invariant 1 enforcement (every migration re-run-safe).

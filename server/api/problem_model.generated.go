@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const (
@@ -20,7 +21,8 @@ const (
 	difficulty FLOAT NOT NULL,
 	status ENUM('active','deprecated','reported','incorrect') NOT NULL DEFAULT 'active',
 	generator VARCHAR(64) NOT NULL,
-	difficulty_version VARCHAR(16) NOT NULL
+	difficulty_version VARCHAR(16) NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     ) DEFAULT CHARSET=utf8mb4 ;`
 
 	createProblemSQL = `INSERT INTO problems (id, problem_type_bitmap, expression, answer, explanation, symbolic_expression, difficulty, generator, difficulty_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`
@@ -31,26 +33,27 @@ const (
 
 	listProblemSQL = `SELECT * FROM problems;`
 
-	updateProblemSQL = `UPDATE problems SET problem_type_bitmap=?, expression=?, answer=?, explanation=?, symbolic_expression=?, difficulty=?, status=?, generator=?, difficulty_version=? WHERE id=?;`
+	updateProblemSQL = `UPDATE problems SET problem_type_bitmap=?, expression=?, answer=?, explanation=?, symbolic_expression=?, difficulty=?, status=?, generator=?, difficulty_version=?, created_at=? WHERE id=?;`
 
 	deleteProblemSQL = `DELETE FROM problems WHERE id=?;`
 )
 
 type Problem struct {
-	Id                 uint32  `json:"id" uri:"id"`
-	ProblemTypeBitmap  uint64  `json:"problem_type_bitmap" uri:"problem_type_bitmap" form:"problem_type_bitmap"`
-	Expression         string  `json:"expression" uri:"expression" form:"expression"`
-	Answer             string  `json:"answer" uri:"answer" form:"answer"`
-	Explanation        string  `json:"explanation" uri:"explanation" form:"explanation"`
-	SymbolicExpression string  `json:"symbolic_expression" uri:"symbolic_expression" form:"symbolic_expression"`
-	Difficulty         float64 `json:"difficulty" uri:"difficulty" form:"difficulty"`
-	Status             string  `json:"status" uri:"status" form:"status"`
-	Generator          string  `json:"generator" uri:"generator" form:"generator"`
-	DifficultyVersion  string  `json:"difficulty_version" uri:"difficulty_version" form:"difficulty_version"`
+	Id                 uint32    `json:"id" uri:"id"`
+	ProblemTypeBitmap  uint64    `json:"problem_type_bitmap" uri:"problem_type_bitmap" form:"problem_type_bitmap"`
+	Expression         string    `json:"expression" uri:"expression" form:"expression"`
+	Answer             string    `json:"answer" uri:"answer" form:"answer"`
+	Explanation        string    `json:"explanation" uri:"explanation" form:"explanation"`
+	SymbolicExpression string    `json:"symbolic_expression" uri:"symbolic_expression" form:"symbolic_expression"`
+	Difficulty         float64   `json:"difficulty" uri:"difficulty" form:"difficulty"`
+	Status             string    `json:"status" uri:"status" form:"status"`
+	Generator          string    `json:"generator" uri:"generator" form:"generator"`
+	DifficultyVersion  string    `json:"difficulty_version" uri:"difficulty_version" form:"difficulty_version"`
+	CreatedAt          time.Time `json:"created_at" uri:"created_at" form:"created_at"`
 }
 
 func (model Problem) String() string {
-	return fmt.Sprintf("Id: %v, ProblemTypeBitmap: %v, Expression: %v, Answer: %v, Explanation: %v, SymbolicExpression: %v, Difficulty: %v, Status: %v, Generator: %v, DifficultyVersion: %v", model.Id, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Explanation, model.SymbolicExpression, model.Difficulty, model.Status, model.Generator, model.DifficultyVersion)
+	return fmt.Sprintf("Id: %v, ProblemTypeBitmap: %v, Expression: %v, Answer: %v, Explanation: %v, SymbolicExpression: %v, Difficulty: %v, Status: %v, Generator: %v, DifficultyVersion: %v, CreatedAt: %v", model.Id, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Explanation, model.SymbolicExpression, model.Difficulty, model.Status, model.Generator, model.DifficultyVersion, model.CreatedAt)
 }
 
 type ProblemManager struct {
@@ -74,7 +77,7 @@ func (m *ProblemManager) Create(model *Problem) (int, string, error) {
 
 func (m *ProblemManager) Get(id uint32) (*Problem, int, string, error) {
 	model := &Problem{}
-	err := m.DB.QueryRow(getProblemSQL, id).Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Explanation, &model.SymbolicExpression, &model.Difficulty, &model.Status, &model.Generator, &model.DifficultyVersion)
+	err := m.DB.QueryRow(getProblemSQL, id).Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Explanation, &model.SymbolicExpression, &model.Difficulty, &model.Status, &model.Generator, &model.DifficultyVersion, &model.CreatedAt)
 	if err == sql.ErrNoRows {
 		msg := "Couldn't find a problem with that id"
 		return nil, http.StatusNotFound, msg, err
@@ -96,7 +99,7 @@ func (m *ProblemManager) List() (*[]Problem, int, string, error) {
 	}
 	for rows.Next() {
 		model := Problem{}
-		err = rows.Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Explanation, &model.SymbolicExpression, &model.Difficulty, &model.Status, &model.Generator, &model.DifficultyVersion)
+		err = rows.Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Explanation, &model.SymbolicExpression, &model.Difficulty, &model.Status, &model.Generator, &model.DifficultyVersion, &model.CreatedAt)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -123,7 +126,7 @@ func (m *ProblemManager) CustomList(sql string) (*[]Problem, int, string, error)
 	}
 	for rows.Next() {
 		model := Problem{}
-		err = rows.Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Explanation, &model.SymbolicExpression, &model.Difficulty, &model.Status, &model.Generator, &model.DifficultyVersion)
+		err = rows.Scan(&model.Id, &model.ProblemTypeBitmap, &model.Expression, &model.Answer, &model.Explanation, &model.SymbolicExpression, &model.Difficulty, &model.Status, &model.Generator, &model.DifficultyVersion, &model.CreatedAt)
 		if err != nil {
 			msg := "Couldn't scan row from database"
 			return nil, http.StatusInternalServerError, msg, err
@@ -181,7 +184,7 @@ func (m *ProblemManager) Update(model *Problem) (int, string, error) {
 		return status, msg, err
 	}
 	// Update
-	_, err = m.DB.Exec(updateProblemSQL, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Explanation, model.SymbolicExpression, model.Difficulty, model.Status, model.Generator, model.DifficultyVersion, model.Id)
+	_, err = m.DB.Exec(updateProblemSQL, model.ProblemTypeBitmap, model.Expression, model.Answer, model.Explanation, model.SymbolicExpression, model.Difficulty, model.Status, model.Generator, model.DifficultyVersion, model.CreatedAt, model.Id)
 	if err != nil {
 		msg := "Couldn't update problem in database"
 		return http.StatusInternalServerError, msg, err

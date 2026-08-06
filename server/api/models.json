@@ -92,6 +92,12 @@
           "type": "string",
           "_note": "DEFAULT intentionally absent here; migration 38 adds it with DEFAULT '' for backfill. Codegen skips DEFAULT-bearing fields in INSERT, so omitting DEFAULT here forces the generator paths to stamp the current api.DifficultyVersion on every new row.",
           "sql": "VARCHAR(16) NOT NULL"
+        },
+        {
+          "name": "CreatedAt",
+          "type": "time.Time",
+          "_note": "When the row was generated; problems.id is a content hash, not a sequence. DEFAULT is intentional so codegen drops it from INSERT and MySQL stamps it. Must stay LAST — see the column-order gotcha in docs/schema.md.",
+          "sql": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
         }
       ]
     },
