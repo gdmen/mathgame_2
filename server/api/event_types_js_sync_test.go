@@ -56,8 +56,12 @@ func declaredValues(t *testing.T, path, start, end string, decl *regexp.Regexp) 
 	return out
 }
 
+func goEventTypes(t *testing.T) []string {
+	return declaredValues(t, "event_types.go", "// EventTypes", "// -end- EventTypes", goEventDecl)
+}
+
 func TestEventTypesMatchJS(t *testing.T) {
-	goTypes := declaredValues(t, "event_types.go", "// EventTypes", "// -end- EventTypes", goEventDecl)
+	goTypes := goEventTypes(t)
 	jsTypes := declaredValues(t, jsEnumsPath, "const EventTypes = {", "};", jsEventDecl)
 
 	if strings.Join(goTypes, ",") != strings.Join(jsTypes, ",") {

@@ -182,14 +182,8 @@ func TestDocsSyncEvents(t *testing.T) {
 	const doc = "../../docs/events.md"
 	anchors := readDocAnchors(t, doc)
 
-	// The full event-type inventory - a new event type cannot land undocumented.
-	allEventTypes := []string{
-		LOGGED_IN, SELECTED_PROBLEM, WORKING_ON_PROBLEM, ANSWERED_PROBLEM,
-		SOLVED_PROBLEM, ERROR_PLAYING_VIDEO, WATCHING_VIDEO, DONE_WATCHING_VIDEO,
-		SET_TARGET_DIFFICULTY, SET_TARGET_WORK_PERCENTAGE, SET_PROBLEM_TYPE_BITMAP,
-		SET_GAMESTATE_TARGET, BAD_PROBLEM_SYSTEM, BAD_PROBLEM_USER,
-	}
-	assertSetAnchor(t, doc, "event_types", anchors["event_types"], allEventTypes)
+	// A new event type cannot land undocumented.
+	assertSetAnchor(t, doc, "event_types", anchors["event_types"], goEventTypes(t))
 
 	// summableEventTypes is a real map; assert against its keys.
 	var summable []string
