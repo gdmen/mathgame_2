@@ -1,0 +1,29 @@
+version: 2
+
+# Security alerts fire on their own regardless of this file; what it adds is
+# scheduled version updates, and a gomod entry so the Go tree is scanned at all.
+updates:
+  # Grouped by dependency-type because the dev tree is ~15x the production tree
+  # (1454 packages vs 95): ungrouped, a weekly run would open dozens of PRs for
+  # bundler and test-runner bumps that ship to nobody.
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      production-dependencies:
+        dependency-type: production
+      development-dependencies:
+        dependency-type: development
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
