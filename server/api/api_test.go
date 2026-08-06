@@ -448,6 +448,81 @@ func TestRemovePlaylist(t *testing.T) {
 	}
 }
 
+// Removing a playlist that held the selected reward has to repoint the
+// gamestate: /play resolves the reward by id alone, so a stale id keeps serving
+// a video the user no longer has until the next reward cycle.
+func TestRemovePlaylist_RepointsTheRewardItTookAway(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("Couldn't read config: %v", err)
+	}
+	api, r, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+	user := createTestUser(t, r, "auth0id|rmreward", "rmreward@test.com", "rmreward")
+
+	videoIDs := insertVideos(t, api, 2)
+	removed := insertPlaylistWithVideos(t, api, "PLrewardGone", videoIDs[:1])
+	kept := insertPlaylistWithVideos(t, api, "PLrewardKept", videoIDs[1:])
+	subscribeUserToPlaylists(t, api, user.Id, removed, kept)
+	setRewardVideo(t, api, user.Id, videoIDs[0])
+
+	removePlaylist(t, r, user, removed)
+	if got := rewardVideo(t, api, user.Id); got != videoIDs[1] {
+		t.Fatalf("expected the reward to move to the kept playlist's video (%d), got %d", videoIDs[1], got)
+	}
+
+	// With no playlists left there is nothing to point at, and nullVideoId is
+	// how the gamestate already spells an empty pool.
+	removePlaylist(t, r, user, kept)
+	if got := rewardVideo(t, api, user.Id); got != nullVideoId {
+		t.Fatalf("expected nullVideoId once the pool is empty, got %d", got)
+	}
+}
+
+// Adding a playlist shrinks the pool too, because the sync rebuilds
+// playlist_video from YouTube's current answer. The DELETE below stands in for
+// that rebuild dropping the video that was the reward.
+func TestAddPlaylist_RepointsARewardTheResyncDropped(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("Couldn't read config: %v", err)
+	}
+	api, r, cleanup := setupTestAPI(t, c)
+	defer cleanup()
+	user := createTestUser(t, r, "auth0id|addreward", "addreward@test.com", "addreward")
+
+	videoIDs := insertVideos(t, api, 2)
+	playlistID := insertPlaylistWithVideos(t, api, "PLresync", videoIDs)
+	subscribeUserToPlaylists(t, api, user.Id, playlistID)
+	setRewardVideo(t, api, user.Id, videoIDs[0])
+
+	if _, err := api.DB.Exec(
+		"DELETE FROM playlist_video WHERE playlist_id=? AND video_id=?", playlistID, videoIDs[0]); err != nil {
+		t.Fatalf("drop video from playlist: %v", err)
+	}
+
+	addPlaylistByID(t, r, user, playlistID)
+	if got := rewardVideo(t, api, user.Id); got != videoIDs[1] {
+		t.Fatalf("expected the reward to move to the video the playlist still has (%d), got %d", videoIDs[1], got)
+	}
+}
+
+func setRewardVideo(t *testing.T, api *Api, userID, videoID uint32) {
+	t.Helper()
+	if _, err := api.DB.Exec("UPDATE gamestates SET video_id=? WHERE user_id=?", videoID, userID); err != nil {
+		t.Fatalf("set reward video: %v", err)
+	}
+}
+
+func rewardVideo(t *testing.T, api *Api, userID uint32) uint32 {
+	t.Helper()
+	var videoID uint32
+	if err := api.DB.QueryRow("SELECT video_id FROM gamestates WHERE user_id=?", userID).Scan(&videoID); err != nil {
+		t.Fatalf("read reward video: %v", err)
+	}
+	return videoID
+}
+
 // Two playlists sharing videos is the case that makes a client-side total wrong:
 // the per-playlist counts sum to more reward videos than exist, because the
 // shared ones are counted once per playlist. playable_total is the count the

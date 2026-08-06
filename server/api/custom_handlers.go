@@ -102,6 +102,47 @@ func (a *Api) selectVideoIfNull(logPrefix string, c *gin.Context, gamestate *Gam
 	return nil
 }
 
+// selectVideoIfUnavailable repoints the reward when the gamestate's video has
+// left the user's pool. helpGetPlayData resolves the reward by id alone, with no
+// user_has_video join, so every caller of refreshUserHasVideo has to run this or
+// the user is served a video they no longer have until the next reward cycle.
+func (a *Api) selectVideoIfUnavailable(logPrefix string, c *gin.Context, userId uint32) error {
+	gamestate, status, msg, err := a.gamestateManager.Get(userId)
+	if HandleMngrResp(logPrefix, c, status, msg, err, gamestate) != nil {
+		return err
+	}
+	// The same pool selectVideo draws from, so "available" and "selectable"
+	// cannot disagree.
+	var available bool
+	err = a.DB.QueryRow(`
+		SELECT EXISTS (
+			SELECT 1 FROM user_has_video uhv
+			INNER JOIN videos v ON v.id = uhv.video_id AND v.disabled = 0
+			WHERE uhv.user_id = ? AND uhv.video_id = ?)`,
+		userId, gamestate.VideoId).Scan(&available)
+	if err != nil {
+		glog.Errorf("%s reward video availability: %v", logPrefix, err)
+		c.JSON(http.StatusInternalServerError, common.GetError("Could not check the reward video"))
+		return err
+	}
+	if available {
+		return nil
+	}
+	// No exclusion to pass: the video being replaced is already out of the pool
+	// selectVideo draws from.
+	videoId, err := a.selectVideo(logPrefix, c, userId, map[uint32]bool{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, common.GetError("Could not select a reward video"))
+		return err
+	}
+	gamestate.VideoId = videoId
+	status, msg, err = a.gamestateManager.Update(gamestate)
+	if HandleMngrResp(logPrefix, c, status, msg, err, gamestate) != nil {
+		return err
+	}
+	return nil
+}
+
 func (a *Api) customGetGamestate(c *gin.Context) {
 	logPrefix := common.GetLogPrefix(c)
 	glog.Infof("%s fcn start", logPrefix)
@@ -763,6 +804,12 @@ func (a *Api) customAddPlaylist(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, common.GetError("Could not update video list"))
 		return
 	}
+	// Adding can shrink the pool too: the sync rebuilds playlist_video from
+	// YouTube's current answer, so re-adding a playlist can drop the video that
+	// was the reward.
+	if a.selectVideoIfUnavailable(logPrefix, c, user.Id) != nil {
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"id": playlistID})
 }
 
@@ -794,6 +841,9 @@ func (a *Api) customRemovePlaylist(c *gin.Context) {
 	if err := a.refreshUserHasVideo(user.Id); err != nil {
 		glog.Errorf("%s refreshUserHasVideo: %v", logPrefix, err)
 		c.JSON(http.StatusInternalServerError, common.GetError("Could not update video list"))
+		return
+	}
+	if a.selectVideoIfUnavailable(logPrefix, c, user.Id) != nil {
 		return
 	}
 	c.Status(http.StatusNoContent)

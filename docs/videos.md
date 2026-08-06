@@ -114,6 +114,14 @@ momentarily empty a playlist's membership until the next successful sync.
   make.** It is derived state, rebuilt rather than amended, so it is never the record of a
   decision. The qualifier is load-bearing: the rebuild is per-user, so it settles the acting
   user's pool and nobody else's (see [Staleness across users](#staleness-across-users)).
+- **A pool that shrinks takes the selected reward with it.** `/play` resolves `gamestate.video_id`
+  by id alone, with no `user_has_video` join, so both callers of `refreshUserHasVideo` follow it
+  with `selectVideoIfUnavailable` (`custom_handlers.go`): if the current reward is no longer
+  drawable from the pool, the gamestate is repointed at one that is. Removing a playlist is the
+  obvious shrink; adding one is the less obvious one, because the sync clears and rebuilds
+  `playlist_video` (step 4), so re-adding a playlist can drop the reward. The check is pool
+  membership, not equality with a single id, because one mutation can drop many videos. An emptied
+  pool leaves `nullVideoId`, which is what a user with no videos already carries.
 - **The `/videos` routes are read-only.** Only `GET /videos`, `GET /videos/:id` and
   `GET /playlists/:playlist_id/videos` are registered; the generated `createVideo`, `updateVideo`
   and `deleteVideo` handlers exist but are unrouted, like `listUser`. The `TestVideoBasic`
@@ -176,7 +184,7 @@ of that failure is this gap, not a broken rebuild.
 - `server/api/youtube_test.go` — decode tests pinning the response structs to the YouTube API's
   payload shape.
 - `server/api/custom_handlers.go` — `customAddPlaylist` (the only caller), `customRemovePlaylist`,
-  and `refreshUserHasVideo` (the user-pool side).
+  `refreshUserHasVideo` and `selectVideoIfUnavailable` (the user-pool side).
 - `server/api/playlist_model.generated.go` — `Playlist` model and `playlistManager`
   (Create/Update/Get); generated from `models.json`.
 - `server/common/config.go` — `YouTubeAPIKey` (`youtube_api_key`), required via `Config.Validate`.
