@@ -11,7 +11,7 @@ The generated Go files in `server/api/` are produced from
 `docs/schema.md`).
 
 1. Edit `server/api/models.json` (the schema is the source of truth).
-2. Run `make build-api` — runs the two `generate_*.py` codegen steps, `gofmt -s`,
+2. Run `make build-api` — runs the `generate_*.py` codegen steps, `gofmt -s`,
    and rebuilds `bin/apiserver`.
 3. Review the regenerated diff and run `make test-api`.
 

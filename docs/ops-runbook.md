@@ -57,7 +57,7 @@ boot). The three jobs that must not overlap a manual run hold a `flock`
 
 | Target | What it does |
 |---|---|
-| `build-api` | regenerates `*_model.generated.go` / `*_handlers.generated.go` from `server/api/models.json` (Python codegen), `gofmt -s`, then builds `bin/apiserver` |
+| `build-api` | regenerates `*_model.generated.go` / `*_handlers.generated.go` from `server/api/models.json` and `web/src/enums.generated.js` from the Go enum blocks (Python codegen), `gofmt -s`, then builds `bin/apiserver` |
 | `build-cmds` | depends on `build-api`; builds every `cmd/*` tool into `bin/` (see list below) |
 | `build-web` | `frontend-conf`, `npm install --force --include=dev`, `landing-assets`, then build into `web/build.next`, prettier, the landing/app HTML swap (below), then swap `build.next` → `build`. `--include=dev` because npm reads `NODE_ENV=production` as `--omit=dev`, which would skip `react-scripts` and `sass` and break the build |
 | `landing-assets` | compiles `web/src/landing.scss` → `web/public/landing.css` and copies the landing's woff2 files into `web/public/fonts/`; both outputs are generated and gitignored |

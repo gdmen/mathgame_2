@@ -33,8 +33,8 @@ validation_error_codes: NO_CORE_OP, LARGE_REQUIRES_MEDIUM, MISMATCHED_REQUIRES_F
 The settings screen exposes the two user controls described in problem-generation.md ("The model"):
 
 - **`problem_type_bitmap`** — the envelope. Authored directly by toggling problem-type chips. Bit
-  constants come from `web/src/enums.js` `ProblemTypes` (the frontend copy of
-  `server/mathcore/problem_type.go`).
+  constants come from `web/src/enums.generated.js` `ProblemTypes`, generated from
+  `server/mathcore/problem_type.go` by `make build-api`.
 - **`target_difficulty`** — the adaptive lever, surfaced as a meter whose max IS the bitmap's
   difficulty ceiling, nudged rather than dragged.
 
@@ -65,7 +65,7 @@ render-time gating, and the toggle math all read it. A parent sits at the bottom
 dependent row falls directly beneath it. The Number size card also carries a `hint`.
 
 Card-to-bit placement is hand-maintained and NOT enforced by a test: every `ProblemTypes` bit
-happens to be placed, but a new bit added to `enums.js` will silently not appear on the screen unless
+happens to be placed, but a newly generated bit will silently not appear on the screen unless
 added to `PROBLEM_TYPE_GROUPS` too (see the new-bit checklist in problem-generation.md).
 
 ## Toggle behavior
@@ -275,7 +275,8 @@ on the card that changed, so a failure is attached to the control that caused it
   `targetDifficultyRange`, `MIN_TARGET_DIFFICULTY`.
 - `web/src/difficulty_band_fixtures.json` — generated Go↔JS parity fixtures
   (`make gen-difficulty-fixtures`, `cmd/gen_difficulty_fixtures`).
-- `web/src/enums.js` — `ProblemTypes` bit constants, mirroring `server/mathcore/problem_type.go`.
+- `web/src/enums.generated.js` — `ProblemTypes` bit constants, generated from
+  `server/mathcore/problem_type.go`; never hand-edit.
 - `server/mathcore/difficulty.go` — `MaxDiffForBitmap`, `MinDiffForBitmap`, `TargetDifficultyRange`,
   `MinTargetDifficulty`, `MaxChainLen`, `MaxWordChainLen`, `MinConstructibleOperand`,
   `LargeMaxOperand`, `SmallMaxOperand`, `MediumMaxOperand` (the authoritative copies).
@@ -286,7 +287,7 @@ on the card that changed, so a failure is attached to the control that caused it
 
 Walk the full new-bit checklist in problem-generation.md; the settings-screen touchpoints are:
 
-1. Add the bit to `web/src/enums.js` `ProblemTypes` (matches `server/mathcore/problem_type.go`).
+1. `make build-api` to pick the new `server/mathcore/problem_type.go` bit up in `ProblemTypes`.
 2. Place it in `PROBLEM_TYPE_GROUPS` — pick the card (verb / noun-kind / noun-size / framing), label
    (parent vocabulary), and `dependsOn` if it's part of a dependency pair (that one field gets the
    row placement, the gating, and the toggle math).

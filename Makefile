@@ -29,6 +29,10 @@ dev-web: frontend-conf landing-assets
 build-api:
 	python3 server/code_generation/generate_models.py -c server/api/models.json -o server/api
 	python3 server/code_generation/generate_handlers.py -c server/api/models.json -o server/api
+	python3 server/code_generation/generate_js_enums.py \
+		--problem-types server/mathcore/problem_type.go \
+		--event-types server/api/event_types.go \
+		-o web/src/enums.generated.js
 	$(MAKE) fmt
 	$(GOBUILD) -o ./bin/apiserver ./cmd/apiserver/main.go
 
@@ -115,6 +119,7 @@ clean:
 	$(RM) ./swagger.yaml
 	$(RM) ./bin/*
 	$(RM) ./server/api/*.generated.go
+	$(RM) ./web/src/enums.generated.js
 	GOBIN=$(GOBIN) $(GOCLEAN) -testcache
 	$(GOMOD) tidy
 	$(RM) ./web/build/* ./web/build.next ./web/build.prev

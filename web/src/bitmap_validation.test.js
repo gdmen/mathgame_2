@@ -4,7 +4,7 @@ import {
   minDiffForBitmap,
   targetDifficultyRange,
 } from "./bitmap_validation.js";
-import { ProblemTypes as T } from "./enums.js";
+import { ProblemTypes as T } from "./enums.generated.js";
 import bandFixtures from "./difficulty_band_fixtures.json";
 
 describe("validateBitmap", () => {

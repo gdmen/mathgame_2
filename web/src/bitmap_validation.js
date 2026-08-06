@@ -5,7 +5,7 @@
 // ceiling constants) REQUIRE updating that doc in the same PR and must stay
 // consistent with the server (server/mathcore/difficulty.go owns the ceiling
 // authoritatively - the server clamps on save; this copy only sizes the UI).
-import { ProblemTypes } from "./enums.js";
+import { ProblemTypes } from "./enums.generated.js";
 
 const T = ProblemTypes;
 

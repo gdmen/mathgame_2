@@ -9,7 +9,7 @@ import {
   errorCardTitle,
 } from "./settings.js";
 import { validateBitmap } from "./bitmap_validation.js";
-import { ProblemTypes as T } from "./enums.js";
+import { ProblemTypes as T } from "./enums.generated.js";
 
 // The toggle rules and the error placement are derived from
 // PROBLEM_TYPE_GROUPS, so these tests are written over the taxonomy rather
