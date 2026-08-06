@@ -271,7 +271,7 @@ func TestCountDistinctUnknowns(t *testing.T) {
 		{"? + 5 = 12", 1, 1},
 		{"3x + 7 = 22", 1, 0},
 		{"3x + 2x = 10", 1, 0},
-		{"? + x = 10", 2, 1},   // two unknowns -> rejected at insert (PR2)
+		{"? + x = 10", 2, 1},   // two unknowns -> rejected at insert
 		{"3x + 2y = 12", 2, 0}, // two distinct letters -> rejected at insert
 		{"? + ? = 10", 1, 2},   // multi-? -> rejected at insert
 		{"12 + 5", 0, 0},

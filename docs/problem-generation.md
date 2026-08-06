@@ -300,7 +300,7 @@ raw       = magnitude * opWeight * concept * structure
 scaled    = 1 + 19 * (ln(raw+1) - ln(1.5)) / (ln(16) - ln(1.5))
 ```
 
-Open-ended scale: floored at 1.0, **no upper clamp** (`compressRaw`; inputs
+Open-ended scale: floored at 1.0, **no upper clamp** (`CompressRaw`; inputs
 are bounded by construction; system max ≈ 62). 1–20 is the band for one/two-
 concept problems; scores above 20 mean multi-concept stacks. Illustrative
 anchors: `3 + 5` ≈ 3.6 · `47 + 28` ≈ 6.5 · `9 × 12` ≈ 9.1 ·
@@ -548,10 +548,10 @@ forbidden until deliberately added.
 ## Related files
 
 - `server/mathcore/problem_type.go` — `ProblemType` bits, `problemTypeNames`, `ALL_PROBLEM_TYPES`
-- `server/mathcore/expression.go` — `NormalizeExpression`, `LexExpression`, `RewriteLoneVariable`, `CountDistinctUnknowns`, `lexNumber`
+- `server/mathcore/expression.go` — `NormalizeExpression`, `DisplayExpression`, `LexExpression`, `RewriteLoneVariable`, `CountDistinctUnknowns`, `lexNumber`
 - `server/mathcore/evaluator.go` — `EvalTokens`, `EvalTokensNaiveLTR`, `requiresPEMDAS`, `pemdasProbes`
 - `server/mathcore/stamping.go` — `AdmitExpression`, `reduceLabeledUnknown`, `DetectProblemTypeBitmap`, `NormalizeProblemBitmap`, `WordFormBitmap`, `VerifyAnswerSymbolic`, `EnvelopeViolation`
-- `server/mathcore/difficulty.go` — `ComputeProblemDifficulty`, `ComputeDifficultyBreakdownFor`, `computeBreakdown`, `compressRaw`, `MaxDiffForBitmap`, `MinDiffForBitmap`, `TargetDifficultyRange`, `ClampTargetDifficulty`, the `Concept*`/`Weight*`/`Structure*` constants, `DifficultyVersion`, `MaxChainLen`, `MaxWordChainLen`, `MinConstructibleOperand`, `LargeMaxOperand`, `SmallMaxOperand`, `MediumMaxOperand`
+- `server/mathcore/difficulty.go` — `ComputeProblemDifficulty`, `ComputeDifficultyBreakdownFor`, `computeBreakdown`, `CompressRaw`, `MaxDiffForBitmap`, `MinDiffForBitmap`, `TargetDifficultyRange`, `ClampTargetDifficulty`, the `Concept*`/`Weight*`/`Structure*` constants, `DifficultyVersion`, `MaxChainLen`, `MaxWordChainLen`, `MinConstructibleOperand`, `LargeMaxOperand`, `SmallMaxOperand`, `MediumMaxOperand`
 - `server/mathcore/answer_compare.go` — `AnswersEquivalent`
 - `server/api/generation_funnel.go` — `generationFunnel`, `VerifyAnswer`, `RewriteLetterInProse` (api-side admission bookkeeping)
 - `server/generator` — the heuristic generator: `BuildProblem`, the knob inverter, the compositional `expand` recursion

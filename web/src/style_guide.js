@@ -620,15 +620,8 @@ const StyleGuideView = () => {
       <Section title="Problem-type toggle pills">
         <p>
           Topic toggles in settings. A hidden checkbox drives a colored
-          background on its sibling pill. Issue{" "}
-          <a
-            href="https://github.com/gdmen/mathgame_2/issues/225"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            #225
-          </a>{" "}
-          extends this pattern to many more bits.
+          background on its sibling pill. Selection is color-only: the pill
+          never changes size on any state change.
         </p>
         <CompoundExample
           name=".problem-type-button"
