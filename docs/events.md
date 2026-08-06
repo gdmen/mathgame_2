@@ -166,7 +166,8 @@ runs.
 - `server/api/statistics_handlers.go` — `UpdateStatisticsForUser`, `getStatistics`, `fullProgressBackfill`, `mergeProgressEventsIntoCache`, `readStatisticsFromCache`.
 - `server/api/event_types.go` — event-type constants, `recordOnlyEventTypes`.
 - `server/api/event_types_js_sync_test.go` — `TestEventTypesMatchJS`, which pins `EventTypes` in
-  `web/src/enums.js` to the constants here. The client's use of them is [gameplay.md](gameplay.md)'s.
+  `web/src/enums.generated.js` to the constants here. The client's use of them is
+  [gameplay.md](gameplay.md)'s.
 - `server/api/event_model.generated.go` — the `Event` struct (generated from `models.json`; never hand-edit).
 - `server/api/migrations/16.sql` — `statistics_cache_meta`, `statistics_totals`, `statistics_monthly`; `migrations/28.sql` — `compress_events_meta`.
 - `server/api/event_compress_test.go`, `server/api/statistics_test.go` — own the concrete values cited above.
@@ -175,8 +176,8 @@ runs.
 ## Extension checklist (adding / changing an event type's role)
 
 1. Add or rename the constant in `event_types.go`, and update the `event_types` anchor to match the enum.
-   Mirror the same change into `EventTypes` in `web/src/enums.js` — `TestEventTypesMatchJS` requires the
-   two sets to be equal, so a server-only edit fails CI.
+   `make build-api` regenerates the client's copy in `web/src/enums.generated.js`, and CI fails on a
+   committed copy that is out of date, so a server edit that skips the regeneration does not land.
 2. **Summable?** (its `value` is a duration to sum across consecutive runs) → add to
    `summableEventTypes` and to the `summable_event_types` anchor.
 3. **Counted by stats?** → add it to the `event_type IN (...)` lists in BOTH `fullProgressBackfill`

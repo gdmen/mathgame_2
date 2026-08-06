@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 
 import { apiFetch } from "./api.js";
-import { ProblemTypes } from "./enums.js";
+import { ProblemTypes } from "./enums.generated.js";
 import { validateBitmap, targetDifficultyRange } from "./bitmap_validation.js";
 import { RequirePin, ClearSessionPin } from "./pin.js";
 import { PinConfirmModal } from "./pin_confirm_modal.js";

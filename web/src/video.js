@@ -9,7 +9,7 @@ import ReactPlayer from "react-player";
 
 import "./video.scss";
 
-import { EventTypes } from "./enums.js";
+import { EventTypes } from "./enums.generated.js";
 
 const VideoView = ({ video, eventReporter, interval }) => {
   const [playing, setPlaying] = useState(false);

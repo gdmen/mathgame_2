@@ -528,7 +528,7 @@ lexer allowlist + admission-pipeline rejects) protects the system between additi
 forbidden until deliberately added.
 
 1. Constant in `server/mathcore/problem_type.go` + `problemTypeNames` entry — feature-named, not subject-named.
-2. Frontend constant in `web/src/enums.js`.
+2. Frontend constant — generated into `web/src/enums.generated.js` by `make build-api`.
 3. Lexer token(s) for new notation (`server/mathcore/expression.go` — the alphabet is the single source of truth).
 4. Normalizer synonyms for LaTeX/unicode dialect forms (`normalizeReplacer`).
 5. `parseProblemFeatures` field + detection logic (token-level; the prose rule applies).

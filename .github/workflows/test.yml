@@ -30,6 +30,12 @@ jobs:
     - name: Build
       run: make build-api
 
+    # The jest job and build-web read the committed copy without regenerating
+    # it, so a stale one ships. Build regenerates before the tests read it,
+    # which is why they cannot catch this themselves.
+    - name: Generated frontend enums up to date
+      run: git diff --exit-code web/src/enums.generated.js
+
     - name: Test
       run: make test-api
 

@@ -41,7 +41,7 @@ videos  doc=docs/videos.md  type=anchored
 gameplay  doc=docs/gameplay.md  type=prose
   globs: web/src/play.js, web/src/problem.js, web/src/video.js
 settings  doc=docs/settings.md  type=anchored
-  globs: web/src/settings.js, web/src/bitmap_validation.js, web/src/enums.js
+  globs: web/src/settings.js, web/src/bitmap_validation.js, web/src/enums.generated.js
 accounts  doc=docs/accounts.md  type=prose
   globs: server/api/roles.go, server/api/self_access.go, web/src/api.js, web/src/auth0.js, web/src/pin.js, web/src/setup.js
 design-system  doc=web/src/style_guide.js  type=prose

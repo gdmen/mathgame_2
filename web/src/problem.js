@@ -3,7 +3,7 @@ import parse from "html-react-parser";
 
 import "./problem.scss";
 
-import { EventTypes, ProblemTypes } from "./enums.js";
+import { EventTypes, ProblemTypes } from "./enums.generated.js";
 
 const PreprocessExpression = (expression) => {
   // KaTeX reads a bare % as a line comment and eats the rest of the math

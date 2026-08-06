@@ -10,12 +10,12 @@ import (
 )
 
 // The client posts event types across a language boundary, so neither compiler
-// can see a rename or a typo. TestEventTypesMatchJS closes that gap: the JS
-// mirror must hold exactly the server's vocabulary, and every event type the
-// client posts must come from that mirror rather than a literal.
+// can see a rename or a typo. TestEventTypesMatchJS closes that gap: the
+// generated JS copy must hold exactly the server's vocabulary, and every event
+// type the client posts must come from that copy rather than a literal.
 
 const (
-	jsEnumsPath = "../../web/src/enums.js"
+	jsEnumsPath = "../../web/src/enums.generated.js"
 	jsSrcDir    = "../../web/src"
 )
 
@@ -82,12 +82,12 @@ func TestEventTypesMatchJS(t *testing.T) {
 		src := readFileForTest(t, path)
 		for _, m := range quotedString.FindAllStringSubmatch(src, -1) {
 			if known[m[1]] {
-				t.Errorf("%s: bare event-type literal %q - use EventTypes from enums.js", path, m[1])
+				t.Errorf("%s: bare event-type literal %q - use EventTypes from enums.generated.js", path, m[1])
 			}
 		}
 		for _, m := range eventCallSite.FindAllStringSubmatch(src, -1) {
 			if !known[m[1]] {
-				t.Errorf("%s: literal %q posted as an event type - use EventTypes from enums.js", path, m[1])
+				t.Errorf("%s: literal %q posted as an event type - use EventTypes from enums.generated.js", path, m[1])
 			}
 		}
 		return nil

@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import "katex/dist/katex.min.css";
 
 import { apiFetch } from "./api.js";
-import { EventTypes } from "./enums.js";
+import { EventTypes } from "./enums.generated.js";
 import { ProblemView, PreprocessExpression } from "./problem.js";
 import { VideoView } from "./video.js";
 import { PinConfirmModal } from "./pin_confirm_modal.js";
