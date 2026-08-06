@@ -309,17 +309,34 @@ Fires every 5 minutes (`mathgame-watchdog.timer`). For each entry in `WATCHES`
 it greps the last hour of the `mathgame-api` journal and pushes a phone
 notification via `ntfy.sh` if the count crosses the entry's threshold. Usually
 that means a *sustained* count, because the retry/self-heal layers absorb
-transient blips (#200). Two watches (`deploy/watchdog.sh` `WATCHES`):
+transient blips (#200). Four watches (`deploy/watchdog.sh` `WATCHES`):
 
 | Slug | Threshold | Pattern | Catches |
 |---|---|---|---|
 | `openai` | 5/hour | `OpenAI.*error.*after retries` | any OpenAI call that exhausted its retries, on either the narration or the validation path. Deliberately excludes the per-attempt `OpenAI transient error` warnings, which self-heal. |
+| `openai-narrate-content` | 5/hour | `OpenAI narrate content error` | the narrator answered, but with something that is not the JSON list the prompt asks for (`NarrateProblems`). The whole batch is lost and those requests fall back to heuristic problems, the same user-visible degradation the `openai` watch pages for, hence the same threshold. A sustained count means prompt or model drift, not a blip. |
+| `openai-quota-code` | 1/hour | `after retries.*openai_code=insufficient_quota` | the billing failure below, matched on OpenAI's machine-readable code rather than its prose. The `after retries` half is not redundant: it anchors the match to our own wording, so a model that echoes the code back inside a narration cannot page anyone. |
 | `openai-quota` | 1/hour | `You exceeded your current quota` | the 429 sub-type that does *not* self-heal: out of credits, spending cap, or a dead payment method. Every LLM call falls back to the heuristic generator until billing is fixed, so no word problems are served. The system is degraded rather than broken, which is exactly why it needs its own page. Titled `BILLING` to be scannable on a lockscreen. |
 
-A quota outage trips both watches, since the generic pattern also matches those
-lines; the quota one crosses its threshold sooner (1 vs 5). Both send
+A quota outage trips the generic watch too, since its pattern also matches
+those lines; the quota ones cross their threshold sooner (1 vs 5). All send
 `Priority: high`; the `BILLING` title, not the ntfy priority, is what
 separates them on the lockscreen.
+
+The content error gets its own slug rather than a wider `openai` pattern for
+two reasons. The call succeeded, so it is not an after-retries failure, and
+folding it in would make that pattern's wording a lie. Loosening the pattern
+toward a bare `OpenAI.*error` is also exactly what the `after retries`
+requirement exists to prevent: the prompt and content-error lines put
+model-authored text in the journal, and a pattern the model can match is a
+pattern the model can page you with. A separate slug also gets its own
+threshold, cooldown and notification title, so the page says which failure
+fired.
+
+Notification bodies are truncated to 300 characters per line (`cut -c`, which
+counts bytes on GNU coreutils). The content-error line carries the model's
+entire response, and ntfy rejects an oversized body, which would fail the
+`curl`, skip the stamp, and retry every 5 minutes forever.
 
 Each watch is rate-limited to one page per hour via a stamp file in
 `$STATE_DIR` (`/run` by default); the stamp is written only on a successful
@@ -336,30 +353,44 @@ cooldown stamps in `/run`:
 
 ```
 sudo systemd-run --unit=mathgame-smoke --collect /bin/echo \
-  "OpenAI narrate error after retries: error, status code: 429, status: Too Many Requests, message: You exceeded your current quota, please check your plan and billing details."
+  "OpenAI narrate error after retries: openai_code=insufficient_quota: error, status code: 429, status: Too Many Requests, message: You exceeded your current quota, please check your plan and billing details."
 sudo env UNIT=mathgame-smoke STATE_DIR=/tmp deploy/watchdog.sh /home/ubuntu/mathgame_2/conf.json
 ```
 
-That pages for real, so expect the notification on your phone. To check a
+That pages for real, so expect the notifications on your phone: that one line
+trips both quota watches. To check a
 pattern without sending anything, count it against the live journal instead:
 
 ```
 journalctl -u mathgame-api --since "1 hour ago" --no-pager | grep -c "You exceeded your current quota"
 ```
 
-Both patterns are matched against log *text*, which drifts from two directions.
-A reworded `glog` line in `server/llm_generator` breaks the `openai` watch, and
-that one is at least visible in our own diffs. The quota watch is matched
-against OpenAI's wording: the Go client's error string carries only
-`status code` / `status` / `message`, not the machine-readable
-`insufficient_quota` code, so the English sentence is the only quota signal
-that reaches the journal. Nothing in CI can catch OpenAI rewording it.
+Every pattern is matched against log *text*, which drifts from two directions.
+A reworded `glog` line in `server/llm_generator` breaks the watches that key on
+our own wording, and those are at least visible in our own diffs. The
+`openai-quota` pattern is matched against OpenAI's English prose, which nothing
+in CI can catch them rewording.
 
-Note the quota count overstates distinct failures: 429s are retryable, so one
-failed call logs three per-attempt warnings plus the final error, all four
-carrying the quota sentence. The pattern is deliberately left broad rather than
-anchored to the final error, because at threshold 1 a missed match costs more
-than an inflated count.
+The two quota watches are a transition, deliberately overlapping. The Go
+client's `Error()` string prints only `status code` / `status` / `message` and
+drops the machine-readable code, so `chatCompletionWithRetry` now prefixes
+`openai_code=<code>` onto the error it returns (`retry.go`
+`withOpenAIErrorCode`); both call sites log that error, so the code reaches the
+journal on the final error line. The prose watch stays as the fallback: a
+journal window spanning a deploy still holds code-less lines from the old
+binary, an error can arrive with no code at all, and the per-attempt transient
+warnings log the raw error either way. The cost is that a real quota outage
+pages twice, which is the right side to err on for a billing outage. The prose
+pattern is also the model-triggerable one, since a narration quoting OpenAI's
+sentence matches it while the anchored code pattern rejects it. Once prod
+journals show the code appearing reliably, drop the `openai-quota` entry.
+
+Note the prose count overstates distinct failures. 429s are retryable, so one
+failed call logs three per-attempt warnings, the final error, and the caller's
+re-log of that same error in `generate_problems.go`: five lines carrying the
+quota sentence, of which `openai-quota-code` counts the one final error line.
+The prose pattern is deliberately left broad rather than anchored to the final
+error, because at threshold 1 a missed match costs more than an inflated count.
 
 ## Operating notes
 

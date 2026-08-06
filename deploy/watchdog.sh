@@ -5,7 +5,8 @@
 # greps the last hour of the UNIT journal and pushes a phone notification if the
 # match count crosses that entry's threshold. The retry / self-heal layers
 # already absorb transient blips, so for most watches a sustained count (not a
-# single hit) is the real signal. See issue #200.
+# single hit) is the real signal. Rationale and the watch table live in
+# docs/ops-runbook.md.
 #
 # To watch another error, add a line to WATCHES:
 #     "slug|threshold|label|grep pattern"
@@ -30,10 +31,12 @@ CONF="${1:-/home/ubuntu/mathgame_2/conf.json}"
 STATE_DIR="${STATE_DIR:-/run}"
 
 # Quota is the exception to the sustained-count rule above: a single hit means
-# billing is dead, not a blip. See docs/ops-runbook.md.
+# billing is dead, not a blip.
 WATCHES=(
     "openai|5|OpenAI errors|OpenAI.*error.*after retries"
-    "openai-quota|1|OpenAI quota exhausted (BILLING)|You exceeded your current quota"
+    "openai-narrate-content|5|OpenAI narration parse errors|OpenAI narrate content error"
+    "openai-quota-code|1|OpenAI quota exhausted (BILLING)|after retries.*openai_code=insufficient_quota"
+    "openai-quota|1|OpenAI quota exhausted (BILLING, prose match)|You exceeded your current quota"
 )
 
 if [ ! -f "$CONF" ]; then
@@ -69,7 +72,9 @@ for watch in "${WATCHES[@]}"; do
         fi
     fi
 
-    body=$(grep "$pattern" <<< "$log" | tail -3)
+    # Truncate each line: a matched line can carry a whole model response, and
+    # ntfy rejects an oversized body (the push would then fail every tick).
+    body=$(grep "$pattern" <<< "$log" | tail -3 | cut -c1-300)
     # Only stamp the cooldown on a successful send, so a failed push retries.
     if curl -fsS \
         -H "Title: Mathgame: $count $label in last hour" \

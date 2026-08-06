@@ -4,6 +4,7 @@ package llm_generator
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang/glog"
@@ -12,9 +13,11 @@ import (
 
 const (
 	maxRetryAttempts = 4
-	initialBackoff   = 1 * time.Second
 	backoffFactor    = 2
 )
+
+// initialBackoff is a var so a test can drive the retry loop without sleeping.
+var initialBackoff = 1 * time.Second
 
 // chatCompletionWithRetry retries CreateChatCompletion with exponential backoff on transient errors.
 func chatCompletionWithRetry(
@@ -33,7 +36,7 @@ func chatCompletionWithRetry(
 			return resp, nil
 		}
 		if !isRetryableOpenAIError(err) {
-			return resp, err
+			return resp, withOpenAIErrorCode(err)
 		}
 		if attempt == maxRetryAttempts {
 			break
@@ -47,7 +50,22 @@ func chatCompletionWithRetry(
 		}
 		backoff *= backoffFactor
 	}
-	return resp, err
+	return resp, withOpenAIErrorCode(err)
+}
+
+// withOpenAIErrorCode prefixes OpenAI's machine-readable error code onto the
+// error the callers log: the client's Error() drops it, which leaves alerting
+// (docs/ops-runbook.md) nothing but OpenAI's English prose to key on.
+func withOpenAIErrorCode(err error) error {
+	var apiErr *openai.APIError
+	if !errors.As(err, &apiErr) || apiErr.Code == nil {
+		return err
+	}
+	code := fmt.Sprintf("%v", apiErr.Code)
+	if code == "" {
+		return err
+	}
+	return fmt.Errorf("openai_code=%s: %w", code, err)
 }
 
 // isRetryableOpenAIError returns true for 408/429/5xx and unknown (likely network) errors.
