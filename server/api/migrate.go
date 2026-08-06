@@ -34,6 +34,11 @@ func RunMigrations(db *sql.DB) error {
 }
 
 func runMigrations(db *sql.DB, skipOneThroughFourteen bool) error {
+	// Base tables first: migrations are a diff history over them and assume
+	// they exist. See docs/schema.md "Startup order".
+	if err := createTables(db); err != nil {
+		return fmt.Errorf("creating base tables: %w", err)
+	}
 	if _, err := db.Exec(createSchemaMigrationsTable); err != nil {
 		return fmt.Errorf("creating schema_migrations table: %w", err)
 	}
