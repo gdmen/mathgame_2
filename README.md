@@ -60,7 +60,7 @@ ops-runbook  doc=docs/ops-runbook.md  type=prose
 
 ## Prerequisites
 - Node.js
-- Go 1.24.2 (see `go.mod`)
+- Go per `go.mod` (the `toolchain` directive pins the patch release)
 - MySQL 8.0+ (8.4 LTS recommended)
 - go-swagger — optional, only for `make build-docs` / `make dev-docs`
 
