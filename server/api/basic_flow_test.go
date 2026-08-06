@@ -85,7 +85,7 @@ func TestFlowBasic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
 	}
-	_, r, cleanup := setupTestAPI(t, c)
+	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 
 	u := createTestUser(t, r, "auth0id|test|1", "test_1@email.com", "test_1")
@@ -96,22 +96,7 @@ func TestFlowBasic(t *testing.T) {
 	})
 
 	t.Run("AddVideos", func(t *testing.T) {
-		for i := 0; i < 2; i++ {
-			ytID := fmt.Sprintf("rm_3bfAEpII%d", i)
-			v := &Video{
-				Title:        "Sesame Street: We're The A Team -A Song",
-				URL:          fmt.Sprintf("https://www.youtube.com/watch?v=%s", ytID),
-				ThumbnailURL: "https://i.ytimg.com/vi/rm_3bfAEpII/hqdefault.jpg",
-				YouTubeId:    ytID,
-			}
-			resp := httptest.NewRecorder()
-			body, _ := json.Marshal(v)
-			req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/videos?test_auth0_id=%s", u.Auth0Id), bytes.NewBuffer(body))
-			r.ServeHTTP(resp, req)
-			if resp.Code != http.StatusCreated {
-				t.Fatalf("Expected status code %d, got %d", http.StatusCreated, resp.Code)
-			}
-		}
+		seedUserVideosViaPlaylist(t, api, u.Id, 2)
 	})
 
 	gs := &Gamestate{}

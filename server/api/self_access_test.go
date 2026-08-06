@@ -111,7 +111,7 @@ func TestSelfOnly_OtherUsersIdIsForbidden(t *testing.T) {
 	// Provision the victim fully, or routes that 403 for their own reasons on an
 	// empty account (GET /play/:user_id below the video floor) pass without the
 	// guard.
-	insertVideosAndUserHasVideo(t, api, victim.Id, minPlayableVideos)
+	seedUserVideosViaPlaylist(t, api, victim.Id, minPlayableVideos)
 
 	for _, ri := range selfOnlyRoutes(t, r) {
 		t.Run(ri.Method+" "+ri.Path, func(t *testing.T) {
@@ -136,7 +136,7 @@ func TestSelfOnly_OwnIdStillAllowed(t *testing.T) {
 	defer cleanup()
 	user := createTestUser(t, r, "auth0id|selfowner", "owner@test.com", "owner")
 	// GET /play/:user_id 403s on its own below the video floor.
-	insertVideosAndUserHasVideo(t, api, user.Id, minPlayableVideos)
+	seedUserVideosViaPlaylist(t, api, user.Id, minPlayableVideos)
 
 	gets := 0
 	for _, ri := range selfOnlyRoutes(t, r) {

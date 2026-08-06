@@ -17,6 +17,20 @@ youtube_api_key_required: true
 
 ## The model
 
+**Videos are playlist-synced only.** A user's video pool is the union of the videos in the
+playlists they subscribe to, and nothing else: there is no supported notion of an individually
+added video. The only way a *user* changes their own pool is by changing which playlists they
+have — `POST /playlists` and `DELETE /playlists/:playlist_id` — after which
+`refreshUserHasVideo` rebuilds `user_has_video` from `user_playlist`, wiping first, so any row the
+union does not back disappears. `TestUserHasVideo_IsThePlaylistUnionAfterEveryMutation`
+(`server/api/user_has_video_invariant_test.go`) pins the equality across a sequence of adds and
+removes over overlapping playlists.
+
+Two things reach a pool from outside that path, and neither goes through a playlist the user
+touched. The server disables a video nobody could play (see the invariants below), and a
+membership resync run for one subscriber rewrites `playlist_video` for every subscriber
+(see [Staleness across users](#staleness-across-users)).
+
 `youtube.go` is a thin sync layer with no HTTP handler of its own. Its single entry point is
 `syncPlaylistFromYouTube`, called from `customAddPlaylist` (`custom_handlers.go`) when a user adds a
 playlist by URL or YouTube ID. Adding by an existing internal `playlist_id` skips sync entirely
@@ -96,15 +110,49 @@ momentarily empty a playlist's membership until the next successful sync.
   YouTube's current response (clear-and-rebuild).
 - `syncPlaylistFromYouTube` never writes `user_playlist` or `user_has_video`; the caller owns
   user-pool reconciliation.
-- **A `videos` row is shared, so no client-facing route updates one.** The row is keyed by nothing
-  but its own id and is reachable by every user who has that video, so a per-video update endpoint
-  would let any caller rewrite the title, URL or `disabled` flag for all of them. `POST /videos/:id`
-  is therefore not registered (the generated `updateVideo` handler exists but is unrouted, like
-  `deleteVideo` and `listUser`); the `TestVideoBasic` "Update: not exposed" step pins that. The only
-  mutations are this sync, the server disabling a video it couldn't play
-  (`videoManager.Update` on `ERROR_PLAYING_VIDEO`, see [events.md](events.md)), and
-  `cmd/check_disabled_videos` re-enabling one. Per-user removal targets `user_has_video`, never the
-  `videos` row (`customDeleteVideo`).
+- **`user_has_video` equals the union of that user's playlists after every playlist mutation they
+  make.** It is derived state, rebuilt rather than amended, so it is never the record of a
+  decision. The qualifier is load-bearing: the rebuild is per-user, so it settles the acting
+  user's pool and nobody else's (see [Staleness across users](#staleness-across-users)).
+- **The `/videos` routes are read-only.** Only `GET /videos`, `GET /videos/:id` and
+  `GET /playlists/:playlist_id/videos` are registered; the generated `createVideo`, `updateVideo`
+  and `deleteVideo` handlers exist but are unrouted, like `listUser`. The `TestVideoBasic`
+  "Create: not exposed", "Update: not exposed" and "Delete: not exposed" steps pin that. Two
+  separate reasons converge on it:
+  - A `videos` row is **shared**. It is keyed by nothing but its own id and is reachable by every
+    user who has that video, so a per-video write endpoint would let any caller rewrite the title,
+    URL or `disabled` flag for all of them.
+  - A user's pool is **derived**. Creating or removing one entry in it authors state the next
+    playlist mutation rebuilds from scratch, so the write would be silently undone rather than
+    honored. Playlists are the only control over a pool.
+- **The only writes to `videos` are server-initiated.** This sync; the server disabling a video it
+  couldn't play (`videoManager.Update` on `ERROR_PLAYING_VIDEO`, see [events.md](events.md)); and
+  `cmd/check_disabled_videos` re-enabling one. Note the disable is **global, not per-user**: it
+  sets `videos.disabled` on the shared row, and `selectVideo` and the playable counts filter on
+  `v.disabled = 0`, so one child's unplayable video leaves every pool that contains it. There is no
+  per-user video-level control at all — the granularity a user has is the playlist.
+
+## Staleness across users
+
+The pool equality holds per user at the moment that user mutates a playlist. It is not a
+continuously maintained invariant across accounts, because two of the writes above are global while
+the rebuild is not:
+
+- `syncPlaylistFromYouTube` clears and rebuilds `playlist_video` for the whole playlist (step 4),
+  but `customAddPlaylist` then calls `refreshUserHasVideo` for **the acting user only**. A second
+  account already subscribed to that playlist keeps its old `user_has_video` rows — including rows
+  for videos the resync just removed from the playlist — until it next adds or removes a playlist
+  of its own.
+- `ERROR_PLAYING_VIDEO` flips `videos.disabled` on the shared row, which every pool reads through
+  the `v.disabled = 0` filter rather than through `user_has_video`, so that one takes effect for
+  everyone immediately.
+
+The consequence is real but narrow: until that user's next playlist mutation, a video dropped from
+the playlist upstream can still be drawn as their reward, because `selectVideo` filters on
+`v.disabled = 0` and not on current playlist membership. Nothing serves a video the user never had
+access to — the stale rows are always videos the playlist did contain. It is recorded here because
+a test asserting the union invariant across two accounts at once would fail, and the honest reading
+of that failure is this gap, not a broken rebuild.
 
 ## Gotchas
 

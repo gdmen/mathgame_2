@@ -19,7 +19,7 @@ func TestGetGamestate_ReturnsInitialState(t *testing.T) {
 	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 	user := createTestUser(t, r, "auth0|get-gamestate", "getgs@test.com", "getgsuser")
-	insertVideosAndUserHasVideo(t, api, user.Id, 3)
+	seedUserVideosViaPlaylist(t, api, user.Id, 3)
 
 	resp := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/gamestates/%d?test_auth0_id=%s", user.Id, user.Auth0Id), nil)
@@ -53,7 +53,7 @@ func TestGetGamestate_SelectsVideo(t *testing.T) {
 	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 	user := createTestUser(t, r, "auth0|gs-video-select", "gsvid@test.com", "gsviduser")
-	videoIDs := insertVideosAndUserHasVideo(t, api, user.Id, 3)
+	videoIDs := seedUserVideosViaPlaylist(t, api, user.Id, 3)
 
 	resp := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/gamestates/%d?test_auth0_id=%s", user.Id, user.Auth0Id), nil)

@@ -64,7 +64,7 @@ func TestBadProblemEventsSetReported(t *testing.T) {
 	defer cleanup()
 	user := createTestUser(t, r, "auth0|bad-problem", "bad@test.com", "baduser")
 	// The event flow assembles PlayData with a reward video at the end.
-	insertVideosAndUserHasVideo(t, api, user.Id, 2)
+	seedUserVideosViaPlaylist(t, api, user.Id, 2)
 
 	cases := []struct {
 		eventType string

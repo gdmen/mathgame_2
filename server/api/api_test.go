@@ -74,9 +74,9 @@ func createTestUser(t *testing.T, r *gin.Engine, auth0Id, email, username string
 	return u
 }
 
-// insertVideosAndUserHasVideo inserts n videos (no user_id) and adds them to user_has_video for the given user. Returns video IDs.
+// insertVideos inserts n catalog videos owned by nobody and returns their IDs.
 // Uses a unique prefix per call so multiple calls in the same test (e.g. subtests) do not hit you_tube_id unique constraint.
-func insertVideosAndUserHasVideo(t *testing.T, api *Api, userID uint32, n int) []uint32 {
+func insertVideos(t *testing.T, api *Api, n int) []uint32 {
 	t.Helper()
 	prefix := atomic.AddUint64(&testVideoIDCounter, 1)
 	var ids []uint32
@@ -95,12 +95,30 @@ func insertVideosAndUserHasVideo(t *testing.T, api *Api, userID uint32, n int) [
 		lastID, _ := res.LastInsertId()
 		ids = append(ids, uint32(lastID))
 	}
-	for _, vid := range ids {
-		_, err := api.DB.Exec("INSERT IGNORE INTO user_has_video (user_id, video_id) VALUES (?, ?)", userID, vid)
-		if err != nil {
-			t.Fatalf("insert user_has_video: %v", err)
+	return ids
+}
+
+// subscribeUserToPlaylists adds the user to each playlist and rebuilds their video pool.
+func subscribeUserToPlaylists(t *testing.T, api *Api, userID uint32, playlistIDs ...uint32) {
+	t.Helper()
+	for _, pid := range playlistIDs {
+		if _, err := api.DB.Exec(
+			"INSERT IGNORE INTO user_playlist (user_id, playlist_id) VALUES (?, ?)", userID, pid); err != nil {
+			t.Fatalf("insert user_playlist: %v", err)
 		}
 	}
+	if err := api.refreshUserHasVideo(userID); err != nil {
+		t.Fatalf("refreshUserHasVideo: %v", err)
+	}
+}
+
+// seedUserVideosViaPlaylist gives the user a pool of n videos the only way the
+// product supports one: a playlist they are subscribed to. Returns video IDs.
+func seedUserVideosViaPlaylist(t *testing.T, api *Api, userID uint32, n int) []uint32 {
+	t.Helper()
+	ids := insertVideos(t, api, n)
+	pid := insertPlaylistWithVideos(t, api, fmt.Sprintf("PLseed_%d", atomic.AddUint64(&testVideoIDCounter, 1)), ids)
+	subscribeUserToPlaylists(t, api, userID, pid)
 	return ids
 }
 
@@ -147,7 +165,7 @@ func TestPlay_RequiresPlayableVideoFloor(t *testing.T) {
 
 	t.Run("SuccessAtTheFloor", func(t *testing.T) {
 		user2 := createTestUser(t, r, "auth0id|playtest2", "play2@test.com", "playtest2")
-		insertVideosAndUserHasVideo(t, api, user2.Id, minPlayableVideos)
+		seedUserVideosViaPlaylist(t, api, user2.Id, minPlayableVideos)
 		resp := httptest.NewRecorder()
 		req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/play/%d?test_auth0_id=%s", user2.Id, user2.Auth0Id), nil)
 		r.ServeHTTP(resp, req)
@@ -183,7 +201,7 @@ func TestSelectVideo_ExclusionsAreAPreference(t *testing.T) {
 
 	t.Run("RepeatsTheOnlyVideo", func(t *testing.T) {
 		user := createTestUser(t, r, "auth0id|selvid-one", "selvid1@test.com", "selvid1")
-		ids := insertVideosAndUserHasVideo(t, api, user.Id, 1)
+		ids := seedUserVideosViaPlaylist(t, api, user.Id, 1)
 		got, err := api.selectVideo("test", nil, user.Id, map[uint32]bool{ids[0]: true})
 		if err != nil {
 			t.Fatalf("selectVideo: %v", err)
@@ -195,7 +213,7 @@ func TestSelectVideo_ExclusionsAreAPreference(t *testing.T) {
 
 	t.Run("RotatesWhenThePoolCanSpareOne", func(t *testing.T) {
 		user := createTestUser(t, r, "auth0id|selvid-many", "selvid2@test.com", "selvid2")
-		ids := insertVideosAndUserHasVideo(t, api, user.Id, 3)
+		ids := seedUserVideosViaPlaylist(t, api, user.Id, 3)
 		// Random pick, so draw enough times that an ignored exclusion shows up.
 		for i := 0; i < 20; i++ {
 			got, err := api.selectVideo("test", nil, user.Id, map[uint32]bool{ids[0]: true})
@@ -228,7 +246,7 @@ func TestListVideos_FromUserHasVideo(t *testing.T) {
 	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 	user := createTestUser(t, r, "auth0id|listvid", "listvid@test.com", "listvid")
-	insertVideosAndUserHasVideo(t, api, user.Id, 2)
+	seedUserVideosViaPlaylist(t, api, user.Id, 2)
 
 	resp := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/videos?test_auth0_id=%s", user.Auth0Id), nil)
@@ -257,7 +275,7 @@ func TestPageload_NumVideosEnabled(t *testing.T) {
 	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 	user := createTestUser(t, r, "auth0id|pageload", "pageload@test.com", "pageload")
-	insertVideosAndUserHasVideo(t, api, user.Id, 4)
+	seedUserVideosViaPlaylist(t, api, user.Id, 4)
 
 	resp := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/pageload/%s?test_auth0_id=%s", url.PathEscape(user.Auth0Id), user.Auth0Id), nil)
@@ -325,12 +343,8 @@ func TestListPlaylists_ReturnsUserPlaylists(t *testing.T) {
 	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 	user := createTestUser(t, r, "auth0id|listpl-user", "listpl2@test.com", "listpl2")
-	videoIDs := insertVideosAndUserHasVideo(t, api, user.Id, 1)
-	playlistID := insertPlaylistWithVideos(t, api, "PLtest123", videoIDs)
-	_, err = api.DB.Exec("INSERT IGNORE INTO user_playlist (user_id, playlist_id) VALUES (?, ?)", user.Id, playlistID)
-	if err != nil {
-		t.Fatalf("insert user_playlist: %v", err)
-	}
+	playlistID := insertPlaylistWithVideos(t, api, "PLtest123", insertVideos(t, api, 1))
+	subscribeUserToPlaylists(t, api, user.Id, playlistID)
 
 	resp := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/playlists?test_auth0_id=%s", user.Auth0Id), nil)
@@ -359,31 +373,12 @@ func TestAddPlaylist_ByPlaylistID(t *testing.T) {
 	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 	user := createTestUser(t, r, "auth0id|addpl", "addpl@test.com", "addpl")
-	videoIDs := make([]uint32, 3)
-	for i := 0; i < 3; i++ {
-		res, err := api.DB.Exec(
-			"INSERT INTO videos (title, url, thumbnailurl, you_tube_id, disabled) VALUES (?, ?, ?, ?, 0)",
-			fmt.Sprintf("V%d", i), fmt.Sprintf("https://youtube.com/watch?v=v%d", i), "", fmt.Sprintf("v%d", i),
-		)
-		if err != nil {
-			t.Fatalf("insert video: %v", err)
-		}
-		id, _ := res.LastInsertId()
-		videoIDs[i] = uint32(id)
-	}
-	playlistID := insertPlaylistWithVideos(t, api, "PLadd", videoIDs)
+	playlistID := insertPlaylistWithVideos(t, api, "PLadd", insertVideos(t, api, 3))
+
+	addPlaylistByID(t, r, user, playlistID)
 
 	resp := httptest.NewRecorder()
-	body, _ := json.Marshal(map[string]interface{}{"playlist_id": playlistID})
-	req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/playlists?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
-	req.Header.Set("Content-Type", "application/json")
-	r.ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.Bytes())
-	}
-
-	resp = httptest.NewRecorder()
-	req, _ = http.NewRequest("GET", fmt.Sprintf("/api/v1/videos?test_auth0_id=%s", user.Auth0Id), nil)
+	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/videos?test_auth0_id=%s", user.Auth0Id), nil)
 	r.ServeHTTP(resp, req)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("GET videos: expected 200, got %d", resp.Code)
@@ -419,36 +414,13 @@ func TestRemovePlaylist(t *testing.T) {
 	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 	user := createTestUser(t, r, "auth0id|rmpl", "rmpl@test.com", "rmpl")
-	var videoIDs []uint32
-	for i := 0; i < 2; i++ {
-		res, err := api.DB.Exec(
-			"INSERT INTO videos (title, url, thumbnailurl, you_tube_id, disabled) VALUES (?, ?, ?, ?, 0)",
-			fmt.Sprintf("V%d", i), fmt.Sprintf("https://youtube.com/watch?v=w%d", i), "", fmt.Sprintf("w%d", i),
-		)
-		if err != nil {
-			t.Fatalf("insert video: %v", err)
-		}
-		id, _ := res.LastInsertId()
-		videoIDs = append(videoIDs, uint32(id))
-	}
-	playlistID := insertPlaylistWithVideos(t, api, "PLrm", videoIDs)
-	_, err = api.DB.Exec("INSERT IGNORE INTO user_playlist (user_id, playlist_id) VALUES (?, ?)", user.Id, playlistID)
-	if err != nil {
-		t.Fatalf("insert user_playlist: %v", err)
-	}
-	if err := api.refreshUserHasVideo(user.Id); err != nil {
-		t.Fatalf("refreshUserHasVideo: %v", err)
-	}
+	playlistID := insertPlaylistWithVideos(t, api, "PLrm", insertVideos(t, api, 2))
+	subscribeUserToPlaylists(t, api, user.Id, playlistID)
+
+	removePlaylist(t, r, user, playlistID)
 
 	resp := httptest.NewRecorder()
-	req, _ := http.NewRequest("DELETE", fmt.Sprintf("/api/v1/playlists/%d?test_auth0_id=%s", playlistID, user.Auth0Id), nil)
-	r.ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK && resp.Code != http.StatusNoContent {
-		t.Fatalf("DELETE playlist: expected 200 or 204, got %d: %s", resp.Code, resp.Body.Bytes())
-	}
-
-	resp = httptest.NewRecorder()
-	req, _ = http.NewRequest("GET", fmt.Sprintf("/api/v1/playlists?test_auth0_id=%s", user.Auth0Id), nil)
+	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/playlists?test_auth0_id=%s", user.Auth0Id), nil)
 	r.ServeHTTP(resp, req)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("GET playlists: %d", resp.Code)
@@ -492,18 +464,10 @@ func TestListPlaylists_PlayableTotalDeduplicates(t *testing.T) {
 
 	// Three videos, split across two playlists that overlap on two of them: the
 	// per-playlist counts are 2 and 2, the union is 3.
-	videoIDs := insertVideosAndUserHasVideo(t, api, user.Id, 3)
+	videoIDs := insertVideos(t, api, 3)
 	first := insertPlaylistWithVideos(t, api, "PLdedupeA", videoIDs[:2])
 	second := insertPlaylistWithVideos(t, api, "PLdedupeB", videoIDs[1:])
-	for _, pid := range []uint32{first, second} {
-		if _, err := api.DB.Exec(
-			"INSERT IGNORE INTO user_playlist (user_id, playlist_id) VALUES (?, ?)", user.Id, pid); err != nil {
-			t.Fatalf("insert user_playlist: %v", err)
-		}
-	}
-	if err := api.refreshUserHasVideo(user.Id); err != nil {
-		t.Fatalf("refreshUserHasVideo: %v", err)
-	}
+	subscribeUserToPlaylists(t, api, user.Id, first, second)
 
 	resp := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/playlists?test_auth0_id=%s", user.Auth0Id), nil)
