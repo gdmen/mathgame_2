@@ -27,7 +27,7 @@ llm_version: llm_0.8
 
 Two generators, each with its own `VERSION` string and its own version line. A problem's stored
 `difficulty` is the score the admission pipeline computes from the expression
-(`api.ComputeProblemDifficulty`), never the requester's target — so a `heuristic_0.0` and an
+(`mathcore.ComputeProblemDifficulty`), never the requester's target — so a `heuristic_0.0` and an
 `llm_0.5` problem at the same stored difficulty are genuinely comparable. A formula-version bump
 re-scores legacy problems via `recompute_problem_difficulty`; the version strings themselves are
 permanent (see [problem-generation.md](problem-generation.md)).
@@ -52,7 +52,7 @@ permanent (see [problem-generation.md](problem-generation.md)).
 Migration 46 marked every `heuristic_0.0`, `llm_0.0`, `llm_0.1`, and `llm_0.2`
 row `status = 'deprecated'`, and migration 47 extended the cutover to every
 remaining pre-current version — `heuristic_1.0`, `llm_0.3`, `llm_0.4`, and
-`llm_0.5`. Only `heuristic_2.0` and `llm_0.6` are still served; everything older
+`llm_0.5`. The served set is `heuristic_2.0`+ and `llm_0.6`+; everything older
 is deprecated: valid when generated but predating the current generators, so no
 longer served (still counted in metrics — they were legitimate when answered).
 Selection enforces this two ways — deprecated rows are filtered out by
