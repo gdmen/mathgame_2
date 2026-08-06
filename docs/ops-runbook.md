@@ -60,10 +60,10 @@ boot). The three jobs that must not overlap a manual run hold a `flock`
 |---|---|
 | `build-api` | regenerates `*_model.generated.go` / `*_handlers.generated.go` from `server/api/models.json` and `web/src/enums.generated.js` from the Go enum blocks (Python codegen), `gofmt -s`, then builds `bin/apiserver` |
 | `build-cmds` | depends on `build-api`; builds every `cmd/*` tool into `bin/` (see list below) |
-| `build-web` | `frontend-conf`, `npm install --force --include=dev`, `landing-assets`, then build into `web/build.next`, prettier, the landing/app HTML swap (below), then swap `build.next` → `build`. `--include=dev` because npm reads `NODE_ENV=production` as `--omit=dev`, which would skip `react-scripts` and `sass` and break the build |
+| `build-web` | `frontend-conf`, `npm ci --include=dev`, `landing-assets`, then build into `web/build.next`, prettier, the landing/app HTML swap (below), then swap `build.next` → `build`. `--include=dev` because npm reads `NODE_ENV=production` as `--omit=dev`, which would skip `react-scripts` and `sass` and break the build. `npm ci` (not `npm install`) so the deployed bundle is built from exactly the lockfile the CI `npm audit` gate certifies, and so the install fails loudly instead of re-resolving. It reinstalls the whole dependency tree every run (a few seconds), so a deploy needs the network |
 | `landing-assets` | compiles `web/src/landing.scss` → `web/public/landing.css` and copies the landing's woff2 files into `web/public/fonts/`; both outputs are generated and gitignored |
 | `test` / `test-api` / `test-cmds` | `test` = `build-api` then both Go suites; `test-api` (`./server/api`) and `test-cmds` (`./cmd/...`) run one each without rebuilding, which is how the CI Go job invokes them after its own `build-api` step. Every suite but `cmd/maintenance_server` needs the MySQL from `test_conf.json` |
-| `web-deps` | `npm ci` in `web/` — lockfile-exact, and fails if `package.json` and the lockfile have drifted (`build-web` uses `npm install` instead, which would hide that) |
+| `web-deps` | `npm ci` in `web/` — lockfile-exact, and fails if `package.json` and the lockfile have drifted |
 | `test-web` | `web-deps`, then the `web/src` jest suite in one pass (`CI=true`). This is exactly what the CI web job runs |
 | `test-bundle-secrets` | rebuilds the web bundle against a canary config and fails if a secret leaks into `web/build` (the CI scan) |
 | `test-all` | `test` + `test-web` + `test-bundle-secrets` — full local CI parity |
@@ -101,7 +101,7 @@ Three build subtleties worth knowing:
 
 - **`build-web` never empties the live dir.** `react-scripts` wipes its output
   dir at the start of every build; building in place left `web/build` a bare
-  directory listing for the whole `npm install` + webpack window while the old
+  directory listing for the whole install + webpack window while the old
   server kept serving it (#243). So it builds into `web/build.next` and swaps
   with two sub-millisecond renames; `serve` re-reads per request, so no restart
   is needed and a failed build (`set -e`) leaves `web/build` untouched
