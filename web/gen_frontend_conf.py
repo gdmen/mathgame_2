@@ -6,7 +6,7 @@ Create React App inlines imported JSON *wholesale* into the public JS bundle.
 The backend conf.json holds secrets (openai_api_key, youtube_api_key, mysql_pass,
 ntfy_topic, DB creds), so it must never be the file the frontend imports -- doing
 so publishes those secrets in the world-readable bundle. Instead we copy only the
-public fields the frontend actually reads into web/src/conf.json. See issue #219.
+public fields the frontend actually reads into web/src/conf.json.
 
 Usage: gen_frontend_conf.py <backend_conf.json> <frontend_conf.json>
 """

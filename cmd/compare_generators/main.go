@@ -112,7 +112,7 @@ func main() {
 	reportGaps(symbolic, rng)
 }
 
-// readGrid runs the issue's grouping query and folds it into per-cell counts.
+// readGrid runs the grouping query and folds it into per-cell counts.
 func readGrid(db *sql.DB) []cellInfo {
 	rows, err := db.Query(`SELECT problem_type_bitmap, ROUND(difficulty) AS db, generator, COUNT(*)
 		FROM problems WHERE status = 'active' GROUP BY problem_type_bitmap, db, generator`)
