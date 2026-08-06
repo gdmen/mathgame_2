@@ -116,9 +116,9 @@
   margin: 1em 0;
   .katex {
     font-size: min(10vw, 3em);
-    .base {
+    .katex-base {
       display: inline;
-      white-space: wrap;
+      white-space: normal;
       width: 100%;
     }
     .mord {
