@@ -5,10 +5,10 @@ selected, and scored. **If you change any behavior described here, update
 this document in the same PR.** Mechanical enforcement: a slim doc-sync test
 (`server/api/docs_sync_test.go` `TestDocsSync`) fails CI when the anchors below
 disagree with the code, so a new bit or a formula-version bump cannot land
-undocumented. Generator version strings (`heuristic_*`, `llm_*`) and the
-`DifficultyVersion` history live in the sibling doc
-[generator-versions.md](generator-versions.md) — point there, don't inline
-them.
+undocumented. Generator version strings (`heuristic_*`, `llm_*`) live in the
+sibling doc [generator-versions.md](generator-versions.md) — point there,
+don't inline them. The `DifficultyVersion` history is owned HERE (below),
+next to the formula and the anchor that pins it.
 
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
@@ -287,8 +287,7 @@ function of the expression because the recompute fast-path depends on that.
 
 `ComputeProblemDifficulty(expression, symbolic_expression)`
 (server/mathcore/difficulty.go); the version string is `DifficultyVersion`
-(pinned by the anchor and tracked in
-[generator-versions.md](generator-versions.md)):
+(pinned by the anchor above; history below):
 
 ```
 magnitude = log10(maxMagnitude + 1) + 0.3      (digit-based for decimals)
@@ -315,14 +314,8 @@ single source of truth for the expr-vs-symbolic dispatch;
 calibration page without affecting scoring.
 
 Changing the formula in ANY way requires bumping `DifficultyVersion` and
-running `recompute_problem_difficulty` on deploy. (v0.6: a negative RESULT
-fires the negatives concept — a bare computation with no `=`, unknown, or
-prose self-evaluates, so `3 - 8` prices `ConceptNegatives` like its stamp; an
-equation's negative solution is stamped via the answer-aware invariant but
-NOT priced, the documented seam. v0.5 was detection-side: the `of` connective
-and its `\text{ of }` normalizer fold made a legacy spliced form like
-`25%\text{ of }80` fire MULTIPLICATION where v0.4 read the connective as
-opaque prose.)
+running `recompute_problem_difficulty` on deploy. The version ledger is at the
+end of this section.
 
 **Word problems (v0.4):** a word problem's `expression` is prose inside
 `\text{...}`, so its operators are invisible to the token-level
@@ -417,6 +410,27 @@ anchors): `MaxChainLen`, `MaxWordChainLen`, `MinConstructibleOperand`,
 floors the selectable target so it never aims below the band the default
 envelope populates (mirrored as `MIN_TARGET_DIFFICULTY` in
 `web/src/bitmap_validation.js`).
+
+### `DifficultyVersion` history
+
+This doc owns the formula-version ledger: `DifficultyVersion` lives in
+`server/mathcore/difficulty.go`, an area file of this doc. The
+`difficulty_version` anchor at the top is the forcing function; it pins the
+anchor value to `mathcore.DifficultyVersion`, so a bump drags you into this
+doc, and adding the current row is the natural completion (the test reads the
+anchor, never this table). Generator version strings (`heuristic_*`, `llm_*`)
+are a SEPARATE ledger in [generator-versions.md](generator-versions.md): a
+generator bump and a formula bump are independent events, and only some
+releases carry both.
+
+| Version | What changed |
+|---|---|
+| `0.1` | The version machinery itself (#201) — a `difficulty_version` column stamped on every row at insert, so `recompute_problem_difficulty` can skip rows already at the current version. The formula was unchanged. |
+| `0.2` | The open-ended scale (#225): the upper clamp at 20 removed (floored at 1.0 only), so multi-concept stacks score above 20 instead of piling up at the cap; the magic numbers lifted into the named `Weight*`/`Concept*`/`Structure*` constants; and `MaxDiffForBitmap` added so the advertised ceiling tracks what generation can actually build. |
+| `0.3` | Word problems scored from the stored `symbolic_expression` (#266) instead of from their prose, whose operators are invisible to the token-level formula — `ComputeProblemDifficulty` gained its second parameter and the `forceWord` path, so a division word problem stopped scoring as addition. |
+| `0.4` | The word band (#277, #304, #316, #317): `MaxWordChainLen` caps word chains and `MaxDiffForBitmap` prices word vs non-word as either/or branches; word problems no longer earn `ConceptPEMDAS`; `MinDiffForBitmap` plus `TargetDifficultyRange`/`ClampTargetDifficulty` become the single authority on the band a target may occupy; and the generated `web/src/difficulty_band_fixtures.json` pins the Go↔JS parity of that band. |
+| `0.5` | Detection-side (#309): the `of` connective and its `\text{ of }` normalizer fold made a legacy spliced form like `25%\text{ of }80` fire MULTIPLICATION where v0.4 read the connective as opaque prose. `MaxDiffForBitmap` also gained the `ConceptPercent` guard described above. |
+| `0.6` (current) | A negative RESULT prices `ConceptNegatives`: a bare computation with no `=`, unknown, or prose self-evaluates, so `3 - 8` prices `ConceptNegatives` like its stamp. An equation's negative solution is stamped via the answer-aware invariant but NOT priced — the documented seam. |
 
 ## Selection
 
