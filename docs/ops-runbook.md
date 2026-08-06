@@ -61,7 +61,7 @@ boot). The three jobs that must not overlap a manual run hold a `flock`
 | `build-cmds` | depends on `build-api`; builds every `cmd/*` tool into `bin/` (see list below) |
 | `build-web` | `frontend-conf`, `npm install --force --include=dev`, `landing-assets`, then build into `web/build.next`, prettier, the landing/app HTML swap (below), then swap `build.next` → `build`. `--include=dev` because npm reads `NODE_ENV=production` as `--omit=dev`, which would skip `react-scripts` and `sass` and break the build |
 | `landing-assets` | compiles `web/src/landing.scss` → `web/public/landing.css` and copies the landing's woff2 files into `web/public/fonts/`; both outputs are generated and gitignored |
-| `test` / `test-api` | `build-api` then `go test ./server/api` |
+| `test` / `test-api` / `test-cmds` | `test` = `build-api` then both Go suites; `test-api` (`./server/api`) and `test-cmds` (`./cmd/...`) run one each without rebuilding, which is how the CI Go job invokes them after its own `build-api` step. Every suite but `cmd/maintenance_server` needs the MySQL from `test_conf.json` |
 | `web-deps` | `npm ci` in `web/` — lockfile-exact, and fails if `package.json` and the lockfile have drifted (`build-web` uses `npm install` instead, which would hide that) |
 | `test-web` | `web-deps`, then the `web/src` jest suite in one pass (`CI=true`). This is exactly what the CI web job runs |
 | `test-bundle-secrets` | rebuilds the web bundle against a canary config and fails if a secret leaks into `web/build` (the CI scan) |
@@ -250,6 +250,12 @@ Every DB tool takes `-config` (default `conf.json`) and connects with the
 deliberate exception: `cleanup_unused_problems` deletes rows irreversibly, so it
 inverts the convention and is dry-run **by default**, writing only under
 `-apply`.
+
+A tool's DB-backed test gets its database from `apitest.SetupTestDB`
+(`server/api/apitest`): a throwaway `mathgame_test_<label>_N` database migrated
+to the current schema, dropped on cleanup, and swept by `clean_test_dbs` if a run
+dies first. `make test-cmds` covers these suites locally and in CI, so a tool
+regression fails the merge gate.
 
 ### Servers / build artifacts
 

@@ -2,7 +2,6 @@ package api // import "garydmenezes.com/mathgame/server/api"
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -16,9 +15,9 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	_ "github.com/go-sql-driver/mysql"
 
 	"garydmenezes.com/mathgame/server/common"
+	"garydmenezes.com/mathgame/server/common/testdb"
 )
 
 const (
@@ -26,50 +25,24 @@ const (
 	TestDataInsertScript = "insert_data.sh"
 )
 
-var testDBCounter uint64
 var testVideoIDCounter uint64
 
 // setupTestAPI creates a unique test database, runs migrations, and returns the Api, router, and a cleanup function.
-// Tests can run in parallel; each gets its own DB (e.g. mathgame_test_1, mathgame_test_2).
+// Tests can run in parallel; each gets its own DB.
 func setupTestAPI(t *testing.T, c *common.Config) (*Api, *gin.Engine, func()) {
 	t.Helper()
-	cfg := *c
-	cfg.MySQLDatabase = c.MySQLDatabase + "_" + fmt.Sprintf("%d", atomic.AddUint64(&testDBCounter, 1))
-	// Connect without a database so we can create the test DB (connecting with non-existent DB name fails).
-	connNoDB := fmt.Sprintf("%s:%s@tcp(%s:%s)/?charset=utf8mb4&parseTime=true", cfg.MySQLUser, cfg.MySQLPass, cfg.MySQLHost, cfg.MySQLPort)
-	dbAdmin, err := sql.Open("mysql", connNoDB)
+	db, cleanup := testdb.Create(t, c, "api")
+	api, err := NewApi(db, c)
 	if err != nil {
-		t.Fatalf("connect (admin): %v", err)
-	}
-	_, _ = dbAdmin.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", cfg.MySQLDatabase))
-	_, err = dbAdmin.Exec(fmt.Sprintf("CREATE DATABASE `%s`", cfg.MySQLDatabase))
-	dbAdmin.Close()
-	if err != nil {
-		t.Fatalf("create database: %v", err)
-	}
-	connectStr := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=true", cfg.MySQLUser, cfg.MySQLPass, cfg.MySQLHost, cfg.MySQLPort, cfg.MySQLDatabase)
-	db, err := sql.Open("mysql", connectStr)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	api, err := NewApi(db, &cfg)
-	if err != nil {
-		db.Close()
+		cleanup()
 		t.Fatalf("NewApi: %v", err)
 	}
 	if err := RunMigrations(db); err != nil {
-		db.Close()
+		cleanup()
 		t.Fatalf("run migrations: %v", err)
 	}
 	api.isTest = true
-	r := api.GetRouter()
-	cleanup := func() {
-		db.Close()
-		dropDB, _ := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/?charset=utf8mb4", cfg.MySQLUser, cfg.MySQLPass, cfg.MySQLHost, cfg.MySQLPort))
-		_, _ = dropDB.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", cfg.MySQLDatabase))
-		dropDB.Close()
-	}
-	return api, r, cleanup
+	return api, api.GetRouter(), cleanup
 }
 
 // Set up flags; no shared DB so tests can run in parallel with setupTestAPI.

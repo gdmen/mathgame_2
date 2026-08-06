@@ -37,7 +37,7 @@ jobs:
       run: git diff --exit-code web/src/enums.generated.js
 
     - name: Test
-      run: make test-api
+      run: make test-api test-cmds
 
   web_test:
     runs-on: ubuntu-latest
