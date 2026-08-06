@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -183,6 +184,64 @@ func TestPlay_RequiresPlayableVideoFloor(t *testing.T) {
 		}
 		if pd.Gamestate == nil || pd.Problem == nil || pd.Video == nil {
 			t.Errorf("expected gamestate, problem, video in response; got %+v", pd)
+		}
+	})
+}
+
+// Neither failure inside selectVideoIfNull can reach the client as a success.
+// selectVideo only logs, so its error had nothing written behind it and gin
+// answered an empty 200; the gamestate write's error was assigned to a shadowed
+// variable and never looked at again. A client gating on response.ok reads
+// either one as "the reward is set".
+func TestSelectVideoIfNull_FailuresReachTheClient(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("Couldn't read config: %v", err)
+	}
+
+	t.Run("PickingTheVideoFails", func(t *testing.T) {
+		api, r, cleanup := setupTestAPI(t, c)
+		defer cleanup()
+		// A fresh gamestate holds nullVideoId, so reading it takes the
+		// selection path.
+		user := createTestUser(t, r, "auth0id|nullsel", "nullsel@test.com", "nullsel")
+		if _, err := api.DB.Exec("DROP TABLE user_has_video"); err != nil {
+			t.Fatalf("drop user_has_video: %v", err)
+		}
+
+		resp := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/gamestates/%d?test_auth0_id=%s", user.Id, user.Auth0Id), nil)
+		r.ServeHTTP(resp, req)
+		if resp.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 when the pool query fails, got %d: %q", resp.Code, resp.Body.String())
+		}
+		if !strings.Contains(resp.Body.String(), "Could not select a reward video") {
+			t.Errorf("expected the reward-selection error in the body, got %q", resp.Body.String())
+		}
+	})
+
+	t.Run("WritingTheGamestateFails", func(t *testing.T) {
+		api, r, cleanup := setupTestAPI(t, c)
+		defer cleanup()
+		user := createTestUser(t, r, "auth0id|nullupd", "nullupd@test.com", "nullupd")
+		seedUserVideosViaPlaylist(t, api, user.Id, 1)
+		gamestate, _, _, err := api.gamestateManager.Get(user.Id)
+		if err != nil {
+			t.Fatalf("get gamestate: %v", err)
+		}
+		gamestate.VideoId = nullVideoId
+		// Selection still succeeds; only the write that persists it fails.
+		if _, err := api.DB.Exec("DROP TABLE gamestates"); err != nil {
+			t.Fatalf("drop gamestates: %v", err)
+		}
+
+		resp := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(resp)
+		if err := api.selectVideoIfNull("test", ctx, gamestate, false); err == nil {
+			t.Error("expected the failed gamestate write to surface as an error")
+		}
+		if resp.Code != http.StatusInternalServerError {
+			t.Errorf("expected 500 written to the response, got %d: %q", resp.Code, resp.Body.String())
 		}
 	})
 }
