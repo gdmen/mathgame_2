@@ -80,21 +80,26 @@ func (a *Api) selectVideo(logPrefix string, c *gin.Context, userId uint32, exclu
 }
 
 func (a *Api) selectVideoIfNull(logPrefix string, c *gin.Context, gamestate *Gamestate, writeCtx bool) error {
+	handleFcn := HandleMngrResp
+	if writeCtx {
+		handleFcn = HandleMngrRespWriteCtx
+	}
 	var status int
 	var msg string
 	var err error
 	// Select a video if setup is done and no video is already selected
 	if gamestate.VideoId == nullVideoId {
-		videoId, err := a.selectVideo(logPrefix, c, gamestate.UserId, map[uint32]bool{})
+		// Declared out here rather than with :=, which would shadow err and
+		// drop the Update result below on the floor.
+		var videoId uint32
+		videoId, err = a.selectVideo(logPrefix, c, gamestate.UserId, map[uint32]bool{})
 		if err != nil {
-			return err
+			// selectVideo only logs, so this is the last chance to answer with
+			// something other than gin's empty 200.
+			return handleFcn(logPrefix, c, http.StatusInternalServerError, "Could not select a reward video", err, gamestate)
 		}
 		gamestate.VideoId = videoId
 		status, msg, err = a.gamestateManager.Update(gamestate)
-	}
-	handleFcn := HandleMngrResp
-	if writeCtx {
-		handleFcn = HandleMngrRespWriteCtx
 	}
 	if handleFcn(logPrefix, c, status, msg, err, gamestate) != nil {
 		return err
