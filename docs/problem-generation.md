@@ -130,7 +130,7 @@ bracket is ≥ MEDIUM (5 states for mul combos, 3 otherwise): 8 mul combos ×
 720 + 7 non-mul combos × 432. It
 walks `0..ALL_PROBLEM_TYPES` filtering by `ValidBitmap` (~65k
 pure bit-tests). The admin bitmap × difficulty coverage matrix
-(`server/api/admin_bitmap_matrix.go`) live-generates one heuristic_2.0 example
+(`server/api/admin_bitmap_matrix.go`) live-generates one heuristic example
 per (bitmap, difficulty) cell across this whole space.
 
 The read side of that report folds pool usage back through a **stamped→settings
@@ -220,12 +220,12 @@ splice mutates stored text (`Admission.Expr`; `spliceLoneLetterRaw` recovers
 the splice point in un-normalized text, falling back to the normalized form
 on dialect ambiguity).
 
-`heuristic_2.0` splits the two forms across two columns: `expression` holds a
-**valid-LaTeX display skin** (`mathcore.DisplayExpression` folds `a/b`→`\frac`,
-`÷`→`\div`, `*`→`\times`, ` of `→`\text{ of }`, `%`→`\%` — KaTeX reads a
-bare `%` as a comment — and parenthesizes a negative literal that follows an
-operator: `9 + (-4)`, the print convention; a LEADING negative and an equation
-RHS stay bare, `-15 ÷ 3`, `? - 3 = -7`),
+The heuristic generator splits the two forms across two columns: `expression`
+holds a **valid-LaTeX display skin** (`mathcore.DisplayExpression` folds
+`a/b`→`\frac`, `÷`→`\div`, `*`→`\times`, ` of `→`\text{ of }`, `%`→`\%` — KaTeX
+reads a bare `%` as a comment — and parenthesizes a negative literal that
+follows an operator: `9 + (-4)`, the print convention; a LEADING negative and
+an equation RHS stay bare, `-15 ÷ 3`, `? - 3 = -7`),
 and `symbolic_expression` holds the canonical grammar (`58/3 ÷ 8`). NORMALIZE
 bridges them — it folds both to the same form (parens around a bare negative
 literal strip back off; they are never PEMDAS-load-bearing, unlike parens
@@ -351,11 +351,12 @@ Two v0.4 word rules keep scoring, stamping, and generation aligned:
   `MaxDiffForBitmap`'s word branch prices it (below), keeping the advertised
   ceiling inside the narratable band. Non-word chains keep `MaxChainLen`.
 
-`symbolic_expression` is not word-only. `heuristic_2.0` stores its canonical
-grammar form (`58/3 ÷ 8`) there and puts a display skin (`\frac`, `\div`) in
-`expression`; it is scored from the grammar with no word bonus (the display
-carries no `\text{}`), and that grammar form is the feedstock a WORD generator
-wraps into prose. See the storage note under the notation section above.
+`symbolic_expression` is not word-only. The heuristic generator stores its
+canonical grammar form (`58/3 ÷ 8`) there and puts a display skin (`\frac`,
+`\div`) in `expression`; it is scored from the grammar with no word bonus
+(the display carries no `\text{}`), and that grammar form is the feedstock a
+WORD generator wraps into prose. See the storage note under the notation
+section above.
 
 **The ceiling, `MaxDiffForBitmap`** — the difficulty of the hardest problem
 the enabled bits can express. WHY IT EXISTS: adaptive difficulty ratchets
@@ -446,7 +447,7 @@ are the generation-relevant surface.)
 
 ## Generation
 
-- **Heuristic generator** (server/generator, `heuristic_2.0`): compositional and
+- **Heuristic generator** (server/generator, `heuristic_2.2`): compositional and
   difficulty-targeting (`BuildProblem(bitmap, target, rng)`). It grows the AST
   outward from a chosen answer via one recursion — operators are node choices,
   concepts are operand realizations in the split — so concepts COMPOSE and it
@@ -470,7 +471,7 @@ are the generation-relevant surface.)
   [generator-versions.md](generator-versions.md). It is the sole source for
   non-WORD problems AND the **skeleton source** for WORD problems (below).
 - **WORD generation** (`server/api/generate_problems.go` `runWordGenerator`,
-  generator `llm_0.7`): the heuristic builds a scored symbolic **skeleton**
+  generator `llm_0.8`): the heuristic builds a scored symbolic **skeleton**
   (`BuildWordSkeletonRaw`) aimed
   at `RawForDifficulty(target) / ConceptWord` — the lower budget that
   lands the narrated word problem near `target` once the word concept multiplies
@@ -478,7 +479,10 @@ are the generation-relevant surface.)
   `MaxWordChainLen`, PEMDAS-stripped envelope; see "Word problems" above) —
   then the LLM (`llm_generator.NarrateProblems`, one batched call,
   `MAX_QUANTITY = 20`) is asked ONLY to dress each skeleton in prose that poses
-  that exact computation: no new numbers, no changed operation. Stored:
+  that exact computation: no new numbers, no changed operation. Every OpenAI
+  call on this path — narration and WORD validation alike — retries transient
+  failures (408/429/5xx and transport errors) up to 4 attempts, backing off 1s
+  and doubling (`chatCompletionWithRetry`). Stored:
   `expression` = the prose, `symbolic_expression` = the skeleton, `answer` = the
   skeleton's answer, bits = `WordFormBitmap(skeleton bits)`; difficulty is
   skeleton × word by construction. The heuristic
@@ -534,7 +538,7 @@ forbidden until deliberately added.
 9. Reachability rules: per-problem exclusivity with existing bits? → insert reject + ceiling either/or entry (both sites, always together).
 10. Settings dependency rules + `web/src/bitmap_validation.js` error code if needed.
 11. UI: group placement (verb / noun-kind / noun-size / framing), label, helper text — against `/style-guide`.
-12. Heuristic generator support: a split/leaf realization for the bit in `heuristic_2.0`'s `expand` recursion (`server/generator/heuristic2.go`), or an explicit LLM-only deferral.
+12. Heuristic generator support: a split/leaf realization for the bit in the heuristic generator's `expand` recursion (`server/generator/heuristic2.go`), or an explicit LLM-only deferral.
 13. Backfill: do legacy rows need re-stamping? (re-run `recompute_problem_type_bitmap`.)
 14. Update THIS DOCUMENT — the doc-sync test fails CI if you skip the anchors.
 
@@ -547,5 +551,5 @@ forbidden until deliberately added.
 - `server/mathcore/difficulty.go` — `ComputeProblemDifficulty`, `ComputeDifficultyBreakdownFor`, `computeBreakdown`, `compressRaw`, `MaxDiffForBitmap`, `MinDiffForBitmap`, `TargetDifficultyRange`, `ClampTargetDifficulty`, the `Concept*`/`Weight*`/`Structure*` constants, `DifficultyVersion`, `MaxChainLen`, `MaxWordChainLen`, `MinConstructibleOperand`, `LargeMaxOperand`, `SmallMaxOperand`, `MediumMaxOperand`
 - `server/mathcore/answer_compare.go` — `AnswersEquivalent`
 - `server/api/generation_funnel.go` — `generationFunnel`, `VerifyAnswer`, `RewriteLetterInProse` (api-side admission bookkeeping)
-- `server/generator` — `heuristic_2.0`: `BuildProblem`, the knob inverter, the compositional `expand` recursion
-- `server/llm_generator` — `NarrateProblems`, `PROMPT_NARRATE`, `Skeleton`, `TopicPromptHint`, `ValidateWordProblem`, `PROMPT_VALIDATION_WORD`
+- `server/generator` — the heuristic generator: `BuildProblem`, the knob inverter, the compositional `expand` recursion
+- `server/llm_generator` — `NarrateProblems`, `chatCompletionWithRetry`, `PROMPT_NARRATE`, `Skeleton`, `TopicPromptHint`, `ValidateWordProblem`, `PROMPT_VALIDATION_WORD`
