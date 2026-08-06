@@ -12,7 +12,7 @@ fails CI when the anchors below disagree with the code.
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
 spaced_rep_intervals: 1, 3, 7
-max_target: 20
+max_target: 30
 min_target_difficulty: 3.0
 problem_selection_epsilon: 1.5
 ```
@@ -42,8 +42,8 @@ All defined as locals/consts at their use site; cite the enclosing symbol.
 
 | Lever | Value | Where | Meaning |
 |---|---|---|---|
-| `maxTarget` | 20 | `process_events.go` const | ceiling on problems-per-session |
-| `minProbs` | 5 | `processEvent`, `DONE_WATCHING_VIDEO` | floor on problems-per-session |
+| `maxTarget` | 30 | `process_events.go` const | ceiling on problems-per-session |
+| `minProbs` | 5 | `process_events.go` const | floor on problems-per-session |
 | `epsilon` | 0.05 | `processEvent`, `DONE_WATCHING_VIDEO` | work%-on-target deadband |
 | `diffIncrease` | 0.05 | `processEvent` | proportional step (× current diff) |
 | `minDiff`/`maxDiff` | per-bitmap | `processEvent` (from `TargetDifficultyRange`) | the adjuster's difficulty band |
@@ -112,6 +112,9 @@ a later admin review (a follow-up) promotes `reported` to `incorrect` or back to
 
 ## Invariants
 
+- **The problems-per-session bounds are one pair.** Both the work-load adjuster and the
+  `SET_GAMESTATE_TARGET` validation (`processEvent`) bound through the same `minProbs`/`maxTarget`
+  consts, so a client-set target and an adjuster-set one can reach the same values.
 - **No difficulty lever leaves the envelope band.** `SET_TARGET_DIFFICULTY` validation
   (`processEvent`), the work-load adjuster, and the settings-save clamp all bound through
   `TargetDifficultyRange` — ceiling `MaxDiffForBitmap`, floor
