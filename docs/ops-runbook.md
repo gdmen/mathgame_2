@@ -59,7 +59,7 @@ boot). The three jobs that must not overlap a manual run hold a `flock`
 |---|---|
 | `build-api` | regenerates `*_model.generated.go` / `*_handlers.generated.go` from `server/api/models.json` (Python codegen), `gofmt -s`, then builds `bin/apiserver` |
 | `build-cmds` | depends on `build-api`; builds every `cmd/*` tool into `bin/` (see list below) |
-| `build-web` | `frontend-conf`, `npm install --force`, `landing-assets`, then build into `web/build.next`, prettier, the landing/app HTML swap (below), then swap `build.next` → `build` |
+| `build-web` | `frontend-conf`, `npm install --force --include=dev`, `landing-assets`, then build into `web/build.next`, prettier, the landing/app HTML swap (below), then swap `build.next` → `build`. `--include=dev` because npm reads `NODE_ENV=production` as `--omit=dev`, which would skip `react-scripts` and `sass` and break the build |
 | `landing-assets` | compiles `web/src/landing.scss` → `web/public/landing.css` and copies the landing's woff2 files into `web/public/fonts/`; both outputs are generated and gitignored |
 | `test` / `test-api` | `build-api` then `go test ./server/api` |
 | `web-deps` | `npm ci` in `web/` — lockfile-exact, and fails if `package.json` and the lockfile have drifted (`build-web` uses `npm install` instead, which would hide that) |
