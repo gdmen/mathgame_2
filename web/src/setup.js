@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 
+import { apiFetch } from "./api.js";
 import {
   MIN_PLAYABLE_VIDEOS,
   ProblemTypesSettingsView,
@@ -11,16 +12,10 @@ import "./setup.scss";
 
 const postSettings = async function (token, apiUrl, model) {
   try {
-    const reqParams = {
+    const req = await apiFetch(apiUrl, "/settings/" + model.user_id, token, {
       method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + token,
-      },
       body: JSON.stringify(model),
-    };
-    const req = await fetch(apiUrl + "/settings/" + model.user_id, reqParams);
+    });
     const json = await req.json();
     return json;
   } catch (e) {
@@ -138,18 +133,11 @@ const PinTabView = ({ token, apiUrl, user, advanceSetup }) => {
 
   const postUser = async function (user) {
     try {
-      const reqParams = {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + token,
-        },
-        body: JSON.stringify(user),
-      };
-      const req = await fetch(
-        apiUrl + "/users/" + encodeURIComponent(user.auth0_id),
-        reqParams
+      const req = await apiFetch(
+        apiUrl,
+        "/users/" + encodeURIComponent(user.auth0_id),
+        token,
+        { method: "POST", body: JSON.stringify(user) }
       );
       const json = await req.json();
       return json;

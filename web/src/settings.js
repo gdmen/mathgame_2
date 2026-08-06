@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 
+import { apiFetch } from "./api.js";
 import { ProblemTypes } from "./enums.js";
 import { validateBitmap, targetDifficultyRange } from "./bitmap_validation.js";
 import { RequirePin, ClearSessionPin } from "./pin.js";
@@ -11,16 +12,10 @@ import "./settings.scss";
 // that fails silently is indistinguishable from one that worked, which is how
 // a parent loses settings without knowing.
 const postSettings = async function (token, apiUrl, model) {
-  const reqParams = {
+  const req = await apiFetch(apiUrl, "/settings/" + model.user_id, token, {
     method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + token,
-    },
     body: JSON.stringify(model),
-  };
-  const req = await fetch(apiUrl + "/settings/" + model.user_id, reqParams);
+  });
   if (!req.ok) {
     throw new Error("save failed with status " + req.status);
   }
@@ -345,7 +340,7 @@ const playlistName = (p) => p.title || p.you_tube_id || "Playlist " + p.id;
 // One playlist row, expandable in place to the videos it contributes. Videos
 // load on first open, so a parent with many playlists pays for only what they
 // look at.
-const PlaylistRow = ({ playlist, apiUrl, authHeaders, onRemove }) => {
+const PlaylistRow = ({ playlist, apiUrl, token, onRemove }) => {
   const [videos, setVideos] = useState(null);
   const [error, setError] = useState(null);
 
@@ -355,9 +350,10 @@ const PlaylistRow = ({ playlist, apiUrl, authHeaders, onRemove }) => {
   const handleToggle = async (e) => {
     if (!e.target.open || videos != null) return;
     try {
-      const req = await fetch(
-        apiUrl + "/playlists/" + playlist.id + "/videos",
-        { method: "GET", headers: authHeaders() }
+      const req = await apiFetch(
+        apiUrl,
+        "/playlists/" + playlist.id + "/videos",
+        token
       );
       if (!req.ok) throw new Error("status " + req.status);
       const json = await req.json();
@@ -503,25 +499,11 @@ const PlaylistsSettingsView = ({
     );
   };
 
-  // Stable per token: the playlist rows take it as a prop, and fetchMyPlaylists
-  // declares it as a dependency.
-  const authHeaders = useCallback(
-    () => ({
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + token,
-    }),
-    [token]
-  );
-
   const fetchMyPlaylists = useCallback(async () => {
     if (token == null || apiUrl == null || user == null) return;
     const seq = ++listSeq.current;
     try {
-      const req = await fetch(apiUrl + "/playlists", {
-        method: "GET",
-        headers: authHeaders(),
-      });
+      const req = await apiFetch(apiUrl, "/playlists", token);
       if (req.ok) {
         const json = await req.json();
         // Every mutation fires one of these without awaiting it, so two quick
@@ -537,7 +519,7 @@ const PlaylistsSettingsView = ({
     } catch (e) {
       console.log(e.message);
     }
-  }, [token, apiUrl, user, authHeaders]);
+  }, [token, apiUrl, user]);
 
   useEffect(() => {
     fetchMyPlaylists();
@@ -559,9 +541,8 @@ const PlaylistsSettingsView = ({
       const body = urlOrId.startsWith("http")
         ? { playlist_url: urlOrId }
         : { youtube_playlist_id: urlOrId };
-      const req = await fetch(apiUrl + "/playlists", {
+      const req = await apiFetch(apiUrl, "/playlists", token, {
         method: "POST",
-        headers: authHeaders(),
         body: JSON.stringify(body),
       });
       const data = req.ok ? await req.json().catch(() => ({})) : null;
@@ -591,9 +572,8 @@ const PlaylistsSettingsView = ({
   const handleRemovePlaylist = async (playlist) => {
     setPlaylistError(null);
     try {
-      const req = await fetch(apiUrl + "/playlists/" + playlist.id, {
+      const req = await apiFetch(apiUrl, "/playlists/" + playlist.id, token, {
         method: "DELETE",
-        headers: authHeaders(),
       });
       if (!req.ok) {
         setPlaylistError("Could not remove that playlist. Try again.");
@@ -627,9 +607,8 @@ const PlaylistsSettingsView = ({
     try {
       // By id, not by URL: this re-attaches the playlist the parent had rather
       // than re-syncing it from YouTube, so it comes back as it was.
-      const req = await fetch(apiUrl + "/playlists", {
+      const req = await apiFetch(apiUrl, "/playlists", token, {
         method: "POST",
-        headers: authHeaders(),
         body: JSON.stringify({ playlist_id: playlist.id }),
       });
       if (!req.ok) {
@@ -752,7 +731,7 @@ const PlaylistsSettingsView = ({
                 key={playlist.id}
                 playlist={playlist}
                 apiUrl={apiUrl}
-                authHeaders={authHeaders}
+                token={token}
                 onRemove={handleRemovePlaylist}
               />
             )
@@ -957,17 +936,11 @@ const DeleteAccountView = ({ token, apiUrl, user }) => {
     setSubmitting(true);
     setError(null);
     try {
-      const req = await fetch(
-        apiUrl + "/users/" + encodeURIComponent(user.auth0_id),
-        {
-          method: "DELETE",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + token,
-          },
-          body: JSON.stringify({ pin }),
-        }
+      const req = await apiFetch(
+        apiUrl,
+        "/users/" + encodeURIComponent(user.auth0_id),
+        token,
+        { method: "DELETE", body: JSON.stringify({ pin }) }
       );
       if (req.status === 204) {
         // The account is gone; drop the adult PIN session and log out of Auth0.

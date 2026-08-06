@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 
 import "katex/dist/katex.min.css";
 
+import { apiFetch } from "./api.js";
 import { ProblemView, PreprocessExpression } from "./problem.js";
 import { VideoView } from "./video.js";
 import { PinConfirmModal } from "./pin_confirm_modal.js";
@@ -127,15 +128,7 @@ const PlayView = ({
         if (token == null || apiUrl == null || userId == null) {
           return;
         }
-        var reqParams = {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + token,
-          },
-        };
-        var req = await fetch(apiUrl + "/play/" + userId, reqParams);
+        var req = await apiFetch(apiUrl, "/play/" + userId, token);
         const text = await req.text();
         if (cancelled) {
           return;

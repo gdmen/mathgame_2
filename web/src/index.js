@@ -11,6 +11,7 @@ import {
 import { Auth0Provider } from "@auth0/auth0-react";
 import { useAuth0 } from "@auth0/auth0-react";
 
+import { apiFetch } from "./api.js";
 import { LoginButton, LogoutButton } from "./auth0.js";
 
 import { SetupView, VideosRepairView, useTakeover } from "./setup.js";
@@ -239,20 +240,14 @@ const AppView = () => {
   const genPostEventFcn = useCallback(() => {
     return async function (event_type, value) {
       try {
-        const reqParams = {
+        console.log("reporting " + event_type + ":" + String(value));
+        const req = await apiFetch(ApiUrl, "/events", token, {
           method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + token,
-          },
           body: JSON.stringify({
             event_type: event_type,
             value: String(value),
           }),
-        };
-        console.log("reporting " + event_type + ":" + String(value));
-        const req = await fetch(ApiUrl + "/events", reqParams);
+        });
         const text = await req.text();
         if (!text || text.trim() === "") {
           console.log("Events API returned empty body");
@@ -291,32 +286,18 @@ const AppView = () => {
       if (token == null || user == null) {
         return;
       }
-      var reqParams = {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + token,
-        },
-      };
-      var req = await fetch(
-        ApiUrl + "/pageload/" + encodeURIComponent(user.sub),
-        reqParams
-      );
+      const pageLoadPath = "/pageload/" + encodeURIComponent(user.sub);
+      var req = await apiFetch(ApiUrl, pageLoadPath, token);
       if (req.status === 404) {
-        reqParams.method = "POST";
-        reqParams.body = JSON.stringify({
-          auth0_id: user.sub,
-          email: user.email,
-          username: user.name,
+        await apiFetch(ApiUrl, "/users", token, {
+          method: "POST",
+          body: JSON.stringify({
+            auth0_id: user.sub,
+            email: user.email,
+            username: user.name,
+          }),
         });
-        await fetch(ApiUrl + "/users", reqParams);
-        reqParams.method = "GET";
-        reqParams.body = null;
-        req = await fetch(
-          ApiUrl + "/pageload/" + encodeURIComponent(user.sub),
-          reqParams
-        );
+        req = await apiFetch(ApiUrl, pageLoadPath, token);
       }
       // An error body parses as JSON just as happily as a payload does, and
       // its missing fields would land as undefined/NaN, overwriting good state.

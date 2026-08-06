@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 
+import { apiFetch } from "./api.js";
 import "./progress.scss";
 
 // Format minutes as "Xh Ym" or "Xm" or "0m" (user-facing, no seconds)
@@ -38,15 +39,7 @@ const ProgressView = ({ token, apiUrl, user }) => {
       setLoading(true);
       setError(null);
       try {
-        const reqParams = {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + token,
-          },
-        };
-        const res = await fetch(apiUrl + "/statistics/" + user.id, reqParams);
+        const res = await apiFetch(apiUrl, "/statistics/" + user.id, token);
         if (!res.ok) {
           setError("Could not load statistics");
           setData(null);

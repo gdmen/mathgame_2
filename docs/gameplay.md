@@ -189,6 +189,9 @@ once `solved >= target`. Notable behavior:
 
 - `web/src/index.js` — `genPostEventFcn` (the `/events` POST), `MainView` route table,
   `conf.event_reporting_interval` wiring.
+- `web/src/api.js` — `apiFetch`, which issues the `/play` GET and the `/events` POST (and every
+  other authenticated call). Returns the raw `Response`, so the 403 handling above is `PlayView`'s
+  own. See [accounts.md](accounts.md).
 - `web/src/conf.json` — `event_reporting_interval`, `debug_quickplay`.
 - `web/src/problem_reporting.test.js` — pins the `working_on_problem` add/remove lifecycle.
 - `web/src/pin.js` — `RequirePin`. The play view no longer clears the session PIN itself; one
