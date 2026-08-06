@@ -8,7 +8,7 @@ require (
 	github.com/auth0/go-jwt-middleware/v2 v2.3.1
 	github.com/gin-contrib/cors v1.7.7
 	github.com/gin-gonic/gin v1.12.0
-	github.com/go-sql-driver/mysql v1.6.0
+	github.com/go-sql-driver/mysql v1.10.0
 	github.com/go-swagger/go-swagger v0.29.0
 	github.com/golang/glog v1.2.5
 	github.com/gwatts/gin-adapter v1.0.0
@@ -18,6 +18,7 @@ require (
 )
 
 require (
+	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
 	github.com/bytedance/sonic v1.15.0 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
