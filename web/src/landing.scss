@@ -220,7 +220,8 @@ h1 {
   background-color: white;
   border: 0.125em solid $color-action;
   border-radius: $radius-large;
-  box-shadow: 0 0 0 0.375em rgba($color-action, 0.1),
+  box-shadow:
+    0 0 0 0.375em rgba($color-action, 0.1),
     0 0.625em 1.75em rgba($color-action, 0.18);
   overflow: hidden;
 }
@@ -486,14 +487,14 @@ h2 {
   }
 }
 
-// ---------------------------------------------------------------- trevor
-.trevor {
+// ---------------------------------------------------------------- story
+.story {
   padding: 4.5 * $base-space 0;
   p {
     margin-bottom: 0.875 * $base-space;
   }
 }
-.trevor-grid {
+.story-grid {
   align-items: center;
   display: grid;
   gap: 3 * $base-space;
@@ -579,7 +580,7 @@ footer {
     padding: 2.5 * $base-space 0 3.5 * $base-space;
   }
   .hero-grid,
-  .trevor-grid,
+  .story-grid,
   .steps,
   .points {
     gap: 2 * $base-space;
