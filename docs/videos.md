@@ -49,7 +49,8 @@ Two endpoints on the YouTube Data API v3, both authenticated with `a.YouTubeAPIK
 - `fetchPlaylistItems` paginates on `nextPageToken` until it is empty, 50 items per page, yielding
   `{VideoID, Title, ThumbnailURL}` per item. A non-200 on any page aborts the whole fetch.
 
-Both prefer the `medium` thumbnail and fall back to `default` — see the thumbnail gotcha below.
+Both prefer the `medium` thumbnail and fall back to `default` when it is absent. Each thumbnail
+size is an object keyed by size (`default`, `medium`) whose URL lives under the inner key `url`.
 
 ## The sync flow
 
@@ -107,12 +108,10 @@ momentarily empty a playlist's membership until the next successful sync.
 
 ## Gotchas
 
-- **Medium-thumbnail tag bug (#276).** In both response structs the medium thumbnail's inner field
-  is tagged `json:"medium"` (`YouTubePlaylistResponse`, `YouTubePlaylistItemsResponse`), but the
-  YouTube Data API returns the URL under the key `url` (as the sibling `Default.URL` is correctly
-  tagged). `Thumbnails.Medium.URL` therefore always decodes empty and every playlist/video silently
-  falls back to the smaller `default` thumbnail. The fallback masks the bug — it never errors.
-  Surfaced, not yet fixed.
+- **Thumbnail decoding fails silently.** The `medium`/`default` fallback in both fetchers means a
+  thumbnail that does not decode produces an empty string rather than an error, so a wrong JSON tag
+  on the response structs degrades quality invisibly. `server/api/youtube_test.go` pins both structs
+  against a representative API payload.
 - **No transaction.** The flow is a sequence of independent `Exec`/`Query` calls, not one
   transaction. An abort mid-flow leaves partial state (see the partial-failure table). Re-running
   the sync is the recovery path and is idempotent for the playlist/video/membership rows.
@@ -126,6 +125,8 @@ momentarily empty a playlist's membership until the next successful sync.
 
 - `server/api/youtube.go` — this area (`fetchPlaylistMetadata`, `fetchPlaylistItems`,
   `syncPlaylistFromYouTube`).
+- `server/api/youtube_test.go` — decode tests pinning the response structs to the YouTube API's
+  payload shape.
 - `server/api/custom_handlers.go` — `customAddPlaylist` (the only caller), `customRemovePlaylist`,
   and `refreshUserHasVideo` (the user-pool side).
 - `server/api/playlist_model.generated.go` — `Playlist` model and `playlistManager`
@@ -138,7 +139,8 @@ momentarily empty a playlist's membership until the next successful sync.
 ## Extension checklist (changing the sync)
 
 1. New YouTube API field needed → add it to the `YouTubePlaylist*Response` struct with the correct
-   JSON tag (mind the `url` key — see the thumbnail gotcha).
+   JSON tag, and cover it in `server/api/youtube_test.go`: a mistagged field decodes to the zero
+   value without erroring.
 2. New DB column on `videos`/`playlists` → migration + regenerate the model from `models.json`
    (`make build-api`), then thread it through the `INSERT`/`Update` in `syncPlaylistFromYouTube`.
 3. Changing membership semantics (e.g. soft-delete instead of clear-and-rebuild) → update step 4 and
