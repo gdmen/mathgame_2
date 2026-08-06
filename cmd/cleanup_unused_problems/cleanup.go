@@ -72,9 +72,8 @@ func loadProblems(db *sql.DB, generators []string) ([]problemRow, error) {
 //
 // The reference tables are events, gamestates, review_queue, and
 // recently_shown_problems — every current table that carries a problem_id.
-// (statistics_hardest_aggregates, listed in the original issue, was created
-// in migration 16 and dropped in 17; the current statistics tables key on
-// user/month, not problem.)
+// (statistics_hardest_aggregates was created in migration 16 and dropped in
+// 17; the current statistics tables key on user/month, not problem.)
 func loadReferencedProblemIds(db *sql.DB) (map[uint32]bool, error) {
 	problemIDEventTypes := []string{api.SELECTED_PROBLEM, api.SOLVED_PROBLEM, api.BAD_PROBLEM_SYSTEM, api.BAD_PROBLEM_USER}
 	quoted := make([]string, len(problemIDEventTypes))

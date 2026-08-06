@@ -6,8 +6,8 @@ Two independent checks, both fatal:
 1. Value scan (primary): no value of a SECRET field from conf.json may appear in
    the build. "Secret" = any conf field NOT in gen_frontend_conf.PUBLIC_FIELDS,
    so this list never drifts from the frontend whitelist. This directly prevents
-   recurrence of #219 (secrets symlinked/imported into the public bundle), and
-   doubles as a pre-deploy check you can run locally against the real bundle:
+   secrets from being symlinked or imported into the public bundle, and doubles
+   as a pre-deploy check you can run locally against the real bundle:
        make build-web && make check-bundle-secrets
 
 2. Pattern scan (defense in depth): no well-known secret format (OpenAI,

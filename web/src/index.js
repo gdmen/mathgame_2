@@ -106,9 +106,9 @@ const PinGateRoute = ({ user }) => {
   );
 };
 
-// The marketing page at "/" is static HTML outside the React app (#329), so it
-// cannot call Auth0 itself. Its CTAs point here instead: this route exists only
-// to hand off to Auth0, and to bounce an already-signed-in visitor into play.
+// The marketing page at "/" is static HTML outside the React app, so it cannot
+// call Auth0 itself. Its CTAs point here instead: this route exists only to
+// hand off to Auth0, and to bounce an already-signed-in visitor into play.
 const LoginView = () => {
   const { isLoading, isAuthenticated, loginWithRedirect } = useAuth0();
   useEffect(() => {

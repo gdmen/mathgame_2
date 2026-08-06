@@ -137,10 +137,10 @@ frontend-conf:
 # (served by prod-web) is never emptied mid-build. react-scripts starts every
 # build by wiping its output dir; building in place left web/build a directory
 # listing for the whole npm-install+webpack window while the old server kept
-# serving it (#243). The swap is two renames (sub-ms); serve re-reads per
+# serving it. The swap is two renames (sub-ms); serve re-reads per
 # request, so no restart is needed and the live dir holds valid content right
 # up to the swap. A failed build aborts (set -e) with web/build untouched.
-# Assets the STATIC landing page needs (#329). The landing is plain HTML with
+# Assets the STATIC landing page needs. The landing is plain HTML with
 # no React, so it cannot use the app's JS @fontsource imports or its compiled
 # bundle: it gets its own stylesheet and its own copies of the woff2 files.
 # landing.scss @imports styles.scss, so both surfaces share one token source.
@@ -168,7 +168,7 @@ build-web: frontend-conf
 # The static landing must be the document served at "/", so it becomes
 # index.html and the React shell moves to app.html. web/public/serve.json
 # rewrites every deeper path to app.html, which is why prod-web must not pass
-# serve's -s flag. See #329.
+# serve's -s flag.
 	mv ./web/build.next/index.html ./web/build.next/app.html
 	mv ./web/build.next/landing.html ./web/build.next/index.html
 	$(RM) ./web/build.prev
