@@ -78,7 +78,9 @@ type Api struct {
 	bitmapMatrixBitmaps []mathcore.ProblemType
 }
 
-func NewApi(db *sql.DB, cfg *common.Config) (*Api, error) {
+// createTables asserts the base tables at their current generated shape,
+// treating "already exists" as success.
+func createTables(db *sql.DB) error {
 	for _, sql := range CREATE_TABLES_SQL {
 		_, err := db.Exec(sql)
 		if err != nil {
@@ -87,8 +89,15 @@ func NewApi(db *sql.DB, cfg *common.Config) (*Api, error) {
 				glog.Infof("%s: %v", msg, err)
 				continue
 			}
-			return nil, err
+			return err
 		}
+	}
+	return nil
+}
+
+func NewApi(db *sql.DB, cfg *common.Config) (*Api, error) {
+	if err := createTables(db); err != nil {
+		return nil, err
 	}
 	a := &Api{DB: db}
 	if cfg != nil {

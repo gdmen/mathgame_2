@@ -26,8 +26,8 @@ migrated DB must **converge to the same schema**:
 
 | Source | Defines | Applied when |
 |---|---|---|
-| `server/api/models.json` → `*_model.generated.go` `CreateXTableSQL` | the 7 CRUD-managed tables (`users`, `problems`, `playlists`, `videos`, `settings`, `gamestates`, `events`) | fresh DB only — `NewApi` runs `CREATE_TABLES_SQL`, ignoring "already exists" |
-| `server/api/init.go` `CREATE_TABLES_SQL` | the 7 generated tables **plus** 3 hand-written join tables (`playlist_video`, `user_playlist`, `user_has_video`) | fresh DB only, same `NewApi` loop |
+| `server/api/models.json` → `*_model.generated.go` `CreateXTableSQL` | the 7 CRUD-managed tables (`users`, `problems`, `playlists`, `videos`, `settings`, `gamestates`, `events`) | every startup — `createTables` (`server/api/init.go`) runs `CREATE_TABLES_SQL`, ignoring "already exists"; called by both `RunMigrations` and `NewApi` |
+| `server/api/init.go` `CREATE_TABLES_SQL` | the 7 generated tables **plus** 3 hand-written join tables (`playlist_video`, `user_playlist`, `user_has_video`) | every startup, same `createTables` loop |
 | `server/api/migrations/<N>.sql` | every schema **change** since the tables were first created, **plus** auxiliary tables never modelled in Go (caches, queues, stats) | every startup, in numeric order |
 
 The generated `CreateXTableSQL` is the table's shape *as it exists today*;
@@ -36,10 +36,12 @@ that shape. A column that `models.json` shows today was added to a
 deployed DB by some migration. The two MUST agree on the end state — see
 the playlist worked example in Gotchas.
 
-`NewApi` (`server/api/init.go` `NewApi`) creates missing tables on a fresh
-DB; `RunMigrations` (`server/api/migrate.go` `RunMigrations`) applies the
-diff history. At startup `RunMigrations` runs **before** `NewApi` — see the
-Startup section for why both DBs still converge.
+`createTables` (`server/api/init.go`) creates missing tables;
+`RunMigrations` (`server/api/migrate.go`) calls it first, then applies the
+diff history. Migrations therefore never see a missing base table: a fresh
+DB gets the tables at the current generated shape before any migration
+runs; a deployed DB's tables stay at whatever shape its applied history
+left them — see the Startup order section.
 
 ## The `models.json` → generated-Go pipeline
 
@@ -170,13 +172,20 @@ migrations, read by the cmd tools / serving paths named):
 ## Startup order
 
 `cmd/apiserver/main.go`: open DB → **`RunMigrations(db)`** → **`NewApi(db, cfg)`**.
-Migrations run *before* `NewApi`'s `CREATE TABLE` loop. On an existing DB
-the `CREATE_TABLES_SQL` loop is all "already exists" no-ops; on a brand-new
-DB the migrations that pre-date a table are recorded-or-run first, then
-`NewApi` creates the tables, then later migrations `ALTER` them — so the
-per-statement `INFORMATION_SCHEMA` guards (which see the fresh generated
-shape) are what keep both DBs converging. `cmd/compress_events` and
-`cmd/update_statistics_cache` also call `RunMigrations` on startup.
+`RunMigrations` itself asserts the base tables (`createTables`) before
+touching the diff history, so the caller's ordering doesn't matter: on an
+existing DB the CREATE loop is all "already exists" no-ops and pending
+migrations then alter the deployed schema; on a brand-new DB the tables
+appear at their final generated shape first, the base-table diff migrations
+no-op via their per-statement `INFORMATION_SCHEMA` guards, and the
+migration-only tables and indexes (15, 16, 28, …) are created for real. A
+migration must never assume a base table is absent — they always exist by
+the time it runs.
+`cmd/compress_events` and `cmd/update_statistics_cache` also call
+`RunMigrations` on startup and get the same guarantee.
+`TestFreshBootstrapProductionOrder` (`server/api/bootstrap_order_test.go`)
+pins the fresh-DB production ordering; `setupTestAPI` exercises the
+NewApi-first ordering on every other test.
 
 ## Gotchas
 
@@ -232,7 +241,7 @@ shape) are what keep both DBs converging. `cmd/compress_events` and
 - `server/api/models.json` — the model source of truth.
 - `server/code_generation/generate_models.py` `get_model_string` — codegen.
 - `server/api/*_model.generated.go` — generated tables/CRUD (do not edit).
-- `server/api/init.go` `NewApi`, `CREATE_TABLES_SQL` — fresh-DB table creation + join tables.
+- `server/api/init.go` `createTables`, `NewApi`, `CREATE_TABLES_SQL` — base-table creation + join tables.
 - `server/api/migrate.go` `RunMigrations`, `splitStatements` — the runner.
 - `server/api/migrations/<N>.sql` — the diff history (latest: 47).
 - `server/api/docs_sync_test.go` `TestDocsSyncSchema` — anchor enforcement.
