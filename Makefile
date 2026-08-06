@@ -68,11 +68,11 @@ test-api: server/api
 test-cmds:
 	$(GOTEST) ./cmd/...
 
-# Node deps for the test suite, from the lockfile alone. npm ci (not the
-# npm install build-web uses) because this feeds a merge gate: it fails loudly
-# when package.json and package-lock.json have drifted, where npm install would
-# quietly resolve the drift and rewrite the lock. It reinstalls from scratch
-# every run, which for this dependency set is a few seconds.
+# Node deps for the test suite, from the lockfile alone. npm ci because this
+# feeds a merge gate: it fails loudly when package.json and package-lock.json
+# have drifted, where npm install would quietly resolve the drift and rewrite
+# the lock. It reinstalls from scratch every run, which for this dependency set
+# is a few seconds.
 web-deps:
 	cd web && npm ci
 
@@ -136,7 +136,7 @@ frontend-conf:
 # Build into web/build.next, then swap it into place, so the live web/build
 # (served by prod-web) is never emptied mid-build. react-scripts starts every
 # build by wiping its output dir; building in place left web/build a directory
-# listing for the whole npm-install+webpack window while the old server kept
+# listing for the whole install+webpack window while the old server kept
 # serving it. The swap is two renames (sub-ms); serve re-reads per
 # request, so no restart is needed and the live dir holds valid content right
 # up to the swap. A failed build aborts (set -e) with web/build untouched.
@@ -161,7 +161,7 @@ landing-assets:
 build-web: frontend-conf
 # --include=dev because npm reads NODE_ENV=production as --omit=dev, and the
 # bundler and compiler this target runs are devDependencies.
-	cd web && npm install --force --include=dev; cd -
+	cd web && npm ci --include=dev
 	$(MAKE) landing-assets
 	cd web && BUILD_PATH=build.next npm run build; cd -
 	$(MAKE) fmt-web
