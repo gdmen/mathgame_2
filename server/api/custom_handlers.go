@@ -299,7 +299,7 @@ func (a *Api) helpGetPlayData(logPrefix string, c *gin.Context, gamestate *Games
 		return
 	}
 
-	// Get Video (by id only; videos table no longer has user_id)
+	// Get Video
 	video := &Video{}
 	err = a.DB.QueryRow("SELECT id, title, url, thumbnailurl, you_tube_id, disabled FROM videos WHERE id=?", gamestate.VideoId).
 		Scan(&video.Id, &video.Title, &video.URL, &video.ThumbnailURL, &video.YouTubeId, &video.Disabled)
