@@ -70,8 +70,8 @@ work percentage (work / work+watch over the last `recentPast` of events) against
 It then resets `gamestate.Solved` and picks a new reward video.
 
 The adjuster moves `target_difficulty` in both directions, so it is clamped to the envelope band
-(`TargetDifficultyRange`) at two points: a standalone repair clamp at entry (`processEvent`, the
-`ClampTargetDifficulty` branch — catches both a runaway high value and a below-floor value from
+(`TargetDifficultyRange`) at two points: a standalone repair clamp at entry (an inline
+min/max against the band in `processEvent` — catches both a runaway high value and a below-floor value from
 before the floor existed; persisted immediately and emitted as a `SET_TARGET_DIFFICULTY` audit
 event) and the per-step guards (`newDiff > maxDiff` cap; step-down floored at `minDiff`, the band
 floor). Outside the band the target sits where the envelope can produce nothing — an empty band by
