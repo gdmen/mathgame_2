@@ -12,7 +12,7 @@ fails CI when the anchors below disagree with the code.
 <!-- BEGIN DOC-SYNC ANCHORS (parsed by server/api/docs_sync_test.go) -->
 ```
 spaced_rep_intervals: 1, 3, 7
-max_target: 30
+max_target: 40
 min_target_difficulty: 3.0
 problem_selection_epsilon: 1.5
 ```
@@ -42,7 +42,7 @@ All defined as locals/consts at their use site; cite the enclosing symbol.
 
 | Lever | Value | Where | Meaning |
 |---|---|---|---|
-| `maxTarget` | 30 | `process_events.go` const | ceiling on problems-per-session |
+| `maxTarget` | 40 | `process_events.go` const | ceiling on problems-per-session |
 | `minProbs` | 5 | `process_events.go` const | floor on problems-per-session |
 | `epsilon` | 0.05 | `processEvent`, `DONE_WATCHING_VIDEO` | work%-on-target deadband |
 | `diffIncrease` | 0.05 | `processEvent` | proportional step (× current diff) |

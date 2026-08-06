@@ -34,7 +34,7 @@ func parseBadProblemID(rawValue string) uint32 {
 }
 
 const (
-	maxTarget = 30
+	maxTarget = 40
 	minProbs  = 5
 )
 
