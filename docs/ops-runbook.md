@@ -19,7 +19,8 @@ on deploy, not what they compute.
 Single server, single MySQL DB. Everything is a systemd
 unit on one Ubuntu 22.04 host running under `/home/ubuntu/mathgame_2`. There is
 no container, no orchestrator, no blue/green — a deploy rebuilds in place and
-restarts the services. Go 1.24.2 (see First-time provisioning below).
+restarts the services. The Go compiler comes from `go.mod`, not from the host
+(see First-time provisioning below).
 
 Two long-running servers plus a stand-in:
 
@@ -171,14 +172,25 @@ operational summary:
 
 ### First-time provisioning
 
-From-scratch setup of a new Ubuntu 22.04 host (Go 1.24.2). One-time; everything
-else in this doc is ongoing operation.
+From-scratch setup of a new Ubuntu 22.04 host. One-time; everything else in
+this doc is ongoing operation.
 
 **Toolchain:**
 
+The Go installed here is only a bootstrap — any release recent enough to
+understand `go.mod`'s `toolchain` directive, and older than it. Under the
+default `GOTOOLCHAIN=auto` the `go` command runs the newer of the two, fetching
+the directive's toolchain when it has to, so keeping the bootstrap behind is
+what leaves `go.mod` deciding which compiler builds prod. Consequences: the
+first deploy after a `toolchain` bump needs the module proxy reachable
+(`GOPROXY`, default `proxy.golang.org`); a bare `go version` reports the
+bootstrap unless it is run inside the repo, so read a built binary with
+`go version -m bin/apiserver` instead; and `GOTOOLCHAIN=local` on the host
+breaks deploys outright.
+
 ```
-wget -c https://go.dev/dl/go1.24.2.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.24.2.linux-amd64.tar.gz   # put /usr/local/go/bin on PATH
+wget -c https://go.dev/dl/go<version>.linux-amd64.tar.gz          # any recent release, see go.dev/dl
+sudo tar -C /usr/local -xzf go<version>.linux-amd64.tar.gz        # put /usr/local/go/bin on PATH
 sudo apt install make
 sudo apt-get install nodejs npm
 sudo npm install -g serve
