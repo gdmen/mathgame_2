@@ -36,7 +36,7 @@ const render = (container) =>
   act(() => {
     ReactDOM.render(
       <DeleteAccountView token="t" apiUrl="/api/v1" user={USER} />,
-      container
+      container,
     );
   });
 
@@ -54,7 +54,7 @@ const typePin = (container, pin) => {
   const input = container.querySelector("input.mock-pin");
   const setValue = Object.getOwnPropertyDescriptor(
     window.HTMLInputElement.prototype,
-    "value"
+    "value",
   ).set;
   act(() => {
     setValue.call(input, pin);
@@ -98,12 +98,12 @@ describe("DeleteAccountView", () => {
 
     await act(async () => {
       confirmButton(container).dispatchEvent(
-        new MouseEvent("click", { bubbles: true })
+        new MouseEvent("click", { bubbles: true }),
       );
     });
 
     expect(
-      container.querySelector(".pin-confirm-modal-error").textContent
+      container.querySelector(".pin-confirm-modal-error").textContent,
     ).toMatch(/Incorrect PIN/);
     expect(mockLogout).not.toHaveBeenCalled();
     expect(GetSessionPin()).toBe("1234");
@@ -117,7 +117,7 @@ describe("DeleteAccountView", () => {
 
     await act(async () => {
       confirmButton(container).dispatchEvent(
-        new MouseEvent("click", { bubbles: true })
+        new MouseEvent("click", { bubbles: true }),
       );
     });
 

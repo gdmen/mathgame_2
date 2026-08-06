@@ -155,7 +155,7 @@ const renderRefreshed = async (container, boot, refreshed, goToVideosStep) => {
             refreshPageLoadData={refreshPageLoadData}
             goToVideosStep={goToVideosStep}
           />,
-          container
+          container,
         );
       }
     });
@@ -166,7 +166,7 @@ const renderRefreshed = async (container, boot, refreshed, goToVideosStep) => {
         refreshPageLoadData={refreshPageLoadData}
         goToVideosStep={goToVideosStep}
       />,
-      container
+      container,
     );
   });
 };
@@ -194,7 +194,7 @@ test("a refreshed count below the floor sends the parent back to the videos step
     container,
     pageLoadFor(SET_UP_USER, 0),
     pageLoadFor(SET_UP_USER, 0),
-    goToVideosStep
+    goToVideosStep,
   );
   expect(goToVideosStep).toHaveBeenCalled();
 });
@@ -205,7 +205,7 @@ test("a refreshed count at the floor keeps the parent here", async () => {
     container,
     pageLoadFor(SET_UP_USER, 0),
     pageLoadFor(SET_UP_USER, 1),
-    goToVideosStep
+    goToVideosStep,
   );
   expect(goToVideosStep).not.toHaveBeenCalled();
 });
@@ -230,7 +230,7 @@ test("no bounce when the refresh itself failed", async () => {
     container,
     pageLoadFor(SET_UP_USER, 0),
     null,
-    goToVideosStep
+    goToVideosStep,
   );
   expect(goToVideosStep).not.toHaveBeenCalled();
 });
@@ -245,7 +245,7 @@ const renderRepair = async (container, playableTotal) => {
       ok: true,
       json: () =>
         Promise.resolve({ playlists: [], playable_total: playableTotal }),
-    })
+    }),
   );
   await act(async () => {
     ReactDOM.render(
@@ -254,21 +254,21 @@ const renderRepair = async (container, playableTotal) => {
       <MemoryRouter>
         <VideosRepairView token="t" apiUrl="/api/v1" user={SET_UP_USER} />
       </MemoryRouter>,
-      container
+      container,
     );
   });
 };
 
 const repairButton = (container) =>
   [...container.querySelectorAll("button")].find(
-    (b) => b.textContent === "Start Playing!"
+    (b) => b.textContent === "Start Playing!",
   );
 
 const typePin = async (container, pin) => {
   const input = container.querySelector("input.mock-pin");
   const setValue = Object.getOwnPropertyDescriptor(
     window.HTMLInputElement.prototype,
-    "value"
+    "value",
   ).set;
   await act(async () => {
     setValue.call(input, pin);
@@ -284,7 +284,7 @@ afterEach(() => {
 test("the repair page asks for the PIN under its own heading", async () => {
   await renderRepair(container, 0);
   expect(container.querySelector("h2").textContent).toBe(
-    "Add videos to keep playing!"
+    "Add videos to keep playing!",
   );
   expect(container.textContent).toMatch(/Enter your four digit PIN code/);
   expect(repairButton(container)).toBeUndefined();
@@ -333,7 +333,7 @@ const renderPinTab = (container, user, advanceSetup = () => {}) =>
         user={user}
         advanceSetup={advanceSetup}
       />,
-      container
+      container,
     );
   });
 
@@ -360,7 +360,7 @@ test("the wizard's PIN step writes the authored code and advances", async () => 
   await typePin(container, "8080");
   await act(async () => {
     continueButton(container).dispatchEvent(
-      new MouseEvent("click", { bubbles: true })
+      new MouseEvent("click", { bubbles: true }),
     );
   });
 
@@ -377,7 +377,7 @@ test("the wizard's PIN step does not rewrite an unchanged prefilled code", async
 
   await act(async () => {
     continueButton(container).dispatchEvent(
-      new MouseEvent("click", { bubbles: true })
+      new MouseEvent("click", { bubbles: true }),
     );
   });
 

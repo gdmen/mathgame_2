@@ -35,7 +35,7 @@ const installFetch = ({ failRestore = false } = {}) => {
       const { playlist_id } = JSON.parse(opts.body);
       serverPlaylists = PLAYLISTS.filter(
         (p) =>
-          p.id === playlist_id || serverPlaylists.some((s) => s.id === p.id)
+          p.id === playlist_id || serverPlaylists.some((s) => s.id === p.id),
       );
       return Promise.resolve({
         ok: true,
@@ -49,7 +49,7 @@ const installFetch = ({ failRestore = false } = {}) => {
           playlists: serverPlaylists.slice(),
           playable_total: serverPlaylists.reduce(
             (sum, p) => sum + p.playable_count,
-            0
+            0,
           ),
         }),
     });
@@ -62,7 +62,7 @@ const listShape = (container) =>
   [...container.querySelectorAll("ul#playlist-list > li")].map((li) =>
     li.classList.contains("playlist-undo")
       ? "undo:" + li.querySelector(".playlist-undo-text").textContent
-      : li.querySelector(".playlist-title").textContent
+      : li.querySelector(".playlist-title").textContent,
   );
 
 const click = (button) =>
@@ -71,7 +71,7 @@ const click = (button) =>
 const removePlaylist = (container, title) =>
   act(async () => {
     const item = [...container.querySelectorAll("li.playlist-item")].find(
-      (li) => li.querySelector(".playlist-title").textContent === title
+      (li) => li.querySelector(".playlist-title").textContent === title,
     );
     click(item.querySelector("button.playlist-remove"));
   });
@@ -79,7 +79,7 @@ const removePlaylist = (container, title) =>
 const undoRemoval = (container, title) =>
   act(async () => {
     const bar = [...container.querySelectorAll("li.playlist-undo")].find((li) =>
-      li.querySelector(".playlist-undo-text").textContent.includes(title)
+      li.querySelector(".playlist-undo-text").textContent.includes(title),
     );
     click(bar.querySelector("button.playlist-undo-action"));
   });
@@ -96,7 +96,7 @@ describe("playlist removal undo", () => {
     await act(async () => {
       ReactDOM.render(
         <PlaylistsSettingsView token="t" apiUrl="/api/v1" user={{ id: 1 }} />,
-        container
+        container,
       );
     });
   });
@@ -124,7 +124,7 @@ describe("playlist removal undo", () => {
     await undoRemoval(container, "Beta");
     expect(listShape(container)).toEqual(["Alpha", "Beta", "Gamma"]);
     const restore = global.fetch.mock.calls.find(
-      ([, opts]) => opts && opts.method === "POST"
+      ([, opts]) => opts && opts.method === "POST",
     );
     // By id: re-attach the playlist the parent had, not a fresh URL sync.
     expect(JSON.parse(restore[1].body)).toEqual({ playlist_id: 2 });
@@ -200,7 +200,7 @@ describe("playlist removal undo", () => {
       "Gamma",
     ]);
     expect(container.querySelector(".playlist-error").textContent).toMatch(
-      /Could not bring that playlist back/
+      /Could not bring that playlist back/,
     );
     // Past the original deadline, inside the new one.
     act(() => {

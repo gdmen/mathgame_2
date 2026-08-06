@@ -31,7 +31,7 @@ const renderProblem = (container, reporter, gamestate = GAMESTATE) =>
         eventReporter={reporter}
         interval={5000}
       />,
-      container
+      container,
     );
   });
 
@@ -75,7 +75,7 @@ describe("ProblemView working_on_problem reporting", () => {
       const input = container.querySelector("#problem-answer-input");
       const setValue = Object.getOwnPropertyDescriptor(
         window.HTMLInputElement.prototype,
-        "value"
+        "value",
       ).set;
       setValue.call(input, "7");
       input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -87,7 +87,7 @@ describe("ProblemView working_on_problem reporting", () => {
     });
 
     expect(container.querySelector("#problem").className).toContain(
-      "submitting"
+      "submitting",
     );
     expect(reporter.events.has("working_on_problem")).toBe(false);
   });

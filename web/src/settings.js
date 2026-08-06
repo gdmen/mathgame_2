@@ -164,7 +164,7 @@ const PROBLEM_TYPE_GROUPS = [
 
 const PROBLEM_TYPE_ENTRIES = PROBLEM_TYPE_GROUPS.reduce(
   (all, group) => all.concat(group.entries),
-  []
+  [],
 );
 
 // Requirement edges — { bit, requires } — mirroring validateBitmap's rules.
@@ -177,7 +177,7 @@ const CROSS_CARD_REQUIREMENTS = [
 ];
 
 const REQUIREMENTS = PROBLEM_TYPE_ENTRIES.filter(
-  (entry) => entry.dependsOn != null
+  (entry) => entry.dependsOn != null,
 )
   .map((entry) => ({ bit: entry.bit, requires: entry.dependsOn }))
   .concat(CROSS_CARD_REQUIREMENTS);
@@ -219,7 +219,7 @@ const applyToggleRules = (bitmap, bit, enabled) =>
 const errorCardTitle = (err) => {
   const bits = err.bits || [];
   const group = PROBLEM_TYPE_GROUPS.find((g) =>
-    g.entries.some((entry) => bits.some((b) => (entry.bit & b) !== 0))
+    g.entries.some((entry) => bits.some((b) => (entry.bit & b) !== 0)),
   );
   return (group || PROBLEM_TYPE_GROUPS[0]).title;
 };
@@ -233,7 +233,7 @@ const ProblemTypesSettingsView = ({
   onBitmapChange,
 }) => {
   const [problemTypeBitmap, setProblemTypeBitmap] = useState(
-    settings.problem_type_bitmap
+    settings.problem_type_bitmap,
   );
   const saveState = useSaveState();
   const validation = validateBitmap(problemTypeBitmap);
@@ -285,8 +285,8 @@ const ProblemTypesSettingsView = ({
                     entry.dependsOn != null
                       ? "dep" + (parentOff ? " parent-off" : "")
                       : isParent(entry.bit)
-                      ? "has-dep"
-                      : "";
+                        ? "has-dep"
+                        : "";
                   return (
                     <li key={entry.bit} className={cls}>
                       <input
@@ -353,7 +353,7 @@ const PlaylistRow = ({ playlist, apiUrl, token, onRemove }) => {
       const req = await apiFetch(
         apiUrl,
         "/playlists/" + playlist.id + "/videos",
-        token
+        token,
       );
       if (!req.ok) throw new Error("status " + req.status);
       const json = await req.json();
@@ -474,7 +474,7 @@ const PlaylistsSettingsView = ({
     () => () => {
       undoTimers.current.forEach((t) => clearTimeout(t));
     },
-    []
+    [],
   );
 
   const stopUndoClock = (playlistId) => {
@@ -495,7 +495,7 @@ const PlaylistsSettingsView = ({
     stopUndoClock(playlistId);
     undoTimers.current.set(
       playlistId,
-      setTimeout(() => expireUndo(playlistId), UNDO_WINDOW_MS)
+      setTimeout(() => expireUndo(playlistId), UNDO_WINDOW_MS),
     );
   };
 
@@ -513,7 +513,7 @@ const PlaylistsSettingsView = ({
         if (seq !== listSeq.current) return;
         setMyPlaylists(Array.isArray(json.playlists) ? json.playlists : []);
         setTotalPlayable(
-          Number.isFinite(json.playable_total) ? json.playable_total : 0
+          Number.isFinite(json.playable_total) ? json.playable_total : 0,
         );
       }
     } catch (e) {
@@ -553,7 +553,7 @@ const PlaylistsSettingsView = ({
       } else {
         setPlaylistError(
           (data && (data.message || data.error)) ||
-            "Playlist must be public or check the URL."
+            "Playlist must be public or check the URL.",
         );
       }
     } catch (e) {
@@ -734,7 +734,7 @@ const PlaylistsSettingsView = ({
                 token={token}
                 onRemove={handleRemovePlaylist}
               />
-            )
+            ),
           )}
         </ul>
         {RECOMMENDED_PLAYLISTS.length > 0 && (
@@ -786,7 +786,7 @@ const TargetDifficultySettingsView = ({
 }) => {
   const { lo: floor, hi: ceiling } = targetDifficultyRange(bitmap);
   const [targetDifficulty, setTargetDifficulty] = useState(
-    settings.target_difficulty
+    settings.target_difficulty,
   );
   const shown = Math.min(Math.max(targetDifficulty, floor), ceiling);
   const saveState = useSaveState();
@@ -865,7 +865,7 @@ const TargetWorkPercentageSettingsView = ({
   settings,
 }) => {
   const [targetWorkPercentage, setTargetWorkPercentage] = useState(
-    settings.target_work_percentage
+    settings.target_work_percentage,
   );
   const saveState = useSaveState();
 
@@ -940,7 +940,7 @@ const DeleteAccountView = ({ token, apiUrl, user }) => {
         apiUrl,
         "/users/" + encodeURIComponent(user.auth0_id),
         token,
-        { method: "DELETE", body: JSON.stringify({ pin }) }
+        { method: "DELETE", body: JSON.stringify({ pin }) },
       );
       if (req.status === 204) {
         // The account is gone; drop the adult PIN session and log out of Auth0.

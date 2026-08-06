@@ -12,13 +12,13 @@ const PreprocessExpression = (expression) => {
   // Split each \text{...} block at internal whitespace into per-word
   // \text{} blocks so word-wrap can happen between words.
   expression = expression.replace(/\\text\{[^\}]+\}/g, (match) =>
-    match.replace(/\s/g, " }\\text{")
+    match.replace(/\s/g, " }\\text{"),
   );
   // Wrap math-mode multi-digit numbers in \text{} so KaTeX renders them
   // as a single atomic span instead of one <span class="mord"> per digit.
   expression = expression.replace(
     /(?<![A-Za-z\\])(\d{2,})(?![A-Za-z])/g,
-    "\\text{$1}"
+    "\\text{$1}",
   );
   return expression;
 };
@@ -88,7 +88,7 @@ const ProblemView = ({ gamestate, latex, eventReporter, interval }) => {
   // The tracker is a singleton, so this only ever hands it the live reporter.
   const answerTracker = useMemo(
     () => (eventReporter ? new AnswerTracker(eventReporter) : null),
-    [eventReporter]
+    [eventReporter],
   );
 
   // Resetting tracker state is a mutation, so it waits for commit rather than
@@ -146,7 +146,7 @@ const ProblemView = ({ gamestate, latex, eventReporter, interval }) => {
               if (e.key === "Enter") {
                 !submitting &&
                   setSubmitting(
-                    answerTracker.reportAnswer(answer, gamestate.problem_id)
+                    answerTracker.reportAnswer(answer, gamestate.problem_id),
                   );
               }
             }}
@@ -155,7 +155,7 @@ const ProblemView = ({ gamestate, latex, eventReporter, interval }) => {
             onClick={() => {
               !submitting &&
                 setSubmitting(
-                  answerTracker.reportAnswer(answer, gamestate.problem_id)
+                  answerTracker.reportAnswer(answer, gamestate.problem_id),
                 );
             }}
           >

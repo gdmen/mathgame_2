@@ -129,7 +129,7 @@ const BitmapMatrixView = ({ token, apiUrl, user }) => {
       const res = await apiFetch(
         apiUrl,
         "/admin/bitmap-matrix/cell?bitmap=" + bitmap + "&bucket=" + bucket,
-        token
+        token,
       );
       if (!res.ok) {
         return;
@@ -152,7 +152,7 @@ const BitmapMatrixView = ({ token, apiUrl, user }) => {
     const rows = data.rows.slice();
     if (sortBy === "complexity") {
       rows.sort(
-        (a, b) => rowComplexity(a) - rowComplexity(b) || a.bitmap - b.bitmap
+        (a, b) => rowComplexity(a) - rowComplexity(b) || a.bitmap - b.bitmap,
       );
     } else {
       rows.sort((a, b) => rowUsage(b) - rowUsage(a) || a.bitmap - b.bitmap);
@@ -162,7 +162,7 @@ const BitmapMatrixView = ({ token, apiUrl, user }) => {
 
   const quantile = useMemo(
     () => (data ? makeQuantile(data.rows) : () => 0),
-    [data]
+    [data],
   );
 
   // Scroll-sync the sticky header and row-label strips to the grid body.
@@ -217,11 +217,11 @@ const BitmapMatrixView = ({ token, apiUrl, user }) => {
         cell.e && Math.abs((cell.d || 0) - bucket) > TARGET_WINDOW;
       const title = offTarget
         ? `off-target: asked d≈${bucket}, closest the heuristic built was d=${fmt1(
-            cell.d
+            cell.d,
           )}` + (cell.a ? ` · answer: ${cell.a}` : "")
         : cell.a
-        ? "answer: " + cell.a
-        : undefined;
+          ? "answer: " + cell.a
+          : undefined;
       return (
         <div
           className={"bm-cell" + (offTarget ? " bm-cell-off" : "")}
@@ -251,7 +251,7 @@ const BitmapMatrixView = ({ token, apiUrl, user }) => {
       );
     },
     // reroll/quantile are stable-enough for the grid; overrides drives updates.
-    [sortedRows, axisLo, overrides, quantile]
+    [sortedRows, axisLo, overrides, quantile],
   );
 
   if (loading) {

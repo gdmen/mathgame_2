@@ -19,7 +19,7 @@ describe("validateBitmap", () => {
     expect(res.valid).toBe(false);
     expect(res.errors.map((e) => e.code)).toContain("LARGE_REQUIRES_MEDIUM");
     expect(
-      validateBitmap(T.ADDITION | T.MEDIUM_NUMBERS | T.LARGE_NUMBERS).valid
+      validateBitmap(T.ADDITION | T.MEDIUM_NUMBERS | T.LARGE_NUMBERS).valid,
     ).toBe(true);
   });
 
@@ -27,7 +27,7 @@ describe("validateBitmap", () => {
     const res = validateBitmap(T.ADDITION | T.MISMATCHED_DENOMINATORS);
     expect(res.valid).toBe(false);
     expect(res.errors.map((e) => e.code)).toContain(
-      "MISMATCHED_REQUIRES_FRACTIONS"
+      "MISMATCHED_REQUIRES_FRACTIONS",
     );
   });
 
@@ -36,7 +36,7 @@ describe("validateBitmap", () => {
     expect(res.valid).toBe(false);
     expect(res.errors.map((e) => e.code)).toContain("PEMDAS_REQUIRES_CHAINED");
     expect(
-      validateBitmap(T.ADDITION | T.CHAINED_OPERATIONS | T.PEMDAS).valid
+      validateBitmap(T.ADDITION | T.CHAINED_OPERATIONS | T.PEMDAS).valid,
     ).toBe(true);
   });
 
@@ -44,14 +44,14 @@ describe("validateBitmap", () => {
     const res = validateBitmap(T.ADDITION | T.PERCENTAGES);
     expect(res.valid).toBe(false);
     expect(res.errors.map((e) => e.code)).toContain(
-      "PERCENTAGES_REQUIRE_MULTIPLICATION"
+      "PERCENTAGES_REQUIRE_MULTIPLICATION",
     );
     expect(res.errors.map((e) => e.code)).toContain(
-      "PERCENTAGES_REQUIRE_MEDIUM"
+      "PERCENTAGES_REQUIRE_MEDIUM",
     );
     expect(validateBitmap(T.MULTIPLICATION | T.PERCENTAGES).valid).toBe(false);
     expect(
-      validateBitmap(T.MULTIPLICATION | T.MEDIUM_NUMBERS | T.PERCENTAGES).valid
+      validateBitmap(T.MULTIPLICATION | T.MEDIUM_NUMBERS | T.PERCENTAGES).valid,
     ).toBe(true);
   });
 
@@ -81,7 +81,7 @@ describe("difficulty band mirrors (maxDiffForBitmap / minDiffForBitmap)", () => 
       }
       if (Math.abs(lo - f.lo) > 1e-9 || Math.abs(hi - f.hi) > 1e-9) {
         failures.push(
-          `${f.name} (bits=${f.bits}): range [${lo}, ${hi}] != [${f.lo}, ${f.hi}]`
+          `${f.name} (bits=${f.bits}): range [${lo}, ${hi}] != [${f.lo}, ${f.hi}]`,
         );
       }
     }
@@ -91,7 +91,7 @@ describe("difficulty band mirrors (maxDiffForBitmap / minDiffForBitmap)", () => 
   it("the slider max grows with the envelope (dynamic max)", () => {
     const small = maxDiffForBitmap(T.ADDITION);
     const bigger = maxDiffForBitmap(
-      T.ADDITION | T.MULTIPLICATION | T.MEDIUM_NUMBERS
+      T.ADDITION | T.MULTIPLICATION | T.MEDIUM_NUMBERS,
     );
     expect(bigger).toBeGreaterThan(small);
   });

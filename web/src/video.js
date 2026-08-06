@@ -65,7 +65,7 @@ const VideoView = ({ video, eventReporter, interval }) => {
             var playedMillis = 1000 * e.playedSeconds;
             eventReporter.postEvent(
               EventTypes.WATCHING_VIDEO,
-              playedMillis - elapsedRef.current
+              playedMillis - elapsedRef.current,
             );
             setElapsed(playedMillis);
           }}

@@ -19,7 +19,7 @@ import { ProblemTypes as T } from "./enums.generated.js";
 
 const ENTRIES = PROBLEM_TYPE_GROUPS.reduce(
   (all, group) => all.concat(group.entries),
-  []
+  [],
 );
 const ALL_BITS = ENTRIES.reduce((mask, entry) => mask | entry.bit, 0);
 
@@ -44,17 +44,18 @@ describe("applyToggleRules", () => {
   it("clears every dependent when its parent goes off", () => {
     ENTRIES.filter((entry) => entry.dependsOn != null).forEach((entry) => {
       expect(
-        applyToggleRules(ALL_BITS, entry.dependsOn, false) & entry.bit
+        applyToggleRules(ALL_BITS, entry.dependsOn, false) & entry.bit,
       ).toBe(0);
     });
   });
 
   it("pulls MEDIUM in behind the bits that need it, and back out with it", () => {
     expect(applyToggleRules(T.ADDITION, T.LARGE_NUMBERS, true)).toBe(
-      T.ADDITION | T.LARGE_NUMBERS | T.MEDIUM_NUMBERS
+      T.ADDITION | T.LARGE_NUMBERS | T.MEDIUM_NUMBERS,
     );
     expect(
-      applyToggleRules(T.MULTIPLICATION, T.PERCENTAGES, true) & T.MEDIUM_NUMBERS
+      applyToggleRules(T.MULTIPLICATION, T.PERCENTAGES, true) &
+        T.MEDIUM_NUMBERS,
     ).toBe(T.MEDIUM_NUMBERS);
     const noMedium = applyToggleRules(ALL_BITS, T.MEDIUM_NUMBERS, false);
     expect(noMedium & (T.LARGE_NUMBERS | T.PERCENTAGES)).toBe(0);
@@ -83,7 +84,7 @@ describe("dependent chips", () => {
           settings={{ user_id: 1, problem_type_bitmap: bitmap }}
           errCallback={() => {}}
         />,
-        container
+        container,
       );
     });
 
@@ -96,7 +97,7 @@ describe("dependent chips", () => {
       expect(chip().disabled).toBe(true);
       expect(
         container.querySelector("#pt-" + entry.dependsOn).closest("li")
-          .className
+          .className,
       ).toBe("has-dep");
 
       renderAt(container, T.ADDITION | entry.dependsOn);
@@ -131,33 +132,33 @@ describe("errorCardTitle", () => {
     // screen refuses to save while any error stands, and there is no error
     // boundary above this view to catch a throw.
     expect(PROBLEM_TYPE_GROUPS.map((group) => group.title)).toContain(
-      errorCardTitle({ code: "NEW_RULE", message: "…" })
+      errorCardTitle({ code: "NEW_RULE", message: "…" }),
     );
   });
 
   it("keeps each error on the card its bits live in", () => {
     const cardFor = (code, bitmap) =>
       errorCardTitle(
-        validateBitmap(bitmap).errors.find((err) => err.code === code)
+        validateBitmap(bitmap).errors.find((err) => err.code === code),
       );
     expect(cardFor("NO_CORE_OP", 0)).toBe("Operations");
     expect(cardFor("LARGE_REQUIRES_MEDIUM", T.ADDITION | T.LARGE_NUMBERS)).toBe(
-      "Number size"
+      "Number size",
     );
     expect(
       cardFor(
         "MISMATCHED_REQUIRES_FRACTIONS",
-        T.ADDITION | T.MISMATCHED_DENOMINATORS
-      )
+        T.ADDITION | T.MISMATCHED_DENOMINATORS,
+      ),
     ).toBe("Number types");
     expect(cardFor("PEMDAS_REQUIRES_CHAINED", T.ADDITION | T.PEMDAS)).toBe(
-      "Problem format"
+      "Problem format",
     );
     expect(
-      cardFor("PERCENTAGES_REQUIRE_MULTIPLICATION", T.ADDITION | T.PERCENTAGES)
+      cardFor("PERCENTAGES_REQUIRE_MULTIPLICATION", T.ADDITION | T.PERCENTAGES),
     ).toBe("Operations");
     expect(
-      cardFor("PERCENTAGES_REQUIRE_MEDIUM", T.MULTIPLICATION | T.PERCENTAGES)
+      cardFor("PERCENTAGES_REQUIRE_MEDIUM", T.MULTIPLICATION | T.PERCENTAGES),
     ).toBe("Operations");
   });
 });

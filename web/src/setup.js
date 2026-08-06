@@ -137,7 +137,7 @@ const PinTabView = ({ token, apiUrl, user, advanceSetup }) => {
         apiUrl,
         "/users/" + encodeURIComponent(user.auth0_id),
         token,
-        { method: "POST", body: JSON.stringify(user) }
+        { method: "POST", body: JSON.stringify(user) },
       );
       const json = await req.json();
       return json;

@@ -33,7 +33,7 @@ const typePin = (container, pin) => {
   const input = container.querySelector("input.mock-pin");
   const setValue = Object.getOwnPropertyDescriptor(
     window.HTMLInputElement.prototype,
-    "value"
+    "value",
   ).set;
   act(() => {
     setValue.call(input, pin);
@@ -58,7 +58,7 @@ describe("PinConfirmModal", () => {
           onCancel={onCancel}
           {...props}
         />,
-        container
+        container,
       );
     });
 
@@ -133,7 +133,7 @@ describe("PinConfirmModal", () => {
     });
     expect(container.querySelector("#extra-field")).not.toBeNull();
     expect(
-      container.querySelector(".pin-confirm-modal-error").textContent
+      container.querySelector(".pin-confirm-modal-error").textContent,
     ).toBe("Incorrect PIN");
   });
 });

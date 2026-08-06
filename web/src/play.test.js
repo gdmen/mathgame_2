@@ -30,7 +30,7 @@ const render = (container, props) =>
         interval={100000}
         {...props}
       />,
-      container
+      container,
     );
   });
 
@@ -49,7 +49,7 @@ afterEach(() => {
 
 test("re-reads the page load data when the pool is below the floor", async () => {
   global.fetch = jest.fn(() =>
-    Promise.resolve({ ok: false, status: 403, text: () => "" })
+    Promise.resolve({ ok: false, status: 403, text: () => "" }),
   );
 
   await act(async () => {
@@ -64,7 +64,7 @@ test("re-reads the page load data when the pool is below the floor", async () =>
 // 403 was never about the video pool.
 test("says so when nothing resolves the 403", async () => {
   global.fetch = jest.fn(() =>
-    Promise.resolve({ ok: false, status: 403, text: () => "" })
+    Promise.resolve({ ok: false, status: 403, text: () => "" }),
   );
 
   await act(async () => {
@@ -81,7 +81,7 @@ test("says so when nothing resolves the 403", async () => {
 // request, forever.
 test("does not re-ask /play when the refresh hands down a new user object", async () => {
   global.fetch = jest.fn(() =>
-    Promise.resolve({ ok: false, status: 403, text: () => "" })
+    Promise.resolve({ ok: false, status: 403, text: () => "" }),
   );
 
   await act(async () => {
@@ -106,7 +106,7 @@ test("leaves the page load data alone on a healthy load", async () => {
           problem: { id: 1, expression: "1+1", answer: "2" },
           video: { id: 1 },
         }),
-    })
+    }),
   );
 
   await act(async () => {
@@ -122,7 +122,7 @@ test("drops a 403 that lands after unmount", async () => {
     () =>
       new Promise((resolve) => {
         respond = () => resolve({ ok: false, status: 403, text: () => "" });
-      })
+      }),
   );
 
   render(container, { refreshPageLoadData });

@@ -462,5 +462,5 @@ ReactDOM.render(
       <AppView />
     </Auth0Provider>
   </BrowserRouter>,
-  document.getElementById("react")
+  document.getElementById("react"),
 );

@@ -83,7 +83,7 @@ const DifficultyCalibrationView = ({ token, apiUrl, user }) => {
       const res = await apiFetch(
         apiUrl,
         "/admin/difficulty-calibration",
-        token
+        token,
       );
       if (!res.ok) {
         setError("Could not load calibration data");

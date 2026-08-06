@@ -60,7 +60,7 @@ class EventReporterSingleton {
     this.events.forEach(
       function (event_type) {
         this.postEvent(event_type, this.interval);
-      }.bind(this)
+      }.bind(this),
     );
   }
 
@@ -181,7 +181,7 @@ const PlayView = ({
           return;
         }
         setLatex(
-          katex.renderToString(PreprocessExpression(problem.expression))
+          katex.renderToString(PreprocessExpression(problem.expression)),
         );
       } catch (e) {
         console.log(e.message);
@@ -382,7 +382,7 @@ const PlayView = ({
                   value={reportExplanation}
                   onChange={(e) =>
                     setReportExplanation(
-                      e.target.value.slice(0, REPORT_EXPLANATION_MAX_LENGTH)
+                      e.target.value.slice(0, REPORT_EXPLANATION_MAX_LENGTH),
                     )
                   }
                   maxLength={REPORT_EXPLANATION_MAX_LENGTH}

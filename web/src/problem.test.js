@@ -16,7 +16,7 @@ describe("PreprocessExpression", () => {
 
   it("escapes every percent in the expression", () => {
     expect(PreprocessExpression("25% + 10%")).toBe(
-      "\\text{25}\\% + \\text{10}\\%"
+      "\\text{25}\\% + \\text{10}\\%",
     );
   });
 

@@ -35,7 +35,7 @@ const typePin = (container, pin) => {
   const input = container.querySelector("input.mock-pin");
   const setValue = Object.getOwnPropertyDescriptor(
     window.HTMLInputElement.prototype,
-    "value"
+    "value",
   ).set;
   act(() => {
     setValue.call(input, pin);
@@ -58,7 +58,7 @@ describe("usePinSessionPolicy", () => {
         <MemoryRouter initialEntries={[pathname]}>
           <Probe takeover={takeover} />
         </MemoryRouter>,
-        container
+        container,
       );
     });
 
@@ -86,7 +86,7 @@ describe("usePinSessionPolicy", () => {
     (pathname) => {
       renderAt(pathname);
       expect(GetSessionPin()).toBe("1234");
-    }
+    },
   );
 
   // The point of the policy: an unlisted path drops the session without that
@@ -97,7 +97,7 @@ describe("usePinSessionPolicy", () => {
     (pathname) => {
       renderAt(pathname);
       expect(GetSessionPin()).toBeNull();
-    }
+    },
   );
 
   // A screen nobody has written yet is the actual subject of this rule.
@@ -126,7 +126,7 @@ describe("usePinSessionPolicy", () => {
     (takeover) => {
       renderAt("/settings", takeover);
       expect(GetSessionPin()).toBeNull();
-    }
+    },
   );
 
   it("only lists surfaces that actually gate on the PIN", () => {
@@ -159,7 +159,7 @@ describe("usePinSessionPolicy", () => {
                 }}
               />
             </MemoryRouter>,
-            c
+            c,
           );
         });
         act(() => {
@@ -170,7 +170,7 @@ describe("usePinSessionPolicy", () => {
 
         expect(routed).toBe(true);
         expect(GetSessionPin()).toBe("1234");
-      }
+      },
     );
   });
 });
@@ -231,7 +231,7 @@ describe("PinView", () => {
       typePin(container, "0000");
       expect(onValid).not.toHaveBeenCalled();
       expect(GetSessionPin()).toBe("");
-    }
+    },
   );
 
   it("starts errored when there is no code to verify against", () => {
@@ -295,7 +295,7 @@ describe("PinGateRoute wiring", () => {
         <MemoryRouter initialEntries={["/pin/%2Fsettings"]}>
           <Harness />
         </MemoryRouter>,
-        container
+        container,
       );
     });
     expect(seen).toEqual(["/settings"]);
