@@ -152,10 +152,10 @@ migrations, read by the cmd tools / serving paths named):
      (migrations 41, 42, 43 are the current template).
    - `INSERT IGNORE` / `DELETE … JOIN` for data backfills.
 
-   The history is not uniformly re-run-safe — migration 16 uses bare
-   `CREATE TABLE` (no `IF NOT EXISTS`), safe only because it is recorded
-   after a full success and so never re-runs (see Gotchas). Hold the idioms
-   above for everything new.
+   The whole history satisfies this: `TestMigrationsAreRerunSafe`
+   (`server/api/migration_rerun_test.go`) re-applies every migration body to
+   an already-migrated schema and fails if any statement errors. Hold the
+   idioms above for everything new.
 2. **No semicolons inside comments.** The splitter is naive; a `;` in a
    `--` comment becomes a bogus statement.
 3. **Generated CREATE and migration history converge.** A column added by
@@ -208,12 +208,6 @@ NewApi-first ordering on every other test.
   used). Editing shipped migrations is safe here because the runner records
   only the *version* (no body checksum), so deployed DBs never re-run them —
   only fresh bootstraps re-execute, where the guards make them no-ops.
-- **Migration 16 is not idempotent.** Its four `statistics_*` tables use
-  bare `CREATE TABLE`, not `CREATE TABLE IF NOT EXISTS`. It survives only
-  because the runner records it after a full success and never re-runs it —
-  but if it ever failed *after* the first `CREATE`, the retry would error on
-  the already-created table and wedge startup. Don't copy this shape; new
-  table-creation migrations use `IF NOT EXISTS` (migration 28+).
 - **`thumbnailurl`, not `thumbnail_url`.** The field is named `ThumbnailURL`
   but `URL` is a single capitalized run, so `CAMEL_TO_SNAKE_RE` (which only
   splits before `[A-Z][a-z]`) leaves it as one token → column
@@ -245,6 +239,8 @@ NewApi-first ordering on every other test.
 - `server/api/migrate.go` `RunMigrations`, `splitStatements` — the runner.
 - `server/api/migrations/<N>.sql` — the diff history (latest: 47).
 - `server/api/docs_sync_test.go` `TestDocsSyncSchema` — anchor enforcement.
+- `server/api/bootstrap_order_test.go` — fresh-DB bootstrap in the production startup order.
+- `server/api/migration_rerun_test.go` — invariant 1 enforcement (every migration re-run-safe).
 - README "mysql" section — charset/collation + DB-creation runbook.
 
 ## Adding to the schema — checklist
