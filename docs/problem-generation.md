@@ -482,7 +482,10 @@ are the generation-relevant surface.)
   that exact computation: no new numbers, no changed operation. Every OpenAI
   call on this path — narration and WORD validation alike — retries transient
   failures (408/429/5xx and transport errors) up to 4 attempts, backing off 1s
-  and doubling (`chatCompletionWithRetry`). Stored:
+  and doubling (`chatCompletionWithRetry`). A call that still fails returns an
+  error carrying OpenAI's machine-readable code (`openai_code=<code>`), which
+  the client's own error string drops; alerting on those journal lines is owned
+  by [ops-runbook.md](ops-runbook.md). Stored:
   `expression` = the prose, `symbolic_expression` = the skeleton, `answer` = the
   skeleton's answer, bits = `WordFormBitmap(skeleton bits)`; difficulty is
   skeleton × word by construction. The heuristic
