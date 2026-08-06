@@ -21,7 +21,7 @@ type YouTubePlaylistResponse struct {
 					URL string `json:"url"`
 				} `json:"default"`
 				Medium struct {
-					URL string `json:"medium"`
+					URL string `json:"url"`
 				} `json:"medium"`
 			} `json:"thumbnails"`
 		} `json:"snippet"`
@@ -41,7 +41,7 @@ type YouTubePlaylistItemsResponse struct {
 					URL string `json:"url"`
 				} `json:"default"`
 				Medium struct {
-					URL string `json:"medium"`
+					URL string `json:"url"`
 				} `json:"medium"`
 			} `json:"thumbnails"`
 		} `json:"snippet"`
