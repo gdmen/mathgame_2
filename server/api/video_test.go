@@ -16,10 +16,6 @@ import (
 	"garydmenezes.com/mathgame/server/common"
 )
 
-func InsertTestVideos(c *common.Config) {
-	insertTestData(c, "videos")
-}
-
 func TestVideoBasic(t *testing.T) {
 	c, err := common.ReadConfig("../../test_conf.json")
 	if err != nil {
