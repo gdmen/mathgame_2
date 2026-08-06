@@ -17,10 +17,6 @@ import (
 	"garydmenezes.com/mathgame/server/common"
 )
 
-func InsertTestProblems(c *common.Config) {
-	insertTestData(c, "problems")
-}
-
 func TestProblemBasic(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	c, err := common.ReadConfig("../../test_conf.json")
