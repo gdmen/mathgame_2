@@ -17,11 +17,13 @@ updates:
       development-dependencies:
         dependency-type: development
 
+  # Higher than npm's because gomod has no grouping to collapse its PRs, and a
+  # saturated queue crowds out security bumps.
   - package-ecosystem: gomod
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 10
 
   - package-ecosystem: github-actions
     directory: /

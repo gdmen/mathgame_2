@@ -415,7 +415,10 @@ error, because at threshold 1 a missed match costs more than an inflated count.
 - `deploy/mathgame-maintenance.service` — the `Conflicts=`/`After=` swap with web.
 - `deploy/drop.sql` — destructive full-DB reset.
 - `Makefile` — all build/test/prod targets.
-- `.github/workflows/test.yml` — CI: the Go suite against a real MySQL, and the web jest suite.
+- `.github/workflows/test.yml` — CI: the Go suite against a real MySQL, the web jest suite, and the
+  vulnerability gates (`govulncheck ./...`, `npm audit --omit=dev --audit-level=moderate`).
+  The npm gate is scoped to production deps: the dev-tree findings are react-scripts', unfixable
+  by any upgrade, and knowingly accepted until the CRA-to-Vite migration (#382) retires it.
 - `.github/workflows/web-bundle-secrets.yml` — CI: the bundle secret scan.
 - `cmd/apiserver/main.go` — `main` runs `api.RunMigrations` on API startup.
 - `cmd/maintenance_server/main.go` — `Handler` (503 page), `main` (TLS guard).
