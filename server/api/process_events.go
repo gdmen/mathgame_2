@@ -34,7 +34,8 @@ func parseBadProblemID(rawValue string) uint32 {
 }
 
 const (
-	maxTarget = 20
+	maxTarget = 30
+	minProbs  = 5
 )
 
 // recentProblemHistorySize and the other recency-related sizes live in
@@ -168,8 +169,8 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		a.generateProblemsBackground(logPrefix, settings)
 	} else if event.EventType == SET_GAMESTATE_TARGET {
 		val, parseErr := strconv.ParseUint(event.Value, 10, 32)
-		if parseErr != nil || val < 5 || val > 20 {
-			msg := fmt.Sprintf("Invalid gamestate_target: %s (must be 5-20)", event.Value)
+		if parseErr != nil || val < minProbs || val > maxTarget {
+			msg := fmt.Sprintf("Invalid gamestate_target: %s (must be %d-%d)", event.Value, minProbs, maxTarget)
 			glog.Errorf("%s %s", logPrefix, msg)
 			c.JSON(http.StatusBadRequest, msg)
 			return errors.New(msg)
@@ -245,7 +246,6 @@ func (a *Api) processEvent(logPrefix string, c *gin.Context, event *Event, write
 		epsilon := 0.05
 		var recentPast int = 900 // seconds aka 15 minutes. This assumes a 1 second event reporting interval.
 		var diffIncrease float64 = 0.05
-		var minProbs uint32 = 5
 		// The difficulty band, derived from the user's settings bitmap: the
 		// easiest and hardest problems their enabled bits can express.
 		// WHY: this adjuster ratchets target_difficulty up on success and
