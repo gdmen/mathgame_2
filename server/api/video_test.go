@@ -5,12 +5,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
 
 	"garydmenezes.com/mathgame/server/common"
@@ -21,172 +20,127 @@ func TestVideoBasic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
 	}
-	_, r, cleanup := setupTestAPI(t, c)
+	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 
-	// Create new user
-	user := &User{
-		Auth0Id:  "auth0id|test|1",
-		Email:    "test_1@email.com",
-		Username: "test_1",
-	}
+	user := createTestUser(t, r, "auth0id|test|1", "test_1@email.com", "test_1")
+	ids := seedUserVideosViaPlaylist(t, api, user.Id, 2)
+
+	// Create: not exposed, and not an oversight — see docs/videos.md.
 	resp := httptest.NewRecorder()
-	body, _ := json.Marshal(user)
-	req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/users?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
+	body, _ := json.Marshal(Video{Title: "smuggled in", URL: "https://ex.co/x", YouTubeId: "x"})
+	req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/videos/?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
 	r.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusOK, resp.Code, resp)
-	}
-	body, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp_user := User{}
-	err = json.Unmarshal(body, &resp_user)
-	if err != nil {
-		t.Fatal(err)
-	}
-	user.Id = resp_user.Id
-	user.Role = resp_user.Role // server-assigned default; not set by the test
-	if resp_user != *user {
-		t.Fatalf("Model mismatch. Received: %v, but expected: %v", resp_user, user)
+	if resp.Code != http.StatusNotFound && resp.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("Expected the create route to be absent (%d or %d), got %d. . .\n%+v", http.StatusNotFound, http.StatusMethodNotAllowed, resp.Code, resp)
 	}
 
-	// Create
+	// List: the pool the playlist put there, and nothing the attempt above added.
+	if got := listMyVideos(t, r, user); len(got) != len(ids) {
+		t.Fatalf("Expected %d videos from the playlist, got %d: %+v", len(ids), len(got), got)
+	}
+
+	// Update: not exposed, and not an oversight — see docs/videos.md.
 	resp = httptest.NewRecorder()
-
-	video := Video{
-		Title:     "son of man",
-		URL:       "https://www.youtube.com/watch?v=-WcHPFUwd6U",
-		YouTubeId: "-WcHPFUwd6U",
-		Disabled:  false,
-	}
-	body, _ = json.Marshal(video)
-	req, _ = http.NewRequest("POST", fmt.Sprintf("/api/v1/videos/?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
-
+	body, _ = json.Marshal(Video{Id: ids[0], Title: "unda da sea", Disabled: true})
+	req, _ = http.NewRequest("POST", fmt.Sprintf("/api/v1/videos/%d?test_auth0_id=%s", ids[0], user.Auth0Id), bytes.NewBuffer(body))
 	r.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusCreated, resp.Code, resp)
-	}
-
-	body, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.TrimSpace(string(body)) != `{"id":1,"title":"son of man","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","thumbnailurl":"","you_tube_id":"-WcHPFUwd6U","disabled":false}` {
-		t.Fatal("ERROR: " + string(body))
-	}
-
-	// List
-	resp = httptest.NewRecorder()
-
-	req, _ = http.NewRequest("GET", fmt.Sprintf("/api/v1/videos/?test_auth0_id=%s", user.Auth0Id), nil)
-
-	r.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusOK, resp.Code, resp)
-	}
-
-	body, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.TrimSpace(string(body)) != `[{"id":1,"title":"son of man","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","thumbnailurl":"","you_tube_id":"-WcHPFUwd6U","disabled":false}]` {
-		t.Fatal("ERROR: " + string(body))
-	}
-
-	// Update: not exposed. A videos row is shared catalog metadata, so a
-	// per-video update route would let any caller rewrite the title, URL or
-	// disabled flag for every user who has that video. Don't restore it.
-	resp = httptest.NewRecorder()
-
-	video.Title = "unda da sea"
-	video.Disabled = true
-	body, _ = json.Marshal(video)
-	req, _ = http.NewRequest("POST", fmt.Sprintf("/api/v1/videos/1?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
-
-	r.ServeHTTP(resp, req)
-
 	if resp.Code != http.StatusNotFound && resp.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("Expected the update route to be absent (%d or %d), got %d. . .\n%+v", http.StatusNotFound, http.StatusMethodNotAllowed, resp.Code, resp)
 	}
 
-	// Get: the row is untouched by the attempt above.
+	// Get: these JSON names are the client's contract, so pin the whole wire
+	// shape, and pin that the row is untouched by the attempt above.
 	resp = httptest.NewRecorder()
-
-	req, _ = http.NewRequest("GET", fmt.Sprintf("/api/v1/videos/1?test_auth0_id=%s", user.Auth0Id), nil)
-
+	req, _ = http.NewRequest("GET", fmt.Sprintf("/api/v1/videos/%d?test_auth0_id=%s", ids[0], user.Auth0Id), nil)
 	r.ServeHTTP(resp, req)
-
 	if resp.Code != http.StatusOK {
 		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusOK, resp.Code, resp)
 	}
-
-	body, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
+	var wire map[string]interface{}
+	if err := json.Unmarshal(resp.Body.Bytes(), &wire); err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(body)) != `{"id":1,"title":"son of man","url":"https://www.youtube.com/watch?v=-WcHPFUwd6U","thumbnailurl":"","you_tube_id":"-WcHPFUwd6U","disabled":false}` {
-		t.Fatal("ERROR: " + string(body))
+	wantFields := []string{"id", "title", "url", "thumbnailurl", "you_tube_id", "disabled"}
+	if len(wire) != len(wantFields) {
+		t.Errorf("Expected exactly the fields %v on the wire, got %v", wantFields, wire)
+	}
+	for _, f := range wantFields {
+		if _, ok := wire[f]; !ok {
+			t.Errorf("Missing field %q in the video JSON: %v", f, wire)
+		}
+	}
+	got := Video{}
+	if err := json.Unmarshal(resp.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Title == "unda da sea" || got.Disabled {
+		t.Fatalf("Expected the video row unchanged, got %+v", got)
+	}
+	want := Video{}
+	if err := api.DB.QueryRow(
+		"SELECT id, title, url, thumbnailurl, you_tube_id, disabled FROM videos WHERE id=?", ids[0]).
+		Scan(&want.Id, &want.Title, &want.URL, &want.ThumbnailURL, &want.YouTubeId, &want.Disabled); err != nil {
+		t.Fatalf("read video row: %v", err)
+	}
+	if got != want {
+		t.Fatalf("GET returned %+v, but the stored row is %+v", got, want)
 	}
 
-	// Delete
+	// Delete: not exposed, and not an oversight — see docs/videos.md.
 	resp = httptest.NewRecorder()
-
-	req, _ = http.NewRequest("DELETE", fmt.Sprintf("/api/v1/videos/1?test_auth0_id=%s", user.Auth0Id), nil)
-
+	req, _ = http.NewRequest("DELETE", fmt.Sprintf("/api/v1/videos/%d?test_auth0_id=%s", ids[0], user.Auth0Id), nil)
 	r.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK && resp.Code != http.StatusNoContent {
-		t.Fatalf("Expected status code %d or %d, got %d. . .\n%+v", http.StatusOK, http.StatusNoContent, resp.Code, resp)
+	if resp.Code != http.StatusNotFound && resp.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("Expected the delete route to be absent (%d or %d), got %d. . .\n%+v", http.StatusNotFound, http.StatusMethodNotAllowed, resp.Code, resp)
 	}
+	if remaining := listMyVideos(t, r, user); len(remaining) != len(ids) {
+		t.Fatalf("Expected the pool untouched at %d videos, got %d", len(ids), len(remaining))
+	}
+}
 
-	// List
-	resp = httptest.NewRecorder()
+// Titles carry non-BMP characters (emoji), which only survive a round trip on a
+// utf8mb4 column and connection.
+func TestVideo_NonBMPTitleRoundTrips(t *testing.T) {
+	c, err := common.ReadConfig("../../test_conf.json")
+	if err != nil {
+		t.Fatalf("Couldn't read config: %v", err)
+	}
+	api, r, cleanup := setupTestAPI(t, c)
+	defer cleanup()
 
-	req, _ = http.NewRequest("GET", fmt.Sprintf("/api/v1/videos/?test_auth0_id=%s", user.Auth0Id), nil)
+	user := createTestUser(t, r, "auth0id|nonbmp", "nonbmp@test.com", "nonbmp")
+	title := "14 years old defeating 16 Blue Belts with Foot Locks! 🤯"
+	res, err := api.DB.Exec(
+		"INSERT INTO videos (title, url, thumbnailurl, you_tube_id, disabled) VALUES (?, ?, ?, ?, 0)",
+		title, "https://www.youtube.com/watch?v=B5YmbhNoD00", "", "B5YmbhNoD00")
+	if err != nil {
+		t.Fatalf("insert video: %v", err)
+	}
+	videoID, _ := res.LastInsertId()
+	subscribeUserToPlaylists(t, api, user.Id,
+		insertPlaylistWithVideos(t, api, "PLnonbmp", []uint32{uint32(videoID)}))
 
+	videos := listMyVideos(t, r, user)
+	if len(videos) != 1 {
+		t.Fatalf("expected 1 video, got %d", len(videos))
+	}
+	if videos[0].Title != title {
+		t.Errorf("expected title %q back, got %q", title, videos[0].Title)
+	}
+}
+
+func listMyVideos(t *testing.T, r *gin.Engine, user *User) []Video {
+	t.Helper()
+	resp := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/videos/?test_auth0_id=%s", user.Auth0Id), nil)
 	r.ServeHTTP(resp, req)
-
 	if resp.Code != http.StatusOK {
-		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusOK, resp.Code, resp)
+		t.Fatalf("GET videos: expected %d, got %d body %s", http.StatusOK, resp.Code, resp.Body.Bytes())
 	}
-
-	body, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
+	var videos []Video
+	if err := json.Unmarshal(resp.Body.Bytes(), &videos); err != nil {
+		t.Fatalf("unmarshal videos: %v", err)
 	}
-	if strings.TrimSpace(string(body)) != "[]" {
-		t.Fatal("ERROR: " + string(body))
-	}
-
-	// Create with a title that has non-BMP unicode characters
-	resp = httptest.NewRecorder()
-
-	video = Video{
-		Title:     "14 years old defeating 16 Blue Belts with Foot Locks! 🤯",
-		URL:       "https://www.youtube.com/watch?v=B5YmbhNoD00",
-		YouTubeId: "B5YmbhNoD00",
-		Disabled:  false,
-	}
-	body, _ = json.Marshal(video)
-	req, _ = http.NewRequest("POST", fmt.Sprintf("/api/v1/videos/?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
-
-	r.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("Expected status code %d, got %d. . .\n%+v", http.StatusCreated, resp.Code, resp)
-	}
-
-	body, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.TrimSpace(string(body)) != `{"id":2,"title":"14 years old defeating 16 Blue Belts with Foot Locks! 🤯","url":"https://www.youtube.com/watch?v=B5YmbhNoD00","thumbnailurl":"","you_tube_id":"B5YmbhNoD00","disabled":false}` {
-		t.Fatal("ERROR: " + string(body))
-	}
-
+	return videos
 }

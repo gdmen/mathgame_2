@@ -25,17 +25,7 @@ func TestRecentlyShownProblems_PopulatedOnSelectedProblem(t *testing.T) {
 	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 	user := createTestUser(t, r, "auth0|rsp-populate", "rsp-pop@test.com", "rsppop")
-	for i := 0; i < 2; i++ {
-		ytID := fmt.Sprintf("rsp%d", i)
-		v := &Video{Title: "V", URL: fmt.Sprintf("https://ex.co/%s", ytID), YouTubeId: ytID}
-		resp := httptest.NewRecorder()
-		body, _ := json.Marshal(v)
-		req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/videos?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
-		r.ServeHTTP(resp, req)
-		if resp.Code != http.StatusCreated {
-			t.Fatalf("create video: expected %d, got %d", http.StatusCreated, resp.Code)
-		}
-	}
+	seedUserVideosViaPlaylist(t, api, user.Id, 2)
 
 	// User creation already wrote some SELECTED_PROBLEM events (every
 	// SET_PROBLEM_TYPE_BITMAP / SET_TARGET_DIFFICULTY in the user-init
@@ -89,17 +79,7 @@ func TestRecentlyShownProblems_FailTolerantWrite(t *testing.T) {
 	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 	user := createTestUser(t, r, "auth0|rsp-fail", "rsp-fail@test.com", "rspfail")
-	for i := 0; i < 2; i++ {
-		ytID := fmt.Sprintf("rspf%d", i)
-		v := &Video{Title: "V", URL: fmt.Sprintf("https://ex.co/%s", ytID), YouTubeId: ytID}
-		resp := httptest.NewRecorder()
-		body, _ := json.Marshal(v)
-		req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/videos?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
-		r.ServeHTTP(resp, req)
-		if resp.Code != http.StatusCreated {
-			t.Fatalf("create video: expected %d, got %d", http.StatusCreated, resp.Code)
-		}
-	}
+	seedUserVideosViaPlaylist(t, api, user.Id, 2)
 
 	// Drop the cache table. The next SELECTED_PROBLEM event must NOT
 	// crash the request — the event INSERT into events should still

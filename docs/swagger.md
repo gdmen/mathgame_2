@@ -23,6 +23,13 @@ table-backed ones (`User`, `Problem`, `Settings`, `Gamestate`, `Event`, `Video`)
 the annotations, so no field list can drift. Only the routes and their status codes are
 hand-written, so those are the only things that can go stale.
 
+Nothing compares the `swagger:route` blocks against the router, so a route added to or dropped
+from `server/api/init.go` has to be mirrored here in the same change — the spec would otherwise
+keep advertising an endpoint that answers 404. A `swagger:parameters` struct naming only that
+operation goes with it. The compiler is no help here: it checks the parameter and response
+*structs* (a renamed `api.Video` field breaks the build), but the annotations themselves are
+comments, so an operation name that no longer corresponds to any route compiles cleanly.
+
 Two commands, both needing go-swagger:
 
 | Command | What it does |

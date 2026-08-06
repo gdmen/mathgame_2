@@ -214,15 +214,7 @@ func (a *Api) GetRouter() *gin.Engine {
 			}
 			video := authed.Group("/videos")
 			{
-				video.POST("", a.customCreateVideo)
-				video.POST("/", a.customCreateVideo)
-				// No client-facing update: a videos row is shared catalog
-				// metadata keyed by nothing but its own id, so an update route
-				// lets any caller rewrite what every user who has that video
-				// plays. The one legitimate mutation is the server disabling a
-				// video it couldn't play (videoManager.Update on
-				// ERROR_PLAYING_VIDEO); cmd/check_disabled_videos re-enables.
-				video.DELETE("/:id", a.customDeleteVideo)
+				// Read-only; see docs/videos.md.
 				video.GET("/:id", a.getVideo)
 				video.GET("", a.customListVideo)
 				video.GET("/", a.customListVideo)

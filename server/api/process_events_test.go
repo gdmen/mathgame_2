@@ -38,21 +38,11 @@ func TestProcessEvents_LoggedIn_Persisted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
 	}
-	_, r, cleanup := setupTestAPI(t, c)
+	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 	user := createTestUser(t, r, "auth0|logged-in", "login@test.com", "loginuser")
 	// Add videos so play-data response (writeCtx) can resolve gamestate.VideoId
-	for i := 0; i < 2; i++ {
-		ytID := fmt.Sprintf("login%d", i)
-		v := &Video{Title: "V", URL: fmt.Sprintf("https://ex.co/%s", ytID), YouTubeId: ytID}
-		resp := httptest.NewRecorder()
-		body, _ := json.Marshal(v)
-		req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/videos?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
-		r.ServeHTTP(resp, req)
-		if resp.Code != http.StatusCreated {
-			t.Fatalf("create video: expected %d, got %d", http.StatusCreated, resp.Code)
-		}
-	}
+	seedUserVideosViaPlaylist(t, api, user.Id, 2)
 
 	resp := httptest.NewRecorder()
 	event := Event{EventType: LOGGED_IN, Value: ""}
@@ -92,25 +82,11 @@ func TestProcessEvents_WorkingOnProblem_Accepted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
 	}
-	_, r, cleanup := setupTestAPI(t, c)
+	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 	user := createTestUser(t, r, "auth0|work-problem", "work@test.com", "workuser")
-	// Need gamestate to exist: add two videos so play flow works, then get gamestate once
-	for i := 0; i < 2; i++ {
-		ytID := fmt.Sprintf("v%d", i)
-		v := &Video{
-			Title:     "Test Video",
-			URL:       fmt.Sprintf("https://example.com/%s", ytID),
-			YouTubeId: ytID,
-		}
-		resp := httptest.NewRecorder()
-		body, _ := json.Marshal(v)
-		req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/videos?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
-		r.ServeHTTP(resp, req)
-		if resp.Code != http.StatusCreated {
-			t.Fatalf("create video: expected %d, got %d", http.StatusCreated, resp.Code)
-		}
-	}
+	// Need gamestate to exist: give the user a video pool so the play flow works
+	seedUserVideosViaPlaylist(t, api, user.Id, 2)
 	// Trigger gamestate creation by getting play data (or report SELECTED_PROBLEM after we have a problem)
 	// Simplest: post one event that goes through full path so gamestate exists
 	_ = reportEvent(t, r, user, SELECTED_PROBLEM, "")
@@ -130,20 +106,10 @@ func TestProcessEvents_WatchingVideo_Accepted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
 	}
-	_, r, cleanup := setupTestAPI(t, c)
+	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 	user := createTestUser(t, r, "auth0|watch-video", "watch@test.com", "watchuser")
-	for i := 0; i < 2; i++ {
-		ytID := fmt.Sprintf("v%d", i)
-		v := &Video{Title: "V", URL: fmt.Sprintf("https://ex.co/%s", ytID), YouTubeId: ytID}
-		resp := httptest.NewRecorder()
-		body, _ := json.Marshal(v)
-		req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/videos?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
-		r.ServeHTTP(resp, req)
-		if resp.Code != http.StatusCreated {
-			t.Fatalf("create video: %d", resp.Code)
-		}
-	}
+	seedUserVideosViaPlaylist(t, api, user.Id, 2)
 	_ = reportEvent(t, r, user, SELECTED_PROBLEM, "")
 
 	resp := httptest.NewRecorder()
@@ -161,20 +127,10 @@ func TestProcessEvents_AnsweredProblem_WrongAnswer_DoesNotIncrementSolved(t *tes
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
 	}
-	_, r, cleanup := setupTestAPI(t, c)
+	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 	user := createTestUser(t, r, "auth0|wrong-answer", "wrong@test.com", "wronguser")
-	for i := 0; i < 2; i++ {
-		ytID := fmt.Sprintf("w%d", i)
-		v := &Video{Title: "V", URL: fmt.Sprintf("https://ex.co/%s", ytID), YouTubeId: ytID}
-		resp := httptest.NewRecorder()
-		body, _ := json.Marshal(v)
-		req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/videos?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
-		r.ServeHTTP(resp, req)
-		if resp.Code != http.StatusCreated {
-			t.Fatalf("create video: %d", resp.Code)
-		}
-	}
+	seedUserVideosViaPlaylist(t, api, user.Id, 2)
 	gs := reportEvent(t, r, user, SELECTED_PROBLEM, "")
 	beforeSolved := gs.Solved
 
@@ -190,20 +146,10 @@ func TestProcessEvents_AnsweredProblem_CorrectAnswer_IncrementsSolved(t *testing
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
 	}
-	_, r, cleanup := setupTestAPI(t, c)
+	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 	user := createTestUser(t, r, "auth0|correct-answer", "correct@test.com", "correctuser")
-	for i := 0; i < 2; i++ {
-		ytID := fmt.Sprintf("c%d", i)
-		v := &Video{Title: "V", URL: fmt.Sprintf("https://ex.co/%s", ytID), YouTubeId: ytID}
-		resp := httptest.NewRecorder()
-		body, _ := json.Marshal(v)
-		req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/videos?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
-		r.ServeHTTP(resp, req)
-		if resp.Code != http.StatusCreated {
-			t.Fatalf("create video: %d", resp.Code)
-		}
-	}
+	seedUserVideosViaPlaylist(t, api, user.Id, 2)
 	gs := reportEvent(t, r, user, SELECTED_PROBLEM, "")
 	p := &Problem{}
 	fetchProblem(t, r, user, gs.ProblemId, p)
@@ -223,17 +169,7 @@ func TestProcessEvents_AnsweredProblem_EquivalentAnswer_Accepted(t *testing.T) {
 	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 	user := createTestUser(t, r, "auth0|equiv-answer", "equiv@test.com", "equivuser")
-	for i := 0; i < 2; i++ {
-		ytID := fmt.Sprintf("e%d", i)
-		v := &Video{Title: "V", URL: fmt.Sprintf("https://ex.co/%s", ytID), YouTubeId: ytID}
-		resp := httptest.NewRecorder()
-		body, _ := json.Marshal(v)
-		req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/videos?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
-		r.ServeHTTP(resp, req)
-		if resp.Code != http.StatusCreated {
-			t.Fatalf("create video: %d", resp.Code)
-		}
-	}
+	seedUserVideosViaPlaylist(t, api, user.Id, 2)
 	_ = reportEvent(t, r, user, SELECTED_PROBLEM, "")
 	gs, _, _, err := api.gamestateManager.Get(user.Id)
 	if err != nil || gs == nil {
@@ -307,20 +243,10 @@ func TestProcessEvents_SetTargetWorkPercentage_Accepted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
 	}
-	_, r, cleanup := setupTestAPI(t, c)
+	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 	user := createTestUser(t, r, "auth0|set-pct", "pct@test.com", "pctuser")
-	for i := 0; i < 2; i++ {
-		ytID := fmt.Sprintf("p%d", i)
-		v := &Video{Title: "V", URL: fmt.Sprintf("https://ex.co/%s", ytID), YouTubeId: ytID}
-		resp := httptest.NewRecorder()
-		body, _ := json.Marshal(v)
-		req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/videos?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
-		r.ServeHTTP(resp, req)
-		if resp.Code != http.StatusCreated {
-			t.Fatalf("create video: %d", resp.Code)
-		}
-	}
+	seedUserVideosViaPlaylist(t, api, user.Id, 2)
 	_ = reportEvent(t, r, user, SELECTED_PROBLEM, "")
 
 	resp := httptest.NewRecorder()
@@ -338,20 +264,10 @@ func TestProcessEvents_RecordOnlyEvent_ThroughCreateEvent_UsesFullPath(t *testin
 	if err != nil {
 		t.Fatalf("Couldn't read config: %v", err)
 	}
-	_, r, cleanup := setupTestAPI(t, c)
+	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 	user := createTestUser(t, r, "auth0|record-create", "record@test.com", "recorduser")
-	for i := 0; i < 2; i++ {
-		ytID := fmt.Sprintf("r%d", i)
-		v := &Video{Title: "V", URL: fmt.Sprintf("https://ex.co/%s", ytID), YouTubeId: ytID}
-		resp := httptest.NewRecorder()
-		body, _ := json.Marshal(v)
-		req, _ := http.NewRequest("POST", fmt.Sprintf("/api/v1/videos?test_auth0_id=%s", user.Auth0Id), bytes.NewBuffer(body))
-		r.ServeHTTP(resp, req)
-		if resp.Code != http.StatusCreated {
-			t.Fatalf("create video: %d", resp.Code)
-		}
-	}
+	seedUserVideosViaPlaylist(t, api, user.Id, 2)
 	_ = reportEvent(t, r, user, SELECTED_PROBLEM, "")
 
 	// Post a record-only event through the create event endpoint (writeCtx=true)

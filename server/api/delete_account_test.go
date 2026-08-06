@@ -33,14 +33,14 @@ var seededPerUserTables = []string{
 // nothing and quietly pass.
 func seedUserData(t *testing.T, api *Api, userID uint32) {
 	t.Helper()
-	videoIDs := insertVideosAndUserHasVideo(t, api, userID, 1)
+	videoIDs := insertVideos(t, api, 1)
 	playlistID := insertPlaylistWithVideos(t, api, fmt.Sprintf("pl_del_%d", userID), videoIDs)
+	subscribeUserToPlaylists(t, api, userID, playlistID)
 
 	stmts := []struct {
 		q    string
 		args []interface{}
 	}{
-		{"INSERT INTO user_playlist (user_id, playlist_id) VALUES (?, ?)", []interface{}{userID, playlistID}},
 		{"INSERT INTO review_queue (user_id, problem_id, interval_days) VALUES (?, 1, 1)", []interface{}{userID}},
 		{"INSERT INTO recently_shown_problems (user_id, problem_id, shown_at) VALUES (?, 1, NOW())", []interface{}{userID}},
 		{"INSERT INTO statistics_cache_meta (user_id, last_event_id) VALUES (?, 0)", []interface{}{userID}},

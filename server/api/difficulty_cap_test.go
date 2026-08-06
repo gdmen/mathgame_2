@@ -25,7 +25,7 @@ func TestDifficultyCap_ClampsRunawayValue(t *testing.T) {
 	defer cleanup()
 
 	user := createTestUser(t, r, "auth0id|difftest", "diff@test.com", "difftest")
-	insertVideosAndUserHasVideo(t, api, user.Id, 1)
+	seedUserVideosViaPlaylist(t, api, user.Id, 1)
 
 	// Give the user a moderate envelope and a pathologically high
 	// target_difficulty that could result from the old unbounded adjuster.
@@ -80,7 +80,7 @@ func TestDifficultyCap_FullBitmap(t *testing.T) {
 	defer cleanup()
 
 	user := createTestUser(t, r, "auth0id|difftest2", "diff2@test.com", "difftest2")
-	insertVideosAndUserHasVideo(t, api, user.Id, 1)
+	seedUserVideosViaPlaylist(t, api, user.Id, 1)
 
 	// Set pathological difficulty with every bit enabled.
 	fullBitmap := uint64(mathcore.ALL_PROBLEM_TYPES)
@@ -136,7 +136,7 @@ func TestDifficultyFloor_ClampsUpToEnvelopeFloor(t *testing.T) {
 	defer cleanup()
 
 	user := createTestUser(t, r, "auth0id|floortest", "floor@test.com", "floortest")
-	insertVideosAndUserHasVideo(t, api, user.Id, 1)
+	seedUserVideosViaPlaylist(t, api, user.Id, 1)
 
 	bitmap := uint64(mathcore.DIVISION)
 	_, err = api.DB.Exec(
@@ -184,7 +184,7 @@ func TestSetTargetDifficulty_RejectsBelowEnvelopeFloor(t *testing.T) {
 	defer cleanup()
 
 	user := createTestUser(t, r, "auth0id|floorevt", "floorevt@test.com", "floorevt")
-	insertVideosAndUserHasVideo(t, api, user.Id, 1)
+	seedUserVideosViaPlaylist(t, api, user.Id, 1)
 
 	bitmap := uint64(mathcore.DIVISION)
 	if _, err := api.DB.Exec(
