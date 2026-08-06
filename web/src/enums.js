@@ -1,4 +1,4 @@
-// Frontend copy of the ProblemType bit constants (server/api/enums.go).
+// Frontend copy of the ProblemType bit constants (server/mathcore/problem_type.go).
 //
 // Part of the problem-generation system - documented in
 // docs/problem-generation.md. New bits MUST be added here, in the server

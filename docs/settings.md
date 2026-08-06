@@ -275,7 +275,7 @@ on the card that changed, so a failure is attached to the control that caused it
   `targetDifficultyRange`, `MIN_TARGET_DIFFICULTY`.
 - `web/src/difficulty_band_fixtures.json` — generated Go↔JS parity fixtures
   (`make gen-difficulty-fixtures`, `cmd/gen_difficulty_fixtures`).
-- `web/src/enums.js` — `ProblemTypes` bit constants.
+- `web/src/enums.js` — `ProblemTypes` bit constants, mirroring `server/mathcore/problem_type.go`.
 - `server/mathcore/difficulty.go` — `MaxDiffForBitmap`, `MinDiffForBitmap`, `TargetDifficultyRange`,
   `MinTargetDifficulty`, `MaxChainLen`, `MaxWordChainLen`, `MinConstructibleOperand`,
   `LargeMaxOperand`, `SmallMaxOperand`, `MediumMaxOperand` (the authoritative copies).

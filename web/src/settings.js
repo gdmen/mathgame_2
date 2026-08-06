@@ -93,7 +93,7 @@ const SettingsCard = ({ title, question, wide, saveState, children }) => (
 
 // Problem-type taxonomy: each bit is placed by one question -
 // verb / noun-kind / noun-size / framing. Labels are parent vocabulary;
-// internal constants are feature-named (see server/api/enums.go).
+// internal constants are feature-named (see server/mathcore/problem_type.go).
 // Dependent entries (dependsOn) always render on their own row directly
 // below their parent and are disabled until the parent is on; a parent sits
 // at the bottom of its card so that row falls directly beneath it. Toggle
