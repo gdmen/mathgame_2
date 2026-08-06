@@ -3,7 +3,7 @@ import parse from "html-react-parser";
 
 import "./problem.scss";
 
-import { ProblemTypes } from "./enums.js";
+import { EventTypes, ProblemTypes } from "./enums.js";
 
 const PreprocessExpression = (expression) => {
   // KaTeX reads a bare % as a line comment and eats the rest of the math
@@ -47,8 +47,8 @@ class AnswerTracker {
     this.lastAnswer = answer;
     this.lastProblemId = problem_id;
     this.answerChanged = false;
-    this.eventReporter.remove("working_on_problem");
-    this.eventReporter.postEvent("answered_problem", answer);
+    this.eventReporter.remove(EventTypes.WORKING_ON_PROBLEM);
+    this.eventReporter.postEvent(EventTypes.ANSWERED_PROBLEM, answer);
     return true;
   }
 
@@ -103,8 +103,8 @@ const ProblemView = ({ gamestate, latex, eventReporter, interval }) => {
   // free.
   useEffect(() => {
     if (!eventReporter || submitting) return;
-    eventReporter.add("working_on_problem");
-    return () => eventReporter.remove("working_on_problem");
+    eventReporter.add(EventTypes.WORKING_ON_PROBLEM);
+    return () => eventReporter.remove(EventTypes.WORKING_ON_PROBLEM);
   }, [eventReporter, submitting, problemId]);
 
   if (

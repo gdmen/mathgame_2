@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import "katex/dist/katex.min.css";
 
 import { apiFetch } from "./api.js";
+import { EventTypes } from "./enums.js";
 import { ProblemView, PreprocessExpression } from "./problem.js";
 import { VideoView } from "./video.js";
 import { PinConfirmModal } from "./pin_confirm_modal.js";
@@ -188,7 +189,7 @@ const PlayView = ({
           problem_id: gamestate.problem_id,
           explanation: e.message || "LaTeX rendering failed",
         });
-        postEvent("bad_problem_system", value).then((json) => {
+        postEvent(EventTypes.BAD_PROBLEM_SYSTEM, value).then((json) => {
           if (json && json.gamestate) {
             setGamestate(json.gamestate);
             setProblem(json.problem);
@@ -219,7 +220,11 @@ const PlayView = ({
   useEffect(() => {
     const reporter = new EventReporterSingleton(async (event_type, value) => {
       const json = await postEventRef.current(event_type, value);
-      if (event_type === "answered_problem" && json && json.gamestate) {
+      if (
+        event_type === EventTypes.ANSWERED_PROBLEM &&
+        json &&
+        json.gamestate
+      ) {
         setGamestate(json["gamestate"]);
         setProblem(json["problem"]);
         setVideo(json["video"]);
@@ -243,15 +248,22 @@ const PlayView = ({
     const advance = async () => {
       const post = postEventRef.current;
       if (solved >= target) {
-        if ((await post("watching_video", 5000)) == null || cancelled) return;
-        if ((await post("done_watching_video", quickplayVideoId)) == null) {
+        if ((await post(EventTypes.WATCHING_VIDEO, 5000)) == null || cancelled)
+          return;
+        if (
+          (await post(EventTypes.DONE_WATCHING_VIDEO, quickplayVideoId)) == null
+        ) {
           return;
         }
       } else {
-        if ((await post("working_on_problem", 1000)) == null || cancelled) {
+        if (
+          (await post(EventTypes.WORKING_ON_PROBLEM, 1000)) == null ||
+          cancelled
+        ) {
           return;
         }
-        if ((await post("answered_problem", correctAnswer)) == null) return;
+        if ((await post(EventTypes.ANSWERED_PROBLEM, correctAnswer)) == null)
+          return;
       }
       if (!cancelled) window.location.pathname = "play";
     };
@@ -318,7 +330,7 @@ const PlayView = ({
             reportExplanation.trim().slice(0, REPORT_EXPLANATION_MAX_LENGTH) ||
             "",
         });
-        postEvent("bad_problem_user", value)
+        postEvent(EventTypes.BAD_PROBLEM_USER, value)
           .then((json) => {
             if (json && json.gamestate) {
               setGamestate(json.gamestate);

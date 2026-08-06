@@ -9,6 +9,8 @@ import ReactPlayer from "react-player";
 
 import "./video.scss";
 
+import { EventTypes } from "./enums.js";
+
 const VideoView = ({ video, eventReporter, interval }) => {
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -62,22 +64,24 @@ const VideoView = ({ video, eventReporter, interval }) => {
           onProgress={(e) => {
             var playedMillis = 1000 * e.playedSeconds;
             eventReporter.postEvent(
-              "watching_video",
+              EventTypes.WATCHING_VIDEO,
               playedMillis - elapsedRef.current
             );
             setElapsed(playedMillis);
           }}
           onEnded={() => {
             eventReporter
-              .postEvent("done_watching_video", video.id)
+              .postEvent(EventTypes.DONE_WATCHING_VIDEO, video.id)
               .then(() => {
                 window.location.pathname = "play";
               });
           }}
           onError={(e) => {
-            eventReporter.postEvent("error_playing_video", e).then(() => {
-              window.location.pathname = "play";
-            });
+            eventReporter
+              .postEvent(EventTypes.ERROR_PLAYING_VIDEO, e)
+              .then(() => {
+                window.location.pathname = "play";
+              });
           }}
         />
         <div id="click-blocker" onClick={playPause}></div>

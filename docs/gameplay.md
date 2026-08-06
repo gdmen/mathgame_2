@@ -62,9 +62,12 @@ One route renders it: `/play` → `PlayView` (`web/src/play.js`), mounted by `Ma
 ## Event types reported from the client
 
 Every event is POSTed to `/events` as `{ event_type, value }` with `value` stringified
-(`genPostEventFcn`, `web/src/index.js`). Event-type strings are bare literals on the client and
-must match the server constants in `server/api/event_types.go` exactly. The table is the subset this area
-emits.
+(`genPostEventFcn`, `web/src/index.js`). Event-type strings come from `EventTypes` in
+`web/src/enums.js`, the client's mirror of the server constants in `server/api/event_types.go`.
+`TestEventTypesMatchJS` pins the two sets to each other, and rejects both a known event type spelled
+as a literal anywhere else under `web/src` and any literal handed to an event-posting call site — the
+second catch is what makes a *misspelled* type fail CI, since it matches no constant to be recognized
+by. The table is the subset this area emits.
 
 | Event | Value | Emitted by | When |
 |---|---|---|---|
@@ -162,8 +165,9 @@ once `solved >= target`. Notable behavior:
 ## Invariants
 
 - **The loop branch is `solved >= target`** (`PlayView`).
-- **Event-type strings must match `server/api/event_types.go`.** They are bare literals on the client; a
-  typo silently drops the event (#279).
+- **Event types are referenced through `EventTypes`, never as literals.** `TestEventTypesMatchJS`
+  enforces it; a literal that slipped past would be free to drift from `server/api/event_types.go`,
+  and the server then just doesn't recognize what it receives.
 - **The singletons must stay singletons.** `EventReporterSingleton` and `AnswerTracker` each guard
   `_instance`; dropping the guard stacks duplicate intervals/handlers on every re-render.
 - **The answer is never rendered on `/play`.** `problem.answer` reaches the client (the
@@ -198,7 +202,9 @@ once `solved >= target`. Notable behavior:
   pathname-keyed rule in `index.js` owns that (see [accounts.md](accounts.md)).
 - `web/src/pin_confirm_modal.js` — the shared PIN-confirmation modal the report flow renders;
   shape and styles are the design system's (`/style-guide`, `components.scss`).
+- `web/src/enums.js` — `EventTypes`, the client's mirror of the server's event-type constants.
 - `server/api/event_types.go` — authoritative event-type constants.
+- `server/api/event_types_js_sync_test.go` — `TestEventTypesMatchJS`, the Go↔JS pin.
 - `server/api/meta_models.go` — `PlayData`, the `/play` response shape.
 - `server/api/custom_handlers.go` — `customGetPlayData` (the `/play` handler, video-count gate,
   problem reselection).
@@ -207,8 +213,8 @@ once `solved >= target`. Notable behavior:
 ## Extension checklist — adding a client event
 
 1. Add the constant to `server/api/event_types.go` (and its server handler / record-only entry).
-2. Emit it from the relevant view via `eventReporter.postEvent` / `postEvent` with a stringified
-   `value`.
+2. Mirror it into `EventTypes` in `web/src/enums.js`, then emit it from the relevant view via
+   `eventReporter.postEvent` / `postEvent` with a stringified `value`.
 3. If it should advance the loop, have the server return a fresh `{ gamestate, problem, video }`
    and swap it in like `answered_problem` (`PlayView`).
 4. If it should accrue over time, add it to the `EventReporterSingleton` Set (sticky) and `remove`

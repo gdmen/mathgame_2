@@ -22,4 +22,26 @@ const ProblemTypes = {
   PERCENTAGES: Math.pow(2, 15),
 };
 
-export { ProblemTypes };
+// Frontend copy of the event-type constants (server/api/event_types.go).
+//
+// The client's only event-type vocabulary: bare literals elsewhere in web/src
+// are rejected by TestEventTypesMatchJS, which also pins this set to the
+// server's. Emitting a client event is documented in docs/gameplay.md.
+const EventTypes = {
+  LOGGED_IN: "logged_in",
+  SELECTED_PROBLEM: "selected_problem",
+  WORKING_ON_PROBLEM: "working_on_problem",
+  ANSWERED_PROBLEM: "answered_problem",
+  SOLVED_PROBLEM: "solved_problem",
+  ERROR_PLAYING_VIDEO: "error_playing_video",
+  WATCHING_VIDEO: "watching_video",
+  DONE_WATCHING_VIDEO: "done_watching_video",
+  SET_TARGET_DIFFICULTY: "set_target_difficulty",
+  SET_TARGET_WORK_PERCENTAGE: "set_target_work_percentage",
+  SET_PROBLEM_TYPE_BITMAP: "set_problem_type_bitmap",
+  SET_GAMESTATE_TARGET: "set_gamestate_target",
+  BAD_PROBLEM_SYSTEM: "bad_problem_system",
+  BAD_PROBLEM_USER: "bad_problem_user",
+};
+
+export { ProblemTypes, EventTypes };
