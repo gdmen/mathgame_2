@@ -35,7 +35,7 @@ selection  doc=docs/selection.md  type=anchored
 adaptive-difficulty  doc=docs/adaptive-difficulty.md  type=anchored
   globs: server/api/process_events.go, server/api/spaced_repetition.go
 events  doc=docs/events.md  type=anchored
-  globs: server/api/event_types.go, server/api/event_compress.go, server/api/statistics_handlers.go
+  globs: server/api/event_types.go, server/api/event_compress.go, server/api/statistics_handlers.go, server/api/event_types_js_sync_test.go
 videos  doc=docs/videos.md  type=anchored
   globs: server/api/youtube.go
 gameplay  doc=docs/gameplay.md  type=prose
