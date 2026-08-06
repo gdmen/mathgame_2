@@ -150,7 +150,9 @@ landing-assets:
 	cp ./web/node_modules/katex/dist/fonts/KaTeX_Main-Regular.woff2 ./web/public/fonts/
 
 build-web: frontend-conf
-	cd web && npm install --force; cd -
+# --include=dev because npm reads NODE_ENV=production as --omit=dev, and the
+# bundler and compiler this target runs are devDependencies.
+	cd web && npm install --force --include=dev; cd -
 	$(MAKE) landing-assets
 	cd web && BUILD_PATH=build.next npm run build; cd -
 	$(MAKE) fmt-web
