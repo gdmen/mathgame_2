@@ -1,0 +1,10 @@
+# Merged into the scanned spec by `make build-docs`. Nested YAML cannot live in
+# the swagger:meta doc comment; see docs/swagger.md.
+securityDefinitions:
+  bearer:
+    type: apiKey
+    name: Authorization
+    in: header
+    description: Auth0-issued JWT, sent as `Bearer <token>`.
+security:
+  - bearer: []

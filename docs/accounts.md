@@ -25,6 +25,12 @@ The Auth0 `sub` is the `auth0_id`; every server handler resolves it to a `users`
 one `users` row = one family/operator; there is no per-kid login (a kid is kept out of adult
 surfaces by the PIN gate, not by identity).
 
+On the `authed` group that middleware runs **strict**: a validated token with no `users` row behind
+it aborts with **404** before any handler runs. So the `user == nil` guards inside the handlers are
+unreachable, and the 401 they look like they return is not a status those routes can produce — the
+401 comes from JWT validation, earlier. Anything describing the API's status codes needs both
+facts; see [swagger.md](swagger.md).
+
 ## Self-only access (`server/api/self_access.go`)
 
 Naming a user in a request path entitles you to nothing. `RequireSelf` is a gin middleware that

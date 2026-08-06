@@ -4,7 +4,9 @@ import "garydmenezes.com/mathgame/server/api"
 
 /*
 swagger:route GET /problems/{id} problems getProblem
-Get a problem.
+Get one problem by id.
+A problem row belongs to no user, so this route needs a valid token but no
+users row behind it.
 responses:
   200: getProblemResp
   400: error
@@ -12,14 +14,15 @@ responses:
   500: error
 */
 
-//swagger:parameters getProblem
+// swagger:parameters getProblem
 type getProblemParameters struct {
-	//in:path
-	Id uint64 `json:"id"`
+	// in:path
+	// required: true
+	Id uint32 `json:"id"`
 }
 
-//swagger:response getProblemResp
+// swagger:response getProblemResp
 type getProblemResponse struct {
-	//in:body
+	// in:body
 	Body api.Problem
 }

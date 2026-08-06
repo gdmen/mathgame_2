@@ -19,6 +19,7 @@ registry's currency against the code with `/audit-project-areas`.
 | Accounts, access & onboarding | [docs/accounts.md](docs/accounts.md) | ✅ |
 | Design system | [web/src/style_guide.js](web/src/style_guide.js) | ✅ (the `/style-guide` page is the living reference) |
 | Data model & schema | [docs/schema.md](docs/schema.md) | ✅ |
+| Swagger API spec | [docs/swagger.md](docs/swagger.md) | ✅ |
 | Deploy & ops runbook | [docs/ops-runbook.md](docs/ops-runbook.md) | ✅ |
 
 The block below is the machine-readable registry (parsed by `scripts/docs_check.py`); the
@@ -48,6 +49,8 @@ design-system  doc=web/src/style_guide.js  type=prose
   globs: web/src/styles.scss, web/src/components.scss
 schema  doc=docs/schema.md  type=anchored
   globs: server/api/models.json, server/api/migrations/**
+swagger  doc=docs/swagger.md  type=prose
+  globs: server/docs/**
 ops-runbook  doc=docs/ops-runbook.md  type=prose
   globs: deploy/**, Makefile, cmd/**
 ```
