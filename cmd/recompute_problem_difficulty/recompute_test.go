@@ -15,7 +15,8 @@ func setupRecomputeTestDB(t *testing.T) (*sql.DB, func()) {
 	if err != nil {
 		t.Fatalf("read config: %v", err)
 	}
-	return apitest.SetupTestDB(t, c, "recompute")
+	db, _, cleanup := apitest.SetupTestDB(t, c, "recompute")
+	return db, cleanup
 }
 
 func seedProblem(t *testing.T, db *sql.DB, id uint32, expr string, difficulty float64, ver string) {

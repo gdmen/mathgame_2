@@ -23,7 +23,7 @@ func TestMigrationsAreRerunSafe(t *testing.T) {
 		t.Fatalf("config: %v", err)
 	}
 	// An empty database, so the first pass exercises the fresh-bootstrap path.
-	db, cleanup := testdb.Create(t, c, "rerun")
+	db, _, cleanup := testdb.Create(t, c, "rerun")
 	defer cleanup()
 
 	if err := RunMigrations(db); err != nil {

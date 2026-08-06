@@ -25,8 +25,8 @@ var testVideoIDCounter uint64
 // Tests can run in parallel; each gets its own DB.
 func setupTestAPI(t *testing.T, c *common.Config) (*Api, *gin.Engine, func()) {
 	t.Helper()
-	db, cleanup := testdb.Create(t, c, "api")
-	api, err := NewApi(db, c)
+	db, dbConf, cleanup := testdb.Create(t, c, "api")
+	api, err := NewApi(db, dbConf)
 	if err != nil {
 		cleanup()
 		t.Fatalf("NewApi: %v", err)
