@@ -104,7 +104,9 @@ Three build subtleties worth knowing:
   directory listing for the whole install + webpack window while the old
   server kept serving it (#243). So it builds into `web/build.next` and swaps
   with two sub-millisecond renames; `serve` re-reads per request, so no restart
-  is needed and a failed build (`set -e`) leaves `web/build` untouched
+  is needed. Any failed step aborts the target before the swap runs, so
+  `web/build` keeps serving the last good bundle; the staging dir is cleared
+  before each build, so no earlier run's output can survive into the swap
   (Makefile `build-web`).
 - **`prod-web` fails loudly without TLS paths.** If `tls_cert_file` /
   `tls_key_file` are absent from `$(CONF)`, `serve` would silently fall back to

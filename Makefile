@@ -133,13 +133,6 @@ clean:
 frontend-conf:
 	python3 web/gen_frontend_conf.py $(CONF) web/src/conf.json
 
-# Build into web/build.next, then swap it into place, so the live web/build
-# (served by prod-web) is never emptied mid-build. react-scripts starts every
-# build by wiping its output dir; building in place left web/build a directory
-# listing for the whole install+webpack window while the old server kept
-# serving it. The swap is two renames (sub-ms); serve re-reads per
-# request, so no restart is needed and the live dir holds valid content right
-# up to the swap. A failed build aborts (set -e) with web/build untouched.
 # Assets the STATIC landing page needs. The landing is plain HTML with
 # no React, so it cannot use the app's JS @fontsource imports or its compiled
 # bundle: it gets its own stylesheet and its own copies of the woff2 files.
@@ -158,12 +151,23 @@ landing-assets:
 	cp ./web/node_modules/@fontsource/caveat/files/caveat-latin-700-normal.woff2 ./web/public/fonts/
 	cp ./web/node_modules/katex/dist/fonts/KaTeX_Main-Regular.woff2 ./web/public/fonts/
 
+# Build into web/build.next, then swap it into place, so the live web/build
+# (served by prod-web) is never emptied mid-build. react-scripts starts every
+# build by wiping its output dir; building in place left web/build a directory
+# listing for the whole install+webpack window while the old server kept
+# serving it. The swap is two renames (sub-ms); serve re-reads per
+# request, so no restart is needed and the live dir holds valid content right
+# up to the swap. Any failed step aborts the target before the swap runs, so
+# web/build keeps serving the last good bundle.
 build-web: frontend-conf
 # --include=dev because npm reads NODE_ENV=production as --omit=dev, and the
 # bundler and compiler this target runs are devDependencies.
 	cd web && npm ci --include=dev
 	$(MAKE) landing-assets
-	cd web && BUILD_PATH=build.next npm run build; cd -
+# Clear the staging dir so the swap below can only ever promote this run's
+# output, whatever a future BUILD_PATH change does to where the build lands.
+	$(RM) ./web/build.next
+	cd web && BUILD_PATH=build.next npm run build
 	$(MAKE) fmt-web
 # The static landing must be the document served at "/", so it becomes
 # index.html and the React shell moves to app.html. web/public/serve.json
