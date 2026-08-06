@@ -60,10 +60,13 @@ fmt-web:
 fmt-web-file:
 	cd web && npx prettier --write $(FILE)
 
-test: build-api test-api
+test: build-api test-api test-cmds
 
 test-api: server/api
 	$(GOTEST) ./$^
+
+test-cmds:
+	$(GOTEST) ./cmd/...
 
 # Node deps for the test suite, from the lockfile alone. npm ci (not the
 # npm install build-web uses) because this feeds a merge gate: it fails loudly

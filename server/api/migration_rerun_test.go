@@ -1,16 +1,14 @@
 package api // import "garydmenezes.com/mathgame/server/api"
 
 import (
-	"database/sql"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
 
-	_ "github.com/go-sql-driver/mysql"
-
 	"garydmenezes.com/mathgame/server/common"
+	"garydmenezes.com/mathgame/server/common/testdb"
 )
 
 // TestMigrationsAreRerunSafe enforces invariant 1 in docs/schema.md: a
@@ -24,33 +22,9 @@ func TestMigrationsAreRerunSafe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("config: %v", err)
 	}
-	cfg := *c
-	// The _rerun suffix keeps it inside cmd/clean_test_dbs's sweep pattern.
-	cfg.MySQLDatabase = c.MySQLDatabase + "_rerun"
-	connNoDB := fmt.Sprintf("%s:%s@tcp(%s:%s)/?charset=utf8mb4&parseTime=true", cfg.MySQLUser, cfg.MySQLPass, cfg.MySQLHost, cfg.MySQLPort)
-	admin, err := sql.Open("mysql", connNoDB)
-	if err != nil {
-		t.Fatalf("connect (admin): %v", err)
-	}
-	if _, err := admin.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", cfg.MySQLDatabase)); err != nil {
-		admin.Close()
-		t.Fatalf("drop database: %v", err)
-	}
-	if _, err := admin.Exec(fmt.Sprintf("CREATE DATABASE `%s`", cfg.MySQLDatabase)); err != nil {
-		admin.Close()
-		t.Fatalf("create database: %v", err)
-	}
-	defer func() {
-		_, _ = admin.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", cfg.MySQLDatabase))
-		admin.Close()
-	}()
-
-	connectStr := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=true", cfg.MySQLUser, cfg.MySQLPass, cfg.MySQLHost, cfg.MySQLPort, cfg.MySQLDatabase)
-	db, err := sql.Open("mysql", connectStr)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	defer db.Close()
+	// An empty database, so the first pass exercises the fresh-bootstrap path.
+	db, cleanup := testdb.Create(t, c, "rerun")
+	defer cleanup()
 
 	if err := RunMigrations(db); err != nil {
 		t.Fatalf("first pass: %v", err)

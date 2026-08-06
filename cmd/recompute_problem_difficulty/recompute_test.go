@@ -2,63 +2,20 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
-	"sync/atomic"
 	"testing"
 
-	_ "github.com/go-sql-driver/mysql"
-
-	"garydmenezes.com/mathgame/server/api"
+	"garydmenezes.com/mathgame/server/api/apitest"
 	"garydmenezes.com/mathgame/server/common"
 	"garydmenezes.com/mathgame/server/mathcore"
 )
 
-var testDBCounter uint64
-
-// setupRecomputeTestDB creates a unique test database, runs migrations, and
-// returns the db handle plus a cleanup function. Mirrors api.setupTestAPI's
-// shape but stays in this package to avoid widening api's test surface.
 func setupRecomputeTestDB(t *testing.T) (*sql.DB, func()) {
 	t.Helper()
 	c, err := common.ReadConfig("../../test_conf.json")
 	if err != nil {
 		t.Fatalf("read config: %v", err)
 	}
-	dbName := c.MySQLDatabase + "_recompute_" + fmt.Sprintf("%d", atomic.AddUint64(&testDBCounter, 1))
-
-	connNoDB := fmt.Sprintf("%s:%s@tcp(%s:%s)/?charset=utf8mb4&parseTime=true", c.MySQLUser, c.MySQLPass, c.MySQLHost, c.MySQLPort)
-	dbAdmin, err := sql.Open("mysql", connNoDB)
-	if err != nil {
-		t.Fatalf("connect (admin): %v", err)
-	}
-	_, _ = dbAdmin.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", dbName))
-	_, err = dbAdmin.Exec(fmt.Sprintf("CREATE DATABASE `%s`", dbName))
-	dbAdmin.Close()
-	if err != nil {
-		t.Fatalf("create database: %v", err)
-	}
-
-	connectStr := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=true", c.MySQLUser, c.MySQLPass, c.MySQLHost, c.MySQLPort, dbName)
-	db, err := sql.Open("mysql", connectStr)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	// NewApi runs the codegen createXTableSQL for each model; needed before
-	// migrations 15+ can ALTER those tables.
-	if _, err := api.NewApi(db, c); err != nil {
-		db.Close()
-		t.Fatalf("NewApi: %v", err)
-	}
-	if err := api.RunMigrations(db); err != nil {
-		db.Close()
-		t.Fatalf("run migrations: %v", err)
-	}
-	return db, func() {
-		db.Close()
-		dropDB, _ := sql.Open("mysql", connNoDB)
-		_, _ = dropDB.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", dbName))
-		dropDB.Close()
-	}
+	return apitest.SetupTestDB(t, c, "recompute")
 }
 
 func seedProblem(t *testing.T, db *sql.DB, id uint32, expr string, difficulty float64, ver string) {

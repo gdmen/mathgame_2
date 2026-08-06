@@ -1,4 +1,4 @@
-// clean_test_dbs drops MySQL databases that match the per-test pattern (mathgame_test_1, mathgame_test_2, ...).
+// clean_test_dbs drops MySQL databases that match the per-test pattern (mathgame_test_api_1, mathgame_test_cleanup_1, ...).
 // Run from repo root so test_conf.json is found. Intended for "make clean".
 package main
 
