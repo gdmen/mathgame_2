@@ -11,8 +11,8 @@
     <link rel="canonical" href="https://mikeymath.org/privacy" />
     <!--
       Static like the landing (see landing.html for the serving story): served
-      at /privacy because `serve` resolves real files before applying the SPA
-      rewrite, and the dev server mirrors that in setupProxy.js. Styles compile
+      at /privacy because nginx resolves extensionless pages to their .html,
+      and the dev server mirrors that in setupProxy.js. Styles compile
       from the app's own tokens via /landing.css.
     -->
     <link rel="stylesheet" href="/landing.css" />

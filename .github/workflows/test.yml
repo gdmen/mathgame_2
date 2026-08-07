@@ -64,3 +64,17 @@ jobs:
     # dev-tree risk is recorded in docs/ops-runbook.md.
     - name: Vulnerability scan
       run: cd web && npm audit --omit=dev --audit-level=moderate
+
+  nginx_contract:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+
+    # ubuntu-latest preinstalls nginx; the guard is for runner-image drift.
+    - name: Install nginx
+      run: command -v nginx || (sudo apt-get update && sudo apt-get install -y nginx)
+
+    # Identical to running `make test-nginx` locally: the target runs the real
+    # deploy/nginx/mikeymath.conf against a fixture build dir.
+    - name: Test
+      run: make test-nginx

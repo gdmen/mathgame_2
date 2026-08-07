@@ -23,11 +23,6 @@ type Config struct {
 	YouTubeAPIKey          string `json:"youtube_api_key"`
 	EventReportingInterval int    `json:"event_reporting_interval"`
 	DebugQuickplay         bool   `json:"debug_quickplay"`
-	// TLS cert/key paths for processes that serve HTTPS directly
-	// (maintenance_server, the prod-web serve invocation). Optional:
-	// empty on dev hosts, where nothing serves TLS.
-	TLSCertFile string `json:"tls_cert_file"`
-	TLSKeyFile  string `json:"tls_key_file"`
 	// Auth0 Management API (machine-to-machine) credentials. Optional: when
 	// unset, account deletion still scrubs our DB but skips removing the
 	// Auth0 identity.
@@ -45,8 +40,6 @@ type Config struct {
 // optionalConfigFields may legitimately be empty (set only on hosts that
 // need them); Validate skips these.
 var optionalConfigFields = map[string]bool{
-	"tls_cert_file":                 true,
-	"tls_key_file":                  true,
 	"auth0_management_clientId":     true,
 	"auth0_management_clientSecret": true,
 	"auth0_management_domain":       true,

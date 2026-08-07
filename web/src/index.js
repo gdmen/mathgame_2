@@ -174,8 +174,8 @@ const MainView = ({
             real document with a full page load.
 
             Production serves the shell only for the routes enumerated in
-            web/public/serve.json — a new top-level route added here must be
-            added there too, or its deployed URL is a 404.
+            deploy/nginx/mikeymath.conf — a new top-level route added here
+            must be added there too, or its deployed URL is a 404.
           */}
           <Route exact path="/">
             <ToLanding />
