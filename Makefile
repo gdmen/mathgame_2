@@ -44,7 +44,6 @@ build-cmds: build-api
 	$(GOBUILD) -o ./bin/recompute_problem_type_bitmap ./cmd/recompute_problem_type_bitmap/
 	$(GOBUILD) -o ./bin/trim_recently_shown_problems ./cmd/trim_recently_shown_problems/
 	$(GOBUILD) -o ./bin/cleanup_unused_problems ./cmd/cleanup_unused_problems/
-	$(GOBUILD) -o ./bin/maintenance_server ./cmd/maintenance_server/
 
 # Canonical formatters — the single source of truth for the gofmt -s / prettier
 # invocations, called by build-api / build-web and by the format-on-edit hook
@@ -152,11 +151,11 @@ landing-assets:
 	cp ./web/node_modules/katex/dist/fonts/KaTeX_Main-Regular.woff2 ./web/public/fonts/
 
 # Build into web/build.next, then swap it into place, so the live web/build
-# (served by prod-web) is never emptied mid-build. react-scripts starts every
+# (served by nginx) is never emptied mid-build. react-scripts starts every
 # build by wiping its output dir; building in place left web/build a directory
 # listing for the whole install+webpack window while the old server kept
-# serving it. The swap is two renames (sub-ms); serve re-reads per
-# request, so no restart is needed and the live dir holds valid content right
+# serving it. The swap is two renames (sub-ms); nginx reads files per
+# request, so no reload is needed and the live dir holds valid content right
 # up to the swap. Any failed step aborts the target before the swap runs, so
 # web/build keeps serving the last good bundle.
 build-web: frontend-conf
@@ -170,9 +169,8 @@ build-web: frontend-conf
 	cd web && BUILD_PATH=build.next npm run build
 	$(MAKE) fmt-web
 # The static landing must be the document served at "/", so it becomes
-# index.html and the React shell moves to app.html. web/public/serve.json
-# rewrites every deeper path to app.html, which is why prod-web must not pass
-# serve's -s flag.
+# index.html and the React shell moves to app.html; deploy/nginx/mikeymath.conf
+# rewrites the enumerated app routes to app.html.
 	mv ./web/build.next/index.html ./web/build.next/app.html
 	mv ./web/build.next/landing.html ./web/build.next/index.html
 	$(RM) ./web/build.prev
@@ -193,23 +191,14 @@ test-bundle-secrets:
 	$(MAKE) build-web CONF=canary_conf.json
 	$(MAKE) check-bundle-secrets CONF=canary_conf.json
 
-# Full local parity with CI: Go tests, web tests, and the bundle secret scan.
-test-all: test test-web test-bundle-secrets
+# The front-door contract: runs deploy/nginx/mikeymath.conf itself against a
+# fixture build dir. Needs an nginx binary (macOS: brew install nginx).
+test-nginx:
+	scripts/nginx_contract_test.sh
 
-# Fails loudly if the TLS paths are missing from $(CONF): with empty --ssl
-# args, serve silently falls back to plain HTTP on 443 and every HTTPS
-# client sees the site as down.
-prod-web:
-	set -e; \
-	CERT=$$(python3 -c "import json; print(json.load(open('$(CONF)')).get('tls_cert_file',''))"); \
-	KEY=$$(python3 -c "import json; print(json.load(open('$(CONF)')).get('tls_key_file',''))"); \
-	if [ -z "$$CERT" ] || [ -z "$$KEY" ]; then echo "tls_cert_file/tls_key_file not set in $(CONF)" >&2; exit 1; fi; \
-	cd web && serve build -l 443 --ssl-cert "$$CERT" --ssl-key "$$KEY"
+# Full local parity with CI: Go tests, web tests, the bundle secret scan, and
+# the nginx front-door contract.
+test-all: test test-web test-bundle-secrets test-nginx
 
 prod-api:
 	GIN_MODE=release $(GOBIN)/apiserver
-
-# Static "down for maintenance" page on the web port; deploy/update.sh swaps
-# this in for mathgame-web around the disruptive part of a deploy.
-prod-maintenance:
-	$(GOBIN)/maintenance_server -config $(CONF) -logtostderr

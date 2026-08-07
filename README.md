@@ -52,7 +52,7 @@ schema  doc=docs/schema.md  type=anchored
 swagger  doc=docs/swagger.md  type=prose
   globs: server/docs/**
 ops-runbook  doc=docs/ops-runbook.md  type=prose
-  globs: deploy/**, Makefile, cmd/**
+  globs: deploy/**, Makefile, cmd/**, scripts/nginx_contract_test.sh
 ```
 <!-- END PROJECT-AREA REGISTRY -->
 

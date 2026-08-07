@@ -22,20 +22,75 @@ no container, no orchestrator, no blue/green — a deploy rebuilds in place and
 restarts the services. The Go compiler comes from `go.mod`, not from the host
 (see First-time provisioning below).
 
-Two long-running servers plus a stand-in:
+nginx owns the public ports and serves the web bundle itself; one long-running
+unit sits behind it:
 
 | Service | `ExecStart` | Role |
 |---|---|---|
-| `mathgame-api` | `make prod-api` (`apiserver`, `GIN_MODE=release`) | the API; runs migrations on startup |
-| `mathgame-web` | `make prod-web` (`serve -s build` on :443, TLS) | the static React bundle |
-| `mathgame-maintenance` | `make prod-maintenance` (`maintenance_server`) | "be right back" page during the disruptive deploy window |
+| `mathgame-api` | `make prod-api` (`apiserver`, `GIN_MODE=release`) | the API; runs migrations on startup. Terminates its own TLS on the API port, from hardcoded Let's Encrypt paths (`cmd/apiserver/main.go`) — it does **not** go through nginx |
 
-`mathgame-maintenance` **conflicts with** `mathgame-web`: both bind :443, and
-the unit declares `Conflicts=mathgame-web.service` + `After=mathgame-web.service`
-so systemd runs the stop before the start in both swap directions and neither
-server fights for the port (`deploy/mathgame-maintenance.service`). All three
-restart on failure (`Restart=always`, `RestartSec=1s`, burst-limited to 5 in
-500s).
+It restarts on failure (`Restart=always`, `RestartSec=1s`, burst-limited to 5
+in 500s). nginx is a stock distro unit — not one of ours, not in `SERVICES`.
+
+### The front door (`deploy/nginx/mikeymath.conf`)
+
+nginx terminates TLS on :443, canonicalizes the host, and serves the static
+bundle. It is synced to `/etc/nginx/conf.d/` by `update.sh` like the systemd
+units, and the canonicalization is what makes `www.mikeymath.org` work: the
+SPA sends `window.location.origin` as its Auth0 `redirect_uri`, so a session
+that starts on a non-canonical host sends an origin Auth0 rejects and login
+dead-ends before the page renders.
+
+| Listener | Behavior |
+|---|---|
+| `:80`, both hostnames | 301 to `https://mikeymath.org$request_uri` (ACME challenge path excepted) |
+| `:443`, `www.mikeymath.org` | 301 to `https://mikeymath.org$request_uri` |
+| `:443`, `mikeymath.org` | `root /var/www/mathgame/build` |
+
+The docroot is a **published copy**, not the repo's `web/build`: `update.sh`
+copies the bundle there with the same staged two-rename swap `build-web` uses.
+Serving from the repo would need world-traversal on `/home/ubuntu`, which
+would let `www-data` — the most exposed account on the box — read the secrets
+in `conf.json`; and a missing permission bit would surface as every request
+404ing while `nginx -t` and the deploy both report success.
+
+The serving contract on the apex, top to bottom:
+
+- **Maintenance flag.** While `/var/www/mathgame/maintenance.on` exists, every
+  request answers 503 with the branded page, `Retry-After: 120` and
+  `Cache-Control: no-store`. `update.sh` creates the flag for the disruptive
+  window and removes it at the end; a failed deploy (or failed post-deploy
+  smoke check) leaves it up, and touching it by hand is the manual "take the
+  site down" switch. Two config subtleties the contract test pins: the error
+  page lives in a **named location** (`error_page 503 @maintenance`), because
+  a URI-form `error_page` re-runs the server-level `if`s on its internal
+  redirect and the flag would 503 the maintenance page itself into nginx's
+  default error page; and `add_header ... always` (a bare `add_header` skips
+  non-2xx/3xx statuses).
+- **The React shell answers an enumerated route list** (`/login`, `/play`,
+  `/settings`, `/progress`, `/admin`, `/pin/*`, `/admin/*` → `app.html`),
+  matched non-strict and case-insensitive (`~*`, optional trailing slash) for
+  parity with the old serve.json and with React Router. A new top-level route
+  in `web/src/index.js` must be added to the config and the contract test or
+  its deployed URL 404s on any hard load — `server/api/web_routes_sync_test.go`
+  parses both files and fails the merge on a missed route. A catch-all is
+  deliberately absent — see the build subtleties below for why the landing/app
+  split forces this shape.
+- **Caching:** everything unhashed answers `Cache-Control: no-cache`
+  (revalidate every load — a heuristically cached shell would request hashed
+  bundles the deploy swap already deleted), while the content-hashed
+  `/static/` tree is `immutable` for a year.
+- **Everything else is files**: `try_files $uri $uri/ $uri.html =404` gives
+  the landing at `/` (via `index`), extensionless statics by their `.html`
+  (`/privacy`), and a real 404 with the branded `404.html` for unknown paths
+  (403 folded in, so bare directory URLs answer the same).
+- **gzip is nginx's** (`gzip on` + types; the list carries both
+  `application/javascript` and `text/javascript` because nginx's bundled
+  `mime.types` switched the `.js` mapping in 1.21.5 and prod runs 1.18).
+
+Every behavior above is exercised by `make test-nginx`
+(`scripts/nginx_contract_test.sh`), which runs this very file — not a copy —
+against a fixture build dir; see the build table below.
 
 Five scheduled `oneshot` jobs, each a `bin/*` tool fired by a `.timer`:
 
@@ -62,56 +117,44 @@ boot). The three jobs that must not overlap a manual run hold a `flock`
 | `build-cmds` | depends on `build-api`; builds every `cmd/*` tool into `bin/` (see list below) |
 | `build-web` | `frontend-conf`, `npm ci --include=dev`, `landing-assets`, then build into `web/build.next`, prettier, the landing/app HTML swap (below), then swap `build.next` → `build`. `--include=dev` because npm reads `NODE_ENV=production` as `--omit=dev`, which would skip `react-scripts` and `sass` and break the build. `npm ci` (not `npm install`) so the deployed bundle is built from exactly the lockfile the CI `npm audit` gate certifies, and so the install fails loudly instead of re-resolving. It reinstalls the whole dependency tree every run (a few seconds), so a deploy needs the network |
 | `landing-assets` | compiles `web/src/landing.scss` → `web/public/landing.css` and copies the landing's woff2 files into `web/public/fonts/`; both outputs are generated and gitignored |
-| `test` / `test-api` / `test-cmds` | `test` = `build-api` then both Go suites; `test-api` (`./server/api`) and `test-cmds` (`./cmd/...`) run one each without rebuilding, which is how the CI Go job invokes them after its own `build-api` step. Every suite but `cmd/maintenance_server` needs the MySQL from `test_conf.json` |
+| `test` / `test-api` / `test-cmds` | `test` = `build-api` then both Go suites; `test-api` (`./server/api`) and `test-cmds` (`./cmd/...`) run one each without rebuilding, which is how the CI Go job invokes them after its own `build-api` step. Every suite needs the MySQL from `test_conf.json` |
 | `web-deps` | `npm ci` in `web/` — lockfile-exact, and fails if `package.json` and the lockfile have drifted |
 | `test-web` | `web-deps`, then the `web/src` jest suite in one pass (`CI=true`). This is exactly what the CI web job runs |
 | `test-bundle-secrets` | rebuilds the web bundle against a canary config and fails if a secret leaks into `web/build` (the CI scan) |
-| `test-all` | `test` + `test-web` + `test-bundle-secrets` — full local CI parity |
+| `test-nginx` | the front-door contract (`scripts/nginx_contract_test.sh`): stages `deploy/nginx/mikeymath.conf` itself — substituting only ports, cert paths and content roots, with a loud failure both for a renamed pattern and for an unsubstituted prod path — and curl-asserts the full serving contract from The front door above against a fixture build dir. Needs an nginx binary (`brew install nginx`; CI installs it from apt) |
+| `test-all` | `test` + `test-web` + `test-bundle-secrets` + `test-nginx` — full local CI parity |
 | `fmt` / `fmt-file` / `fmt-web` / `fmt-web-file` | canonical formatters — `gofmt -s` on the tree or a single Go file (`FILE=`), and `prettier --write` on `web/src` or a single web file (`FILE=`); single source of truth, invoked by `build-api` / `build-web` and the format-on-edit hook in `.claude/hooks/fmt-on-edit.sh` |
 | `docs-check` | `scripts/docs_check.py`; pass `BASE=origin/master` to enforce per-area doc updates |
 | `build-docs` / `dev-docs` | generate `swagger.yaml` from the `server/docs` annotations and validate it, and serve it locally; both need go-swagger (`check-swagger` installs it). See [docs/swagger.md](swagger.md) |
 | `frontend-conf` | emits `web/src/conf.json` with only the public config fields |
 | `check-bundle-secrets` | fails if a secret value from `$(CONF)` made it into `web/build` |
-| `prod-api` / `prod-web` / `prod-maintenance` | the three service entrypoints |
+| `prod-api` | the API service entrypoint |
 | `clean` | drops test DBs, removes `bin/*`, generated Go, `swagger.yaml`, web build dirs; `go mod tidy` |
 
-Three build subtleties worth knowing:
+Two build subtleties worth knowing:
 
 - **The landing page is `index.html`; the React shell is `app.html`.** The
   marketing pages (`/`, `/privacy`) are static HTML so crawlers, link unfurlers,
-  and no-JS readers get real content instead of an empty JS shell. `serve`
-  resolves `/` to whatever `index.html` is, so the only way to put a static page
-  at `/` is to *be* `index.html` — hence the two renames at the end of
-  `build-web`. `web/public/serve.json` rewrites **an enumerated list of app
-  routes** (`/login`, `/play`, `/settings`, `/progress`, `/pin/*`, `/admin/*`)
-  to `app.html`; a new top-level React route must be added there too or its
-  deployed URL 404s (the `Switch` in `web/src/index.js` carries the same
-  warning). A catch-all rewrite cannot coexist with static
-  clean URLs: `serve` 14 checks the filesystem before rewrites only for paths
-  with an extension, and its rewrite engine cascades each rule's output through
-  the remaining rules, so `/privacy → /privacy.html → catch-all → app.html` no
-  matter the order (verified against `serve` 14 and its `serve-handler`
-  source). With no catch-all, extensionless statics resolve via `cleanUrls`
-  (`/privacy` → `privacy.html`), unknown paths get a **real 404** served from
-  the branded `404.html` (`serve-handler` picks up that filename natively), and
-  a missing asset is now a clean 404 rather than the old
-  shell-with-a-200 behavior. **`prod-web` must not pass `serve`'s
-  `-s`/`--single` flag** — it would rewrite everything to `index.html` and
-  serve the marketing page in place of the app.
+  and no-JS readers get real content instead of an empty JS shell. nginx's
+  `index` directive resolves `/` to `index.html`, so the only way to put a
+  static page at `/` is to *be* `index.html` — hence the two renames at the end
+  of `build-web`. The flip side is that the React shell cannot be `index.html`,
+  which is why the front door rewrites **an enumerated route list** to
+  `app.html` instead of a catch-all: with a catch-all, `/privacy`, the branded
+  404, and every missing asset would collapse into the shell (the old
+  shell-with-a-200 behavior); without one, extensionless statics resolve via
+  `$uri.html` and unknown paths are real 404s. The route list, its extension
+  procedure, and the full serving contract live in The front door above.
 
 - **`build-web` never empties the live dir.** `react-scripts` wipes its output
   dir at the start of every build; building in place left `web/build` a bare
   directory listing for the whole install + webpack window while the old
   server kept serving it (#243). So it builds into `web/build.next` and swaps
-  with two sub-millisecond renames; `serve` re-reads per request, so no restart
-  is needed. Any failed step aborts the target before the swap runs, so
+  with two sub-millisecond renames; nginx opens files per request, so no
+  reload is needed. Any failed step aborts the target before the swap runs, so
   `web/build` keeps serving the last good bundle; the staging dir is cleared
   before each build, so no earlier run's output can survive into the swap
   (Makefile `build-web`).
-- **`prod-web` fails loudly without TLS paths.** If `tls_cert_file` /
-  `tls_key_file` are absent from `$(CONF)`, `serve` would silently fall back to
-  plain HTTP on :443 and every HTTPS client sees the site as down — so the
-  target asserts both are set before starting (Makefile `prod-web`).
 
 Generated Go and migrations have their own rules — see `docs/schema.md`.
 Never hand-edit `*.generated.go`.
@@ -133,15 +176,26 @@ git reset --hard origin/master
    build aborts here with the live site untouched (`build-web` swap semantics).
 2. **Sync unit files** — `cp deploy/*.service` / `deploy/*.timer` to
    `/etc/systemd/system`, then `systemctl daemon-reload`.
-3. **Start `mathgame-maintenance`** — its `Conflicts=` stops `mathgame-web`, so
-   users see the maintenance page (HTTP 503, `Retry-After: 120`) through the
-   disruptive window. If anything below fails, `set -e` exits with the
-   maintenance page still up.
-4. **`systemctl restart mathgame-api`** — the new binary boots and runs DB
+3. **Publish the bundle** — `web/build` to `/var/www/mathgame/build` with the
+   same staged two-rename swap as `build-web`, plus `maintenance.html`.
+4. **Sync the front door** — `mikeymath.conf` to `/etc/nginx/conf.d/`, then
+   `nginx -t` and `systemctl reload nginx`. The validation runs *before* the
+   window opens, so a config nginx rejects aborts with the site still up,
+   serving, and the previously installed config restored (a rejected file
+   must not linger in `conf.d/`, where the next reload — e.g. certbot's
+   renewal hook — would load it).
+5. **`touch` the maintenance flag** — opens the disruptive window: nginx
+   answers every request with the maintenance page (HTTP 503,
+   `Retry-After: 120`). If anything below fails, `set -e` exits with the flag
+   still in place.
+6. **`systemctl restart mathgame-api`** — the new binary boots and runs DB
    migrations on startup (`api.RunMigrations`, called from `cmd/apiserver/main.go`
    `main`).
-5. **Restart the timers** (picks up any schedule change).
-6. **Start `mathgame-web`** — its start stops the maintenance page (`Conflicts=`).
+7. **Restart the timers** (picks up any schedule change).
+8. **Remove the flag and smoke-check** — `curl` hits `/` and `/play` through
+   the real front door (`--resolve` to loopback); a failure re-raises the
+   flag and exits non-zero, so a deploy that cannot serve ends on the
+   maintenance page, never on "Update complete."
 
 ### When a generation/difficulty change is part of the deploy
 
@@ -204,8 +258,11 @@ sudo tar -C /usr/local -xzf go<version>.linux-amd64.tar.gz        # put /usr/loc
 sudo apt install make
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - # apt's own nodejs is far older
 sudo apt-get install -y nodejs
-sudo npm install -g serve
+sudo apt install nginx
 ```
+
+Leave the distro default site in place for now — the TLS cert step below needs
+it as the `:80` listener, and the front-door install step removes it.
 
 **Database:**
 
@@ -232,28 +289,41 @@ start — see `docs/schema.md`.
 
 **TLS cert (Let's Encrypt):**
 
+Webroot, not `--standalone`: standalone spins up its own temporary listener on
+:80, which nginx holds permanently. Issuance runs while the distro default site
+still owns :80 and serves `/var/www/html` — the same webroot the front door's
+ACME location serves after it takes over, so the recorded renewal config works
+in both worlds. The cert must carry both hostnames: `www` serves its redirect
+over TLS, so it needs a valid certificate of its own.
+
 ```
 sudo ln -s /snap/bin/certbot /usr/bin/certbot
-sudo certbot certonly --standalone
+sudo certbot certonly --webroot -w /var/www/html \
+  -d mikeymath.org -d www.mikeymath.org \
+  --deploy-hook "systemctl reload nginx && systemctl restart mathgame-api"
 ```
 
-**Clone, build, install units:**
+The deploy-hook is the point: every process that terminates TLS reads the cert
+files at startup, so a renewal used to mean restarting services by hand. Now
+the hook reloads nginx (graceful) and restarts `mathgame-api` (which reads its
+own hardcoded paths, `cmd/apiserver/main.go`) automatically on every renewal.
+
+**Clone, install, first deploy:**
+
+Write `conf.json` (below) after cloning; `update.sh` builds, publishes the
+bundle, installs the front door, and starts the API, so the first deploy is
+just the normal deploy.
 
 ```
-git clone https://github.com/gdmen/mathgame_2.git && cd mathgame_2 && make
-sudo cp deploy/*.service deploy/*.timer /etc/systemd/system && sudo systemctl daemon-reload
-sudo systemctl enable mathgame-api mathgame-web
+git clone https://github.com/gdmen/mathgame_2.git && cd mathgame_2
+sudo rm -f /etc/nginx/sites-enabled/default   # the :80 block replaces it; cert already issued
+./deploy/update.sh
+sudo systemctl enable mathgame-api
 sudo systemctl enable --now mathgame-{compress-events,check-disabled-videos,update-statistics,trim-recently-shown-problems,watchdog}.timer
-sudo service mathgame-api start && sudo service mathgame-web start
 ```
 
-(`mathgame-maintenance` is started on demand by `update.sh`, never enabled.)
-
-**`conf.json`** (gitignored): set `ntfy_topic` (an unguessable `ntfy.sh` topic,
-subscribed in the ntfy app) and the TLS paths `tls_cert_file` / `tls_key_file`
-(the Let's Encrypt `fullchain.pem` / `privkey.pem`) — both `prod-web` and the
-maintenance page read them. Cert renewal: `certbot renew`, then restart
-`mathgame-web`.
+**`conf.json`** (gitignored): set `ntfy_topic` — an unguessable `ntfy.sh` topic,
+subscribed in the ntfy app.
 
 `auth0_management_clientId` / `auth0_management_clientSecret` are the credentials
 of an Auth0 machine-to-machine application authorized for the Management API with
@@ -287,7 +357,6 @@ covers these suites locally and in CI, so a tool regression fails the merge gate
 | Tool | Purpose | Notes |
 |---|---|---|
 | `apiserver` | the API server | reads `conf.json` from CWD (no `-config` flag); runs migrations on startup |
-| `maintenance_server` | static 503 maintenance page | `-port` (default 443); serves HTTPS iff both TLS paths set, else plain HTTP; fails if only one is set (`main`, the "only one of tls_cert_file/tls_key_file" guard) |
 
 ### Scheduled maintenance jobs
 
@@ -428,25 +497,32 @@ error, because at threshold 1 a missed match costs more than an inflated count.
 - **Secret scan before deploy:** `make test-bundle-secrets` (or `test-all`)
   reproduces the CI bundle scan locally against a canary config; `CONF`
   overrides the config the web build reads.
-- **The maintenance page is the safety net:** because `update.sh` raises it
-  first and `set -e` aborts on any later failure, a broken deploy leaves users
-  on "down for maintenance," not on errors.
+- **The maintenance page is the safety net:** nginx serves it whenever
+  `/var/www/mathgame/maintenance.on` exists, and `set -e` aborts `update.sh`
+  with the flag still up on any failure, so a broken deploy leaves users on
+  "down for maintenance," not on errors. The flag doubles as the manual
+  switch: `sudo touch` it to take the site down, `sudo rm` it to come back.
+- **Front-door changes:** `nginx -t` before `systemctl reload nginx`, always —
+  `update.sh` does both for you, and `make test-nginx` covers the behavior
+  ahead of the deploy.
 
 ## Related files
 
-- `deploy/update.sh` — the deploy script (build → maintenance → restart → web).
+- `deploy/update.sh` — the deploy script (build → units → front door → flag up → restart → flag down).
+- `deploy/nginx/mikeymath.conf` — the front door: TLS, host canonicalization, the static bundle, the maintenance flag.
+- `deploy/maintenance.html` — the page nginx serves while the maintenance flag exists.
 - `deploy/watchdog.sh` — journal watchdog.
 - `deploy/*.service`, `deploy/*.timer` — systemd units.
-- `deploy/mathgame-maintenance.service` — the `Conflicts=`/`After=` swap with web.
 - `deploy/drop.sql` — destructive full-DB reset.
 - `Makefile` — all build/test/prod targets.
-- `.github/workflows/test.yml` — CI: the Go suite against a real MySQL, the web jest suite, and the
-  vulnerability gates (`govulncheck ./...`, `npm audit --omit=dev --audit-level=moderate`).
+- `scripts/nginx_contract_test.sh` — the front-door contract tests (`make test-nginx`).
+- `.github/workflows/test.yml` — CI: the Go suite against a real MySQL, the web jest suite, the
+  nginx front-door contract, and the vulnerability gates (`govulncheck ./...`,
+  `npm audit --omit=dev --audit-level=moderate`).
   The npm gate is scoped to production deps: the dev-tree findings are react-scripts', unfixable
   by any upgrade, and knowingly accepted until the CRA-to-Vite migration (#382) retires it.
 - `.github/workflows/web-bundle-secrets.yml` — CI: the bundle secret scan.
 - `cmd/apiserver/main.go` — `main` runs `api.RunMigrations` on API startup.
-- `cmd/maintenance_server/main.go` — `Handler` (503 page), `main` (TLS guard).
 - `cmd/recompute_problem_type_bitmap/main.go`, `cmd/recompute_problem_difficulty/main.go` —
   generation backfills (contract in `docs/problem-generation.md`).
 - `cmd/compare_generators/main.go` — heuristic_2.0 vs heuristic_1.0/llm pool comparison (#283).
