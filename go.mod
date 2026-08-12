@@ -9,7 +9,7 @@ require (
 	github.com/gin-contrib/cors v1.7.7
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-sql-driver/mysql v1.10.0
-	github.com/go-swagger/go-swagger v0.36.1
+	github.com/go-swagger/go-swagger v0.36.2
 	github.com/golang/glog v1.2.5
 	github.com/gwatts/gin-adapter v1.0.0
 	github.com/sashabaranov/go-openai v1.42.0
