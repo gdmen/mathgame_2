@@ -198,13 +198,20 @@ bare `make`, so this host compiles the same bundle CI does and must not lag the
 failed deploy. The floor is 22.12, where `require()` of an ES module starts
 working, which newer releases of the web toolchain depend on.
 
+`serve` is pinned to major 14 for the same reason Node is pinned deliberately:
+the serving semantics documented in the build subtleties below (the rewrite
+cascade, `cleanUrls`, the `404.html` pickup) were verified against serve 14's
+source, and nothing in CI exercises `serve` itself — a different major
+installed by a later reprovision could change route behavior with no test
+noticing. Check a host with `serve --version`.
+
 ```
 wget -c https://go.dev/dl/go<version>.linux-amd64.tar.gz          # any recent release, see go.dev/dl
 sudo tar -C /usr/local -xzf go<version>.linux-amd64.tar.gz        # put /usr/local/go/bin on PATH
 sudo apt install make
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - # apt's own nodejs is far older
 sudo apt-get install -y nodejs
-sudo npm install -g serve
+sudo npm install -g serve@14
 ```
 
 **Database:**
