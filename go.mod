@@ -2,7 +2,7 @@ module garydmenezes.com/mathgame
 
 go 1.25.0
 
-toolchain go1.25.12
+toolchain go1.25.13
 
 require (
 	github.com/auth0/go-jwt-middleware/v2 v2.3.1
