@@ -793,7 +793,7 @@ func (a *Api) customAddPlaylist(c *gin.Context) {
 		syncedID, err := a.syncPlaylistFromYouTube(ytID)
 		if err != nil {
 			glog.Errorf("%s syncPlaylistFromYouTube %s: %v", logPrefix, ytID, err)
-			c.JSON(http.StatusBadRequest, common.GetError("Could not fetch playlist from YouTube: "+err.Error()))
+			c.JSON(http.StatusBadRequest, common.GetError("Could not fetch playlist from YouTube."))
 			return
 		}
 		playlistID = syncedID
