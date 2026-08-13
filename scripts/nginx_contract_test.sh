@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Front-door contract tests (`make test-nginx`); scope and rationale in
 # docs/ops-runbook.md ("The front door"). Runs deploy/nginx/mikeymath.conf
-# itself against a fixture build dir, substituting only ports, cert paths
-# and the three content roots.
+# itself against a fixture build dir and a stub API upstream, substituting
+# only ports, cert paths, the three content roots and the proxy target.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -11,6 +11,7 @@ PAGE_SRC="$REPO_ROOT/deploy/maintenance.html"
 
 HTTP_PORT=18080
 HTTPS_PORT=18443
+API_PORT=18081
 
 if ! command -v nginx >/dev/null; then
     echo "nginx not installed (macOS: brew install nginx; Ubuntu: sudo apt-get install -y nginx)" >&2
@@ -19,8 +20,13 @@ fi
 
 WORK="$(mktemp -d)"
 NGINX_PID=""
+API_PID=""
 cleanup() {
     if [ -n "$NGINX_PID" ]; then kill "$NGINX_PID" 2>/dev/null || true; fi
+    if [ -n "$API_PID" ]; then
+        kill "$API_PID" 2>/dev/null || true
+        wait "$API_PID" 2>/dev/null || true
+    fi
     rm -rf "$WORK"
 }
 trap cleanup EXIT
@@ -68,6 +74,7 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
 
 sub "listen 80;" "listen 127.0.0.1:$HTTP_PORT;"
 sub "listen 443 ssl http2;" "listen 127.0.0.1:$HTTPS_PORT ssl http2;"
+sub "proxy_pass http://127.0.0.1:8080;" "proxy_pass http://127.0.0.1:$API_PORT;"
 sub "/etc/letsencrypt/live/mikeymath.org/fullchain.pem" "$WORK/cert.pem"
 sub "/etc/letsencrypt/live/mikeymath.org/privkey.pem" "$WORK/key.pem"
 sub "/var/www/mathgame/build" "$WORK/build"
@@ -78,7 +85,8 @@ sub "/var/www/html" "$WORK/acme"
 # run here unsubstituted, silently shrinking coverage. Fail on any residue
 # (ignoring comments and the staged $WORK paths the sub() calls just wrote).
 residue=$(grep -vE "^[[:space:]]*#" "$STAGED" | grep -Fv "$WORK" |
-    grep -E "/etc/|/var/|/home/|listen" | grep -v "listen 127.0.0.1" || true)
+    grep -E "/etc/|/var/|/home/|listen|proxy_pass" | grep -v "listen 127.0.0.1" |
+    grep -v "proxy_pass http://127.0.0.1:$API_PORT;" || true)
 if [ -n "$residue" ]; then
     printf 'FAIL: unsubstituted prod path/listener; add a sub() for it:\n%s\n' "$residue" >&2
     exit 1
@@ -105,20 +113,56 @@ http {
 }
 EOF
 
+# A stand-in for apiserver: echoes the request path and the proxy headers
+# back as JSON, so the tests can assert what nginx actually forwarded.
+cat > "$WORK/api_stub.py" <<'EOF'
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import json, sys
+
+class Echo(BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = json.dumps({
+            "path": self.path,
+            "host": self.headers.get("Host", ""),
+            "proto": self.headers.get("X-Forwarded-Proto", ""),
+        }).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+HTTPServer(("127.0.0.1", int(sys.argv[1])), Echo).serve_forever()
+EOF
+python3 "$WORK/api_stub.py" "$API_PORT" &
+API_PID=$!
+
 nginx -p "$WORK" -c "$WORK/nginx.conf" -g "daemon off;" &
 NGINX_PID=$!
 
-ready=""
-for _ in $(seq 1 50); do
-    if [ "$(curl -sk -o /dev/null -w '%{http_code}' --max-time 1 \
-        --resolve "mikeymath.org:$HTTPS_PORT:127.0.0.1" \
-        "https://mikeymath.org:$HTTPS_PORT/" || true)" = 200 ]; then
-        ready=yes
-        break
-    fi
-    sleep 0.2
-done
-if [ -z "$ready" ]; then
+# wait_ready <url> [extra curl args...] -> polls until the URL answers 200
+wait_ready() {
+    local url=$1
+    shift
+    for _ in $(seq 1 50); do
+        if [ "$(curl -sk -o /dev/null -w '%{http_code}' --max-time 1 \
+            "$@" "$url" || true)" = 200 ]; then
+            return 0
+        fi
+        sleep 0.2
+    done
+    return 1
+}
+
+if ! wait_ready "http://127.0.0.1:$API_PORT/ready"; then
+    echo "FAIL: the API stub never became ready" >&2
+    exit 1
+fi
+if ! wait_ready "https://mikeymath.org:$HTTPS_PORT/" \
+    --resolve "mikeymath.org:$HTTPS_PORT:127.0.0.1"; then
     echo "FAIL: nginx never became ready; error log follows" >&2
     cat "$WORK/error.log" >&2 || true
     exit 1
@@ -174,8 +218,8 @@ else
     fail "landing: got $STATUS, want 200 with index.html"
 fi
 
-# /play/ and /PLAY match serve.json's old non-strict, case-insensitive
-# behavior (and React Router's, which is also case-insensitive).
+# /play/ and /PLAY exercise the non-strict, case-insensitive match; React
+# Router routes are case-insensitive, so the front door must be too.
 for route in /login /play /settings /progress /admin /admin/deep /pin/target /play/ /PLAY; do
     get https mikeymath.org "$route"
     if [ "$STATUS" = 200 ] && body_is "APP-SHELL-MARKER"; then
@@ -184,6 +228,18 @@ for route in /login /play /settings /progress /admin /admin/deep /pin/target /pl
         fail "$route: got $STATUS, want 200 with app.html"
     fi
 done
+
+get https mikeymath.org "/api/v1/problems/42?x=1"
+if [ "$STATUS" = 200 ] && body_is '"path": "/api/v1/problems/42?x=1"'; then
+    pass "/api/ is proxied to the API upstream, path and query preserved"
+else
+    fail "/api/ proxy: got $STATUS body $(cat "$WORK/b"), want the upstream echo of the full path"
+fi
+if body_is '"host": "mikeymath.org"' && body_is '"proto": "https"'; then
+    pass "the proxy forwards Host and X-Forwarded-Proto"
+else
+    fail "proxy headers: got $(cat "$WORK/b"), want Host mikeymath.org and X-Forwarded-Proto https"
+fi
 
 get https mikeymath.org "/privacy"
 if [ "$STATUS" = 200 ] && body_is "PRIVACY-MARKER"; then
@@ -232,6 +288,12 @@ if [ "$STATUS" = 503 ] && [ "$(header retry-after)" = 120 ] &&
     pass "the maintenance flag serves the branded page as a 503"
 else
     fail "maintenance flag: got $STATUS retry-after=$(header retry-after) cache-control=$(header cache-control), want 503 with the maintenance page"
+fi
+get https mikeymath.org "/api/v1/problems/42"
+if [ "$STATUS" = 503 ]; then
+    pass "the maintenance flag covers API requests too"
+else
+    fail "maintenance flag on /api/: got $STATUS, want 503 (the deploy window must close the API as well)"
 fi
 rm "$WORK/www/maintenance.on"
 

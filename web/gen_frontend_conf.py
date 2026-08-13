@@ -12,12 +12,12 @@ Usage: gen_frontend_conf.py <backend_conf.json> <frontend_conf.json>
 """
 import json
 import os
+import re
 import sys
 
 # The only fields web/src/*.js reads. Keep in sync with usages of `conf.` there.
 PUBLIC_FIELDS = (
     "api_host",
-    "api_port",
     "event_reporting_interval",
     "auth0_audience",
     "auth0_clientId",
@@ -32,6 +32,17 @@ def generate(src, dst):
     with open(src) as f:
         backend = json.load(f)
     frontend = {k: backend[k] for k in PUBLIC_FIELDS if k in backend}
+
+    # api_host is the full origin the bundle dials; a wrong-but-parseable
+    # value (like the stale portless "http://localhost") bakes a dead URL
+    # with no other signal.
+    api_host = frontend.get("api_host", "")
+    if not re.match(r"^https?://[^/]+$", api_host) or api_host == "http://localhost":
+        sys.exit(
+            f"{src}: api_host {api_host!r} must be the full API origin the "
+            "bundle calls, e.g. http://localhost:8080 (dev) or "
+            "https://mikeymath.org (prod); see conf.json_"
+        )
 
     # The previous build symlinked dst -> backend conf.json. Unlink first so we
     # never follow that symlink and truncate the real backend config.

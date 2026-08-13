@@ -27,15 +27,15 @@ unit sits behind it:
 
 | Service | `ExecStart` | Role |
 |---|---|---|
-| `mathgame-api` | `make prod-api` (`apiserver`, `GIN_MODE=release`) | the API; runs migrations on startup. Terminates its own TLS on the API port, from hardcoded Let's Encrypt paths (`cmd/apiserver/main.go`) — it does **not** go through nginx |
+| `mathgame-api` | `make prod-api` (`apiserver`, `GIN_MODE=release`) | the API; runs migrations on startup. Plain HTTP on loopback (`127.0.0.1:<api_port>`, `cmd/apiserver/main.go`); nginx proxies `/api/` to it |
 
 It restarts on failure (`Restart=always`, `RestartSec=1s`, burst-limited to 5
 in 500s). nginx is a stock distro unit — not one of ours, not in `SERVICES`.
 
 ### The front door (`deploy/nginx/mikeymath.conf`)
 
-nginx terminates TLS on :443, canonicalizes the host, and serves the static
-bundle. It is synced to `/etc/nginx/conf.d/` by `update.sh` like the systemd
+nginx terminates TLS on :443, canonicalizes the host, serves the static
+bundle, and proxies the API. It is synced to `/etc/nginx/conf.d/` by `update.sh` like the systemd
 units, and the canonicalization is what makes `www.mikeymath.org` work: the
 SPA sends `window.location.origin` as its Auth0 `redirect_uri`, so a session
 that starts on a non-canonical host sends an origin Auth0 rejects and login
@@ -45,7 +45,7 @@ dead-ends before the page renders.
 |---|---|
 | `:80`, both hostnames | 301 to `https://mikeymath.org$request_uri` (ACME challenge path excepted) |
 | `:443`, `www.mikeymath.org` | 301 to `https://mikeymath.org$request_uri` |
-| `:443`, `mikeymath.org` | `root /var/www/mathgame/build` |
+| `:443`, `mikeymath.org` | `root /var/www/mathgame/build`; `/api/` proxied to `apiserver` on loopback |
 
 The docroot is a **published copy**, not the repo's `web/build`: `update.sh`
 copies the bundle there with the same staged two-rename swap `build-web` uses.
@@ -67,10 +67,21 @@ The serving contract on the apex, top to bottom:
   redirect and the flag would 503 the maintenance page itself into nginx's
   default error page; and `add_header ... always` (a bare `add_header` skips
   non-2xx/3xx statuses).
+- **`/api/` is the API** (`location ^~ /api/`): proxied unmodified to
+  `apiserver` on loopback plain HTTP, with `Host`, `X-Real-IP`,
+  `X-Forwarded-For` and `X-Forwarded-Proto` set. The `proxy_pass` port is
+  hardcoded in the config and must match `api_port` in the host's `conf.json`
+  — `update.sh` preflights the match before building. A 300s
+  `proxy_read_timeout` replaces nginx's 60s default because the synchronous
+  last-resort WORD generation (`docs/problem-generation.md`) can legitimately
+  run for minutes. This makes the API same-origin with the app: the bundle
+  builds its API URL from `api_host` alone (see First-time provisioning), and
+  the maintenance flag closes the API along with the site during the deploy
+  window.
 - **The React shell answers an enumerated route list** (`/login`, `/play`,
   `/settings`, `/progress`, `/admin`, `/pin/*`, `/admin/*` → `app.html`),
   matched non-strict and case-insensitive (`~*`, optional trailing slash) for
-  parity with the old serve.json and with React Router. A new top-level route
+  parity with React Router. A new top-level route
   in `web/src/index.js` must be added to the config and the contract test or
   its deployed URL 404s on any hard load — `server/api/web_routes_sync_test.go`
   parses both files and fails the merge on a missed route. A catch-all is
@@ -121,7 +132,7 @@ boot). The three jobs that must not overlap a manual run hold a `flock`
 | `web-deps` | `npm ci` in `web/` — lockfile-exact, and fails if `package.json` and the lockfile have drifted |
 | `test-web` | `web-deps`, then the `web/src` jest suite in one pass (`CI=true`). This is exactly what the CI web job runs |
 | `test-bundle-secrets` | rebuilds the web bundle against a canary config and fails if a secret leaks into `web/build` (the CI scan) |
-| `test-nginx` | the front-door contract (`scripts/nginx_contract_test.sh`): stages `deploy/nginx/mikeymath.conf` itself — substituting only ports, cert paths and content roots, with a loud failure both for a renamed pattern and for an unsubstituted prod path — and curl-asserts the full serving contract from The front door above against a fixture build dir. Needs an nginx binary (`brew install nginx`; CI installs it from apt) |
+| `test-nginx` | the front-door contract (`scripts/nginx_contract_test.sh`): stages `deploy/nginx/mikeymath.conf` itself — substituting only ports, cert paths, content roots and the API upstream, with a loud failure both for a renamed pattern and for an unsubstituted prod path — and curl-asserts the full serving contract from The front door above against a fixture build dir and a stub API upstream. Needs an nginx binary (`brew install nginx`; CI installs it from apt) |
 | `test-all` | `test` + `test-web` + `test-bundle-secrets` + `test-nginx` — full local CI parity |
 | `fmt` / `fmt-file` / `fmt-web` / `fmt-web-file` | canonical formatters — `gofmt -s` on the tree or a single Go file (`FILE=`), and `prettier --write` on `web/src` or a single web file (`FILE=`); single source of truth, invoked by `build-api` / `build-web` and the format-on-edit hook in `.claude/hooks/fmt-on-edit.sh` |
 | `docs-check` | `scripts/docs_check.py`; pass `BASE=origin/master` to enforce per-area doc updates |
@@ -172,8 +183,11 @@ git reset --hard origin/master
 `update.sh` is idempotent (`set -euo pipefail`) and does, in order
 (`deploy/update.sh`):
 
-1. **`make`** — rebuild everything *before* touching any service. A failed
-   build aborts here with the live site untouched (`build-web` swap semantics).
+1. **Preflight, then `make`** — first checks `conf.json`'s `api_host` (the
+   origin baked into the bundle) and `api_port` (must match the front door's
+   `proxy_pass` target), then rebuilds everything *before* touching any
+   service. A failed check or build aborts here with the live site untouched
+   (`build-web` swap semantics).
 2. **Sync unit files** — `cp deploy/*.service` / `deploy/*.timer` to
    `/etc/systemd/system`, then `systemctl daemon-reload`.
 3. **Publish the bundle** — `web/build` to `/var/www/mathgame/build` with the
@@ -192,9 +206,12 @@ git reset --hard origin/master
    migrations on startup (`api.RunMigrations`, called from `cmd/apiserver/main.go`
    `main`).
 7. **Restart the timers** (picks up any schedule change).
-8. **Remove the flag and smoke-check** — `curl` hits `/` and `/play` through
-   the real front door (`--resolve` to loopback); a failure re-raises the
-   flag and exits non-zero, so a deploy that cannot serve ends on the
+8. **Wait for apiserver, remove the flag, smoke-check** — a loopback poll
+   waits for the API's unauthenticated 401 while startup migrations run, with
+   the maintenance page still covering users (the flag only gates nginx);
+   then the flag comes down and `curl` hits `/`, `/play`, and the API route
+   through the real front door (`--resolve` to loopback). A failure re-raises
+   the flag and exits non-zero, so a deploy that cannot serve ends on the
    maintenance page, never on "Update complete."
 
 ### When a generation/difficulty change is part of the deploy
@@ -300,13 +317,13 @@ over TLS, so it needs a valid certificate of its own.
 sudo ln -s /snap/bin/certbot /usr/bin/certbot
 sudo certbot certonly --webroot -w /var/www/html \
   -d mikeymath.org -d www.mikeymath.org \
-  --deploy-hook "systemctl reload nginx && systemctl restart mathgame-api"
+  --deploy-hook "systemctl reload nginx"
 ```
 
-The deploy-hook is the point: every process that terminates TLS reads the cert
-files at startup, so a renewal used to mean restarting services by hand. Now
-the hook reloads nginx (graceful) and restarts `mathgame-api` (which reads its
-own hardcoded paths, `cmd/apiserver/main.go`) automatically on every renewal.
+The deploy-hook is the point: nginx is the only process that terminates TLS
+(`apiserver` sits behind it on loopback plain HTTP), and it reads the cert
+files at startup, so every renewal needs the graceful reload. The hook makes
+that automatic; nothing else on the box needs a restart when the cert rolls.
 
 **Clone, install, first deploy:**
 
@@ -324,6 +341,17 @@ sudo systemctl enable --now mathgame-{compress-events,check-disabled-videos,upda
 
 **`conf.json`** (gitignored): set `ntfy_topic` — an unguessable `ntfy.sh` topic,
 subscribed in the ntfy app.
+
+`api_host` is the API origin **as the browser sees it**, baked into the web
+bundle by `make frontend-conf`: `https://mikeymath.org` in prod (same-origin
+through the front door), `http://localhost:8080` in dev, where the bundle
+talks to `apiserver` directly. `api_port` is the port `apiserver` listens on;
+it never reaches the bundle, and it must match the front door's `proxy_pass`
+target. Getting either wrong is a hard outage — every API call from the
+deployed bundle fails — so `update.sh` preflights both against the front
+door before building, `gen_frontend_conf.py` rejects an `api_host` that is
+not a full origin, and the deploy smoke-checks an API route through the
+front door.
 
 `auth0_management_clientId` / `auth0_management_clientSecret` are the credentials
 of an Auth0 machine-to-machine application authorized for the Management API with

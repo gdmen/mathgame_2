@@ -4,7 +4,7 @@
   "mysql_database": "mathgame",
   "mysql_user": "",
   "mysql_pass": "",
-  "api_host": "http://localhost",
+  "api_host": "http://localhost:8080",
   "api_port": "8080",
   "auth0_domain": "",
   "auth0_clientId": "",

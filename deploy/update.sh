@@ -25,6 +25,26 @@ grep -qF "$MAINTENANCE_FLAG" deploy/nginx/mikeymath.conf || {
     exit 1
 }
 
+# Preflight the two conf.json fields the front door depends on, before the
+# build touches anything: api_host is baked into the bundle, api_port must
+# match the front door's proxy target (docs/ops-runbook.md).
+python3 - <<'EOF'
+import json, re, sys
+conf = json.load(open("conf.json"))
+nginx = open("deploy/nginx/mikeymath.conf").read()
+errs = []
+m = re.search(r"proxy_pass http://127\.0\.0\.1:(\d+);", nginx)
+if not m:
+    errs.append("deploy/nginx/mikeymath.conf has no proxy_pass http://127.0.0.1:<port>;")
+elif conf.get("api_port") != m.group(1):
+    errs.append(f"conf.json api_port {conf.get('api_port')!r} != front-door proxy_pass port {m.group(1)!r}")
+if conf.get("api_host") != "https://mikeymath.org":
+    errs.append(f"conf.json api_host {conf.get('api_host')!r} != 'https://mikeymath.org' (the origin baked into the bundle)")
+if errs:
+    print("preflight failed:\n  " + "\n  ".join(errs), file=sys.stderr)
+    sys.exit(1)
+EOF
+
 # Rebuild from whatever is currently checked out, before touching any
 # service. build-web stages into web/build.next and swaps, so nginx keeps
 # serving valid content through the whole build and a failed build
@@ -83,17 +103,48 @@ for t in "${TIMERS[@]}"; do
     sudo systemctl restart "${t}.timer"
 done
 
+# apiserver readiness, on loopback with the maintenance page still up (the
+# flag only gates nginx): it was just restarted and runs migrations before it
+# listens, so 000 (refused) retries; the app answers unauthenticated requests
+# 401. The port comes from conf.json, which the preflight pinned to the
+# front door's proxy target.
+api_port=$(python3 -c 'import json; print(json.load(open("conf.json"))["api_port"])')
+api_status=""
+for _ in $(seq 1 150); do
+    api_status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
+        "http://127.0.0.1:${api_port}/api/v1/problems/1" || true)
+    [ "$api_status" = 000 ] || break
+    sleep 2
+done
+if [ "$api_status" != 401 ]; then
+    echo "apiserver readiness check failed (got ${api_status}, want 401); maintenance page left up" >&2
+    exit 1
+fi
+
 sudo rm -f "$MAINTENANCE_FLAG"
+
+RESOLVE="--resolve mikeymath.org:443:127.0.0.1"
+smoke_fail() {
+    sudo touch "$MAINTENANCE_FLAG"
+    echo "smoke check failed on $1; maintenance page re-raised" >&2
+    exit 1
+}
 
 # Smoke-check through the real front door; a failure re-raises the flag so a
 # broken deploy ends on the maintenance page, not on errors.
 for path in / /play; do
-    if ! curl -fsS -o /dev/null --resolve mikeymath.org:443:127.0.0.1 \
+    if ! curl -fsS -o /dev/null --max-time 10 $RESOLVE \
         "https://mikeymath.org${path}"; then
-        sudo touch "$MAINTENANCE_FLAG"
-        echo "smoke check failed on ${path}; maintenance page re-raised" >&2
-        exit 1
+        smoke_fail "${path}"
     fi
 done
+
+# The API wiring: apiserver is already up (readiness above), so anything but
+# its 401 here is the proxy's failure.
+api_status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 $RESOLVE \
+    "https://mikeymath.org/api/v1/problems/1" || true)
+if [ "$api_status" != 401 ]; then
+    smoke_fail "/api/v1/problems/1 (got ${api_status}, want 401)"
+fi
 
 echo "Update complete."
