@@ -272,6 +272,34 @@ else
     fail "shell cache-control: got '$(header cache-control)', want no-cache (a stale shell requests deleted hashed bundles)"
 fi
 
+# The security header set must ride on every response. /static/ and
+# @maintenance set their own add_header, which drops the inherited server-level
+# set, so the config re-declares the security headers in both; assert here that
+# it stayed in sync.
+sec_headers_present() {
+    [ "$(header x-content-type-options)" = "nosniff" ] &&
+        [ "$(header x-frame-options)" = "DENY" ] &&
+        [ "$(header referrer-policy)" = "strict-origin-when-cross-origin" ]
+}
+sec_report() {
+    echo "nosniff=$(header x-content-type-options)" \
+        "xfo=$(header x-frame-options) referrer=$(header referrer-policy)"
+}
+
+get https mikeymath.org "/"
+if sec_headers_present; then
+    pass "the security headers ride the landing page"
+else
+    fail "security headers on /: got $(sec_report)"
+fi
+
+get https mikeymath.org "/static/js/main.js"
+if sec_headers_present; then
+    pass "the security headers survive the /static/ add_header override"
+else
+    fail "security headers on /static/: got $(sec_report)"
+fi
+
 for path in /no-such-page /static/; do
     get https mikeymath.org "$path"
     if [ "$STATUS" = 404 ] && body_is "NOT-FOUND-MARKER"; then
@@ -288,6 +316,11 @@ if [ "$STATUS" = 503 ] && [ "$(header retry-after)" = 120 ] &&
     pass "the maintenance flag serves the branded page as a 503"
 else
     fail "maintenance flag: got $STATUS retry-after=$(header retry-after) cache-control=$(header cache-control), want 503 with the maintenance page"
+fi
+if sec_headers_present; then
+    pass "the security headers survive the @maintenance add_header override"
+else
+    fail "security headers on the maintenance 503: got $(sec_report)"
 fi
 get https mikeymath.org "/api/v1/problems/42"
 if [ "$STATUS" = 503 ]; then

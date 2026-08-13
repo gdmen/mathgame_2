@@ -98,6 +98,15 @@ The serving contract on the apex, top to bottom:
 - **gzip is nginx's** (`gzip on` + types; the list carries both
   `application/javascript` and `text/javascript` because nginx's bundled
   `mime.types` switched the `.js` mapping in 1.21.5 and prod runs 1.18).
+- **Security headers ride every response:** `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, and `Referrer-Policy: strict-origin-when-cross-origin`.
+  nginx drops the inherited server-level `add_header` set in any location that
+  declares its own, so the set is re-declared in `/static/` and `@maintenance`;
+  the contract test asserts all three on the landing page, a `/static/` asset,
+  and the maintenance 503 so an overriding location can't silently drop them.
+  `server_tokens off` keeps the nginx version out of the `Server` header.
+  `Strict-Transport-Security` and `Content-Security-Policy` are deliberately not
+  set here yet — both are standalone commitments tracked separately.
 
 Every behavior above is exercised by `make test-nginx`
 (`scripts/nginx_contract_test.sh`), which runs this very file — not a copy —
