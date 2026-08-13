@@ -3,6 +3,7 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +12,20 @@ import (
 
 	"github.com/golang/glog"
 )
+
+// getYouTube is http.Get with the request URL (which carries the API key)
+// stripped from any transport error. See docs/videos.md.
+func getYouTube(rawURL string) (*http.Response, error) {
+	resp, err := http.Get(rawURL)
+	if err != nil {
+		var uerr *url.Error
+		if errors.As(err, &uerr) {
+			return nil, fmt.Errorf("%s: %w", uerr.Op, uerr.Err)
+		}
+		return nil, err
+	}
+	return resp, nil
+}
 
 type YouTubePlaylistResponse struct {
 	Items []struct {
@@ -52,7 +67,7 @@ type YouTubePlaylistItemsResponse struct {
 func (a *Api) fetchPlaylistMetadata(playlistID string) (thumbURL, etag, title string, err error) {
 	apiURL := fmt.Sprintf("https://www.googleapis.com/youtube/v3/playlists?part=snippet&id=%s&key=%s",
 		url.QueryEscape(playlistID), url.QueryEscape(a.YouTubeAPIKey))
-	resp, err := http.Get(apiURL)
+	resp, err := getYouTube(apiURL)
 	if err != nil {
 		return "", "", "", fmt.Errorf("failed to fetch playlist: %w", err)
 	}
@@ -93,7 +108,7 @@ func (a *Api) fetchPlaylistItems(playlistID string) ([]struct {
 		if pageToken != "" {
 			apiURL += "&pageToken=" + url.QueryEscape(pageToken)
 		}
-		resp, err := http.Get(apiURL)
+		resp, err := getYouTube(apiURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch playlist items: %w", err)
 		}

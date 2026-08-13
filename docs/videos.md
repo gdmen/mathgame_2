@@ -53,6 +53,11 @@ Two endpoints on the YouTube Data API v3, both authenticated with `a.YouTubeAPIK
 `youtube_api_key` config field, **required** because it is not in `optionalConfigFields`, so
 `Config.Validate` (`server/common/config.go`) rejects an empty value.
 
+The key rides in the request URL's `key=` param, so both calls go through `getYouTube`, which
+strips the URL out of any transport error (`http.Get` returns a `*url.Error` that embeds the full
+URL, key included). Without it the key would land in the logs and, via `customAddPlaylist`, in the
+client's error response. The handler returns only a fixed message; the detail stays server-side.
+
 | Call | Endpoint | Function |
 |---|---|---|
 | Playlist metadata | `playlists?part=snippet&id=...` | `fetchPlaylistMetadata` |
