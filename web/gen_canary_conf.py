@@ -18,6 +18,9 @@ def generate(src, dst):
     for k, v in conf.items():
         if isinstance(v, str):
             conf[k] = f"CANARY-{k}-d34db33f"
+    # api_host must pass gen_frontend_conf.py's origin check; keep the
+    # sentinel inside a URL-shaped value.
+    conf["api_host"] = "https://CANARY-api_host-d34db33f.invalid"
     with open(dst, "w") as f:
         json.dump(conf, f, indent=2)
         f.write("\n")

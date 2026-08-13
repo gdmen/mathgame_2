@@ -49,9 +49,13 @@ func main() {
 		glog.Fatal(err)
 	}
 	api_router := api.GetRouter()
+	addr := fmt.Sprintf(":%s", c.ApiPort)
 	if gin.Mode() == gin.ReleaseMode {
-		api_router.RunTLS(fmt.Sprintf(":%s", c.ApiPort), "/etc/letsencrypt/live/mikeymath.org/fullchain.pem", "/etc/letsencrypt/live/mikeymath.org/privkey.pem")
-	} else {
-		api_router.Run(fmt.Sprintf(":%s", c.ApiPort))
+		// nginx terminates TLS and proxies /api/ here; loopback-only so the
+		// plain-HTTP port is never reachable directly.
+		addr = "127.0.0.1" + addr
+	}
+	if err := api_router.Run(addr); err != nil {
+		glog.Fatal(err)
 	}
 }

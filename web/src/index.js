@@ -38,7 +38,7 @@ import "@fontsource/caveat/700.css";
 import "./index.scss";
 
 const conf = require("./conf");
-const ApiUrl = conf.api_host + ":" + conf.api_port + "/api/v1";
+const ApiUrl = conf.api_host + "/api/v1";
 
 const SiteName = "Mikey's Math Game";
 
