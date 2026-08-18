@@ -324,8 +324,37 @@ const ProblemTypesSettingsView = ({
   );
 };
 
-// Add public YouTube playlist links to show as "Recommended playlists" (UI only).
-const RECOMMENDED_PLAYLISTS = [];
+// Public YouTube playlists offered as a starting point. Each row is drawn the
+// way it will look once added, so the fields mirror what /playlists returns.
+// Titles and thumbnails are copied from YouTube, not fetched: the section has
+// to render before any network round trip, and a stale thumbnail is only a
+// different picture.
+const RECOMMENDED_PLAYLISTS = [
+  {
+    you_tube_id: "PL8TioFHubWFtCsC4hUMX9EZAWVJjkyiCQ",
+    title: "Sing and Dance with Elmo and Friends on Sesame Street",
+    channel: "Sesame Street",
+    video_count: 10,
+    thumbnailurl: "https://i.ytimg.com/vi/XfzkAn8Jp3s/mqdefault.jpg",
+  },
+  {
+    you_tube_id: "PLXaH20eIS38ZpfAgvMbbCo7QBmI860ONl",
+    title: "Disney Channel Essentials",
+    channel: "DisneyMusicVEVO",
+    video_count: 115,
+    thumbnailurl: "https://i.ytimg.com/vi/1QyA57UG16o/mqdefault.jpg",
+  },
+  {
+    you_tube_id: "PLMr-d2PLsO96tK0CR-PrL3srgwC2BQMQ5",
+    title: "The Best of KIDZ BOP 2016!",
+    channel: "KIDZ BOP",
+    video_count: 18,
+    thumbnailurl: "https://i.ytimg.com/vi/d0x47MJYZII/mqdefault.jpg",
+  },
+];
+
+const youTubePlaylistURL = (youTubeId) =>
+  "https://www.youtube.com/playlist?list=" + youTubeId;
 
 // The reward loop needs at least this many playable videos to draw from. The
 // server enforces the same floor on /play (minPlayableVideos); docs/settings.md's
@@ -336,6 +365,7 @@ const MIN_PLAYABLE_VIDEOS = 1;
 const UNDO_WINDOW_MS = 30000;
 
 const playlistName = (p) => p.title || p.you_tube_id || "Playlist " + p.id;
+const videoCountLabel = (n) => n + (n === 1 ? " video" : " videos");
 
 // One playlist row, expandable in place to the videos it contributes. Videos
 // load on first open, so a parent with many playlists pays for only what they
@@ -375,7 +405,7 @@ const PlaylistRow = ({ playlist, apiUrl, token, onRemove }) => {
   const playable = playlist.playable_count || 0;
   const countLabel =
     playable === total
-      ? total + (total === 1 ? " video" : " videos")
+      ? videoCountLabel(total)
       : total + " videos · " + playable + " playable";
 
   return (
@@ -445,6 +475,41 @@ const PlaylistRow = ({ playlist, apiUrl, token, onRemove }) => {
   );
 };
 
+// A recommendation, drawn on the playlist row's grid so that adding it changes
+// only which list it sits in; the caret slot is kept, empty, so thumbnails
+// line up down the card. The title links out so a parent can vet the playlist
+// before taking it.
+const RecommendedPlaylistRow = ({ rec, adding, onAdd }) => (
+  <li className="recommended-playlist-item">
+    <span className="playlist-caret" aria-hidden="true" />
+    <span
+      className="playlist-thumbnail"
+      style={{ backgroundImage: `url(${rec.thumbnailurl})` }}
+    />
+    <span className="recommended-text">
+      <a
+        className="recommended-title"
+        href={youTubePlaylistURL(rec.you_tube_id)}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        {rec.title}
+      </a>
+      <span className="recommended-channel">{rec.channel}</span>
+    </span>
+    <span className="playlist-count">{videoCountLabel(rec.video_count)}</span>
+    <button
+      type="button"
+      className="recommended-add"
+      onClick={() => onAdd(rec)}
+      disabled={adding}
+      aria-busy={adding}
+    >
+      {adding ? "Adding…" : "Add"}
+    </button>
+  </li>
+);
+
 const PlaylistsSettingsView = ({
   token,
   apiUrl,
@@ -459,6 +524,7 @@ const PlaylistsSettingsView = ({
   const [playlistInput, setPlaylistInput] = useState("");
   const [playlistError, setPlaylistError] = useState(null);
   const [addingPlaylist, setAddingPlaylist] = useState(false);
+  const [addingRecommendedIds, setAddingRecommendedIds] = useState([]);
   // Just-removed playlists, held only long enough to offer them back. One
   // entry — and one clock — per removal, so removing a second playlist cannot
   // shorten the first one's window. No position is stored: rows and offers
@@ -532,35 +598,53 @@ const PlaylistsSettingsView = ({
     if (onPlayableCountChange) onPlayableCountChange(totalPlayable);
   }, [onPlayableCountChange, totalPlayable]);
 
-  const handleAddPlaylistByUrl = async (e) => {
+  // Posts one playlist and reports success; the caller owns its own busy
+  // state because the input's Add and a recommendation's Add are separate
+  // controls that must not grey each other out. Errors land in the shared
+  // line above the input either way.
+  const addPlaylist = async (body) => {
     setPlaylistError(null);
-    const urlOrId = playlistInput.trim();
-    if (!urlOrId) return;
-    setAddingPlaylist(true);
     try {
-      const body = urlOrId.startsWith("http")
-        ? { playlist_url: urlOrId }
-        : { youtube_playlist_id: urlOrId };
       const req = await apiFetch(apiUrl, "/playlists", token, {
         method: "POST",
         body: JSON.stringify(body),
       });
-      const data = req.ok ? await req.json().catch(() => ({})) : null;
       if (req.ok) {
-        setPlaylistInput("");
         fetchMyPlaylists();
         if (onPlaylistsChange) onPlaylistsChange();
-      } else {
-        setPlaylistError(
-          (data && (data.message || data.error)) ||
-            "Playlist must be public or check the URL.",
-        );
+        return true;
       }
+      // The server says why (GetError's {message}); the fallback is for a
+      // reply with no usable body, such as an nginx error page.
+      const data = await req.json().catch(() => ({}));
+      setPlaylistError(
+        (data && data.message) || "Playlist must be public or check the URL.",
+      );
     } catch (e) {
       setPlaylistError("Could not add playlist. Try again.");
-    } finally {
-      setAddingPlaylist(false);
     }
+    return false;
+  };
+
+  const handleAddPlaylistByUrl = async (e) => {
+    const urlOrId = playlistInput.trim();
+    if (!urlOrId) return;
+    setAddingPlaylist(true);
+    const ok = await addPlaylist(
+      urlOrId.startsWith("http")
+        ? { playlist_url: urlOrId }
+        : { youtube_playlist_id: urlOrId },
+    );
+    if (ok) setPlaylistInput("");
+    setAddingPlaylist(false);
+  };
+
+  const handleAddRecommended = async (rec) => {
+    setAddingRecommendedIds((prev) => [...prev, rec.you_tube_id]);
+    await addPlaylist({ youtube_playlist_id: rec.you_tube_id });
+    setAddingRecommendedIds((prev) =>
+      prev.filter((id) => id !== rec.you_tube_id),
+    );
   };
 
   // The removal is real immediately; undo re-adds. The alternative — holding
@@ -652,6 +736,13 @@ const PlaylistsSettingsView = ({
       .map((p) => ({ playlist: p, removed: true })),
   ].sort((a, b) => a.playlist.id - b.playlist.id);
 
+  // A recommendation the parent already has is not a suggestion. Matched on
+  // the YouTube id because that is the one field both sides carry.
+  const mine = new Set(myPlaylists.map((p) => p.you_tube_id));
+  const suggestions = RECOMMENDED_PLAYLISTS.filter(
+    (rec) => !mine.has(rec.you_tube_id),
+  );
+
   const undoBar = (playlist) => {
     const restoring = restoringIds.includes(playlist.id);
     return (
@@ -696,7 +787,6 @@ const PlaylistsSettingsView = ({
           )}
         </>
       }
-      question="Rewards are drawn only from these."
       wide
     >
       <div id="playlists-settings">
@@ -737,32 +827,19 @@ const PlaylistsSettingsView = ({
             ),
           )}
         </ul>
-        {RECOMMENDED_PLAYLISTS.length > 0 && (
-          <div className="curated-section">
-            <h4>Recommended playlists</h4>
-            <p className="settings-hint">
-              Public YouTube playlists you can add. Paste the URL above and
-              click Add playlist, or open the link to view on YouTube.
+        {suggestions.length > 0 && (
+          <div className="recommended-section">
+            <p className="settings-hint recommended-label">
+              Need ideas? Add one of these:
             </p>
             <ul id="recommended-playlist-list">
-              {RECOMMENDED_PLAYLISTS.map((p, i) => (
-                <li key={i} className="recommended-playlist-item">
-                  <a
-                    href={p.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="recommended-link"
-                  >
-                    {p.label}
-                  </a>
-                  <button
-                    type="button"
-                    className="add-recommended"
-                    onClick={() => setPlaylistInput(p.url)}
-                  >
-                    Use this URL
-                  </button>
-                </li>
+              {suggestions.map((rec) => (
+                <RecommendedPlaylistRow
+                  key={rec.you_tube_id}
+                  rec={rec}
+                  adding={addingRecommendedIds.includes(rec.you_tube_id)}
+                  onAdd={handleAddRecommended}
+                />
               ))}
             </ul>
           </div>
@@ -1042,6 +1119,7 @@ const SettingsView = ({ token, apiUrl, user, settings }) => {
 export {
   MIN_PLAYABLE_VIDEOS,
   UNDO_WINDOW_MS,
+  RECOMMENDED_PLAYLISTS,
   PROBLEM_TYPE_GROUPS,
   applyToggleRules,
   errorCardTitle,
