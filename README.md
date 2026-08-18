@@ -56,6 +56,35 @@ ops-runbook  doc=docs/ops-runbook.md  type=prose
 ```
 <!-- END PROJECT-AREA REGISTRY -->
 
+# Issue labels
+
+Every issue gets exactly one **kind** and one **priority**. **Modifiers** are optional and stack.
+Areas are not labels: the project-area registry above owns the file-to-area mapping.
+
+| Kind (pick one) | Meaning |
+|---|---|
+| `bug` | existing behavior is wrong |
+| `feature` | new or changed behavior |
+| `tech debt` | internal quality, no user-visible change (includes missing tests) |
+| `documentation` | doc-only, no code |
+| `spike` | investigate and decide; the deliverable is a decision, not a diff |
+
+| Priority (pick one) | Meaning |
+|---|---|
+| `p1` | harming users or blocking other work; next up |
+| `p2` | real, scheduled |
+| `p3` | someday, opportunistic |
+
+| Modifier (optional, any number) | Meaning |
+|---|---|
+| `security` | auth, secrets, headers, dependency advisories, anything an attacker can reach |
+| `performance` | latency, query cost, payload size |
+| `reliability` | correctness under failure: timeouts, retries, data integrity |
+| `operations` | deploy, host, or CI; needs prod access or a deploy window |
+
+`dependencies`, `go`, `javascript`, and `github_actions` are applied by Dependabot to PRs. Don't
+hand-apply them. Duplicate and won't-do issues use GitHub's close reason, not a label.
+
 # Local development
 
 ## Prerequisites
