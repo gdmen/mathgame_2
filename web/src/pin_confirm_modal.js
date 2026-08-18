@@ -45,6 +45,7 @@ const PinConfirmModal = ({
         <div className="pin-confirm-modal-pin">
           <label>{pinLabel}</label>
           <PinInput
+            focus
             length={PIN_LENGTH}
             type="numeric"
             inputMode="numeric"

@@ -212,6 +212,11 @@ Every PIN field in the app — this gate and the shared `PinConfirmModal` — pa
 `inputMode="numeric"` to `react-pin-input`. `"number"` is not a value the spec defines: browsers
 ignore it silently and fall back to the full keyboard, so a mobile parent gets no keypad.
 
+Both also mount with `focus`, so the caret starts in the first digit box. `PinView` passes it at
+every call site (the gate, the wizard's PIN step, the videos-repair gate), and the modal passes it
+on every open. In each, the PIN is the first thing on the surface asking to be typed into, and the
+modal only ever opens on a deliberate adult click.
+
 **Entry is masked (`secret`) everywhere except the setup wizard.** A parent types the PIN on the
 device the kid is holding, so displayed digits hand over the gate. Setup is the exception: that is
 where the parent chooses the code and has to be able to read back what they set (`PinView` masks on

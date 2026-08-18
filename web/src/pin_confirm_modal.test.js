@@ -16,9 +16,10 @@ jest.mock("react-pin-input", () => {
   const mockReact = require("react");
   return {
     __esModule: true,
-    default: ({ onChange }) =>
+    default: ({ onChange, focus }) =>
       mockReact.createElement("input", {
         className: "mock-pin",
+        autoFocus: focus,
         onChange: (e) => onChange(e.target.value),
       }),
   };
@@ -90,6 +91,13 @@ describe("PinConfirmModal", () => {
 
     typePin(container, "1234");
     expect(confirmButton().disabled).toBe(false);
+  });
+
+  it("puts the caret in the PIN on open", () => {
+    render();
+    expect(document.activeElement).toBe(
+      container.querySelector("input.mock-pin"),
+    );
   });
 
   it("hands the entered PIN to onConfirm", () => {

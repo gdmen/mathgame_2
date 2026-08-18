@@ -731,7 +731,8 @@ const StyleGuideView = () => {
           <code>components.scss</code>). The only modal shape in the app — the
           report-problem and delete-account flows are both this component,
           differing only in copy, confirm label, and the fields they pass as
-          children. Confirm stays disabled until four digits are in.
+          children. It opens with the caret in the PIN, and confirm stays
+          disabled until four digits are in.
         </p>
         <button
           className="sg-modal-open-btn"
