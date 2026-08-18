@@ -17,6 +17,21 @@ $playlist-row-content: 2.125em;
   font-size: 0.8em;
   padding: 0.35em 0.8em;
 }
+// The row button in the page's action colour, outlined: the one thing in a
+// quiet row that does something.
+@mixin playlist-row-action {
+  @include playlist-row-button;
+  background: transparent;
+  border-color: $color-one-contrast;
+  color: $color-one-contrast;
+  &:hover:not(:disabled) {
+    background: $color-two;
+  }
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+}
 
 .settings {
   @include page-under-band;
@@ -419,7 +434,7 @@ $playlist-row-content: 2.125em;
       }
     }
     ul#playlist-list,
-    ul#curated-playlist-list {
+    ul#recommended-playlist-list {
       list-style-type: none;
       padding: 0;
       // Each playlist is a disclosure: the row is the trigger, the videos it
@@ -513,19 +528,8 @@ $playlist-row-content: 2.125em;
           text-overflow: ellipsis;
           white-space: nowrap;
         }
-        // The one actionable thing in the slot gets the page's action colour.
         .playlist-undo-action {
-          @include playlist-row-button;
-          background: transparent;
-          border-color: $color-one-contrast;
-          color: $color-one-contrast;
-          &:hover:not(:disabled) {
-            background: $color-two;
-          }
-          &:disabled {
-            cursor: default;
-            opacity: 0.6;
-          }
+          @include playlist-row-action;
         }
       }
       .playlist-videos {
@@ -572,24 +576,49 @@ $playlist-row-content: 2.125em;
         }
       }
     }
-    .curated-section {
+    // Suggestions sit under the parent's own list on the same row grid, so a
+    // playlist looks the same before and after Add; only the list it is in
+    // changes. Everything about them is quieter: a soft-ink lead line instead
+    // of a heading, and an outline Add rather than the input's filled one.
+    .recommended-section {
       margin-top: 1.5 * $base-space;
-      ul#recommended-playlist-list {
-        list-style-type: none;
-        padding: 0;
+      .recommended-label {
+        margin-bottom: 0.35em;
       }
       .recommended-playlist-item {
         align-items: center;
+        border-top: $playlist-slot-border;
         display: flex;
-        margin-bottom: 0.5em;
-        .recommended-link {
-          color: $color-one;
-          margin-right: 0.5em;
+        gap: 0.625em;
+        padding: $playlist-slot-padding;
+      }
+      // Title over channel, both single-line, in the row's stretch slot.
+      .recommended-text {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .recommended-title {
+        color: inherit;
+        font-size: 0.95em;
+        overflow: hidden;
+        text-decoration: none;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        &:hover {
+          text-decoration: underline;
         }
-        .add-recommended {
-          margin-left: 0.5em;
-          padding: 0.25em 0.5em;
-        }
+      }
+      .recommended-channel {
+        color: $color-ink-soft;
+        font-size: 0.72em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .recommended-add {
+        @include playlist-row-action;
       }
     }
   }

@@ -185,7 +185,18 @@ completeness:
   "Math / video balance" with both ends named so the direction is unambiguous.
 - **`PlaylistsSettingsView`** — add/remove YouTube reward playlists (`GET/POST/DELETE /playlists`);
   accepts a URL (`playlist_url`) or a raw playlist ID (`youtube_playlist_id`).
-  `RECOMMENDED_PLAYLISTS` is an empty UI-only curation list, hidden unless populated.
+  Under the parent's list, **`RECOMMENDED_PLAYLISTS`** offers a few hand-picked public playlists
+  for a parent who arrives with nothing in mind, drawn on the same row grid as the list above
+  (thumbnail, title linking out to YouTube, channel, count chip, outline *Add*) so a playlist looks
+  the same before and after adding; only the list it sits in changes. It is a UI-only constant in
+  `settings.js` holding copied YouTube metadata (id, title, channel, count, thumbnail): nothing is
+  fetched to draw it. *Add* posts `youtube_playlist_id` through the same `addPlaylist` path as a
+  pasted URL, so a recommendation gets no special server treatment; each row carries its own busy
+  state so one *Adding…* does not grey out the input's Add or the other rows. A recommendation the
+  parent already has (matched on `you_tube_id`) is not shown, and the section disappears when
+  nothing is left to suggest. Entries are links to other people's playlists: one going private or
+  being deleted shows up as the add failing in the shared error line, the same failure a bad
+  pasted URL gives, so the only maintenance is replacing the entry.
   Each row is a **disclosure**: opening one lazily fetches
   `GET /playlists/{playlist_id}/videos` and lists that playlist's videos, with unavailable ones
   muted and labelled (never red — unavailable is a status, not a validation error). The card header
