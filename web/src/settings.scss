@@ -1,4 +1,4 @@
-@import "styles.scss";
+@use "styles" as *;
 
 // The playlist list's row rhythm. The undo bar takes a removed row's slot and
 // has to measure identically or the list shifts under it, so the numbers that
@@ -647,7 +647,7 @@ $playlist-row-content: 2.125em;
 @media only screen and (max-width: 870px) {
   .settings {
     .tab-content {
-      padding: $base-space $base-space/2;
+      padding: $base-space 0.5 * $base-space;
       .settings-form {
         width: 100%;
       }

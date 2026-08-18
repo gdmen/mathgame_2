@@ -1,4 +1,4 @@
-@import "styles.scss";
+@use "styles" as *;
 
 // A parent affordance sitting on the kid's screen: legible, but quiet enough
 // that it never competes with the answer box.

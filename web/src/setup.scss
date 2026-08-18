@@ -1,4 +1,4 @@
-@import "styles.scss";
+@use "styles" as *;
 
 // The PIN-gated repair page for a finished account short on reward videos:
 // one heading, the playlists card, and the way back into the game. The same
@@ -102,7 +102,7 @@
       }
     }
     .tab-content {
-      padding: $base-space $base-space/2;
+      padding: $base-space 0.5 * $base-space;
       .setup-form {
         width: 100%;
       }

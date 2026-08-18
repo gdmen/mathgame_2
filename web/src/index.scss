@@ -1,6 +1,6 @@
-@import "reset.scss";
-@import "styles.scss";
-@import "components.scss";
+@use "reset";
+@use "styles" as *;
+@use "components";
 
 html,
 body,

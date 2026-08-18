@@ -1,4 +1,4 @@
-@import "styles.scss";
+@use "styles" as *;
 
 // Same shape as the landing page's demo card (landing.scss .progress-track):
 // the marketing page shows this bar, so the real one has to be it.

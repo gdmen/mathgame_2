@@ -10,8 +10,8 @@
 //
 // reset before styles.scss matches the app's cascade order (index.scss), so the
 // landing shares the app's reset instead of hand-rolling its own.
-@import "reset.scss";
-@import "styles.scss";
+@use "reset";
+@use "styles" as *;
 
 // ---------------------------------------------------------------- fonts
 @font-face {

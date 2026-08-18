@@ -1,4 +1,4 @@
-@import "styles.scss";
+@use "styles" as *;
 
 .calib-page {
   max-width: $max-width;
