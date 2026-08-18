@@ -135,7 +135,7 @@ frontend-conf:
 # Assets the STATIC landing page needs. The landing is plain HTML with
 # no React, so it cannot use the app's JS @fontsource imports or its compiled
 # bundle: it gets its own stylesheet and its own copies of the woff2 files.
-# landing.scss @imports styles.scss, so both surfaces share one token source.
+# landing.scss pulls in styles.scss with @use, so both surfaces share one token source.
 # Outputs land in web/public/, which CRA copies verbatim into the build; both
 # are generated, so both are gitignored.
 landing-assets:

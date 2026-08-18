@@ -109,7 +109,7 @@ $radius-large: 1em;
 $radius-pill: 99em;
 $shadow-card: 0 0.5em 1.5em rgba(35, 48, 32, 0.1);
 
-// Keyboard-focus ring, shared by the app and the static landing (both @import
+// Keyboard-focus ring, shared by the app and the static landing (both @use
 // this file). :focus-visible fires only for keyboard/assistive-tech focus, so
 // mouse clicks never draw it.
 :focus-visible {

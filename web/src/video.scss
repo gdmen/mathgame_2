@@ -1,4 +1,4 @@
-@import "styles.scss";
+@use "styles" as *;
 
 #video-container {
   margin: 0 auto;
