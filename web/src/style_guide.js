@@ -315,11 +315,11 @@ const StyleGuideView = () => {
             <code>h3</code>
           </div>
           <div className="sg-type-row">
-            <h4>Heading 4 / UA default</h4>
+            <h4>Heading 4 / 1.25em</h4>
             <code>h4</code>
           </div>
           <div className="sg-type-row">
-            <h5>Heading 5 / UA default</h5>
+            <h5>Heading 5 / 1.1em</h5>
             <code>h5</code>
           </div>
           <div className="sg-type-row">
