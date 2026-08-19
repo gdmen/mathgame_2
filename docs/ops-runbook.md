@@ -83,8 +83,10 @@ The serving contract on the apex, top to bottom:
   matched non-strict and case-insensitive (`~*`, optional trailing slash) for
   parity with React Router. A new top-level route
   in `web/src/index.js` must be added to the config and the contract test or
-  its deployed URL 404s on any hard load — `server/api/web_routes_sync_test.go`
-  parses both files and fails the merge on a missed route. A catch-all is
+  its deployed URL answers with a 404 status on any hard load (the page still
+  renders, since the 404 body is the shell, so nothing visible flags it) —
+  `server/api/web_routes_sync_test.go` parses both files and fails the merge
+  on a missed route. A catch-all is
   deliberately absent — see the build subtleties below for why the landing/app
   split forces this shape.
 - **Caching:** everything unhashed answers `Cache-Control: no-cache`
@@ -93,8 +95,15 @@ The serving contract on the apex, top to bottom:
   `/static/` tree is `immutable` for a year.
 - **Everything else is files**: `try_files $uri $uri/ $uri.html =404` gives
   the landing at `/` (via `index`), extensionless statics by their `.html`
-  (`/privacy`), and a real 404 with the branded `404.html` for unknown paths
-  (403 folded in, so bare directory URLs answer the same).
+  (`/privacy`), and a real 404 for unknown paths (403 folded in, so bare
+  directory URLs answer the same). The 404 body is `app.html`
+  (`error_page 403 404 =404 /app.html`, with the no-cache header riding it via
+  `always`), so the shell's own not-found route (`NotFound` in
+  `web/src/index.js`) is the 404 page and the status stays 404. Two consequences
+  worth knowing: no-JS clients (curl, link unfurlers) see the bare shell rather
+  than not-found copy, which the 404 status covers for crawlers; and a
+  signed-in account mid-setup gets its setup takeover at an unknown URL, the
+  same as on any app route.
 - **gzip is nginx's** (`gzip on` + types; the list carries both
   `application/javascript` and `text/javascript` because nginx's bundled
   `mime.types` switched the `.js` mapping in 1.21.5 and prod runs 1.18).
@@ -160,8 +169,8 @@ Two build subtleties worth knowing:
   static page at `/` is to *be* `index.html` — hence the two renames at the end
   of `build-web`. The flip side is that the React shell cannot be `index.html`,
   which is why the front door rewrites **an enumerated route list** to
-  `app.html` instead of a catch-all: with a catch-all, `/privacy`, the branded
-  404, and every missing asset would collapse into the shell (the old
+  `app.html` instead of a catch-all: with a catch-all, `/privacy` and every
+  missing asset would collapse into the shell with a 200 (the old
   shell-with-a-200 behavior); without one, extensionless statics resolve via
   `$uri.html` and unknown paths are real 404s. The route list, its extension
   procedure, and the full serving contract live in The front door above.
