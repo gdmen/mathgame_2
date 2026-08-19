@@ -463,16 +463,12 @@ h2 {
   &[aria-pressed="true"] {
     @include toggle-pill-on;
   }
-  small {
-    color: $color-ink-soft;
-    font-size: 0.85em;
-  }
 }
 
 .points {
   display: grid;
   gap: 1.375 * $base-space;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
 }
 .point {
   border-left: 0.25em solid $color-one-contrast;

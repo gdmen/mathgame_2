@@ -58,9 +58,8 @@ const NotFound = () => {
   useDocumentTitle("Page not found");
   return (
     <div className="not-found">
-      <h1>404</h1>
-      <p>We couldn't find that page.</p>
-      <a href="/">Back to the game</a>
+      <h1>Oops! We can't find that page.</h1>
+      <a href="/">Back to the home page</a>
     </div>
   );
 };

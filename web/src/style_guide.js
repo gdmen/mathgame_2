@@ -967,8 +967,8 @@ const StyleGuideView = () => {
                 <span className="save-state">Saved ✓</span>
               </div>
               <p className="settings-hint">
-                Adjusts automatically as your child plays; nudge it if it feels
-                off.
+                This adjusts automatically as your child plays. If it's too far
+                off, feel free to nudge it.
               </p>
               <p className="settings-value">62%</p>
               <div className="settings-meter">
@@ -1060,7 +1060,7 @@ const StyleGuideView = () => {
           dead-end layout.
         </p>
         <div className="not-found">
-          <h1>Hold on</h1>
+          <h1>Oops</h1>
           <p>We couldn't start the game.</p>
           <a href="/settings">Ask a grown-up to check Settings</a>
         </div>

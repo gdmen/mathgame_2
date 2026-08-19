@@ -131,7 +131,7 @@ guide's colour invariant).
 
 ## Report-problem flow
 
-A kid-visible "Report problem" link opens the shared `PinConfirmModal`
+A kid-visible "Skip problem" link opens the shared `PinConfirmModal`
 (`web/src/pin_confirm_modal.js`; the modal shape is documented on `/style-guide`), which holds the
 typed PIN and won't enable Submit until all four digits are in. This page contributes only the
 optional explanation field, passed as children and styled by `.report-explanation` in `play.scss`.

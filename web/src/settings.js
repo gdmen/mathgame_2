@@ -141,7 +141,7 @@ const PROBLEM_TYPE_GROUPS = [
   },
   {
     title: "Problem format",
-    question: "How can problems be posed?",
+    question: "How can problems be written?",
     entries: [
       { bit: ProblemTypes.WORD, label: "Word problems" },
       {
@@ -265,7 +265,7 @@ const ProblemTypesSettingsView = ({
   return (
     <SettingsCard
       title="Skills"
-      question="What can your child do, and how can problems be posed?"
+      question="What is your child working on, and how can problems be written?"
       wide
       saveState={saveState}
     >
@@ -892,7 +892,7 @@ const TargetDifficultySettingsView = ({
   return (
     <SettingsCard
       title="Current difficulty"
-      question="Adjusts automatically as your child plays; nudge it if it feels off."
+      question="This adjusts automatically as your child plays. If it's too far off, feel free to nudge it."
       saveState={saveState}
     >
       <div id="target-difficulty-settings">
@@ -1038,16 +1038,12 @@ const DeleteAccountView = ({ token, apiUrl, user }) => {
   };
 
   return (
-    <SettingsCard
-      title="Delete account"
-      question="Want to remove this account and everything in it?"
-      wide
-    >
+    <SettingsCard title="Permanently delete account" wide>
       <div className="delete-account">
         <p className="settings-hint">
-          This deletes your account, settings, playlists and saved progress,
-          then signs you out. Anonymous gameplay data is kept, with nothing left
-          in it that identifies you. Account deletion can&rsquo;t be undone.
+          This deletes your account, settings, playlists and saved progress and
+          then signs you out. Anonymous gameplay data is kept with nothing left
+          in it to identify you. Account deletion can&rsquo;t be undone.
         </p>
         <button
           type="button"
@@ -1061,7 +1057,7 @@ const DeleteAccountView = ({ token, apiUrl, user }) => {
       {showModal && (
         <PinConfirmModal
           title="Delete account?"
-          copy="This permanently deletes the account. Enter your PIN to confirm."
+          copy="This permanently deletes your account."
           confirmLabel="Delete forever"
           submittingLabel="Deleting…"
           confirmClassName="delete-account-confirm"
