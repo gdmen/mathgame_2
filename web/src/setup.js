@@ -46,8 +46,8 @@ const ProblemTypesTabView = ({
     <>
       <h2>What kinds of math can your child do?</h2>
       <p className="settings-hint" style={{ textAlign: "center" }}>
-        Turn on what your child can do — leave off what they can't yet. You can
-        change everything later.
+        Turn on what your child can do and leave off what they can't yet. You
+        can change everything later.
       </p>
       <ProblemTypesSettingsView
         token={token}
@@ -166,7 +166,7 @@ const PinTabView = ({ token, apiUrl, user, advanceSetup }) => {
     <>
       <h2>Set a PIN!</h2>
       <p className="settings-hint">
-        You'll need it to change these settings later.
+        You'll need to remember it to change these settings later.
       </p>
       <div className="setup-form">
         {/*

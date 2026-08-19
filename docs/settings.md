@@ -54,7 +54,7 @@ problem-generation.md "Bit reference").
 | Operations | What can your child do? | ADDITION, SUBTRACTION, DIVISION, MULTIPLICATION → PERCENTAGES |
 | Number types | What kinds of numbers? | DECIMALS, NEGATIVES, FRACTIONS → MISMATCHED_DENOMINATORS |
 | Number size | How big can the numbers be? | MEDIUM_NUMBERS, LARGE_NUMBERS |
-| Problem format | How can problems be posed? | WORD, MISSING_NUMBER, SINGLE_VARIABLE, CHAINED_OPERATIONS → PEMDAS |
+| Problem format | How can problems be written? | WORD, MISSING_NUMBER, SINGLE_VARIABLE, CHAINED_OPERATIONS → PEMDAS |
 
 `→` marks a **dependent** (`dependsOn`) rendered on its own row directly below its **parent**.
 Three dependent pairs exist: FRACTIONS→MISMATCHED_DENOMINATORS, CHAINED_OPERATIONS→PEMDAS, and

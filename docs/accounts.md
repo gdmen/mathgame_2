@@ -219,8 +219,9 @@ modal only ever opens on a deliberate adult click.
 
 **Entry is masked (`secret`) everywhere except the setup wizard.** A parent types the PIN on the
 device the kid is holding, so displayed digits hand over the gate. Setup is the exception: that is
-where the parent chooses the code and has to be able to read back what they set (`PinView` masks on
-`!isSetup`, the same flag that prefills it). Masking is only half of it — `react-pin-input` names
+where the parent chooses the code and has to be able to read back what they set (the wizard step
+passes `secret={false}` next to `authoring` and the prefilled `initialValue`; every gate keeps
+`PinView`'s masked default). Masking is only half of it — `react-pin-input` names
 each box after the digit it holds unless given an `ariaLabel`, so every site passes
 `PIN_DIGIT_LABEL` (exported from `pin.js`) and a masked PIN is not read aloud.
 
@@ -265,9 +266,9 @@ takeover instead of the pin entry it was navigated to for.
    list — see [settings.md](settings.md). It is the server's de-duplicated `playable_total`, which
    is what lets this gate and step 4's agree; a client-side sum of the per-playlist counts would
    pass a parent whose playlists overlap and then strand them on a blocked step 4.
-3. **Set Parent Pin** — `PinView` in `isSetup` mode; first arrival types all four digits. A
+3. **Set Parent Pin** — `PinView` with `authoring`; first arrival types all four digits. A
    parent who set the code and then stepped back to this tab sees it **prefilled** (`PinView`'s
-   `initialValue`, setup mode only — the gate route never prefills, since typing the code is the
+   `initialValue`, the wizard step only — the gate route never prefills, since typing the code is the
    entire check) with continue live. Continue POSTs the user only when the step actually authored
    a PIN — four digits typed here that differ from `user.pin` (`PinTabView`); a prefilled
    pass-through writes nothing, which is also what keeps it from overwriting the stored PIN with

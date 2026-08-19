@@ -279,7 +279,7 @@ const PlayView = ({
   if (blocked) {
     return (
       <div className="not-found">
-        <h1>Hold on</h1>
+        <h1>Oops</h1>
         <p>We couldn't start the game.</p>
         <a href="/settings">Ask a grown-up to check Settings</a>
       </div>
@@ -359,13 +359,12 @@ const PlayView = ({
               setReportExplanation("");
             }}
           >
-            Report problem
+            Skip problem
           </button>
           {showReportModal && (
             <PinConfirmModal
-              title="Report problem"
-              copy="Report if this problem is unsuitable or doesn't accept the correct answer. Your PIN is required."
-              pinLabel="PIN"
+              title="Skip problem"
+              copy="Report if this problem is unsuitable or doesn't accept the correct answer."
               confirmLabel="Submit"
               submittingLabel="Submitting…"
               submitting={reportSubmitting}
@@ -387,7 +386,7 @@ const PlayView = ({
                   }
                   maxLength={REPORT_EXPLANATION_MAX_LENGTH}
                   rows={3}
-                  placeholder="e.g. Wrong answer was marked correct"
+                  placeholder="e.g. Correct answer wasn't accepted"
                 />
                 <span className="report-char-count">
                   {reportExplanation.length}/{REPORT_EXPLANATION_MAX_LENGTH}

@@ -17,7 +17,7 @@ import { PIN_DIGIT_LABEL, PIN_LENGTH } from "./pin.js";
 const PinConfirmModal = ({
   title,
   copy,
-  pinLabel = "Enter PIN to confirm",
+  pinLabel = "PIN (required)",
   confirmLabel,
   submittingLabel,
   confirmClassName,
