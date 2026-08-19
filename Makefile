@@ -10,8 +10,7 @@ GOINSTALL=$(GOCMD) install
 GOMOD=$(GOCMD) mod
 GOTEST=$(GOCMD) test
 GOFMT=gofmt -w
-GOPATH=$(HOME)/go
-SWAGGER=$(GOPATH)/bin/swagger
+SWAGGER=$(GOBIN)/swagger
 RM=rm -rf
 
 # Backend config the web build reads. Override for the secret scan, which builds
@@ -34,6 +33,7 @@ build-api:
 		--event-types server/api/event_types.go \
 		-o web/src/enums.generated.js
 	$(MAKE) fmt
+	$(MAKE) build-docs
 	$(GOBUILD) -o ./bin/apiserver ./cmd/apiserver/main.go
 
 build-cmds: build-api
@@ -95,12 +95,9 @@ gen-difficulty-fixtures:
 docs-check:
 	python3 scripts/docs_check.py $(if $(BASE),--base $(BASE),)
 
+# Builds the go.mod-pinned go-swagger; see docs/swagger.md.
 check-swagger:
-	if ! which swagger >/dev/null; then \
-		go get github.com/go-swagger/go-swagger/cmd/swagger && \
-		go install github.com/go-swagger/go-swagger/cmd/swagger && \
-		echo "swagger installed"; \
-	fi
+	$(GOBUILD) -o $(SWAGGER) github.com/go-swagger/go-swagger/cmd/swagger
 
 build-docs: check-swagger
 	$(SWAGGER) generate spec -i ./server/docs/swagger_base.yml -o ./swagger.yaml --scan-models
