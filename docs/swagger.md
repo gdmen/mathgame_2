@@ -37,8 +37,12 @@ Two commands, both needing go-swagger:
 | `make build-docs` | scans the annotations into `swagger.yaml`, merging `server/docs/swagger_base.yml`, then validates the result |
 | `make dev-docs` | serves `swagger.yaml` locally in the Swagger UI |
 
-Both depend on `check-swagger`, which installs go-swagger if it is missing — read the first gotcha
-below before relying on that. `swagger.yaml` is generated and gitignored; `make clean` removes it.
+Both depend on `check-swagger`, which builds go-swagger into `bin/swagger` at the version go.mod
+pins (recorded in `tools.go`), so every checkout generates the same bytes. `build-api` runs
+`build-docs` before compiling `apiserver`, so any build (and CI's build step) regenerates the spec
+and fails on a broken one. A go-swagger version bump rewrites the output wholesale (ordering,
+formatting, definition shapes) and belongs in its own commit.
+`swagger.yaml` is generated and gitignored; `make clean` removes it.
 
 ## The formatting constraint
 
@@ -74,12 +78,6 @@ one path-parameter type serves every operation on the resource; `emptyResp` is t
 
 ## Gotchas
 
-- **`check-swagger` may install a go-swagger that cannot scan this codebase.** On Go 1.24 a freshly
-  installed binary has been observed panicking inside `golang.org/x/tools` during `generate spec`,
-  while an older already-installed binary works. The cause is not pinned down, and a newer
-  go-swagger may well settle it, so treat a panic from `swagger generate spec` as a toolchain
-  question rather than a problem with the annotations, and check what `$(GOPATH)/bin/swagger`
-  actually is. Open in #363, which also covers whether the spec build can go in CI.
 - **A route with no user-naming path param is not self-gated.** `RequireSelf` only compares params
   it finds, so `POST /events` and the collection routes cannot answer 403. Documenting one there is
   a factual error.

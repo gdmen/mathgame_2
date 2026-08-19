@@ -142,9 +142,9 @@ boot). The three jobs that must not overlap a manual run hold a `flock`
 
 | Target | What it does |
 |---|---|
-| `build-api` | regenerates `*_model.generated.go` / `*_handlers.generated.go` from `server/api/models.json` and `web/src/enums.generated.js` from the Go enum blocks (Python codegen), `gofmt -s`, then builds `bin/apiserver` |
+| `build-api` | regenerates `*_model.generated.go` / `*_handlers.generated.go` from `server/api/models.json` and `web/src/enums.generated.js` from the Go enum blocks (Python codegen), `gofmt -s`, regenerates the Swagger spec (`build-docs`), then builds `bin/apiserver` |
 | `build-cmds` | depends on `build-api`; builds every `cmd/*` tool into `bin/` (see list below) |
-| `build-web` | `frontend-conf`, `npm ci --include=dev`, `landing-assets`, then build into `web/build.next`, prettier, the landing/app HTML swap (below), then swap `build.next` → `build`. `--include=dev` because npm reads `NODE_ENV=production` as `--omit=dev`, which would skip `react-scripts` and `sass` and break the build. `npm ci` (not `npm install`) so the deployed bundle is built from exactly the lockfile the CI `npm audit` gate certifies, and so the install fails loudly instead of re-resolving. It reinstalls the whole dependency tree every run (a few seconds), so a deploy needs the network |
+| `build-web` | `frontend-conf`, `npm ci --include=dev`, `landing-assets`, then build into `web/build.next`, prettier, the landing/app HTML swap (below), then swap `build.next` → `build`. `--include=dev` because npm reads `NODE_ENV=production` as `--omit=dev`, which would skip `react-scripts` and `sass` and break the build. `npm ci` (not `npm install`) so the deployed bundle is built from exactly the lockfile the CI `npm audit` gate certifies, and so the install fails loudly instead of re-resolving. It reinstalls the whole dependency tree every run (a few seconds), so a deploy needs the network — as does the Go side for any modules new since the last deploy (the go-swagger toolchain included) |
 | `landing-assets` | compiles `web/src/landing.scss` → `web/public/landing.css` and copies the landing's woff2 files into `web/public/fonts/`; both outputs are generated and gitignored. The landing is plain HTML with no React, so it can reach neither the app's bundle nor its JS `@fontsource` imports and needs its own copies. `landing.scss` pulls in `styles.scss` with `@use`, so the two surfaces still compile from one token source |
 | `test` / `test-api` / `test-cmds` | `test` = `build-api` then both Go suites; `test-api` (`./server/api`) and `test-cmds` (`./cmd/...`) run one each without rebuilding, which is how the CI Go job invokes them after its own `build-api` step. Every suite needs the MySQL from `test_conf.json` |
 | `web-deps` | `npm ci` in `web/` — lockfile-exact, and fails if `package.json` and the lockfile have drifted |
@@ -154,7 +154,7 @@ boot). The three jobs that must not overlap a manual run hold a `flock`
 | `test-all` | `test` + `test-web` + `test-bundle-secrets` + `test-nginx` — full local CI parity |
 | `fmt` / `fmt-file` / `fmt-web` / `fmt-web-file` | canonical formatters — `gofmt -s` on the tree or a single Go file (`FILE=`), and `prettier --write` on `web/src` or a single web file (`FILE=`); single source of truth, invoked by `build-api` / `build-web` and the format-on-edit hook in `.claude/hooks/fmt-on-edit.sh` |
 | `docs-check` | `scripts/docs_check.py`; pass `BASE=origin/master` to enforce per-area doc updates |
-| `build-docs` / `dev-docs` | generate `swagger.yaml` from the `server/docs` annotations and validate it, and serve it locally; both need go-swagger (`check-swagger` installs it). See [docs/swagger.md](swagger.md) |
+| `build-docs` / `dev-docs` | generate `swagger.yaml` from the `server/docs` annotations and validate it, and serve it locally; `check-swagger` builds the pinned go-swagger into `bin/swagger`. See [docs/swagger.md](swagger.md) |
 | `frontend-conf` | emits `web/src/conf.json` with only the public config fields |
 | `check-bundle-secrets` | fails if a secret value from `$(CONF)` made it into `web/build` |
 | `prod-api` | the API service entrypoint |
