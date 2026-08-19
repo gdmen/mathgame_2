@@ -2,6 +2,9 @@
     "name": "web",
     "version": "0.1.0",
     "private": true,
+    "scarfSettings": {
+        "enabled": false
+    },
     "dependencies": {
         "@auth0/auth0-react": "^1.12.1",
         "@fontsource/caveat": "^5.3.0",
@@ -16,7 +19,8 @@
         "react-router-dom": "^5.3.4",
         "react-window": "^1.8.11",
         "semantic-ui-css": "^2.5.0",
-        "semantic-ui-react": "^0.88.2"
+        "semantic-ui-react": "^0.88.2",
+        "swagger-ui-dist": "^5.32.14"
     },
     "devDependencies": {
         "@babel/plugin-proposal-private-property-in-object": "^7.21.11",

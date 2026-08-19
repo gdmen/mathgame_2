@@ -73,6 +73,17 @@ func createTestUser(t *testing.T, r *gin.Engine, auth0Id, email, username string
 	return u
 }
 
+// createTestAdmin is createTestUser plus promotion to the admin role, which
+// only ever happens by hand in the DB (docs/accounts.md).
+func createTestAdmin(t *testing.T, api *Api, r *gin.Engine, auth0Id, email, username string) *User {
+	t.Helper()
+	u := createTestUser(t, r, auth0Id, email, username)
+	if _, err := api.DB.Exec("UPDATE users SET role=? WHERE auth0_id=?", RoleAdmin, u.Auth0Id); err != nil {
+		t.Fatalf("promote to admin: %v", err)
+	}
+	return u
+}
+
 // insertVideos inserts n catalog videos owned by nobody and returns their IDs.
 // Uses a unique prefix per call so multiple calls in the same test (e.g. subtests) do not hit you_tube_id unique constraint.
 func insertVideos(t *testing.T, api *Api, n int) []uint32 {

@@ -134,10 +134,7 @@ func TestCalibrationCacheEndpoints(t *testing.T) {
 	defer cleanup()
 	seedCalibrationProblems(t, api)
 
-	admin := createTestUser(t, r, "auth0id|calib-admin", "calib@test.com", "calibadmin")
-	if _, err := api.DB.Exec("UPDATE users SET role=? WHERE auth0_id=?", RoleAdmin, admin.Auth0Id); err != nil {
-		t.Fatalf("promote admin: %v", err)
-	}
+	admin := createTestAdmin(t, api, r, "auth0id|calib-admin", "calib@test.com", "calibadmin")
 
 	getReport := func(auth string) (*httptest.ResponseRecorder, CalibrationReportResponse) {
 		resp := httptest.NewRecorder()

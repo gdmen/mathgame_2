@@ -1,0 +1,1273 @@
+basePath: /api/v1
+consumes:
+    - application/json
+definitions:
+    BitmapMatrixData:
+        description: |-
+            AxisHi is the global max floor(MaxDiffForBitmap), extended to cover the
+            highest counted over-ceiling pool bucket. PoolMax is the largest per-cell pool
+            count, for the frontend heatmap's log/quantile scaling.
+        properties:
+            axis_hi:
+                format: int64
+                type: integer
+                x-go-name: AxisHi
+            axis_lo:
+                format: int64
+                type: integer
+                x-go-name: AxisLo
+            pool_max:
+                format: int64
+                type: integer
+                x-go-name: PoolMax
+            rows:
+                items:
+                    $ref: '#/definitions/MatrixRow'
+                type: array
+                x-go-name: Rows
+        title: BitmapMatrixData is the whole report. AxisLo is MinTargetDifficulty (3);
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    CalibrationBucket:
+        properties:
+            dominant_bits:
+                items:
+                    $ref: '#/definitions/NameCount'
+                type: array
+                x-go-name: DominantBits
+            generators:
+                items:
+                    $ref: '#/definitions/CalibrationGenGroup'
+                type: array
+                x-go-name: Generators
+            label:
+                type: string
+                x-go-name: Label
+            live_count:
+                format: int64
+                type: integer
+                x-go-name: LiveCount
+            not_served_count:
+                format: int64
+                type: integer
+                x-go-name: NotServedCount
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    CalibrationData:
+        properties:
+            buckets:
+                items:
+                    $ref: '#/definitions/CalibrationBucket'
+                type: array
+                x-go-name: Buckets
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    CalibrationGenGroup:
+        description: |-
+            CalibrationGenGroup is one generator version's presence in a bucket: how many
+            live problems it has there, and one example of each distinct problem-type
+            bitmap it produced.
+        properties:
+            generator:
+                type: string
+                x-go-name: Generator
+            live_count:
+                format: int64
+                type: integer
+                x-go-name: LiveCount
+            problems:
+                items:
+                    $ref: '#/definitions/CalibrationProblem'
+                type: array
+                x-go-name: Problems
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    CalibrationProblem:
+        properties:
+            bits:
+                items:
+                    type: string
+                type: array
+                x-go-name: Bits
+            breakdown:
+                $ref: '#/definitions/DifficultyBreakdown'
+            difficulty:
+                format: double
+                type: number
+                x-go-name: Difficulty
+            expression:
+                type: string
+                x-go-name: Expression
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    CalibrationReportResponse:
+        description: |-
+            CalibrationReportResponse is the GET payload: the cached report (nil until
+            first computed), when it was computed, and whether a rebuild is in flight.
+        properties:
+            computed_at:
+                type: string
+                x-go-name: ComputedAt
+            computing:
+                type: boolean
+                x-go-name: Computing
+            report:
+                $ref: '#/definitions/CalibrationData'
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    ConceptFactor:
+        description: for inspection tools. Presentation (labels/formatting) is the caller's job.
+        properties:
+            factor:
+                format: double
+                type: number
+                x-go-name: Factor
+            name:
+                type: string
+                x-go-name: Name
+        title: ConceptFactor is one enabled concept multiplier and the factor it contributed,
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/mathcore
+    DifficultyBreakdown:
+        description: |-
+            DifficultyBreakdown exposes the intermediate factors that
+            ComputeProblemDifficulty combines. It exists for inspection (the admin
+            difficulty-calibration page) and does NOT affect scoring:
+            ComputeProblemDifficulty returns Scaled, computed by exactly the formula
+            below. Keep this output-identical to the documented formula - any change
+            to Scaled requires a DifficultyVersion bump (see docs/problem-generation.md).
+        properties:
+            concept:
+                format: double
+                type: number
+                x-go-name: Concept
+            concepts:
+                items:
+                    $ref: '#/definitions/ConceptFactor'
+                type: array
+                x-go-name: Concepts
+            has_missing:
+                type: boolean
+                x-go-name: HasMissing
+            magnitude:
+                format: double
+                type: number
+                x-go-name: Magnitude
+            max_magnitude:
+                format: double
+                type: number
+                x-go-name: MaxMagnitude
+            num_ops:
+                format: int64
+                type: integer
+                x-go-name: NumOps
+            op_weight:
+                format: double
+                type: number
+                x-go-name: OpWeight
+            raw:
+                format: double
+                type: number
+                x-go-name: Raw
+            scaled:
+                format: double
+                type: number
+                x-go-name: Scaled
+            structure:
+                format: double
+                type: number
+                x-go-name: Structure
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/mathcore
+    Error:
+        properties:
+            message:
+                type: string
+                x-go-name: Message
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/common
+    Event:
+        properties:
+            event_type:
+                type: string
+                x-go-name: EventType
+            id:
+                format: uint32
+                type: integer
+                x-go-name: Id
+            timestamp:
+                format: date-time
+                type: string
+                x-go-name: Timestamp
+            user_id:
+                format: uint32
+                type: integer
+                x-go-name: UserId
+            value:
+                type: string
+                x-go-name: Value
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    Gamestate:
+        properties:
+            problem_id:
+                format: uint32
+                type: integer
+                x-go-name: ProblemId
+            solved:
+                format: uint32
+                type: integer
+                x-go-name: Solved
+            target:
+                format: uint32
+                type: integer
+                x-go-name: Target
+            user_id:
+                format: uint32
+                type: integer
+                x-go-name: UserId
+            video_id:
+                format: uint32
+                type: integer
+                x-go-name: VideoId
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    MatrixCell:
+        description: |-
+            MatrixCell is one (bitmap, difficulty-bucket) cell. Short JSON keys with
+            omitempty: at ~200k cells the key names dominate the payload. A targetable
+            cell carries the live example (Ex/Ans/Diff) and its pool count; an
+            over-ceiling cell carries only Pool (if any) and Over; an unbuildable
+            targetable cell carries neither example nor Over (Ex == "" is the marker).
+        properties:
+            a:
+                type: string
+                x-go-name: Ans
+            d:
+                format: double
+                type: number
+                x-go-name: Diff
+            e:
+                type: string
+                x-go-name: Ex
+            o:
+                type: boolean
+                x-go-name: Over
+            p:
+                format: int64
+                type: integer
+                x-go-name: Pool
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    MatrixRow:
+        description: |-
+            MatrixRow is one bitmap's row of cells. Cells[i] is the bucket AxisLo+i; the
+            row runs from AxisLo up to its own ceiling (extended to cover any over-ceiling
+            pool rows), so most rows are far shorter than the full axis.
+        properties:
+            bitmap:
+                format: uint64
+                type: integer
+                x-go-name: Bitmap
+            bits:
+                items:
+                    type: string
+                type: array
+                x-go-name: Bits
+            ceil:
+                format: int64
+                type: integer
+                x-go-name: Ceil
+            cells:
+                items:
+                    $ref: '#/definitions/MatrixCell'
+                type: array
+                x-go-name: Cells
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    MonthStats:
+        properties:
+            month:
+                type: string
+                x-go-name: Month
+            total_problems_solved:
+                format: int64
+                type: integer
+                x-go-name: TotalProblemsSolved
+            total_video_minutes:
+                format: int64
+                type: integer
+                x-go-name: TotalVideoMinutes
+            total_work_minutes:
+                format: int64
+                type: integer
+                x-go-name: TotalWorkMinutes
+        title: MonthStats holds the same top-level stats for a single month (YYYY-MM).
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    MyPlaylists:
+        description: |-
+            MyPlaylists wraps the rows with the one number a caller must not compute
+            itself. Summing PlayableCount across playlists double-counts a video that
+            sits in two of them, so a total derived that way can clear minPlayableVideos
+            while the reward loop, which draws from the de-duplicated user_has_video, has
+            fewer. PlayableTotal is that same de-duplicated count.
+        properties:
+            playable_total:
+                format: int64
+                type: integer
+                x-go-name: PlayableTotal
+            playlists:
+                items:
+                    $ref: '#/definitions/PlaylistWithCounts'
+                type: array
+                x-go-name: Playlists
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    NameCount:
+        properties:
+            count:
+                format: int64
+                type: integer
+                x-go-name: Count
+            name:
+                type: string
+                x-go-name: Name
+        title: NameCount is a label with its occurrence count (bit frequencies).
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    PageLoadData:
+        properties:
+            num_videos_enabled:
+                format: int64
+                type: integer
+                x-go-name: NumVideosEnabled
+            settings:
+                $ref: '#/definitions/Settings'
+            user:
+                $ref: '#/definitions/User'
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    PlayData:
+        properties:
+            gamestate:
+                $ref: '#/definitions/Gamestate'
+            problem:
+                $ref: '#/definitions/Problem'
+            video:
+                $ref: '#/definitions/Video'
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    PlaylistWithCounts:
+        description: |-
+            PlaylistWithCounts carries the per-playlist video tallies the settings page
+            shows on each row. Embedding Playlist keeps its JSON shape unchanged, so the
+            counts are additive for any existing caller.
+        properties:
+            etag:
+                type: string
+                x-go-name: Etag
+            id:
+                format: uint32
+                type: integer
+                x-go-name: Id
+            playable_count:
+                format: int64
+                type: integer
+                x-go-name: PlayableCount
+            thumbnailurl:
+                type: string
+                x-go-name: ThumbnailURL
+            title:
+                type: string
+                x-go-name: Title
+            video_count:
+                format: int64
+                type: integer
+                x-go-name: VideoCount
+            you_tube_id:
+                type: string
+                x-go-name: YouTubeId
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    Problem:
+        properties:
+            answer:
+                type: string
+                x-go-name: Answer
+            created_at:
+                format: date-time
+                type: string
+                x-go-name: CreatedAt
+            difficulty:
+                format: double
+                type: number
+                x-go-name: Difficulty
+            difficulty_version:
+                type: string
+                x-go-name: DifficultyVersion
+            explanation:
+                type: string
+                x-go-name: Explanation
+            expression:
+                type: string
+                x-go-name: Expression
+            generator:
+                type: string
+                x-go-name: Generator
+            id:
+                format: uint32
+                type: integer
+                x-go-name: Id
+            problem_type_bitmap:
+                format: uint64
+                type: integer
+                x-go-name: ProblemTypeBitmap
+            status:
+                type: string
+                x-go-name: Status
+            symbolic_expression:
+                type: string
+                x-go-name: SymbolicExpression
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    Settings:
+        properties:
+            problem_type_bitmap:
+                format: uint64
+                type: integer
+                x-go-name: ProblemTypeBitmap
+            target_difficulty:
+                format: double
+                type: number
+                x-go-name: TargetDifficulty
+            target_work_percentage:
+                format: uint8
+                type: integer
+                x-go-name: TargetWorkPercentage
+            user_id:
+                format: uint32
+                type: integer
+                x-go-name: UserId
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    StatisticsResponse:
+        description: StatisticsResponse is the JSON response for GET /api/v1/statistics/:user_id
+        properties:
+            stats_by_month:
+                items:
+                    $ref: '#/definitions/MonthStats'
+                type: array
+                x-go-name: StatsByMonth
+            total_problems_solved:
+                format: int64
+                type: integer
+                x-go-name: TotalProblemsSolved
+            total_video_minutes:
+                format: int64
+                type: integer
+                x-go-name: TotalVideoMinutes
+            total_work_minutes:
+                format: int64
+                type: integer
+                x-go-name: TotalWorkMinutes
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    User:
+        properties:
+            auth0_id:
+                type: string
+                x-go-name: Auth0Id
+            email:
+                type: string
+                x-go-name: Email
+            id:
+                format: uint32
+                type: integer
+                x-go-name: Id
+            pin:
+                type: string
+                x-go-name: Pin
+            role:
+                type: string
+                x-go-name: Role
+            username:
+                type: string
+                x-go-name: Username
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+    Video:
+        properties:
+            disabled:
+                type: boolean
+                x-go-name: Disabled
+            id:
+                format: uint32
+                type: integer
+                x-go-name: Id
+            thumbnailurl:
+                type: string
+                x-go-name: ThumbnailURL
+            title:
+                type: string
+                x-go-name: Title
+            url:
+                type: string
+                x-go-name: URL
+            you_tube_id:
+                type: string
+                x-go-name: YouTubeId
+        type: object
+        x-go-package: garydmenezes.com/mathgame/server/api
+info:
+    description: |-
+        Every route requires an Auth0-issued bearer JWT and answers 401 without a
+        valid one. Routes carrying an :auth0_id or :user_id path parameter are
+        further restricted to the caller's own record, and /admin routes additionally
+        require the admin role, so both can answer 403 for an authenticated caller.
+        Every route except POST /users and GET /problems/{id} also answers 404 when
+        the token is valid but has no users row behind it yet; the 404s listed on
+        each operation below are that resource's own.
+    title: Math Game API.
+    version: 1.0.0
+paths:
+    /admin/bitmap-matrix:
+        get:
+            description: |-
+                The body is the raw gzipped report (Content-Encoding: gzip) and is empty until
+                one has been computed. The envelope rides in response headers instead:
+                X-Has-Report, X-Computing, X-Compute-Done, X-Compute-Total, X-Computed-At.
+            operationId: adminBitmapMatrix
+            responses:
+                "200":
+                    $ref: '#/responses/bitmapMatrixResp'
+                "403":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: Get the cached bitmap-matrix report.
+            tags:
+                - admin
+    /admin/bitmap-matrix/cell:
+        get:
+            description: |-
+                Ephemeral: the cached report is never touched. 400 when the bitmap is invalid
+                or the bucket is not targetable for it; 422 when no problem could be built.
+            operationId: adminBitmapMatrixCell
+            parameters:
+                - format: uint64
+                  in: query
+                  name: bitmap
+                  required: true
+                  type: integer
+                  x-go-name: Bitmap
+                - description: Difficulty bucket, which must be targetable for this bitmap.
+                  format: int64
+                  in: query
+                  name: bucket
+                  required: true
+                  type: integer
+                  x-go-name: Bucket
+            responses:
+                "200":
+                    $ref: '#/responses/matrixCellResp'
+                "400":
+                    $ref: '#/responses/error'
+                "403":
+                    $ref: '#/responses/error'
+                "422":
+                    $ref: '#/responses/error'
+            summary: Live-regenerate one bitmap-matrix cell.
+            tags:
+                - admin
+    /admin/bitmap-matrix/recompute:
+        post:
+            description: Returns immediately. A second request while one is already running is a no-op.
+            operationId: adminRecomputeBitmapMatrix
+            responses:
+                "200":
+                    $ref: '#/responses/computingResp'
+                "403":
+                    $ref: '#/responses/error'
+            summary: Start a background rebuild of the bitmap-matrix report.
+            tags:
+                - admin
+    /admin/difficulty-calibration:
+        get:
+            description: |-
+                report is null until one has been computed; computing says whether a rebuild is
+                in flight.
+            operationId: adminDifficultyCalibration
+            responses:
+                "200":
+                    $ref: '#/responses/calibrationResp'
+                "403":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: Get the cached difficulty-calibration report.
+            tags:
+                - admin
+    /admin/difficulty-calibration/recompute:
+        post:
+            description: Returns immediately. A second request while one is already running is a no-op.
+            operationId: adminRecomputeCalibration
+            responses:
+                "200":
+                    $ref: '#/responses/computingResp'
+                "403":
+                    $ref: '#/responses/error'
+            summary: Start a background rebuild of the calibration report.
+            tags:
+                - admin
+    /admin/swagger.yaml:
+        get:
+            operationId: adminSwaggerSpec
+            produces:
+                - application/yaml
+            responses:
+                "200":
+                    $ref: '#/responses/swaggerSpecResp'
+                "403":
+                    $ref: '#/responses/error'
+            summary: Get this spec, as the admin API docs page loads it.
+            tags:
+                - admin
+    /admin/whoami:
+        get:
+            operationId: adminWhoami
+            responses:
+                "200":
+                    $ref: '#/responses/adminWhoamiResp'
+                "403":
+                    $ref: '#/responses/error'
+            summary: Confirm admin access and report the caller's identity and role.
+            tags:
+                - admin
+    /events:
+        post:
+            description: |-
+                The event drives the gamestate machine, so the response is the caller's
+                post-event play data (gamestate, next problem, next video) rather than the
+                stored event. Reporting a bad problem marks it reported so it stops being
+                served; if it was the current problem, the same response carries its
+                replacement.
+            operationId: createEvent
+            parameters:
+                - in: body
+                  name: Body
+                  schema:
+                    $ref: '#/definitions/Event'
+            responses:
+                "200":
+                    $ref: '#/responses/playDataResp'
+                "400":
+                    $ref: '#/responses/error'
+                "404":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: Record one gameplay event and get back the resulting play data.
+            tags:
+                - events
+    /events/{user_id}/{seconds}:
+        get:
+            description: |-
+                Limited to the last {seconds} seconds and to the event types the client
+                replays: LOGGED_IN, SELECTED_PROBLEM, ANSWERED_PROBLEM, SOLVED_PROBLEM,
+                DONE_WATCHING_VIDEO.
+            operationId: listEvents
+            parameters:
+                - description: Id of the caller's own user row.
+                  format: uint32
+                  in: path
+                  name: user_id
+                  required: true
+                  type: integer
+                  x-go-name: UserId
+                - description: How far back to look, in seconds.
+                  format: uint32
+                  in: path
+                  name: seconds
+                  required: true
+                  type: integer
+                  x-go-name: Seconds
+            responses:
+                "200":
+                    $ref: '#/responses/eventListResp'
+                "400":
+                    $ref: '#/responses/error'
+                "403":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: List the caller's own recent events.
+            tags:
+                - events
+    /gamestates/{user_id}:
+        get:
+            description: |-
+                If the gamestate has no video assigned, one is selected and persisted before
+                the response is written.
+            operationId: getGamestate
+            parameters:
+                - description: Id of the caller's own user row.
+                  format: uint32
+                  in: path
+                  name: user_id
+                  required: true
+                  type: integer
+                  x-go-name: UserId
+            responses:
+                "200":
+                    $ref: '#/responses/gamestateResp'
+                "400":
+                    $ref: '#/responses/error'
+                "403":
+                    $ref: '#/responses/error'
+                "404":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: Get the caller's own gamestate.
+            tags:
+                - gamestates
+    /pageload/{auth0_id}:
+        get:
+            description: |-
+                One call for the caller's user row, their settings, and how many videos they
+                have enabled.
+            operationId: getPageLoadData
+            parameters:
+                - description: Auth0 subject of the caller, which must match the token.
+                  in: path
+                  name: auth0_id
+                  required: true
+                  type: string
+                  x-go-name: Auth0Id
+            responses:
+                "200":
+                    $ref: '#/responses/pageLoadResp'
+                "400":
+                    $ref: '#/responses/error'
+                "403":
+                    $ref: '#/responses/error'
+                "404":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: Get everything the client needs on page load.
+            tags:
+                - session
+    /play/{user_id}:
+        get:
+            description: |-
+                Selects and persists a problem or video when the gamestate is missing one. 403
+                when the caller has too few playable videos to start a session; the message
+                names the minimum.
+            operationId: getPlayData
+            parameters:
+                - description: Id of the caller's own user row.
+                  format: uint32
+                  in: path
+                  name: user_id
+                  required: true
+                  type: integer
+                  x-go-name: UserId
+            responses:
+                "200":
+                    $ref: '#/responses/playDataResp'
+                "400":
+                    $ref: '#/responses/error'
+                "403":
+                    $ref: '#/responses/error'
+                "404":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: Get the caller's current gamestate with its problem and video resolved.
+            tags:
+                - session
+    /playlists:
+        get:
+            description: |-
+                playable_total is the de-duplicated count across all of them: summing
+                playable_count per playlist double-counts a video that sits in two, so callers
+                must not compute the total themselves.
+            operationId: listPlaylists
+            responses:
+                "200":
+                    $ref: '#/responses/myPlaylistsResp'
+                "500":
+                    $ref: '#/responses/error'
+            summary: List the playlists the caller has added, with per-playlist video tallies.
+            tags:
+                - playlists
+        post:
+            description: |-
+                Identify the playlist by playlist_id (an already-known row),
+                youtube_playlist_id, or playlist_url, checked in that order; the latter two are
+                fetched from YouTube on first use. Returns the id of the playlist that was
+                added.
+            operationId: addPlaylist
+            parameters:
+                - in: body
+                  name: Body
+                  schema:
+                    properties:
+                        playlist_id:
+                            description: Id of a playlist row already known to the server.
+                            format: uint32
+                            type: integer
+                            x-go-name: PlaylistId
+                        playlist_url:
+                            description: A YouTube playlist URL to parse the id out of.
+                            type: string
+                            x-go-name: PlaylistUrl
+                        youtube_playlist_id:
+                            description: YouTube's own playlist id.
+                            type: string
+                            x-go-name: YouTubePlaylistId
+                    type: object
+            responses:
+                "200":
+                    $ref: '#/responses/addPlaylistResp'
+                "400":
+                    $ref: '#/responses/error'
+                "404":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: Add a playlist to the caller's list.
+            tags:
+                - playlists
+    /playlists/{playlist_id}:
+        delete:
+            operationId: removePlaylist
+            parameters:
+                - format: uint32
+                  in: path
+                  name: playlist_id
+                  required: true
+                  type: integer
+                  x-go-name: PlaylistId
+            responses:
+                "204":
+                    $ref: '#/responses/emptyResp'
+                "400":
+                    $ref: '#/responses/error'
+                "404":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: Remove a playlist from the caller's list.
+            tags:
+                - playlists
+    /playlists/{playlist_id}/videos:
+        get:
+            description: |-
+                The caller's playlist membership is the authorization: a playlist they have not
+                added returns no rows.
+            operationId: listPlaylistVideos
+            parameters:
+                - format: uint32
+                  in: path
+                  name: playlist_id
+                  required: true
+                  type: integer
+                  x-go-name: PlaylistId
+            responses:
+                "200":
+                    $ref: '#/responses/videoListResp'
+                "400":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: List the videos in one playlist the caller has added.
+            tags:
+                - playlists
+    /problems/{id}:
+        get:
+            description: |-
+                A problem row belongs to no user, so this route needs a valid token but no
+                users row behind it.
+            operationId: getProblem
+            parameters:
+                - format: uint32
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: Id
+            responses:
+                "200":
+                    $ref: '#/responses/getProblemResp'
+                "400":
+                    $ref: '#/responses/error'
+                "404":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: Get one problem by id.
+            tags:
+                - problems
+    /settings/{user_id}:
+        get:
+            operationId: getSettings
+            parameters:
+                - description: Id of the caller's own user row.
+                  format: uint32
+                  in: path
+                  name: user_id
+                  required: true
+                  type: integer
+                  x-go-name: UserId
+            responses:
+                "200":
+                    $ref: '#/responses/settingsResp'
+                "400":
+                    $ref: '#/responses/error'
+                "403":
+                    $ref: '#/responses/error'
+                "404":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: Get the caller's own settings.
+            tags:
+                - settings
+        post:
+            description: |-
+                user_id is taken from the authenticated identity, not the path or body.
+                target_difficulty is clamped into the band the saved problem_type_bitmap
+                supports before the write, so the value returned may differ from the one sent.
+                Changed fields also emit settings events.
+            operationId: updateSettings
+            parameters:
+                - description: Id of the caller's own user row.
+                  format: uint32
+                  in: path
+                  name: user_id
+                  required: true
+                  type: integer
+                  x-go-name: UserId
+                - in: body
+                  name: Body
+                  schema:
+                    $ref: '#/definitions/Settings'
+            responses:
+                "200":
+                    $ref: '#/responses/settingsResp'
+                "400":
+                    $ref: '#/responses/error'
+                "403":
+                    $ref: '#/responses/error'
+                "404":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: Update the caller's own settings.
+            tags:
+                - settings
+    /statistics/{user_id}:
+        get:
+            description: |-
+                Reads through the statistics cache, refreshing it from any events recorded
+                since the last read before answering.
+            operationId: getStatistics
+            parameters:
+                - description: Id of the caller's own user row.
+                  format: uint32
+                  in: path
+                  name: user_id
+                  required: true
+                  type: integer
+                  x-go-name: UserId
+            responses:
+                "200":
+                    $ref: '#/responses/statisticsResp'
+                "403":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: Get the caller's own lifetime and per-month totals.
+            tags:
+                - session
+    /users:
+        post:
+            description: |-
+                This is the first-login route. It names no user in its path and takes the
+                auth0_id from the token, because a first-login caller has no users row yet.
+                Answers 200 whether the row was created or already existed.
+            operationId: createOrUpdateUser
+            parameters:
+                - in: body
+                  name: Body
+                  schema:
+                    $ref: '#/definitions/User'
+            responses:
+                "200":
+                    $ref: '#/responses/userResp'
+                "400":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: Create the caller's own user row, or return it if it already exists.
+            tags:
+                - users
+    /users/{auth0_id}:
+        delete:
+            description: |-
+                Purges per-user state, anonymizes the users row, and best-effort removes the
+                Auth0 identity. Events are retained against the anonymized row. Requires the
+                adult PIN in the body as a deliberate-intent gate; 403 if it is wrong or if no
+                PIN has been set yet.
+            operationId: deleteAccount
+            parameters:
+                - description: Auth0 subject of the caller, which must match the token.
+                  in: path
+                  name: auth0_id
+                  required: true
+                  type: string
+                  x-go-name: Auth0Id
+                - in: body
+                  name: Body
+                  schema:
+                    properties:
+                        pin:
+                            description: The adult PIN, re-entered to confirm.
+                            type: string
+                            x-go-name: Pin
+                    required:
+                        - pin
+                    type: object
+            responses:
+                "204":
+                    $ref: '#/responses/emptyResp'
+                "400":
+                    $ref: '#/responses/error'
+                "403":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: Delete the caller's own account.
+            tags:
+                - users
+        get:
+            operationId: getUser
+            parameters:
+                - description: Auth0 subject of the caller, which must match the token.
+                  in: path
+                  name: auth0_id
+                  required: true
+                  type: string
+                  x-go-name: Auth0Id
+            responses:
+                "200":
+                    $ref: '#/responses/userResp'
+                "400":
+                    $ref: '#/responses/error'
+                "403":
+                    $ref: '#/responses/error'
+                "404":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: Get the caller's own user row.
+            tags:
+                - users
+        post:
+            description: |-
+                Id and role are forced from the stored row, so neither can be set by the
+                client; the row written is always the token's own.
+            operationId: updateUser
+            parameters:
+                - in: body
+                  name: Body
+                  schema:
+                    $ref: '#/definitions/User'
+                - description: Auth0 subject of the caller, which must match the token.
+                  in: path
+                  name: auth0_id
+                  required: true
+                  type: string
+                  x-go-name: Auth0Id
+            responses:
+                "200":
+                    $ref: '#/responses/userResp'
+                "400":
+                    $ref: '#/responses/error'
+                "403":
+                    $ref: '#/responses/error'
+                "404":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: Update the caller's own user row.
+            tags:
+                - users
+    /videos:
+        get:
+            operationId: listVideos
+            responses:
+                "200":
+                    $ref: '#/responses/videoListResp'
+                "500":
+                    $ref: '#/responses/error'
+            summary: List the videos on the caller's own list.
+            tags:
+                - videos
+    /videos/{id}:
+        get:
+            operationId: getVideo
+            parameters:
+                - format: uint32
+                  in: path
+                  name: id
+                  required: true
+                  type: integer
+                  x-go-name: Id
+            responses:
+                "200":
+                    $ref: '#/responses/videoResp'
+                "400":
+                    $ref: '#/responses/error'
+                "404":
+                    $ref: '#/responses/error'
+                "500":
+                    $ref: '#/responses/error'
+            summary: Get one video by id.
+            tags:
+                - videos
+produces:
+    - application/json
+responses:
+    addPlaylistResp:
+        description: ""
+        schema:
+            properties:
+                id:
+                    format: uint32
+                    type: integer
+                    x-go-name: Id
+            type: object
+    adminWhoamiResp:
+        description: ""
+        schema:
+            properties:
+                auth0_id:
+                    type: string
+                    x-go-name: Auth0Id
+                id:
+                    format: uint32
+                    type: integer
+                    x-go-name: Id
+                role:
+                    type: string
+                    x-go-name: Role
+            type: object
+    bitmapMatrixResp:
+        description: ""
+        headers:
+            X-Compute-Done:
+                description: Bitmaps processed so far by the in-flight rebuild.
+                format: int64
+                type: integer
+            X-Compute-Total:
+                description: Bitmaps the in-flight rebuild will process.
+                format: int64
+                type: integer
+            X-Computed-At:
+                description: When the cached report was computed.
+                type: string
+            X-Computing:
+                description: Whether a rebuild is in flight.
+                type: boolean
+            X-Has-Report:
+                description: Whether a cached report exists.
+                type: boolean
+        schema:
+            $ref: '#/definitions/BitmapMatrixData'
+    calibrationResp:
+        description: ""
+        schema:
+            $ref: '#/definitions/CalibrationReportResponse'
+    computingResp:
+        description: ""
+        schema:
+            properties:
+                computing:
+                    type: boolean
+                    x-go-name: Computing
+            type: object
+    emptyResp:
+        description: ""
+    error:
+        description: ""
+        schema:
+            $ref: '#/definitions/Error'
+    eventListResp:
+        description: ""
+        schema:
+            items:
+                $ref: '#/definitions/Event'
+            type: array
+    gamestateResp:
+        description: ""
+        schema:
+            $ref: '#/definitions/Gamestate'
+    getProblemResp:
+        description: ""
+        schema:
+            $ref: '#/definitions/Problem'
+    matrixCellResp:
+        description: ""
+        schema:
+            $ref: '#/definitions/MatrixCell'
+    myPlaylistsResp:
+        description: ""
+        schema:
+            $ref: '#/definitions/MyPlaylists'
+    pageLoadResp:
+        description: ""
+        schema:
+            $ref: '#/definitions/PageLoadData'
+    playDataResp:
+        description: ""
+        schema:
+            $ref: '#/definitions/PlayData'
+    settingsResp:
+        description: ""
+        schema:
+            $ref: '#/definitions/Settings'
+    statisticsResp:
+        description: ""
+        schema:
+            $ref: '#/definitions/StatisticsResponse'
+    swaggerSpecResp:
+        description: The Swagger 2.0 document, as YAML.
+        schema:
+            type: string
+    userResp:
+        description: ""
+        schema:
+            $ref: '#/definitions/User'
+    videoListResp:
+        description: ""
+        schema:
+            items:
+                $ref: '#/definitions/Video'
+            type: array
+    videoResp:
+        description: ""
+        schema:
+            $ref: '#/definitions/Video'
+security:
+    - bearer: []
+securityDefinitions:
+    bearer:
+        description: Auth0-issued JWT, sent as `Bearer <token>`.
+        in: header
+        name: Authorization
+        type: apiKey
+swagger: "2.0"

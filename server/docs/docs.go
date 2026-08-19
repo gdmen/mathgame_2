@@ -8,10 +8,8 @@
 // the token is valid but has no users row behind it yet; the 404s listed on
 // each operation below are that resource's own.
 //
-// Schemes: http, https
 // BasePath: /api/v1
 // Version: 1.0.0
-// Host: localhost:8080
 //
 // Consumes:
 // - application/json

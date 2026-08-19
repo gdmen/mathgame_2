@@ -1,0 +1,5 @@
+@use "styles" as *;
+
+.api-docs-page {
+  @include page-under-band;
+}

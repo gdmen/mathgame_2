@@ -244,6 +244,7 @@ func (a *Api) GetRouter() *gin.Engine {
 				admin.GET("/bitmap-matrix", a.adminBitmapMatrix)
 				admin.POST("/bitmap-matrix/recompute", a.adminRecomputeBitmapMatrix)
 				admin.GET("/bitmap-matrix/cell", a.adminBitmapMatrixCell)
+				admin.GET("/swagger.yaml", a.adminSwaggerSpec)
 			}
 		}
 	}

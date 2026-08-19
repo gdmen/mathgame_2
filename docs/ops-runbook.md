@@ -154,11 +154,11 @@ boot). The three jobs that must not overlap a manual run hold a `flock`
 | `test-all` | `test` + `test-web` + `test-bundle-secrets` + `test-nginx` — full local CI parity |
 | `fmt` / `fmt-file` / `fmt-web` / `fmt-web-file` | canonical formatters — `gofmt -s` on the tree or a single Go file (`FILE=`), and `prettier --write` on `web/src` or a single web file (`FILE=`); single source of truth, invoked by `build-api` / `build-web` and the format-on-edit hook in `.claude/hooks/fmt-on-edit.sh` |
 | `docs-check` | `scripts/docs_check.py`; pass `BASE=origin/master` to enforce per-area doc updates |
-| `build-docs` / `dev-docs` | generate `swagger.yaml` from the `server/docs` annotations and validate it, and serve it locally; `check-swagger` builds the pinned go-swagger into `bin/swagger`. See [docs/swagger.md](swagger.md) |
+| `build-docs` | regenerate the committed `server/docs/spec/swagger.yaml` from the `server/docs` annotations and validate it; `check-swagger` builds the pinned go-swagger into `bin/swagger`. See [docs/swagger.md](swagger.md) |
 | `frontend-conf` | emits `web/src/conf.json` with only the public config fields |
 | `check-bundle-secrets` | fails if a secret value from `$(CONF)` made it into `web/build` |
 | `prod-api` | the API service entrypoint |
-| `clean` | drops test DBs, removes `bin/*`, generated Go, `swagger.yaml`, web build dirs; `go mod tidy` |
+| `clean` | drops test DBs, removes `bin/*`, generated Go, web build dirs; `go mod tidy` |
 
 Two build subtleties worth knowing:
 

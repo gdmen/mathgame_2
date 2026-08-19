@@ -8,3 +8,9 @@ securityDefinitions:
     description: Auth0-issued JWT, sent as `Bearer <token>`.
 security:
   - bearer: []
+# The one primitive-bodied response; see docs/swagger.md.
+responses:
+  swaggerSpecResp:
+    description: The Swagger 2.0 document, as YAML.
+    schema:
+      type: string

@@ -30,15 +30,17 @@ jobs:
     - name: Build
       run: make build-api
 
-    # The jest job and build-web read the committed copy without regenerating
-    # it, so a stale one ships. Build regenerates before the tests read it,
-    # which is why they cannot catch this themselves.
-    - name: Generated frontend enums up to date
-      run: git diff --exit-code web/src/enums.generated.js
+    # Build regenerated these committed files; a stale one otherwise ships,
+    # because the jest job and build-web read the enums without regenerating
+    # them and apiserver embeds the spec.
+    - name: Generated files up to date
+      run: git diff --exit-code web/src/enums.generated.js server/docs/spec/swagger.yaml
 
     - name: Test
       run: make test-api test-cmds
 
+    - name: Test
+      run: make test-api test-cmds
     # Default symbol scan: exits nonzero only when our code actually calls a
     # vulnerable symbol, so modules we merely require don't gate the build.
     - name: Vulnerability scan

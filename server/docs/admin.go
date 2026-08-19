@@ -63,6 +63,16 @@ responses:
   422: error
 */
 
+/*
+swagger:route GET /admin/swagger.yaml admin adminSwaggerSpec
+Get this spec, as the admin API docs page loads it.
+produces:
+- application/yaml
+responses:
+  200: swaggerSpecResp
+  403: error
+*/
+
 // swagger:parameters adminBitmapMatrixCell
 type adminBitmapMatrixCellParameters struct {
 	// in:query

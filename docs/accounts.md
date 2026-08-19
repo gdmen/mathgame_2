@@ -104,13 +104,14 @@ in the DB. The role lives only on the `users` row; the DB is the single source o
 loaded user's role is `RoleAdmin`. It reads the user that `UserMiddleware` loaded, so it must be
 registered after it. All operator surfaces live under the `/api/v1/admin` group, which composes
 `userMiddleware` then `RequireAdmin()` (`init.go`). Inhabitants: `GET /admin/whoami`
-(`adminWhoami`, a liveness/first-inhabitant echo of the caller's auth0_id/id/role) and the
-difficulty-calibration endpoints (owned by another area).
+(`adminWhoami`, a liveness/first-inhabitant echo of the caller's auth0_id/id/role), the
+difficulty-calibration and bitmap-matrix endpoints (owned by another area), and
+`GET /admin/swagger.yaml` (the embedded API spec; [swagger.md](swagger.md)).
 
 **Client gate — admin UI** (`web/src/index.js`, `isAdmin`): role-derived flag that drives three
 things — the "Admin" nav button renders only for an admin; admin routes (`/admin`,
-`/admin/difficulty-calibration`, `/admin/style-guide`) render their view for an admin and the
-**404 page** for everyone else, so a non-admin gets no hint the surface exists; and admin paths
+`/admin/difficulty-calibration`, `/admin/bitmap-matrix`, `/admin/style-guide`, `/admin/api-docs`)
+render their view for an admin and the **404 page** for everyone else, so a non-admin gets no hint the surface exists; and admin paths
 **bypass the setup-wizard gate** (the `onExemptPath` short-circuit, which also exempts the `/pin/`
 gate route — see the setup wizard section), so an operator reaches admin
 tools without completing kid onboarding. The client gate is cosmetic; server `RequireAdmin` is
