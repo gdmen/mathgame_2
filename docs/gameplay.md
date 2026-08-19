@@ -156,6 +156,13 @@ once `solved >= target`. Notable behavior:
 
 - The `list` query param is stripped from the URL so a single video plays instead of an embedded
   playlist.
+- **The embed is served from `youtube-nocookie.com`**, YouTube's privacy-enhanced host, set through
+  `react-player`'s `config.youtube.embedOptions.host` (spread into the `YT.Player` options, which
+  is where the IFrame API reads the embed domain from). The JS API, events and playback are the
+  same on either host. What this buys is that the view is kept out of ad personalization. It does
+  **not** buy a cookie-free screen: the host defers cookies until playback, and playback is the
+  whole point here, so the privacy copy's "when a video plays, YouTube may set cookies" stays
+  accurate as written.
 - Spacebar toggles play/pause via a global `document.body.onkeyup` handler; a transparent
   `#click-blocker` overlay intercepts clicks to the same toggle so the kid can't reach YouTube's
   own chrome.

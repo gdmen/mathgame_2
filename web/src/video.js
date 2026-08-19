@@ -11,6 +11,12 @@ import "./video.scss";
 
 import { EventTypes } from "./enums.generated.js";
 
+// react-player spreads embedOptions into YT.Player, whose host picks the embed
+// domain. Module scope so the prop identity is stable across renders.
+const YOUTUBE_CONFIG = {
+  youtube: { embedOptions: { host: "https://www.youtube-nocookie.com" } },
+};
+
 const VideoView = ({ video, eventReporter, interval }) => {
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -59,6 +65,7 @@ const VideoView = ({ video, eventReporter, interval }) => {
           width="100%"
           height="100%"
           url={playUrl}
+          config={YOUTUBE_CONFIG}
           playing={playing}
           progressInterval={interval}
           onProgress={(e) => {
