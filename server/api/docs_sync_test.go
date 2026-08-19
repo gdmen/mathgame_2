@@ -4,11 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
 
+	"go.yaml.in/yaml/v3"
+
+	"garydmenezes.com/mathgame/server/docs/spec"
 	"garydmenezes.com/mathgame/server/generator"
 	"garydmenezes.com/mathgame/server/llm_generator"
 	"garydmenezes.com/mathgame/server/mathcore"
@@ -305,4 +310,49 @@ func TestDocsSyncSchema(t *testing.T) {
 		tables = append(tables, m.Table)
 	}
 	assertSetAnchor(t, doc, "model_tables", anchors["model_tables"], tables)
+}
+
+// TestDocsSyncSwaggerSpec pins the committed spec's operations to the
+// swagger:route annotations, both directions, without needing go-swagger;
+// docs/swagger.md owns the gate layering.
+func TestDocsSyncSwaggerSpec(t *testing.T) {
+	annotated := map[string]bool{}
+	routeRe := regexp.MustCompile(`(?m)^(?://\s*)?swagger:route (\w+) (\S+) `)
+	files, _ := filepath.Glob("../docs/*.go")
+	for _, f := range files {
+		for _, m := range routeRe.FindAllStringSubmatch(readFileForTest(t, f), -1) {
+			annotated[strings.ToLower(m[1])+" "+m[2]] = true
+		}
+	}
+	if len(annotated) == 0 {
+		t.Fatal("no swagger:route annotations found under server/docs; update this test alongside them")
+	}
+
+	var parsed struct {
+		Paths map[string]map[string]any `yaml:"paths"`
+	}
+	if err := yaml.Unmarshal(spec.YAML, &parsed); err != nil {
+		t.Fatalf("committed spec unparseable: %v", err)
+	}
+	// Path items can carry non-operation keys ($ref, parameters); count verbs only.
+	methods := map[string]bool{"get": true, "put": true, "post": true, "delete": true, "options": true, "head": true, "patch": true}
+	generated := map[string]bool{}
+	for path, ops := range parsed.Paths {
+		for method := range ops {
+			if methods[method] {
+				generated[method+" "+path] = true
+			}
+		}
+	}
+
+	for op := range annotated {
+		if !generated[op] {
+			t.Errorf("%s is annotated but absent from the committed spec; run `make build-docs` and commit the result", op)
+		}
+	}
+	for op := range generated {
+		if !annotated[op] {
+			t.Errorf("%s is in the committed spec but no longer annotated; run `make build-docs` and commit the result", op)
+		}
+	}
 }

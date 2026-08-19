@@ -7,13 +7,16 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"garydmenezes.com/mathgame/server/common"
+	"garydmenezes.com/mathgame/server/docs/spec"
 )
 
-// TestAdminGate verifies RequireAdmin: a default (student) user is forbidden
-// from an /api/v1/admin route, while a user whose role is admin is allowed.
+// TestAdminGate verifies RequireAdmin on every route in the /admin group that
+// has no body of its own to test elsewhere: a default (student) user is
+// forbidden, a user whose role is admin is allowed.
 func TestAdminGate(t *testing.T) {
 	c, err := common.ReadConfig("../../test_conf.json")
 	if err != nil {
@@ -21,25 +24,24 @@ func TestAdminGate(t *testing.T) {
 	}
 	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
+	student := createTestUser(t, r, "auth0id|admin-student", "s@test.com", "student")
+	admin := createTestAdmin(t, api, r, "auth0id|admin-admin", "a@test.com", "admin")
 
-	t.Run("ForbiddenForStudent", func(t *testing.T) {
-		user := createTestUser(t, r, "auth0id|admin-student", "s@test.com", "student")
+	get := func(user *User, path string) *httptest.ResponseRecorder {
 		resp := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/admin/whoami?test_auth0_id=%s", user.Auth0Id), nil)
+		req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/admin%s?test_auth0_id=%s", path, user.Auth0Id), nil)
 		r.ServeHTTP(resp, req)
-		if resp.Code != http.StatusForbidden {
-			t.Errorf("expected 403 for student, got %d: %s", resp.Code, resp.Body.Bytes())
-		}
-	})
+		return resp
+	}
 
-	t.Run("AllowedForAdmin", func(t *testing.T) {
-		user := createTestUser(t, r, "auth0id|admin-admin", "a@test.com", "admin")
-		if _, err := api.DB.Exec("UPDATE users SET role=? WHERE auth0_id=?", RoleAdmin, user.Auth0Id); err != nil {
-			t.Fatalf("promote to admin: %v", err)
+	for _, path := range []string{"/whoami", "/swagger.yaml"} {
+		if resp := get(student, path); resp.Code != http.StatusForbidden {
+			t.Errorf("%s: expected 403 for student, got %d: %s", path, resp.Code, resp.Body.Bytes())
 		}
-		resp := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/admin/whoami?test_auth0_id=%s", user.Auth0Id), nil)
-		r.ServeHTTP(resp, req)
+	}
+
+	t.Run("Whoami", func(t *testing.T) {
+		resp := get(admin, "/whoami")
 		if resp.Code != http.StatusOK {
 			t.Fatalf("expected 200 for admin, got %d: %s", resp.Code, resp.Body.Bytes())
 		}
@@ -51,6 +53,19 @@ func TestAdminGate(t *testing.T) {
 		}
 		if body.Role != RoleAdmin {
 			t.Errorf("expected role %q, got %q", RoleAdmin, body.Role)
+		}
+	})
+
+	t.Run("SwaggerSpec", func(t *testing.T) {
+		resp := get(admin, "/swagger.yaml")
+		if resp.Code != http.StatusOK {
+			t.Fatalf("expected 200 for admin, got %d: %s", resp.Code, resp.Body.Bytes())
+		}
+		if ct := resp.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/yaml") {
+			t.Errorf("expected a YAML content type, got %q", ct)
+		}
+		if !bytes.Equal(resp.Body.Bytes(), spec.YAML) {
+			t.Errorf("body is not the embedded spec")
 		}
 	})
 }

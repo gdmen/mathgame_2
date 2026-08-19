@@ -19,6 +19,11 @@ const tools = [
     label: "Style guide",
     desc: "Design tokens and component patterns.",
   },
+  {
+    path: "/admin/api-docs",
+    label: "API docs",
+    desc: "The Swagger spec for /api/v1, with Try it out running as you.",
+  },
 ];
 
 const AdminHomeView = () => (

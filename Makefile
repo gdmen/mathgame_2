@@ -99,12 +99,10 @@ docs-check:
 check-swagger:
 	$(GOBUILD) -o $(SWAGGER) github.com/go-swagger/go-swagger/cmd/swagger
 
+# The output is committed and embedded into apiserver; see docs/swagger.md.
 build-docs: check-swagger
-	$(SWAGGER) generate spec -i ./server/docs/swagger_base.yml -o ./swagger.yaml --scan-models
-	$(SWAGGER) validate ./swagger.yaml
-
-dev-docs: check-swagger
-	$(SWAGGER) serve -F=swagger swagger.yaml
+	$(SWAGGER) generate spec -i ./server/docs/swagger_base.yml -o ./server/docs/spec/swagger.yaml --scan-models
+	$(SWAGGER) validate ./server/docs/spec/swagger.yaml
 
 check-disabled-videos:
 	$(GOBUILD) -o ./bin/check_disabled_videos ./cmd/check_disabled_videos/
@@ -116,7 +114,6 @@ fix-disabled-videos:
 
 clean:
 	-$(GOCMD) run ./cmd/clean_test_dbs -config test_conf.json
-	$(RM) ./swagger.yaml
 	$(RM) ./bin/*
 	$(RM) ./server/api/*.generated.go
 	$(RM) ./web/src/enums.generated.js

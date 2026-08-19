@@ -1,8 +1,8 @@
 # log files
 *.log
 
-# swagger output
-swagger.yaml
+# Stale build-docs output present in older checkouts
+/swagger.yaml
 
 # conf files
 conf.json

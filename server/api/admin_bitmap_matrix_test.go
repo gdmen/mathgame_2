@@ -159,10 +159,7 @@ func TestBitmapMatrixCacheEndpoints(t *testing.T) {
 	seedMatrixProblems(t, api)
 	api.bitmapMatrixBitmaps = matrixTestBitmaps // keep the recompute fast
 
-	admin := createTestUser(t, r, "auth0id|matrix-admin", "matrix@test.com", "matrixadmin")
-	if _, err := api.DB.Exec("UPDATE users SET role=? WHERE auth0_id=?", RoleAdmin, admin.Auth0Id); err != nil {
-		t.Fatalf("promote admin: %v", err)
-	}
+	admin := createTestAdmin(t, api, r, "auth0id|matrix-admin", "matrix@test.com", "matrixadmin")
 
 	get := func(auth string) *httptest.ResponseRecorder {
 		resp := httptest.NewRecorder()
@@ -249,10 +246,7 @@ func TestBitmapMatrixCellEndpoint(t *testing.T) {
 	api, r, cleanup := setupTestAPI(t, c)
 	defer cleanup()
 
-	admin := createTestUser(t, r, "auth0id|cell-admin", "cell@test.com", "celladmin")
-	if _, err := api.DB.Exec("UPDATE users SET role=? WHERE auth0_id=?", RoleAdmin, admin.Auth0Id); err != nil {
-		t.Fatalf("promote admin: %v", err)
-	}
+	admin := createTestAdmin(t, api, r, "auth0id|cell-admin", "cell@test.com", "celladmin")
 
 	cell := func(bitmap, bucket string) *httptest.ResponseRecorder {
 		resp := httptest.NewRecorder()

@@ -22,6 +22,7 @@ import { ProgressView } from "./progress.js";
 import { AdminHomeView } from "./admin_home.js";
 import { DifficultyCalibrationView } from "./admin_calibration.js";
 import { BitmapMatrixView } from "./admin_bitmap_matrix.js";
+import { ApiDocsView } from "./admin_api_docs.js";
 import { StyleGuideView } from "./style_guide.js";
 
 // Self-hosted fonts (families declared in styles.scss). Only the weights the
@@ -259,6 +260,15 @@ const MainView = ({
             {isAdmin ? (
               <Titled title="Style Guide">
                 <StyleGuideView />
+              </Titled>
+            ) : (
+              <NotFound />
+            )}
+          </Route>
+          <Route exact path="/admin/api-docs">
+            {isAdmin ? (
+              <Titled title="API docs">
+                <ApiDocsView token={token} apiUrl={apiUrl} />
               </Titled>
             ) : (
               <NotFound />

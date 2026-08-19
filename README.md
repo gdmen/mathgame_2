@@ -91,7 +91,6 @@ hand-apply them. Duplicate and won't-do issues use GitHub's close reason, not a 
 - Node.js 22.12+ (CI pins `22`, which resolves to the latest 22.x)
 - Go per `go.mod` (the `toolchain` directive sets the minimum patch release; `GOTOOLCHAIN=auto` fetches it)
 - MySQL 8.0+ (8.4 LTS recommended)
-- go-swagger — optional, only for `make build-docs` / `make dev-docs`
 
 ## Setup
 1. **Config** — copy `conf.json_` to `conf.json` and fill in MySQL user/pass and any Auth0 / OpenAI keys you need.
