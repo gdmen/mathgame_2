@@ -61,7 +61,6 @@ mkdir -p "$WORK/build/static/js" "$WORK/build/static/css" "$WORK/www" \
 echo "<title>LANDING-MARKER</title>" > "$WORK/build/index.html"
 echo "<title>APP-SHELL-MARKER</title>" > "$WORK/build/app.html"
 echo "<title>PRIVACY-MARKER</title>" > "$WORK/build/privacy.html"
-echo "<title>NOT-FOUND-MARKER</title>" > "$WORK/build/404.html"
 python3 -c "print('BUNDLE-MARKER();' * 200)" > "$WORK/build/static/js/main.js"
 python3 -c "print('.bundle-marker{}' * 200)" > "$WORK/build/static/css/main.css"
 cp "$PAGE_SRC" "$WORK/www/maintenance.html"
@@ -302,10 +301,15 @@ fi
 
 for path in /no-such-page /static/; do
     get https mikeymath.org "$path"
-    if [ "$STATUS" = 404 ] && body_is "NOT-FOUND-MARKER"; then
-        pass "$path is a real 404 with the branded page"
+    if [ "$STATUS" = 404 ] && body_is "APP-SHELL-MARKER"; then
+        pass "$path is a real 404 with the shell as the body"
     else
-        fail "$path: got $STATUS, want 404 with 404.html"
+        fail "$path: got $STATUS, want 404 with app.html"
+    fi
+    if [ "$(header cache-control)" = no-cache ] && sec_headers_present; then
+        pass "$path carries no-cache and the security headers"
+    else
+        fail "$path: cache-control='$(header cache-control)' $(sec_report), want no-cache plus the security set on the 404 shell"
     fi
 done
 

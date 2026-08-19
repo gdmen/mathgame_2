@@ -8,8 +8,9 @@ import (
 
 // TestWebRoutesNginxSync: every React route in the web/src/index.js Switch
 // must be matched by a shell-route location regex in the nginx front door,
-// or its URL serves the branded 404 on any hard load in production. The
-// route list is otherwise guarded only by comments; this is the merge gate.
+// or its URL answers with a 404 status on any hard load in production (the
+// page still renders, so nothing visible flags it). The route list is
+// otherwise guarded only by comments; this is the merge gate.
 func TestWebRoutesNginxSync(t *testing.T) {
 	indexJS, err := os.ReadFile("../../web/src/index.js")
 	if err != nil {
@@ -54,7 +55,7 @@ func TestWebRoutesNginxSync(t *testing.T) {
 			}
 		}
 		if !matched {
-			t.Errorf("route %q (as %q) matches no shell-route location in deploy/nginx/mikeymath.conf; its URL will 404 on hard load in production", route, probe)
+			t.Errorf("route %q (as %q) matches no shell-route location in deploy/nginx/mikeymath.conf; its URL will answer with a 404 status on hard load in production", route, probe)
 		}
 	}
 }

@@ -173,9 +173,11 @@ const MainView = ({
             only catches in-app navigations to "/" and hands them back to the
             real document with a full page load.
 
-            Production serves the shell only for the routes enumerated in
-            deploy/nginx/mikeymath.conf — a new top-level route added here
-            must be added there too, or its deployed URL is a 404.
+            Production serves the shell with a 200 only for the routes
+            enumerated in deploy/nginx/mikeymath.conf — a new top-level route
+            added here must be added there too, or its deployed URL answers
+            with a 404 status (the page still renders; only the sync test
+            catches the omission).
           */}
           <Route exact path="/">
             <ToLanding />
