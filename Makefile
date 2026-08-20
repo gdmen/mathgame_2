@@ -160,7 +160,9 @@ build-web: frontend-conf
 # Clear the staging dir so the swap below can only ever promote this run's
 # output, whatever a future BUILD_PATH change does to where the build lands.
 	$(RM) ./web/build.next
-	cd web && BUILD_PATH=build.next npm run build
+# No sourcemaps in the shipped bundle.
+# Explicit heap cap to avoid Node OOM.
+	cd web && NODE_OPTIONS=--max-old-space-size=1024 GENERATE_SOURCEMAP=false BUILD_PATH=build.next npm run build
 	$(MAKE) fmt-web
 # The static landing must be the document served at "/", so it becomes
 # index.html and the React shell moves to app.html; deploy/nginx/mikeymath.conf
