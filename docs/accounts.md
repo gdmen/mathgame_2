@@ -144,10 +144,11 @@ is for. Leave it empty on a tenant with no custom domain and it falls back to `a
 ## Identity / Auth0 (`web/src/auth0.js`)
 
 Two buttons wrapping `@auth0/auth0-react`: `LoginButton` calls `loginWithRedirect`, `LogoutButton`
-calls `logout` returning to the window origin. (A third, `SignupButton`, was removed with the old
-React landing page — it was byte-identical to `LoginButton` apart from styling.) The
-`Auth0Provider` is configured once at the app root (`index.js`,
-`cacheLocation: "localstorage"`); after login the app pulls an access token with
+calls `logout` returning to the window origin (`logoutParams.returnTo`). (A third, `SignupButton`,
+was removed with the old React landing page — it was byte-identical to `LoginButton` apart from
+styling.) The `Auth0Provider` is configured once at the app root (`index.js`,
+`cacheLocation: "localstorage"`, with the audience and callback URL under `authorizationParams`);
+after login the app pulls an access token with
 `getAccessTokenSilently` and sends it as a `Bearer` token on every API call.
 
 **Every API call goes through one function**, `apiFetch(apiUrl, path, token, opts)`
@@ -418,8 +419,8 @@ kept, because saying "deletes everything" would be a promise this endpoint does 
   (`pin.js`, called once from `MainView`) clears the session unless a protected surface is actually
   on screen — the **router** matches the location against `PIN_PROTECTED_PATHS` (today just
   `/settings`) **and** no takeover is holding the screen. The entries are route patterns, matched
-  with `useRouteMatch`, not URLs compared as strings: `<Route exact path="/settings">` is neither
-  strict nor case-sensitive, so it renders the settings page for `/settings/` and `/SETTINGS` too,
+  with the router's own `matchPath`, not URLs compared as strings: `<Route path="/settings">` is
+  neither strict nor case-sensitive, so it renders the settings page for `/settings/` and `/SETTINGS` too,
   and a string compare called those unprotected — clearing the session on the one page the rule
   exists to protect and leaving the gate redirecting to itself. Both halves matter: a takeover replaces whatever the path would have
   rendered, so the videos repair page intercepting `/settings` is not the settings page, and that

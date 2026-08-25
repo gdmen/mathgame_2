@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from "react";
-import ReactDOM from "react-dom";
+import { createRoot } from "react-dom/client";
 import {
   BrowserRouter,
-  Redirect,
+  Navigate,
   Route,
-  Switch,
+  Routes,
   useParams,
 } from "react-router-dom";
 
@@ -94,13 +94,15 @@ const RequireAuth = ({ isAuthenticated, children }) =>
 // to clear the menu band itself. The wizard step and the videos repair page
 // both sit inside pages that already carry that padding.
 const PinGateRoute = ({ user }) => {
+  // Already decoded: the router decodes params, and decoding the escaped path
+  // a second time throws on any target carrying a literal "%".
   const { redirect_pathname } = useParams();
   return (
     <div className="pin-page">
       <PinView
         verifyAgainst={user.pin}
         onValid={() => {
-          window.location.pathname = decodeURIComponent(redirect_pathname);
+          window.location.pathname = redirect_pathname;
         }}
       />
     </div>
@@ -118,7 +120,7 @@ const LoginView = () => {
     }
   }, [isLoading, isAuthenticated, loginWithRedirect]);
   if (!isLoading && isAuthenticated) {
-    return <Redirect to="/play" />;
+    return <Navigate to="/play" replace />;
   }
   return <div className="content-loading"></div>;
 };
@@ -165,10 +167,10 @@ const MainView = ({
     );
   } else {
     // MainView has already short-circuited to content-loading while isLoading,
-    // so within this Switch a false isAuthenticated means genuinely logged out.
+    // so within these routes a false isAuthenticated means genuinely logged out.
     return (
       <main>
-        <Switch>
+        <Routes>
           {/*
             "/" and "/privacy" are static pages, not React routes. This entry
             only catches in-app navigations to "/" and hands them back to the
@@ -180,103 +182,126 @@ const MainView = ({
             with a 404 status (the page still renders; only the sync test
             catches the omission).
           */}
-          <Route exact path="/">
-            <ToLanding />
-          </Route>
-          <Route exact path="/login">
-            <LoginView />
-          </Route>
-          <Route exact path="/pin/:redirect_pathname">
-            <RequireAuth isAuthenticated={isAuthenticated}>
-              <Titled title="Enter PIN">
-                <PinGateRoute user={user} />
-              </Titled>
-            </RequireAuth>
-          </Route>
-          <Route exact path="/play">
-            <RequireAuth isAuthenticated={isAuthenticated}>
-              <Titled title="Play">
-                <PlayView
-                  token={token}
-                  apiUrl={apiUrl}
-                  user={user}
-                  postEvent={postEvent}
-                  interval={conf.event_reporting_interval}
-                  refreshPageLoadData={refreshPageLoadData}
-                />
-              </Titled>
-            </RequireAuth>
-          </Route>
-          <Route exact path="/settings">
-            <RequireAuth isAuthenticated={isAuthenticated}>
-              <Titled title="Settings">
-                <SettingsView
-                  token={token}
-                  apiUrl={apiUrl}
-                  user={user}
-                  settings={settings}
-                />
-              </Titled>
-            </RequireAuth>
-          </Route>
-          <Route exact path="/progress">
-            <RequireAuth isAuthenticated={isAuthenticated}>
-              <Titled title="Progress">
-                <ProgressView token={token} apiUrl={apiUrl} user={user} />
-              </Titled>
-            </RequireAuth>
-          </Route>
-          <Route exact path="/admin">
-            {isAdmin ? (
-              <Titled title="Admin">
-                <AdminHomeView />
-              </Titled>
-            ) : (
-              <NotFound />
-            )}
-          </Route>
-          <Route exact path="/admin/difficulty-calibration">
-            {isAdmin ? (
-              <Titled title="Difficulty calibration">
-                <DifficultyCalibrationView
-                  token={token}
-                  apiUrl={apiUrl}
-                  user={user}
-                />
-              </Titled>
-            ) : (
-              <NotFound />
-            )}
-          </Route>
-          <Route exact path="/admin/bitmap-matrix">
-            {isAdmin ? (
-              <Titled title="Bitmap matrix">
-                <BitmapMatrixView token={token} apiUrl={apiUrl} user={user} />
-              </Titled>
-            ) : (
-              <NotFound />
-            )}
-          </Route>
-          <Route exact path="/admin/style-guide">
-            {isAdmin ? (
-              <Titled title="Style Guide">
-                <StyleGuideView />
-              </Titled>
-            ) : (
-              <NotFound />
-            )}
-          </Route>
-          <Route exact path="/admin/api-docs">
-            {isAdmin ? (
-              <Titled title="API docs">
-                <ApiDocsView token={token} apiUrl={apiUrl} />
-              </Titled>
-            ) : (
-              <NotFound />
-            )}
-          </Route>
-          <Route path="*" component={NotFound} />
-        </Switch>
+          <Route path="/" element={<ToLanding />} />
+          <Route path="/login" element={<LoginView />} />
+          <Route
+            path="/pin/:redirect_pathname"
+            element={
+              <RequireAuth isAuthenticated={isAuthenticated}>
+                <Titled title="Enter PIN">
+                  <PinGateRoute user={user} />
+                </Titled>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/play"
+            element={
+              <RequireAuth isAuthenticated={isAuthenticated}>
+                <Titled title="Play">
+                  <PlayView
+                    token={token}
+                    apiUrl={apiUrl}
+                    user={user}
+                    postEvent={postEvent}
+                    interval={conf.event_reporting_interval}
+                    refreshPageLoadData={refreshPageLoadData}
+                  />
+                </Titled>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <RequireAuth isAuthenticated={isAuthenticated}>
+                <Titled title="Settings">
+                  <SettingsView
+                    token={token}
+                    apiUrl={apiUrl}
+                    user={user}
+                    settings={settings}
+                  />
+                </Titled>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/progress"
+            element={
+              <RequireAuth isAuthenticated={isAuthenticated}>
+                <Titled title="Progress">
+                  <ProgressView token={token} apiUrl={apiUrl} user={user} />
+                </Titled>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              isAdmin ? (
+                <Titled title="Admin">
+                  <AdminHomeView />
+                </Titled>
+              ) : (
+                <NotFound />
+              )
+            }
+          />
+          <Route
+            path="/admin/difficulty-calibration"
+            element={
+              isAdmin ? (
+                <Titled title="Difficulty calibration">
+                  <DifficultyCalibrationView
+                    token={token}
+                    apiUrl={apiUrl}
+                    user={user}
+                  />
+                </Titled>
+              ) : (
+                <NotFound />
+              )
+            }
+          />
+          <Route
+            path="/admin/bitmap-matrix"
+            element={
+              isAdmin ? (
+                <Titled title="Bitmap matrix">
+                  <BitmapMatrixView token={token} apiUrl={apiUrl} user={user} />
+                </Titled>
+              ) : (
+                <NotFound />
+              )
+            }
+          />
+          <Route
+            path="/admin/style-guide"
+            element={
+              isAdmin ? (
+                <Titled title="Style Guide">
+                  <StyleGuideView />
+                </Titled>
+              ) : (
+                <NotFound />
+              )
+            }
+          />
+          <Route
+            path="/admin/api-docs"
+            element={
+              isAdmin ? (
+                <Titled title="API docs">
+                  <ApiDocsView token={token} apiUrl={apiUrl} />
+                </Titled>
+              ) : (
+                <NotFound />
+              )
+            }
+          />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
       </main>
     );
   }
@@ -286,9 +311,8 @@ const AppView = () => {
   const { user, isLoading, isAuthenticated, getAccessTokenSilently } =
     useAuth0();
   const [token, setToken] = useState(null);
-  // One object, so the payload is never half-applied: React 16 does not batch
-  // the updates an await lands on, and every consumer of a field here would
-  // otherwise have to survive the renders where the rest is still missing.
+  // One object, so the payload is never half-applied and no consumer of a field
+  // here has to survive a render where the rest is still missing.
   const [pageLoad, setPageLoad] = useState(null);
   // Phone-only nav disclosure. Above the breakpoint the nav is always inline
   // and this flag is inert.
@@ -462,17 +486,18 @@ const AppView = () => {
   );
 };
 
-ReactDOM.render(
+createRoot(document.getElementById("react")).render(
   <BrowserRouter>
     <Auth0Provider
-      audience={conf.auth0_audience}
       clientId={conf.auth0_clientId}
       domain={conf.auth0_domain}
-      redirectUri={window.location.origin}
+      authorizationParams={{
+        audience: conf.auth0_audience,
+        redirect_uri: window.location.origin,
+      }}
       cacheLocation="localstorage"
     >
       <AppView />
     </Auth0Provider>
   </BrowserRouter>,
-  document.getElementById("react"),
 );

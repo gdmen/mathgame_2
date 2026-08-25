@@ -1,6 +1,5 @@
-import React from "react";
-import ReactDOM from "react-dom";
-import { act } from "react-dom/test-utils";
+import React, { act } from "react";
+import { renderInto, unmountFrom } from "./test_dom.js";
 
 import { PlayView } from "./play.js";
 
@@ -14,7 +13,7 @@ import { PlayView } from "./play.js";
 
 const render = (container, props) =>
   act(() => {
-    ReactDOM.render(
+    renderInto(
       <PlayView
         token="t"
         apiUrl="http://api"
@@ -35,7 +34,7 @@ beforeEach(() => {
   refreshPageLoadData = vi.fn(() => Promise.resolve(true));
 });
 afterEach(() => {
-  ReactDOM.unmountComponentAtNode(container);
+  unmountFrom(container);
   container.remove();
   delete global.fetch;
 });
@@ -120,7 +119,7 @@ test("drops a 403 that lands after unmount", async () => {
 
   render(container, { refreshPageLoadData });
   act(() => {
-    ReactDOM.unmountComponentAtNode(container);
+    unmountFrom(container);
   });
   await act(async () => {
     respond();

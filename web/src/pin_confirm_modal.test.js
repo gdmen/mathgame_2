@@ -1,6 +1,5 @@
-import React from "react";
-import ReactDOM from "react-dom";
-import { act } from "react-dom/test-utils";
+import React, { act } from "react";
+import { renderInto, unmountFrom } from "./test_dom.js";
 
 import { PinConfirmModal } from "./pin_confirm_modal.js";
 
@@ -49,7 +48,7 @@ describe("PinConfirmModal", () => {
 
   const render = (props = {}) =>
     act(() => {
-      ReactDOM.render(
+      renderInto(
         <PinConfirmModal
           title="Confirm action"
           copy="Enter your PIN."
@@ -77,7 +76,7 @@ describe("PinConfirmModal", () => {
 
   afterEach(() => {
     act(() => {
-      ReactDOM.unmountComponentAtNode(container);
+      unmountFrom(container);
     });
     container.remove();
   });

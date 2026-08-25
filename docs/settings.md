@@ -225,7 +225,8 @@ completeness:
   There is no separate reward-video list: per-playlist counts plus the drill-down carry everything
   it showed.
 - **`DeleteAccountView`** — the last card in the grid: self-service account deletion, confirmed by
-  the shared `PinConfirmModal` re-asking for the PIN (`DELETE /users/:auth0_id`). Its hint copy
+  the shared `PinConfirmModal` re-asking for the PIN (`DELETE /users/:auth0_id`). Only a 204 drops
+  the adult PIN session and logs out of Auth0 (`logout({ logoutParams: { returnTo } })`). Its hint copy
   spells out what is deleted, what is retained, and that deletion is irreversible. It is the only
   red-button surface on the page, which is why this page re-neutralises the shared modal's action
   row (`.pin-confirm-modal-actions` in `settings.scss`) — the modal lives outside the page's

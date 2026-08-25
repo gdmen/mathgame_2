@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { FixedSizeGrid } from "react-window";
+import { Grid } from "react-window";
 
 import { renderMath, usePollWhileComputing } from "./admin_common.js";
 import { apiFetch } from "./api.js";
@@ -14,9 +14,9 @@ import "./admin_bitmap_matrix.scss";
 
 // Grid geometry (px). Cells are wide enough for a small rendered expression;
 // the left column holds the bitmap's feature list, the top strip the difficulty
-// axis. FixedSizeGrid has no native sticky row/column, so the header and
-// row-label strips are rendered separately and translated in lockstep with the
-// grid's scroll offset (see onScroll below).
+// axis. The grid has no native sticky row/column, so the header and row-label
+// strips are rendered separately and translated in lockstep with the grid's
+// scroll offset (see onScroll below).
 const CELL_W = 128;
 const CELL_H = 78;
 const LABEL_W = 220;
@@ -65,6 +65,75 @@ const makeQuantile = (rows) => {
 
 // heatColor maps a quantile t∈[0,1] to red (zero / cold) → green (high / hot).
 const heatColor = (t) => `hsl(${Math.round(120 * t)}, 65%, ${88 - 30 * t}%)`;
+
+// Everything the cell varies on arrives through cellProps, which is what the
+// grid memoizes on.
+const Cell = ({
+  columnIndex,
+  rowIndex,
+  style,
+  sortedRows,
+  axisLo,
+  overrides,
+  quantile,
+  reroll,
+}) => {
+  const row = sortedRows[rowIndex];
+  const bucket = axisLo + columnIndex;
+  // The row runs only to its own ceiling (extended for over-ceiling pool
+  // rows); columns past that are outside this bitmap's space.
+  if (columnIndex >= row.cells.length) {
+    return <div className="bm-cell bm-cell-blank" style={style} />;
+  }
+  let cell = row.cells[columnIndex];
+  const ov = overrides[row.bitmap + ":" + bucket];
+  if (ov) {
+    cell = { ...cell, e: ov.e, a: ov.a, d: ov.d };
+  }
+  if (cell.o) {
+    return (
+      <div className="bm-cell bm-cell-over" style={style}>
+        {cell.p > 0 && <span className="bm-pool">pool {cell.p}</span>}
+      </div>
+    );
+  }
+  const bg = heatColor(quantile(cell.p || 0));
+  const offTarget = cell.e && Math.abs((cell.d || 0) - bucket) > TARGET_WINDOW;
+  const title = offTarget
+    ? `off-target: asked d≈${bucket}, closest the heuristic built was d=${fmt1(
+        cell.d,
+      )}` + (cell.a ? ` · answer: ${cell.a}` : "")
+    : cell.a
+      ? "answer: " + cell.a
+      : undefined;
+  return (
+    <div
+      className={"bm-cell" + (offTarget ? " bm-cell-off" : "")}
+      style={{ ...style, background: bg }}
+      title={title}
+    >
+      {cell.e ? (
+        <span className="bm-math">{renderMath(cell.e)}</span>
+      ) : (
+        <span className="bm-unbuildable">×</span>
+      )}
+      <span className="bm-meta">
+        <span className={offTarget ? "bm-off" : undefined}>
+          d={fmt1(cell.d)}
+          {offTarget ? "≠" : ""}
+        </span>
+        <span className="bm-poolcount">pool {cell.p || 0}</span>
+        <button
+          className="bm-reroll"
+          title="Regenerate this cell (does not change the cache)"
+          onClick={() => reroll(row.bitmap, bucket)}
+        >
+          ↻
+        </button>
+      </span>
+    </div>
+  );
+};
 
 const BitmapMatrixView = ({ token, apiUrl, user }) => {
   const [data, setData] = useState(null);
@@ -124,22 +193,25 @@ const BitmapMatrixView = ({ token, apiUrl, user }) => {
     fetchReport();
   };
 
-  const reroll = async (bitmap, bucket) => {
-    try {
-      const res = await apiFetch(
-        apiUrl,
-        "/admin/bitmap-matrix/cell?bitmap=" + bitmap + "&bucket=" + bucket,
-        token,
-      );
-      if (!res.ok) {
-        return;
+  const reroll = useCallback(
+    async (bitmap, bucket) => {
+      try {
+        const res = await apiFetch(
+          apiUrl,
+          "/admin/bitmap-matrix/cell?bitmap=" + bitmap + "&bucket=" + bucket,
+          token,
+        );
+        if (!res.ok) {
+          return;
+        }
+        const cell = await res.json();
+        setOverrides((o) => ({ ...o, [bitmap + ":" + bucket]: cell }));
+      } catch (e) {
+        // Leave the existing cell in place on failure.
       }
-      const cell = await res.json();
-      setOverrides((o) => ({ ...o, [bitmap + ":" + bucket]: cell }));
-    } catch (e) {
-      // Leave the existing cell in place on failure.
-    }
-  };
+    },
+    [apiUrl, token],
+  );
 
   const axisLo = data ? data.axis_lo : 0;
   const axisHi = data ? data.axis_hi : 0;
@@ -168,7 +240,8 @@ const BitmapMatrixView = ({ token, apiUrl, user }) => {
   // Scroll-sync the sticky header and row-label strips to the grid body.
   const headerRef = useRef(null);
   const rowLabelRef = useRef(null);
-  const onScroll = useCallback(({ scrollLeft, scrollTop }) => {
+  const onScroll = useCallback((e) => {
+    const { scrollLeft, scrollTop } = e.currentTarget;
     if (headerRef.current) {
       headerRef.current.style.transform = `translateX(${-scrollLeft}px)`;
     }
@@ -190,69 +263,6 @@ const BitmapMatrixView = ({ token, apiUrl, user }) => {
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, [data]);
-
-  const Cell = useCallback(
-    ({ columnIndex, rowIndex, style }) => {
-      const row = sortedRows[rowIndex];
-      const bucket = axisLo + columnIndex;
-      // The row runs only to its own ceiling (extended for over-ceiling pool
-      // rows); columns past that are outside this bitmap's space.
-      if (columnIndex >= row.cells.length) {
-        return <div className="bm-cell bm-cell-blank" style={style} />;
-      }
-      let cell = row.cells[columnIndex];
-      const ov = overrides[row.bitmap + ":" + bucket];
-      if (ov) {
-        cell = { ...cell, e: ov.e, a: ov.a, d: ov.d };
-      }
-      if (cell.o) {
-        return (
-          <div className="bm-cell bm-cell-over" style={style}>
-            {cell.p > 0 && <span className="bm-pool">pool {cell.p}</span>}
-          </div>
-        );
-      }
-      const bg = heatColor(quantile(cell.p || 0));
-      const offTarget =
-        cell.e && Math.abs((cell.d || 0) - bucket) > TARGET_WINDOW;
-      const title = offTarget
-        ? `off-target: asked d≈${bucket}, closest the heuristic built was d=${fmt1(
-            cell.d,
-          )}` + (cell.a ? ` · answer: ${cell.a}` : "")
-        : cell.a
-          ? "answer: " + cell.a
-          : undefined;
-      return (
-        <div
-          className={"bm-cell" + (offTarget ? " bm-cell-off" : "")}
-          style={{ ...style, background: bg }}
-          title={title}
-        >
-          {cell.e ? (
-            <span className="bm-math">{renderMath(cell.e)}</span>
-          ) : (
-            <span className="bm-unbuildable">×</span>
-          )}
-          <span className="bm-meta">
-            <span className={offTarget ? "bm-off" : undefined}>
-              d={fmt1(cell.d)}
-              {offTarget ? "≠" : ""}
-            </span>
-            <span className="bm-poolcount">pool {cell.p || 0}</span>
-            <button
-              className="bm-reroll"
-              title="Regenerate this cell (does not change the cache)"
-              onClick={() => reroll(row.bitmap, bucket)}
-            >
-              ↻
-            </button>
-          </span>
-        </div>
-      );
-    },
-    // reroll/quantile are stable-enough for the grid; overrides drives updates.
-    [sortedRows, axisLo, overrides, quantile],
-  );
 
   if (loading) {
     return <div className="content-loading"></div>;
@@ -347,18 +357,17 @@ const BitmapMatrixView = ({ token, apiUrl, user }) => {
                 ))}
               </div>
             </div>
-            <FixedSizeGrid
+            <Grid
               className="bm-body"
+              cellComponent={Cell}
+              cellProps={{ sortedRows, axisLo, overrides, quantile, reroll }}
               columnCount={numCols}
               columnWidth={CELL_W}
               rowCount={sortedRows.length}
               rowHeight={CELL_H}
-              width={gridW}
-              height={GRID_H}
+              style={{ width: gridW, height: GRID_H }}
               onScroll={onScroll}
-            >
-              {Cell}
-            </FixedSizeGrid>
+            />
           </div>
         </div>
       )}

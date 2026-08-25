@@ -1,6 +1,5 @@
-import React from "react";
-import ReactDOM from "react-dom";
-import { act } from "react-dom/test-utils";
+import React, { act } from "react";
+import { renderInto, unmountFrom } from "./test_dom.js";
 
 import { PlaylistsSettingsView, UNDO_WINDOW_MS } from "./settings.js";
 
@@ -94,7 +93,7 @@ describe("playlist removal undo", () => {
     container = document.createElement("div");
     document.body.appendChild(container);
     await act(async () => {
-      ReactDOM.render(
+      renderInto(
         <PlaylistsSettingsView token="t" apiUrl="/api/v1" user={{ id: 1 }} />,
         container,
       );
@@ -103,7 +102,7 @@ describe("playlist removal undo", () => {
 
   afterEach(() => {
     act(() => {
-      ReactDOM.unmountComponentAtNode(container);
+      unmountFrom(container);
     });
     container.remove();
     vi.useRealTimers();

@@ -11,11 +11,9 @@ import "./video.scss";
 
 import { EventTypes } from "./enums.generated.js";
 
-// react-player spreads embedOptions into YT.Player, whose host picks the embed
-// domain. Module scope so the prop identity is stable across renders.
-const YOUTUBE_CONFIG = {
-  youtube: { embedOptions: { host: "https://www.youtube-nocookie.com" } },
-};
+// react-player picks the embed domain from the src host, so this is what keeps
+// the reward video on the no-cookie domain.
+const NOCOOKIE_HOST = "www.youtube-nocookie.com";
 
 const VideoView = ({ video, eventReporter, interval }) => {
   const [playing, setPlaying] = useState(false);
@@ -25,6 +23,10 @@ const VideoView = ({ video, eventReporter, interval }) => {
   useEffect(() => {
     elapsedRef.current = elapsed;
   }, [elapsed]);
+
+  // timeupdate fires on the player's own polling cadence, which is faster than
+  // the reporting interval the caller asked for.
+  const lastReportRef = useRef(0);
 
   const playPause = useCallback(() => {
     setPlaying((wasPlaying) => !wasPlaying);
@@ -50,6 +52,7 @@ const VideoView = ({ video, eventReporter, interval }) => {
     if (video == null) return null;
     const u = new URL(video.url);
     u.searchParams.delete("list");
+    u.hostname = NOCOOKIE_HOST;
     return u.toString();
   }, [video]);
 
@@ -64,12 +67,15 @@ const VideoView = ({ video, eventReporter, interval }) => {
           className="react-player"
           width="100%"
           height="100%"
-          url={playUrl}
-          config={YOUTUBE_CONFIG}
+          src={playUrl}
           playing={playing}
-          progressInterval={interval}
-          onProgress={(e) => {
-            var playedMillis = 1000 * e.playedSeconds;
+          onTimeUpdate={(e) => {
+            const now = Date.now();
+            if (now - lastReportRef.current < interval) {
+              return;
+            }
+            lastReportRef.current = now;
+            const playedMillis = 1000 * e.currentTarget.currentTime;
             eventReporter.postEvent(
               EventTypes.WATCHING_VIDEO,
               playedMillis - elapsedRef.current,
@@ -84,8 +90,12 @@ const VideoView = ({ video, eventReporter, interval }) => {
               });
           }}
           onError={(e) => {
+            const err = e.currentTarget && e.currentTarget.error;
             eventReporter
-              .postEvent(EventTypes.ERROR_PLAYING_VIDEO, e)
+              .postEvent(
+                EventTypes.ERROR_PLAYING_VIDEO,
+                err ? err.code : e.type,
+              )
               .then(() => {
                 window.location.pathname = "play";
               });

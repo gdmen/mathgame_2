@@ -1,6 +1,5 @@
-import React from "react";
-import ReactDOM from "react-dom";
-import { act } from "react-dom/test-utils";
+import React, { act } from "react";
+import { renderInto, unmountFrom } from "./test_dom.js";
 
 import {
   PROBLEM_TYPE_GROUPS,
@@ -75,8 +74,8 @@ describe("dependent chips", () => {
   // fresh rather than re-rendering the same tree.
   const renderAt = (container, bitmap) =>
     act(() => {
-      ReactDOM.unmountComponentAtNode(container);
-      ReactDOM.render(
+      unmountFrom(container);
+      renderInto(
         <ProblemTypesSettingsView
           token="t"
           apiUrl="/api/v1"

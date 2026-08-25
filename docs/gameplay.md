@@ -73,7 +73,7 @@ matches no constant to be recognized by. The table is the subset this area emits
 |---|---|---|---|
 | `working_on_problem` | interval ms | `EventReporterSingleton` ticker | every interval while focused and a problem is shown |
 | `answered_problem` | typed answer string | `AnswerTracker.reportAnswer` | submit |
-| `watching_video` | elapsed delta ms | `VideoView` `onProgress` | during playback |
+| `watching_video` | elapsed delta ms | `VideoView` `onTimeUpdate` | during playback, at most once per interval |
 | `done_watching_video` | video id | `VideoView` `onEnded` | video finishes |
 | `error_playing_video` | error | `VideoView` `onError` | playback error |
 | `bad_problem_system` | `{problem_id, explanation}` JSON | `PlayView` `renderLatex` catch | KaTeX throws |
@@ -156,18 +156,19 @@ once `solved >= target`. Notable behavior:
 
 - The `list` query param is stripped from the URL so a single video plays instead of an embedded
   playlist.
-- **The embed is served from `youtube-nocookie.com`**, YouTube's privacy-enhanced host, set through
-  `react-player`'s `config.youtube.embedOptions.host` (spread into the `YT.Player` options, which
-  is where the IFrame API reads the embed domain from). The JS API, events and playback are the
-  same on either host. What this buys is that the view is kept out of ad personalization. It does
-  **not** buy a cookie-free screen: the host defers cookies until playback, and playback is the
-  whole point here, so the privacy copy's "when a video plays, YouTube may set cookies" stays
-  accurate as written.
+- **The embed is served from `youtube-nocookie.com`**, YouTube's privacy-enhanced host. `react-player`
+  picks the embed domain from the host in `src`, so `VideoView` rewrites the stored
+  `youtube.com/watch` URL onto the no-cookie host before handing it over. The JS API, events and
+  playback are the same on either host. What this buys is that the view is kept out of ad
+  personalization. It does **not** buy a cookie-free screen: the host defers cookies until
+  playback, and playback is the whole point here, so the privacy copy's "when a video plays,
+  YouTube may set cookies" stays accurate as written.
 - Spacebar toggles play/pause via a global `document.body.onkeyup` handler; a transparent
   `#click-blocker` overlay intercepts clicks to the same toggle so the kid can't reach YouTube's
   own chrome.
-- `onProgress` reports the **delta** since the last tick, not cumulative elapsed, so the server can
-  sum watch-time correctly.
+- `onTimeUpdate` reports the **delta** since the last report, not cumulative elapsed, so the server
+  can sum watch-time correctly. The player fires it on its own polling cadence, so `VideoView`
+  throttles the reports down to the caller's `interval`.
 
 ## Invariants
 

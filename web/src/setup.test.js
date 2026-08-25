@@ -1,6 +1,5 @@
-import React from "react";
-import ReactDOM from "react-dom";
-import { act } from "react-dom/test-utils";
+import React, { act } from "react";
+import { renderInto, unmountFrom } from "./test_dom.js";
 import { MemoryRouter } from "react-router-dom";
 
 import {
@@ -41,7 +40,7 @@ const SET_UP_USER = { pin: "1234" };
 
 const render = (container, props) =>
   act(() => {
-    ReactDOM.render(<Probe {...props} />, container);
+    renderInto(<Probe {...props} />, container);
   });
 
 const shown = (container) => container.querySelector("i").textContent;
@@ -52,7 +51,7 @@ beforeEach(() => {
   document.body.appendChild(container);
 });
 afterEach(() => {
-  ReactDOM.unmountComponentAtNode(container);
+  unmountFrom(container);
   container.remove();
 });
 
@@ -137,7 +136,7 @@ test("no decision is made before the page-load data arrives", () => {
 // what it waits for is a *different* payload object.
 const renderLastStep = (container, props) =>
   act(() => {
-    ReactDOM.render(<StartPlayingTabView {...props} />, container);
+    renderInto(<StartPlayingTabView {...props} />, container);
   });
 
 const startButton = (container) =>
@@ -149,7 +148,7 @@ const renderRefreshed = async (container, boot, refreshed, goToVideosStep) => {
   const refreshPageLoadData = () =>
     Promise.resolve().then(() => {
       if (refreshed) {
-        ReactDOM.render(
+        renderInto(
           <StartPlayingTabView
             pageLoad={refreshed}
             refreshPageLoadData={refreshPageLoadData}
@@ -160,7 +159,7 @@ const renderRefreshed = async (container, boot, refreshed, goToVideosStep) => {
       }
     });
   await act(async () => {
-    ReactDOM.render(
+    renderInto(
       <StartPlayingTabView
         pageLoad={boot}
         refreshPageLoadData={refreshPageLoadData}
@@ -248,7 +247,7 @@ const renderRepair = async (container, playableTotal) => {
     }),
   );
   await act(async () => {
-    ReactDOM.render(
+    renderInto(
       // The router context is for PinView's useParams: the inline gate never
       // reads a route param, but the hook still needs a router above it.
       <MemoryRouter>
@@ -326,7 +325,7 @@ test("the repair page releases the gate at the floor", async () => {
 // entry, and a first-run parent could never finish onboarding.
 const renderPinTab = (container, user, advanceSetup = () => {}) =>
   act(() => {
-    ReactDOM.render(
+    renderInto(
       <PinTabView
         token="t"
         apiUrl="/api/v1"

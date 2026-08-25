@@ -7,21 +7,25 @@
         "enabled": false
     },
     "dependencies": {
-        "@auth0/auth0-react": "^1.12.1",
+        "@auth0/auth0-react": "^2.24.1",
         "@fontsource/caveat": "^5.3.0",
         "@fontsource/nunito": "^5.3.0",
         "@fontsource/quicksand": "^5.3.0",
-        "html-react-parser": "^5.2.2",
+        "html-react-parser": "^6.1.7",
         "katex": "^0.18.1",
-        "react": "^16.14.0",
-        "react-dom": "^16.14.0",
+        "react": "^19.2.8",
+        "react-dom": "^19.2.8",
         "react-pin-input": "^1.3.0",
-        "react-player": "^1.15.3",
-        "react-router-dom": "^5.3.4",
-        "react-window": "^1.8.11",
-        "semantic-ui-css": "^2.5.0",
-        "semantic-ui-react": "^0.88.2",
+        "react-player": "^3.4.0",
+        "react-router-dom": "^7.18.2",
+        "react-window": "^2.3.0",
         "swagger-ui-dist": "^5.32.14"
+    },
+    "overrides": {
+        "react-pin-input": {
+            "react": "$react",
+            "react-dom": "$react-dom"
+        }
     },
     "devDependencies": {
         "@vitejs/plugin-react": "^5.2.0",

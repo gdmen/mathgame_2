@@ -1,6 +1,5 @@
-import React from "react";
-import ReactDOM from "react-dom";
-import { act } from "react-dom/test-utils";
+import React, { act } from "react";
+import { renderInto, unmountFrom } from "./test_dom.js";
 
 import { DeleteAccountView } from "./settings.js";
 import { SetSessionPin, GetSessionPin } from "./pin.js";
@@ -36,7 +35,7 @@ const USER = { id: 1, auth0_id: "auth0|abc", pin: "1234" };
 
 const render = (container) =>
   act(() => {
-    ReactDOM.render(
+    renderInto(
       <DeleteAccountView token="t" apiUrl="/api/v1" user={USER} />,
       container,
     );
@@ -76,7 +75,7 @@ describe("DeleteAccountView", () => {
 
   afterEach(() => {
     act(() => {
-      ReactDOM.unmountComponentAtNode(container);
+      unmountFrom(container);
     });
     container.remove();
     delete global.fetch;

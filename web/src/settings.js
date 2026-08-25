@@ -1022,7 +1022,7 @@ const DeleteAccountView = ({ token, apiUrl, user }) => {
       if (req.status === 204) {
         // The account is gone; drop the adult PIN session and log out of Auth0.
         ClearSessionPin();
-        logout({ returnTo: window.location.origin });
+        logout({ logoutParams: { returnTo: window.location.origin } });
         return;
       }
       if (req.status === 403) {
