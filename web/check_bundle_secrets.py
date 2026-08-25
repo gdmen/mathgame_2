@@ -40,7 +40,7 @@ SECRET_PATTERNS = {
 
 
 def secret_variants(value):
-    # webpack inlines imported JSON as escaped JS string literals, so a value
+    # The bundler inlines imported JSON as escaped JS string literals, so a value
     # with quotes/backslashes/non-ASCII appears escaped in the bundle. Match
     # both the raw value and its JSON-escaped inner form.
     return {value, json.dumps(value)[1:-1]}

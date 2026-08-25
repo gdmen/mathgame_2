@@ -13,6 +13,7 @@ import { useAuth0 } from "@auth0/auth0-react";
 
 import { apiFetch } from "./api.js";
 import { LoginButton, LogoutButton } from "./auth0.js";
+import conf from "./conf.json";
 
 import { SetupView, VideosRepairView, useTakeover } from "./setup.js";
 import { PinView, usePinSessionPolicy } from "./pin.js";
@@ -38,7 +39,6 @@ import "@fontsource/caveat/700.css";
 
 import "./index.scss";
 
-const conf = require("./conf");
 const ApiUrl = conf.api_host + "/api/v1";
 
 const SiteName = "Mikey's Math Game";
@@ -71,8 +71,9 @@ const ToLanding = () => {
   useEffect(() => {
     // Guard against a reload loop: if "/" is already what served this bundle,
     // navigating there again would just re-serve it forever. That should not
-    // happen (prod swaps in the static page, dev has setupProxy.js), so the
-    // guard is a backstop rather than a path we expect to take.
+    // happen (prod swaps in the static page, dev serves it from the bundler
+    // config's static-pages plugin), so the guard is a backstop rather than a
+    // path we expect to take.
     if (window.location.pathname !== "/") {
       window.location.replace("/");
     }

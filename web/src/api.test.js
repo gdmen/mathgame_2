@@ -7,7 +7,7 @@ const lastCall = () =>
   global.fetch.mock.calls[global.fetch.mock.calls.length - 1];
 
 beforeEach(() => {
-  global.fetch = jest.fn(() => Promise.resolve({ ok: true }));
+  global.fetch = vi.fn(() => Promise.resolve({ ok: true }));
 });
 
 afterEach(() => {
@@ -52,6 +52,6 @@ test("opts cannot displace the auth headers", async () => {
 
 test("returns the response untouched, so callers own the outcome", async () => {
   const res = { ok: false, status: 403 };
-  global.fetch = jest.fn(() => Promise.resolve(res));
+  global.fetch = vi.fn(() => Promise.resolve(res));
   await expect(apiFetch("/api/v1", "/play/1", "tok")).resolves.toBe(res);
 });

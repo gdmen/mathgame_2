@@ -23,7 +23,7 @@ const PLAYLISTS = [
 // undo offers are slotted by.
 let serverPlaylists;
 const installFetch = ({ failRestore = false } = {}) => {
-  global.fetch = jest.fn((url, opts = {}) => {
+  global.fetch = vi.fn((url, opts = {}) => {
     const method = opts.method || "GET";
     if (method === "DELETE") {
       const id = Number(url.split("/").pop());
@@ -88,7 +88,7 @@ describe("playlist removal undo", () => {
   let container;
 
   beforeEach(async () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     serverPlaylists = PLAYLISTS.slice();
     installFetch();
     container = document.createElement("div");
@@ -106,7 +106,7 @@ describe("playlist removal undo", () => {
       ReactDOM.unmountComponentAtNode(container);
     });
     container.remove();
-    jest.useRealTimers();
+    vi.useRealTimers();
     delete global.fetch;
   });
 
@@ -133,7 +133,7 @@ describe("playlist removal undo", () => {
   it("the offer expires on its own", async () => {
     await removePlaylist(container, "Beta");
     act(() => {
-      jest.advanceTimersByTime(UNDO_WINDOW_MS + 1);
+      vi.advanceTimersByTime(UNDO_WINDOW_MS + 1);
     });
     expect(listShape(container)).toEqual(["Alpha", "Gamma"]);
   });
@@ -141,7 +141,7 @@ describe("playlist removal undo", () => {
   it("a second removal neither evicts the first offer nor shortens its window", async () => {
     await removePlaylist(container, "Beta");
     act(() => {
-      jest.advanceTimersByTime(UNDO_WINDOW_MS / 2);
+      vi.advanceTimersByTime(UNDO_WINDOW_MS / 2);
     });
     await removePlaylist(container, "Gamma");
     expect(listShape(container)).toEqual([
@@ -151,11 +151,11 @@ describe("playlist removal undo", () => {
     ]);
     // Past Beta's expiry but inside Gamma's window.
     act(() => {
-      jest.advanceTimersByTime(UNDO_WINDOW_MS / 2 + 1);
+      vi.advanceTimersByTime(UNDO_WINDOW_MS / 2 + 1);
     });
     expect(listShape(container)).toEqual(["Alpha", "undo:Removed “Gamma”"]);
     act(() => {
-      jest.advanceTimersByTime(UNDO_WINDOW_MS / 2);
+      vi.advanceTimersByTime(UNDO_WINDOW_MS / 2);
     });
     expect(listShape(container)).toEqual(["Alpha"]);
   });
@@ -190,7 +190,7 @@ describe("playlist removal undo", () => {
   it("a failed restore keeps the offer and re-arms its clock", async () => {
     await removePlaylist(container, "Beta");
     act(() => {
-      jest.advanceTimersByTime(UNDO_WINDOW_MS - 1000);
+      vi.advanceTimersByTime(UNDO_WINDOW_MS - 1000);
     });
     installFetch({ failRestore: true });
     await undoRemoval(container, "Beta");
@@ -204,11 +204,11 @@ describe("playlist removal undo", () => {
     );
     // Past the original deadline, inside the new one.
     act(() => {
-      jest.advanceTimersByTime(2000);
+      vi.advanceTimersByTime(2000);
     });
     expect(listShape(container)).toContain("undo:Removed “Beta”");
     act(() => {
-      jest.advanceTimersByTime(UNDO_WINDOW_MS);
+      vi.advanceTimersByTime(UNDO_WINDOW_MS);
     });
     expect(listShape(container)).toEqual(["Alpha", "Gamma"]);
   });

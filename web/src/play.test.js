@@ -4,13 +4,6 @@ import { act } from "react-dom/test-utils";
 
 import { PlayView } from "./play.js";
 
-// `./conf` is generated from the backend conf (gen_frontend_conf.py), so it is
-// gitignored and absent on a clean checkout — this is the first suite to pull
-// in a module that reads it. Virtual, therefore, rather than a fixture: it
-// stands in whether or not the real file exists. debug_quickplay is the field
-// PlayView reads, and false is the shipped value; true makes it render null.
-jest.mock("./conf", () => ({ debug_quickplay: false }), { virtual: true });
-
 // /play 403s when the reward pool is below the floor. The answer to that is
 // the repair page, which the takeover puts on the screen once it sees a short
 // count — so PlayView's whole job here is to re-read the count. Pinned: that
@@ -26,7 +19,7 @@ const render = (container, props) =>
         token="t"
         apiUrl="http://api"
         user={{ id: 7 }}
-        postEvent={jest.fn()}
+        postEvent={vi.fn()}
         interval={100000}
         {...props}
       />,
@@ -39,7 +32,7 @@ let refreshPageLoadData;
 beforeEach(() => {
   container = document.createElement("div");
   document.body.appendChild(container);
-  refreshPageLoadData = jest.fn(() => Promise.resolve(true));
+  refreshPageLoadData = vi.fn(() => Promise.resolve(true));
 });
 afterEach(() => {
   ReactDOM.unmountComponentAtNode(container);
@@ -48,7 +41,7 @@ afterEach(() => {
 });
 
 test("re-reads the page load data when the pool is below the floor", async () => {
-  global.fetch = jest.fn(() =>
+  global.fetch = vi.fn(() =>
     Promise.resolve({ ok: false, status: 403, text: () => "" }),
   );
 
@@ -63,7 +56,7 @@ test("re-reads the page load data when the pool is below the floor", async () =>
 // which is exactly the case the message exists for: the refresh failed, or the
 // 403 was never about the video pool.
 test("says so when nothing resolves the 403", async () => {
-  global.fetch = jest.fn(() =>
+  global.fetch = vi.fn(() =>
     Promise.resolve({ ok: false, status: 403, text: () => "" }),
   );
 
@@ -80,7 +73,7 @@ test("says so when nothing resolves the 403", async () => {
 // effect keyed on that object would answer its own 403 with another /play
 // request, forever.
 test("does not re-ask /play when the refresh hands down a new user object", async () => {
-  global.fetch = jest.fn(() =>
+  global.fetch = vi.fn(() =>
     Promise.resolve({ ok: false, status: 403, text: () => "" }),
   );
 
@@ -96,7 +89,7 @@ test("does not re-ask /play when the refresh hands down a new user object", asyn
 });
 
 test("leaves the page load data alone on a healthy load", async () => {
-  global.fetch = jest.fn(() =>
+  global.fetch = vi.fn(() =>
     Promise.resolve({
       ok: true,
       status: 200,
@@ -118,7 +111,7 @@ test("leaves the page load data alone on a healthy load", async () => {
 
 test("drops a 403 that lands after unmount", async () => {
   let respond;
-  global.fetch = jest.fn(
+  global.fetch = vi.fn(
     () =>
       new Promise((resolve) => {
         respond = () => resolve({ ok: false, status: 403, text: () => "" });

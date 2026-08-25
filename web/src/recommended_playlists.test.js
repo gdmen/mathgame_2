@@ -13,7 +13,7 @@ import { PlaylistsSettingsView, RECOMMENDED_PLAYLISTS } from "./settings.js";
 // puts a matching row in the list, the way the server does after a sync.
 let serverPlaylists;
 const installFetch = ({ failAdd = false } = {}) => {
-  global.fetch = jest.fn((url, opts = {}) => {
+  global.fetch = vi.fn((url, opts = {}) => {
     if ((opts.method || "GET") === "POST") {
       if (failAdd) {
         return Promise.resolve({

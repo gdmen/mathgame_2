@@ -12,12 +12,12 @@ import { PinConfirmModal } from "./pin_confirm_modal.js";
 // react-pin-input drives its per-digit focus through real timers, which jsdom
 // can't satisfy. Stand in a single input that reports the same thing the widget
 // reports (the concatenated value).
-jest.mock("react-pin-input", () => {
-  const mockReact = require("react");
+vi.mock("react-pin-input", async () => {
+  const { createElement } = await vi.importActual("react");
   return {
     __esModule: true,
     default: ({ onChange, focus }) =>
-      mockReact.createElement("input", {
+      createElement("input", {
         className: "mock-pin",
         autoFocus: focus,
         onChange: (e) => onChange(e.target.value),
@@ -71,8 +71,8 @@ describe("PinConfirmModal", () => {
   beforeEach(() => {
     container = document.createElement("div");
     document.body.appendChild(container);
-    onConfirm = jest.fn();
-    onCancel = jest.fn();
+    onConfirm = vi.fn();
+    onCancel = vi.fn();
   });
 
   afterEach(() => {

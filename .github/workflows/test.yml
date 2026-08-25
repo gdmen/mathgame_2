@@ -31,7 +31,7 @@ jobs:
       run: make build-api
 
     # Build regenerated these committed files; a stale one otherwise ships,
-    # because the jest job and build-web read the enums without regenerating
+    # because the web test job and build-web read the enums without regenerating
     # them and apiserver embeds the spec.
     - name: Generated files up to date
       run: git diff --exit-code web/src/enums.generated.js server/docs/spec/swagger.yaml
@@ -62,8 +62,8 @@ jobs:
     - name: Test
       run: make test-web
 
-    # --omit=dev scopes the gate to what ships to browsers; the accepted
-    # dev-tree risk is recorded in docs/ops-runbook.md.
+    # --omit=dev scopes the gate to what ships to browsers, so a build-only
+    # advisory can never block a merge on its own.
     - name: Vulnerability scan
       run: cd web && npm audit --omit=dev --audit-level=moderate
 

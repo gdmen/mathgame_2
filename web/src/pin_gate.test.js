@@ -19,12 +19,12 @@ import {
 // react-pin-input drives its per-digit focus through real timers, which jsdom
 // can't satisfy. Stand in a single input that reports the same thing the widget
 // reports (the concatenated value).
-jest.mock("react-pin-input", () => {
-  const mockReact = require("react");
+vi.mock("react-pin-input", async () => {
+  const { createElement } = await vi.importActual("react");
   return {
     __esModule: true,
     default: ({ onChange }) =>
-      mockReact.createElement("input", {
+      createElement("input", {
         className: "mock-pin",
         onChange: (e) => onChange(e.target.value),
       }),
@@ -187,7 +187,7 @@ describe("PinView", () => {
   beforeEach(() => {
     container = document.createElement("div");
     document.body.appendChild(container);
-    onValid = jest.fn();
+    onValid = vi.fn();
     SetSessionPin("");
   });
 
