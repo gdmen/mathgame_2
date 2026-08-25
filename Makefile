@@ -75,10 +75,10 @@ test-cmds:
 web-deps:
 	cd web && npm ci
 
-# The web unit tests (jest via react-scripts). CI=true makes the runner exit
-# after one pass instead of dropping into interactive watch mode.
+# The web unit tests (vitest). The npm script carries the single-pass flag so
+# local and CI runs share one definition.
 test-web: web-deps
-	cd web && CI=true npx react-scripts test --env=jsdom
+	cd web && npm test
 
 # Regenerate the Go<->JS difficulty-band parity fixtures
 # (web/src/difficulty_band_fixtures.json). Run after any change to the
@@ -130,8 +130,8 @@ frontend-conf:
 # no React, so it cannot use the app's JS @fontsource imports or its compiled
 # bundle: it gets its own stylesheet and its own copies of the woff2 files.
 # landing.scss pulls in styles.scss with @use, so both surfaces share one token source.
-# Outputs land in web/public/, which CRA copies verbatim into the build; both
-# are generated, so both are gitignored.
+# Outputs land in web/public/, which the build copies verbatim; both are
+# generated, so both are gitignored.
 landing-assets:
 	mkdir -p ./web/public/fonts
 	cd web && npx sass --no-source-map --load-path=node_modules \
@@ -145,9 +145,9 @@ landing-assets:
 	cp ./web/node_modules/katex/dist/fonts/KaTeX_Main-Regular.woff2 ./web/public/fonts/
 
 # Build into web/build.next, then swap it into place, so the live web/build
-# (served by nginx) is never emptied mid-build. react-scripts starts every
-# build by wiping its output dir; building in place left web/build a directory
-# listing for the whole install+webpack window while the old server kept
+# (served by nginx) is never emptied mid-build. The bundler starts every build
+# by wiping its output dir; building in place left web/build a directory
+# listing for the whole install+bundle window while the old server kept
 # serving it. The swap is two renames (sub-ms); nginx reads files per
 # request, so no reload is needed and the live dir holds valid content right
 # up to the swap. Any failed step aborts the target before the swap runs, so
@@ -158,11 +158,10 @@ build-web: frontend-conf
 	cd web && npm ci --include=dev
 	$(MAKE) landing-assets
 # Clear the staging dir so the swap below can only ever promote this run's
-# output, whatever a future BUILD_PATH change does to where the build lands.
+# output, whatever a future --outDir change does to where the build lands.
 	$(RM) ./web/build.next
-# No sourcemaps in the shipped bundle.
-# Explicit heap cap to avoid Node OOM.
-	cd web && NODE_OPTIONS=--max-old-space-size=1024 GENERATE_SOURCEMAP=false BUILD_PATH=build.next npm run build
+# Explicit heap cap to avoid Node OOM. Sourcemaps are off in web/vite.config.js.
+	cd web && NODE_OPTIONS=--max-old-space-size=1024 npm run build -- --outDir build.next
 	$(MAKE) fmt-web
 # The static landing must be the document served at "/", so it becomes
 # index.html and the React shell moves to app.html; deploy/nginx/mikeymath.conf

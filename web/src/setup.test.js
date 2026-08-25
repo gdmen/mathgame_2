@@ -14,12 +14,12 @@ import { SetSessionPin, GetSessionPin, ClearSessionPin } from "./pin.js";
 // react-pin-input drives its per-digit focus through real timers, which jsdom
 // can't satisfy. Stand in a single input reporting the same thing the widget
 // reports (the concatenated value), as delete_account.test.js does.
-jest.mock("react-pin-input", () => {
-  const mockReact = require("react");
+vi.mock("react-pin-input", async () => {
+  const { createElement } = await vi.importActual("react");
   return {
     __esModule: true,
     default: ({ onChange }) =>
-      mockReact.createElement("input", {
+      createElement("input", {
         className: "mock-pin",
         onChange: (e) => onChange(e.target.value),
       }),
@@ -189,7 +189,7 @@ test("the button is live even before the count is known", () => {
 });
 
 test("a refreshed count below the floor sends the parent back to the videos step", async () => {
-  const goToVideosStep = jest.fn();
+  const goToVideosStep = vi.fn();
   await renderRefreshed(
     container,
     pageLoadFor(SET_UP_USER, 0),
@@ -200,7 +200,7 @@ test("a refreshed count below the floor sends the parent back to the videos step
 });
 
 test("a refreshed count at the floor keeps the parent here", async () => {
-  const goToVideosStep = jest.fn();
+  const goToVideosStep = vi.fn();
   await renderRefreshed(
     container,
     pageLoadFor(SET_UP_USER, 0),
@@ -213,7 +213,7 @@ test("a refreshed count at the floor keeps the parent here", async () => {
 // The boot count is 0 for a new account, so acting on it before the refresh
 // lands would bounce everyone who just added playlists in step 2.
 test("no bounce while the refresh is still in flight", () => {
-  const goToVideosStep = jest.fn();
+  const goToVideosStep = vi.fn();
   renderLastStep(container, {
     pageLoad: pageLoadFor(SET_UP_USER, 0),
     refreshPageLoadData: () => new Promise(() => {}),
@@ -225,7 +225,7 @@ test("no bounce while the refresh is still in flight", () => {
 // A failed read leaves the boot payload in place, identity and all, which is
 // exactly the "no answer yet" state — the same one as still-in-flight.
 test("no bounce when the refresh itself failed", async () => {
-  const goToVideosStep = jest.fn();
+  const goToVideosStep = vi.fn();
   await renderRefreshed(
     container,
     pageLoadFor(SET_UP_USER, 0),
@@ -240,7 +240,7 @@ test("no bounce when the refresh itself failed", async () => {
 // server tally, different exit. The gate renders inline here, so unlocking
 // means typing the code.
 const renderRepair = async (container, playableTotal) => {
-  global.fetch = jest.fn(() =>
+  global.fetch = vi.fn(() =>
     Promise.resolve({
       ok: true,
       json: () =>
@@ -340,7 +340,7 @@ const renderPinTab = (container, user, advanceSetup = () => {}) =>
 const continueButton = (container) => container.querySelector("button.submit");
 
 test("the wizard's PIN step accepts a code the account does not have yet", async () => {
-  global.fetch = jest.fn(() => Promise.resolve({ json: () => ({}) }));
+  global.fetch = vi.fn(() => Promise.resolve({ json: () => ({}) }));
   const user = { auth0_id: "auth0|abc", pin: "" };
   renderPinTab(container, user);
 
@@ -352,8 +352,8 @@ test("the wizard's PIN step accepts a code the account does not have yet", async
 });
 
 test("the wizard's PIN step writes the authored code and advances", async () => {
-  global.fetch = jest.fn(() => Promise.resolve({ json: () => ({}) }));
-  const advanceSetup = jest.fn();
+  global.fetch = vi.fn(() => Promise.resolve({ json: () => ({}) }));
+  const advanceSetup = vi.fn();
   const user = { auth0_id: "auth0|abc", pin: "" };
   renderPinTab(container, user, advanceSetup);
 
@@ -370,8 +370,8 @@ test("the wizard's PIN step writes the authored code and advances", async () => 
 });
 
 test("the wizard's PIN step does not rewrite an unchanged prefilled code", async () => {
-  global.fetch = jest.fn(() => Promise.resolve({ json: () => ({}) }));
-  const advanceSetup = jest.fn();
+  global.fetch = vi.fn(() => Promise.resolve({ json: () => ({}) }));
+  const advanceSetup = vi.fn();
   SetSessionPin("1234");
   renderPinTab(container, { auth0_id: "auth0|abc", pin: "1234" }, advanceSetup);
 

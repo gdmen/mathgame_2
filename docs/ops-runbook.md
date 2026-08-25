@@ -144,11 +144,11 @@ boot). The three jobs that must not overlap a manual run hold a `flock`
 |---|---|
 | `build-api` | regenerates `*_model.generated.go` / `*_handlers.generated.go` from `server/api/models.json` and `web/src/enums.generated.js` from the Go enum blocks (Python codegen), `gofmt -s`, regenerates the Swagger spec (`build-docs`), then builds `bin/apiserver` |
 | `build-cmds` | depends on `build-api`; builds every `cmd/*` tool into `bin/` (see list below) |
-| `build-web` | `frontend-conf`, `npm ci --include=dev`, `landing-assets`, then build into `web/build.next` (`GENERATE_SOURCEMAP=false` and a 1024MB Node heap: no `.map` files ship, and building the swagger-ui chunk OOMs the prod host's default half-of-1GB heap — it needs the box's swap), prettier, the landing/app HTML swap (below), then swap `build.next` → `build`. `--include=dev` because npm reads `NODE_ENV=production` as `--omit=dev`, which would skip `react-scripts` and `sass` and break the build. `npm ci` (not `npm install`) so the deployed bundle is built from exactly the lockfile the CI `npm audit` gate certifies, and so the install fails loudly instead of re-resolving. It reinstalls the whole dependency tree every run (a few seconds), so a deploy needs the network — as does the Go side for any modules new since the last deploy (the go-swagger toolchain included) |
+| `build-web` | `frontend-conf`, `npm ci --include=dev`, `landing-assets`, then a Vite build into `web/build.next` (`--outDir`, plus a 1024MB Node heap: building the swagger-ui chunk OOMs the prod host's default half-of-1GB heap — it needs the box's swap; `build.sourcemap: false` in `web/vite.config.js` keeps `.map` files out of the shipped bundle), prettier, the landing/app HTML swap (below), then swap `build.next` → `build`. `--include=dev` because npm reads `NODE_ENV=production` as `--omit=dev`, which would skip `vite` and `sass` and break the build. `npm ci` (not `npm install`) so the deployed bundle is built from exactly the lockfile the CI `npm audit` gate certifies, and so the install fails loudly instead of re-resolving. It reinstalls the whole dependency tree every run (a few seconds), so a deploy needs the network — as does the Go side for any modules new since the last deploy (the go-swagger toolchain included) |
 | `landing-assets` | compiles `web/src/landing.scss` → `web/public/landing.css` and copies the landing's woff2 files into `web/public/fonts/`; both outputs are generated and gitignored. The landing is plain HTML with no React, so it can reach neither the app's bundle nor its JS `@fontsource` imports and needs its own copies. `landing.scss` pulls in `styles.scss` with `@use`, so the two surfaces still compile from one token source |
 | `test` / `test-api` / `test-cmds` | `test` = `build-api` then both Go suites; `test-api` (`./server/api`) and `test-cmds` (`./cmd/...`) run one each without rebuilding, which is how the CI Go job invokes them after its own `build-api` step. Every suite needs the MySQL from `test_conf.json` |
 | `web-deps` | `npm ci` in `web/` — lockfile-exact, and fails if `package.json` and the lockfile have drifted |
-| `test-web` | `web-deps`, then the `web/src` jest suite in one pass (`CI=true`). This is exactly what the CI web job runs |
+| `test-web` | `web-deps`, then the `web/src` vitest suite in one pass (`npm test` = `vitest run`). This is exactly what the CI web job runs |
 | `test-bundle-secrets` | rebuilds the web bundle against a canary config and fails if a secret leaks into `web/build` (the CI scan) |
 | `test-nginx` | the front-door contract (`scripts/nginx_contract_test.sh`): stages `deploy/nginx/mikeymath.conf` itself — substituting only ports, cert paths, content roots and the API upstream, with a loud failure both for a renamed pattern and for an unsubstituted prod path — and curl-asserts the full serving contract from The front door above against a fixture build dir and a stub API upstream. Needs an nginx binary (`brew install nginx`; CI installs it from apt) |
 | `test-all` | `test` + `test-web` + `test-bundle-secrets` + `test-nginx` — full local CI parity |
@@ -175,9 +175,9 @@ Two build subtleties worth knowing:
   `$uri.html` and unknown paths are real 404s. The route list, its extension
   procedure, and the full serving contract live in The front door above.
 
-- **`build-web` never empties the live dir.** `react-scripts` wipes its output
+- **`build-web` never empties the live dir.** The bundler wipes its output
   dir at the start of every build; building in place left `web/build` a bare
-  directory listing for the whole install + webpack window while the old
+  directory listing for the whole install + bundle window while the old
   server kept serving it (#243). So it builds into `web/build.next` and swaps
   with two sub-millisecond renames; nginx opens files per request, so no
   reload is needed. Any failed step aborts the target before the swap runs, so
@@ -562,11 +562,10 @@ error, because at threshold 1 a missed match costs more than an inflated count.
 - `deploy/drop.sql` — destructive full-DB reset.
 - `Makefile` — all build/test/prod targets.
 - `scripts/nginx_contract_test.sh` — the front-door contract tests (`make test-nginx`).
-- `.github/workflows/test.yml` — CI: the Go suite against a real MySQL, the web jest suite, the
+- `.github/workflows/test.yml` — CI: the Go suite against a real MySQL, the web vitest suite, the
   nginx front-door contract, and the vulnerability gates (`govulncheck ./...`,
   `npm audit --omit=dev --audit-level=moderate`).
-  The npm gate is scoped to production deps: the dev-tree findings are react-scripts', unfixable
-  by any upgrade, and knowingly accepted until the CRA-to-Vite migration (#382) retires it.
+  The npm gate is scoped to production deps; the whole `web/` tree audits clean on Vite.
 - `.github/workflows/web-bundle-secrets.yml` — CI: the bundle secret scan.
 - `cmd/apiserver/main.go` — `main` runs `api.RunMigrations` on API startup.
 - `cmd/recompute_problem_type_bitmap/main.go`, `cmd/recompute_problem_difficulty/main.go` —

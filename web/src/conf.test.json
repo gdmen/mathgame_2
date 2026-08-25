@@ -1,0 +1,8 @@
+{
+  "api_host": "http://localhost:8080",
+  "event_reporting_interval": 500,
+  "auth0_audience": "test-audience",
+  "auth0_clientId": "test-client-id",
+  "auth0_domain": "test.auth0.local",
+  "debug_quickplay": false
+}

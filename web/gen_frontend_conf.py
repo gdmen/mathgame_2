@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Generate the frontend config from the backend conf.json.
 
-The React app (web/src/index.js, web/src/play.js) does require("./conf"), and
-Create React App inlines imported JSON *wholesale* into the public JS bundle.
+The React app (web/src/index.js, web/src/play.js) imports "./conf.json", and the
+bundler inlines imported JSON *wholesale* into the public JS bundle.
 The backend conf.json holds secrets (openai_api_key, youtube_api_key, mysql_pass,
 ntfy_topic, DB creds), so it must never be the file the frontend imports -- doing
 so publishes those secrets in the world-readable bundle. Instead we copy only the

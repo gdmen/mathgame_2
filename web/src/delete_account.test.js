@@ -9,8 +9,10 @@ import { SetSessionPin, GetSessionPin } from "./pin.js";
 // that stand between a stray tap and a deleted account are pinned here: the
 // confirm button stays disabled until a full PIN is entered, a rejected PIN
 // leaves the session intact, and only a 204 tears the session down.
-const mockLogout = jest.fn();
-jest.mock("@auth0/auth0-react", () => ({
+// vi.hoisted because the mock factory runs before this module's own bindings
+// are initialised.
+const mockLogout = vi.hoisted(() => vi.fn());
+vi.mock("@auth0/auth0-react", () => ({
   useAuth0: () => ({ logout: mockLogout }),
 }));
 
@@ -18,12 +20,12 @@ jest.mock("@auth0/auth0-react", () => ({
 // can't satisfy. Stand in a single input that reports the same thing the widget
 // reports (the concatenated value) so these tests exercise our state machine
 // rather than the widget's.
-jest.mock("react-pin-input", () => {
-  const mockReact = require("react");
+vi.mock("react-pin-input", async () => {
+  const { createElement } = await vi.importActual("react");
   return {
     __esModule: true,
     default: ({ onChange }) =>
-      mockReact.createElement("input", {
+      createElement("input", {
         className: "mock-pin",
         onChange: (e) => onChange(e.target.value),
       }),
@@ -91,7 +93,7 @@ describe("DeleteAccountView", () => {
   });
 
   it("surfaces a rejected PIN and leaves the session signed in", async () => {
-    global.fetch = jest.fn(() => Promise.resolve({ status: 403 }));
+    global.fetch = vi.fn(() => Promise.resolve({ status: 403 }));
     render(container);
     openModal(container);
     typePin(container, "9999");
@@ -110,7 +112,7 @@ describe("DeleteAccountView", () => {
   });
 
   it("clears the PIN session and logs out on a successful delete", async () => {
-    global.fetch = jest.fn(() => Promise.resolve({ status: 204 }));
+    global.fetch = vi.fn(() => Promise.resolve({ status: 204 }));
     render(container);
     openModal(container);
     typePin(container, "1234");
