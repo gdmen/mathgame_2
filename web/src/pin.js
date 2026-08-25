@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useRouteMatch } from "react-router-dom";
+import { matchPath, useLocation } from "react-router-dom";
 import PinInput from "react-pin-input";
 
 const pinSessionStorageName = "math-game-pin";
@@ -52,16 +52,18 @@ const ClearSessionPin = function () {
 // changes hands. Keying on the route alone would honour a session behind a
 // takeover that happened to intercept /settings.
 //
-// The router decides whether we are on a protected route, rather than this
-// comparing the URL itself. Those are not the same question: <Route exact
-// path="/settings"> also renders the settings page for "/settings/" and
+// The router's own matcher decides whether we are on a protected route, rather
+// than this comparing the URL itself. Those are not the same question:
+// <Route path="/settings"> also renders the settings page for "/settings/" and
 // "/SETTINGS", and a string compare called both of those unprotected — which
 // cleared the session on the one page it exists to protect, on every render,
-// and turned the gate into a redirect loop. Asking the same matcher the routes
-// use is what keeps the two answers from drifting apart again.
+// and turned the gate into a redirect loop. Asking matchPath is what keeps the
+// two answers from drifting apart again.
 const usePinSessionPolicy = (takeover = null) => {
-  const onProtectedRoute =
-    useRouteMatch({ path: PIN_PROTECTED_PATHS, exact: true }) != null;
+  const { pathname } = useLocation();
+  const onProtectedRoute = PIN_PROTECTED_PATHS.some(
+    (pattern) => matchPath(pattern, pathname) != null,
+  );
   const onProtectedSurface = takeover == null && onProtectedRoute;
   useEffect(() => {
     if (!onProtectedSurface) {

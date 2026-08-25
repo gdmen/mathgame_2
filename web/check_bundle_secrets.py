@@ -35,7 +35,9 @@ SECRET_PATTERNS = {
     "OpenAI key": r"sk-[A-Za-z0-9]{40,}",
     "Anthropic key": r"sk-ant-[A-Za-z0-9_-]{20,}",
     "Google API key": r"AIza[0-9A-Za-z_-]{35}",
-    "PEM private key": r"-----BEGIN [A-Z ]*PRIVATE KEY-----",
+    # The base64 body is required: crypto libraries carry the bare header as a
+    # format check, and matching on it alone flagged them as leaks.
+    "PEM private key": r"-----BEGIN [A-Z ]*PRIVATE KEY-----[^A-Za-z0-9+/]{0,8}[A-Za-z0-9+/]{40,}",
 }
 
 

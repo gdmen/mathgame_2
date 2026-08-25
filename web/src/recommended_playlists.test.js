@@ -1,6 +1,5 @@
-import React from "react";
-import ReactDOM from "react-dom";
-import { act } from "react-dom/test-utils";
+import React, { act } from "react";
+import { renderInto, unmountFrom } from "./test_dom.js";
 
 import { PlaylistsSettingsView, RECOMMENDED_PLAYLISTS } from "./settings.js";
 
@@ -67,7 +66,7 @@ const suggestionTitles = (container) =>
 
 const render = (container) =>
   act(async () => {
-    ReactDOM.render(
+    renderInto(
       <PlaylistsSettingsView token="t" apiUrl="/api/v1" user={{ id: 1 }} />,
       container,
     );
@@ -86,7 +85,7 @@ describe("recommended playlists", () => {
 
   afterEach(() => {
     act(() => {
-      ReactDOM.unmountComponentAtNode(container);
+      unmountFrom(container);
     });
     container.remove();
     delete global.fetch;

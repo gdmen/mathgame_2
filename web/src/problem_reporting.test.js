@@ -1,6 +1,5 @@
-import React from "react";
-import ReactDOM from "react-dom";
-import { act } from "react-dom/test-utils";
+import React, { act } from "react";
+import { renderInto, unmountFrom } from "./test_dom.js";
 
 import { ProblemView } from "./problem.js";
 
@@ -24,7 +23,7 @@ const LATEX = "<span>4 + 3</span>";
 
 const renderProblem = (container, reporter, gamestate = GAMESTATE) =>
   act(() => {
-    ReactDOM.render(
+    renderInto(
       <ProblemView
         gamestate={gamestate}
         latex={LATEX}
@@ -45,7 +44,7 @@ describe("ProblemView working_on_problem reporting", () => {
 
   afterEach(() => {
     act(() => {
-      ReactDOM.unmountComponentAtNode(container);
+      unmountFrom(container);
     });
     container.remove();
   });
@@ -60,7 +59,7 @@ describe("ProblemView working_on_problem reporting", () => {
     const reporter = makeReporter();
     renderProblem(container, reporter);
     act(() => {
-      ReactDOM.unmountComponentAtNode(container);
+      unmountFrom(container);
     });
     expect(reporter.events.has("working_on_problem")).toBe(false);
   });

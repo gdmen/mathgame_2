@@ -67,6 +67,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    setupFiles: ["./src/test_setup.js"],
     // src/conf.json is generated from the backend conf (gen_frontend_conf.py),
     // so it is gitignored and absent on a clean checkout. The suites that pull
     // in a module reading it get this fixture instead of whatever the machine

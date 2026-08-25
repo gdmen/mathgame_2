@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// TestWebRoutesNginxSync: every React route in the web/src/index.js Switch
-// must be matched by a shell-route location regex in the nginx front door,
+// TestWebRoutesNginxSync: every React route in the web/src/index.js route
+// table must be matched by a shell-route location regex in the nginx front door,
 // or its URL answers with a 404 status on any hard load in production (the
 // page still renders, so nothing visible flags it). The route list is
 // otherwise guarded only by comments; this is the merge gate.
@@ -33,7 +33,7 @@ func TestWebRoutesNginxSync(t *testing.T) {
 		t.Fatal("no shell-route locations found in mikeymath.conf; update this test alongside the config")
 	}
 
-	routeRe := regexp.MustCompile(`<Route exact path="([^"]+)"`)
+	routeRe := regexp.MustCompile(`<Route\s+path="([^"]+)"`)
 	routes := routeRe.FindAllStringSubmatch(string(indexJS), -1)
 	if len(routes) == 0 {
 		t.Fatal("no routes found in web/src/index.js; update this test alongside it")
@@ -43,6 +43,11 @@ func TestWebRoutesNginxSync(t *testing.T) {
 		route := m[1]
 		if route == "/" {
 			// The landing document, deliberately not the shell.
+			continue
+		}
+		if route == "*" {
+			// The catch-all renders the 404 page; the front door answers
+			// unknown paths with the shell as a 404 body, not a shell route.
 			continue
 		}
 		// A :param segment matches as any literal segment would.

@@ -1,7 +1,12 @@
-import React from "react";
-import ReactDOM from "react-dom";
-import { act } from "react-dom/test-utils";
-import { MemoryRouter, Route, useHistory } from "react-router-dom";
+import React, { act } from "react";
+import { renderInto, unmountFrom } from "./test_dom.js";
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 
 import {
   PIN_PROTECTED_PATHS,
@@ -48,13 +53,13 @@ describe("usePinSessionPolicy", () => {
 
   const Probe = ({ takeover = null }) => {
     usePinSessionPolicy(takeover);
-    const history = useHistory();
-    return <button onClick={() => history.push("/play")}>navigate away</button>;
+    const navigate = useNavigate();
+    return <button onClick={() => navigate("/play")}>navigate away</button>;
   };
 
   const renderAt = (pathname, takeover = null) =>
     act(() => {
-      ReactDOM.render(
+      renderInto(
         <MemoryRouter initialEntries={[pathname]}>
           <Probe takeover={takeover} />
         </MemoryRouter>,
@@ -70,7 +75,7 @@ describe("usePinSessionPolicy", () => {
 
   afterEach(() => {
     act(() => {
-      ReactDOM.unmountComponentAtNode(container);
+      unmountFrom(container);
     });
     container.remove();
   });
@@ -135,10 +140,10 @@ describe("usePinSessionPolicy", () => {
 
   // The generic form of the bug, so a second protected route inherits the
   // guard instead of needing its own cases. For every pattern in the list, the
-  // policy has to agree with what <Route exact path={pattern}> actually
-  // renders — including the URL shapes react-router matches loosely. Asserting
-  // the route matches too means this fails loudly if those defaults ever
-  // change, rather than passing for the wrong reason.
+  // policy has to agree with what <Route path={pattern}> actually renders —
+  // including the URL shapes react-router matches loosely. Asserting the route
+  // matches too means this fails loudly if those defaults ever change, rather
+  // than passing for the wrong reason.
   const variants = (p) => [p, p + "/", p.toUpperCase()];
 
   PIN_PROTECTED_PATHS.forEach((pattern) => {
@@ -146,24 +151,23 @@ describe("usePinSessionPolicy", () => {
       `${pattern} route and policy agree on %s`,
       (pathname) => {
         let routed = false;
+        const Probed = () => {
+          routed = true;
+          return null;
+        };
         const c = document.createElement("div");
         act(() => {
-          ReactDOM.render(
+          renderInto(
             <MemoryRouter initialEntries={[pathname]}>
-              <Route
-                exact
-                path={pattern}
-                render={() => {
-                  routed = true;
-                  return null;
-                }}
-              />
+              <Routes>
+                <Route path={pattern} element={<Probed />} />
+              </Routes>
             </MemoryRouter>,
             c,
           );
         });
         act(() => {
-          ReactDOM.unmountComponentAtNode(c);
+          unmountFrom(c);
         });
 
         renderAt(pathname);
@@ -181,7 +185,7 @@ describe("PinView", () => {
 
   const render = (props) =>
     act(() => {
-      ReactDOM.render(<PinView onValid={onValid} {...props} />, container);
+      renderInto(<PinView onValid={onValid} {...props} />, container);
     });
 
   beforeEach(() => {
@@ -193,7 +197,7 @@ describe("PinView", () => {
 
   afterEach(() => {
     act(() => {
-      ReactDOM.unmountComponentAtNode(container);
+      unmountFrom(container);
     });
     container.remove();
   });
@@ -276,31 +280,39 @@ describe("PinView", () => {
 
 describe("PinGateRoute wiring", () => {
   // PinView no longer navigates; the route does. Pinned here because the
-  // redirect is the half that has no other test.
-  it("hands the decoded redirect target to the route's own handler", () => {
+  // redirect is the half that has no other test. The param arrives decoded,
+  // which is why PinGateRoute hands it straight to window.location: a second
+  // decode throws on a target carrying a literal "%".
+  const paramFor = (pathname) => {
     const seen = [];
-    const Harness = () => (
-      <Route
-        exact
-        path="/pin/:redirect_pathname"
-        render={({ match }) => {
-          seen.push(decodeURIComponent(match.params.redirect_pathname));
-          return null;
-        }}
-      />
-    );
+    const Target = () => {
+      seen.push(useParams().redirect_pathname);
+      return null;
+    };
     const container = document.createElement("div");
     act(() => {
-      ReactDOM.render(
-        <MemoryRouter initialEntries={["/pin/%2Fsettings"]}>
-          <Harness />
+      renderInto(
+        <MemoryRouter initialEntries={[pathname]}>
+          <Routes>
+            <Route path="/pin/:redirect_pathname" element={<Target />} />
+          </Routes>
         </MemoryRouter>,
         container,
       );
     });
-    expect(seen).toEqual(["/settings"]);
     act(() => {
-      ReactDOM.unmountComponentAtNode(container);
+      unmountFrom(container);
     });
+    return seen;
+  };
+
+  it("hands the decoded redirect target to the route's own handler", () => {
+    expect(paramFor("/pin/" + encodeURIComponent("/settings"))).toEqual([
+      "/settings",
+    ]);
+  });
+
+  it("decodes a target carrying a literal percent exactly once", () => {
+    expect(paramFor("/pin/" + encodeURIComponent("/a%b"))).toEqual(["/a%b"]);
   });
 });
