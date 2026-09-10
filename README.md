@@ -6,6 +6,11 @@ doc is touched when its code changes, and `docs_sync_test` pins the `anchored` d
 constants. Create or refresh an area's doc with `/document-project-area <area>`; audit the
 registry's currency against the code with `/audit-project-areas`.
 
+For a whole-system map, see the architecture diagram:
+[docs/architecture.html](docs/architecture.html) (self-contained, open in a browser) or
+[docs/architecture.drawio](docs/architecture.drawio) (editable in draw.io). Regenerate both with
+`python3 scripts/gen_architecture_diagram.py`.
+
 | Area | Doc | Status |
 |------|-----|--------|
 | Problem generation & difficulty | [docs/problem-generation.md](docs/problem-generation.md) | ✅ |
